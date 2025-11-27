@@ -577,10 +577,11 @@ body.dark .lang-switcher button { background: rgba(30, 30, 35, 0.6); }
    FOOTER
 */
 .footer {
-    margin-top: 24px;
-    text-align: center;
-    opacity: 0.5; 
-    transition: opacity 0.2s ease;
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end; 
+    gap: 0;
 }
 
 .footer:hover {
@@ -596,16 +597,19 @@ body.dark .lang-switcher button { background: rgba(30, 30, 35, 0.6); }
     font-size: 0.75rem;
     font-weight: 500;
     font-family: 'Google', sans-serif;
-    padding: 6px 12px;
-    border-radius: 20px;
-    transition: background 0.2s;
+    padding: 4px 7px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    opacity: 0.5;
 }
 
 .github-link:hover {
-    background: rgba(0, 0, 0, 0.05); 
+    background: rgba(0, 0, 0, 0.05);
     color: var(--text);
+    opacity: 1;
 }
 
 body.dark .github-link:hover {
     background: rgba(255, 255, 255, 0.1);
+    opacity: 1;
 }
