@@ -1,0 +1,20 @@
+{
+  "name": "Lanpaper",
+  "short_name": "Lanpaper",
+  "start_url": "/admin",
+  "display": "standalone",
+  "background_color": "#fafbfc",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/static/icons/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

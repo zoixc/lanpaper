@@ -1,0 +1,34 @@
+{
+  "create_new_link": "Create new link",
+  "input_placeholder": "Link ID (letters, numbers, - or _)",
+  "create_btn": "Create",
+  "existing_links": "Links",
+  "no_links": "No links yet",
+  "no_image": "No image",
+  "copy_url": "Copy URL",
+  "set_image": "Upload",
+  "paste_url": "URL",
+  "select_server": "Server",
+  "remove": "Remove",
+  
+  "enter_image_url_title": "Paste from URL",
+  "select_server_title": "Select from Server",
+  "enter_image_url": "Image URL:",
+  
+  "invalid_id": "ID is required",
+  "invalid_id_chars": "Use a-z, 0-9, - or _",
+  "invalid_image": "Invalid file format",
+  
+  "upload_success": "Uploaded!",
+  "created_success": "Link created",
+  "deleted_success": "Link deleted",
+  "confirm_delete": "Delete this link?",
+  
+  "loading": "Loading...",
+  "server_empty": "Folder is empty",
+  "server_error": "Access error",
+  "copied": "Copied!",
+  
+  "modal_cancel": "Cancel",
+  "modal_ok": "OK"
+}

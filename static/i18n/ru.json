@@ -1,0 +1,34 @@
+{
+  "create_new_link": "Создать ссылку",
+  "input_placeholder": "ID ссылки (буквы, цифры, - или _)",
+  "create_btn": "Создать",
+  "existing_links": "Ссылки",
+  "no_links": "Список пуст",
+  "no_image": "Нет картинки",
+  "copy_url": "Копировать",
+  "set_image": "Загрузить",
+  "paste_url": "Ссылка",
+  "select_server": "Сервер",
+  "remove": "Удалить",
+  
+  "enter_image_url_title": "Вставить по ссылке",
+  "select_server_title": "Выбор с сервера",
+  "enter_image_url": "URL картинки:",
+  
+  "invalid_id": "Введите ID",
+  "invalid_id_chars": "Только a-z, 0-9, -, _",
+  "invalid_image": "Неверный формат",
+  
+  "upload_success": "Загружено!",
+  "created_success": "Создано",
+  "deleted_success": "Удалено",
+  "confirm_delete": "Удалить ссылку?",
+  
+  "loading": "Загрузка...",
+  "server_empty": "Папка пуста",
+  "server_error": "Ошибка доступа",
+  "copied": "Скопировано!",
+  
+  "modal_cancel": "Отмена",
+  "modal_ok": "ОК"
+}

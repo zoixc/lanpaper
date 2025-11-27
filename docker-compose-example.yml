@@ -1,0 +1,37 @@
+services:
+  lanpaper:
+    image: ptabi/lanpaper:latest
+    container_name: lanpaper
+    restart: unless-stopped
+    ports:
+      - "9350:8080"
+
+    environment:
+      - ADMIN_USER=admin
+      - ADMIN_PASS=password
+      - PORT=9350
+      
+      - MAX_UPLOAD_MB=200
+      - RATE_LIMIT=200
+      - MAX_IMAGES=100
+      
+      # Set path inside the container where your images will be mounted
+      - EXTERNAL_IMAGE_DIR=/app/gallery
+
+      # If true, disables authentication (not recommended for public servers)
+      - DISABLE_AUTH=true
+      - GOMEMLIMIT=15MiB 
+      - GOGC=50
+      
+      # Optinal proxy settings
+      - PROXY_TYPE=socks5
+      - PROXY_HOST=123.45.67.89
+      - PROXY_PORT=33186
+      - PROXY_USER=proxy_username
+      - PROXY_PASS=proxy_password
+
+    volumes:
+      # Example path mappings - adjust these paths as needed
+      - ./lanpaper/data:/app/data
+      - ./lanpaper/images:/app/static/images
+      - ./homepage/images:/app/gallery:ro

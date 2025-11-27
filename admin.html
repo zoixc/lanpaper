@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Lanpaper</title>
+  <!-- <link rel="icon" href="/static/icons/favicon.svg" type="image/svg+xml"> -->
+  <link rel="alternate icon" href="/static/icons/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#ffffff">
+</head>
+<body>
+  <!-- Background -->
+  <div class="network-bg"></div>
+
+  <div class="container">
+    <!-- Header -->
+    <header class="header-row">
+      <h1 data-title="Lanpaper">Lanpaper</h1>
+      <div class="controls">
+        <!-- Language -->
+        <div id="langSwitcher" class="lang-switcher">
+          <div class="lang-controls">
+            <img id="langIconLight" src="/static/icons/lang-light.png" class="lang-icon" alt="Language">
+            <img id="langIconDark" src="/static/icons/lang-dark.png" class="lang-icon" alt="Language">
+            <button id="langBtn" class="lang-btn" aria-expanded="false" aria-haspopup="listbox">
+              <span id="langLabel">EN</span>
+            </button>
+          </div>
+          <ul id="langList" class="lang-list" role="listbox" aria-label="Language selector"></ul>
+        </div>
+
+        <!-- View Toggle -->
+        <button id="viewToggle" class="theme-switcher" aria-label="Toggle view">
+           <img src="/static/icons/grid-dark.png" class="view-icon list-icon light-theme-icon" alt="List">
+           <img src="/static/icons/grid-light.png" class="view-icon list-icon dark-theme-icon" alt="List">
+           <img src="/static/icons/list-dark.png" class="view-icon grid-icon light-theme-icon active" alt="Grid">
+           <img src="/static/icons/list-light.png" class="view-icon grid-icon dark-theme-icon active" alt="Grid">
+        </button>
+
+        <!-- Theme Toggle -->
+        <button id="themeToggle" class="theme-switcher" aria-label="Toggle dark mode">
+          <img src="/static/icons/sun.png" alt="Dark" class="theme-icon active">
+          <img src="/static/icons/moon.png" alt="Light" class="theme-icon">
+        </button>
+      </div>
+    </header>
+
+    <!-- Create new link -->
+    <section class="section">
+      <h2 data-i18n="create_new_link">Create new link</h2>
+      <form class="create-card" id="createForm" onsubmit="return false;">
+        <div class="create-row">
+          <input type="text" id="newLinkId" class="input-field" 
+                 data-i18n-placeholder="input_placeholder" 
+                 placeholder="Link ID (letters, numbers, - or _)" 
+                 autocomplete="off" 
+                 pattern="[a-zA-Z0-9_-]+"
+                 aria-label="Link ID">
+        </div>
+        <button type="submit" id="createLinkBtn" class="btn btn--primary" data-i18n="create_btn">Create</button>
+      </form>
+    </section>
+
+    <!-- Existing links -->
+    <section class="section">
+      <h2 data-i18n="existing_links">Existing links</h2>
+      <div class="links-list" id="linksList">
+        <!-- JS will populate this -->
+      </div>
+      <div class="empty-state" id="emptyState" data-i18n="no_links">No links yet</div>
+    </section>
+        <footer class="footer">
+      <a href="https://github.com/zoixc/lanpaper" target="_blank" rel="noopener noreferrer" class="github-link">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+        </svg>
+        GitHub | 0.7.7
+      </a>
+    </footer>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Modal -->
+  <div id="modalOverlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h3 id="modalTitle" data-i18n="modal_default_title">Input</h3>
+      <div class="modal-body" id="modalBody">
+        <input type="text" id="modalInput" class="input-field" placeholder="https://...">
+        <div id="modalList" class="modal-list hidden"></div>
+      </div>
+      <div class="modal-actions">
+        <button id="modalCancelBtn" class="btn" data-i18n="modal_cancel">Cancel</button>
+        <button id="modalConfirmBtn" class="btn btn--primary" data-i18n="modal_ok">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Link Card Template -->
+  <template id="linkCardTemplate">
+    <article class="link-card" role="article">
+      <!-- Clickable Preview -->
+      <a class="preview-link" target="_blank" rel="noopener noreferrer" aria-label="Open image">
+        <div class="preview-wrapper">
+          <img class="preview" src="" alt="Preview" loading="lazy">
+          <div class="no-image" data-i18n="no_image">No image</div>
+        </div>
+      </a>
+
+      <div class="link-info">
+        <div class="link-id" aria-label="Link ID"></div>
+        <div class="link-meta" aria-label="File info"></div>
+        <div class="link-url-wrapper">
+          <button class="copy-url-btn" data-i18n="copy_url" aria-label="Copy URL">Copy URL</button>
+        </div>
+      </div>
+
+      <div class="actions-row">
+        <button class="btn btn--primary upload-file-btn" data-i18n="set_image" aria-label="Upload image">Upload</button>
+        <input type="file" class="file-input" 
+               accept="image/*,video/mp4,video/webm" 
+               style="display:none;" aria-label="Choose file">
+        <button class="btn btn--primary paste-url-btn" data-i18n="paste_url" aria-label="Paste image URL">URL</button>
+        <button class="btn btn--primary select-server-btn" data-i18n="select_server" aria-label="Select from server">Server</button>
+        <button class="btn btn--danger delete-btn" data-i18n="remove" aria-label="Delete link">Remove</button>
+      </div>
+    </article>
+  </template>
+
+  <script src="/static/js/app.js" defer></script>
+</body>
+</html>

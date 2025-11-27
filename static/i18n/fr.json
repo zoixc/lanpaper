@@ -1,0 +1,34 @@
+{
+  "create_new_link": "Nouveau lien",
+  "input_placeholder": "ID du lien (a-z, 0-9, -, _)",
+  "create_btn": "Créer",
+  "existing_links": "Liens",
+  "no_links": "Aucun lien",
+  "no_image": "Aucune image",
+  "copy_url": "Copier",
+  "set_image": "Importer",
+  "paste_url": "URL",
+  "select_server": "Serveur",
+  "remove": "Supprimer",
+  
+  "enter_image_url_title": "Coller l'URL",
+  "select_server_title": "Choisir sur le serveur",
+  "enter_image_url": "URL de l'image :",
+  
+  "invalid_id": "ID requis",
+  "invalid_id_chars": "Utilisez a-z, 0-9, -, _",
+  "invalid_image": "Format invalide",
+  
+  "upload_success": "Téléchargé !",
+  "created_success": "Créé",
+  "deleted_success": "Supprimé",
+  "confirm_delete": "Supprimer ce lien ?",
+  
+  "loading": "Chargement...",
+  "server_empty": "Dossier vide",
+  "server_error": "Erreur d'accès",
+  "copied": "Copié !",
+  
+  "modal_cancel": "Annuler",
+  "modal_ok": "OK"
+}

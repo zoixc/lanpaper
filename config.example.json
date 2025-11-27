@@ -1,0 +1,19 @@
+{
+  "port": "8080",
+  "username": "admin",
+  "password": "password",
+  "maxUploadMB": 200,
+  "maxImages": 20,
+  "rate": {
+    "public_per_min": 200,
+    "admin_per_min": 300,
+    "upload_per_min": 10,
+    "burst": 50
+  },
+  "externalImageDir": "./images",
+  "proxyType": "socks5",
+  "proxyHost": "123.45.67.89",
+  "proxyPort": "33186",
+  "proxyUsername": "proxy_username",
+  "proxyPassword": "proxy_password"
+}
