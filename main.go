@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -42,6 +43,9 @@ func main() {
 
 	// Routing
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+
+	// Health check endpoint
+	http.HandleFunc("/health", healthCheckHandler)
 
 	// Admin UI
 	http.HandleFunc("/admin", middleware.WithSecurity(handlers.Admin))
@@ -90,4 +94,21 @@ func main() {
 		log.Fatalf("Server failed: %v", err)
 	}
 	log.Println("Server stopped")
+}
+
+// healthCheckHandler provides a simple health check endpoint
+func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	
+	response := map[string]interface{}{
+		"status":  "ok",
+		"service": "lanpaper",
+		"time":    time.Now().Unix(),
+	}
+	
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("Error encoding health check response: %v", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+	}
 }
