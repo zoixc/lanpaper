@@ -104,4 +104,12 @@ func Load() {
 			Current.MaxImages = n
 		}
 	}
+
+	// Auto-disable auth if no credentials provided
+	if Current.Username == "" || Current.Password == "" {
+		if !Current.DisableAuth {
+			log.Println("Warning: No credentials provided (ADMIN_USER/ADMIN_PASS or username/password in config.json). Authentication is automatically disabled.")
+			Current.DisableAuth = true
+		}
+	}
 }
