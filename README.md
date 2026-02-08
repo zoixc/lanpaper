@@ -1,29 +1,52 @@
 # Lanpaper
 
-Сервис для управления обоями через веб-интерфейс с поддержкой загрузки изображений и видео.
+A web-based wallpaper management service with support for image and video uploads.
 
-## Возможности
+## Features
 
-- 📤 Загрузка изображений (JPEG, PNG, GIF, WebP, BMP, TIFF) и видео (MP4, WebM)
-- 🔗 Создание коротких ссылок для доступа к обоям
-- 🖼️ Автоматическая генерация превью
-- 🌐 Загрузка изображений по URL или из локальной директории
-- 🔒 Basic Auth для защиты админ-панели
-- ⚡ Rate limiting для защиты от злоупотреблений
-- 🐳 Docker поддержка
-- 🎯 Прокси поддержка для загрузки внешних изображений
+- Upload images (JPEG, PNG, GIF, WebP, BMP, TIFF) and videos (MP4, WebM)
+- Create short links for wallpaper access
+- Automatic thumbnail generation
+- Load images from URL or local server directory
+- Basic Auth for admin panel protection
+- Enhanced security (CSP, path traversal protection)
+- Rate limiting for abuse prevention
+- Docker support
+- Proxy support for external image downloads
+- Modular code architecture
 
-## Быстрый старт
+## What's New in v0.8.0
 
-### Docker Compose (рекомендуется)
+### Security Improvements
+- Strict Content Security Policy (no `unsafe-inline` for scripts)
+- Enhanced path traversal protection with absolute path validation
+- Additional security headers (X-XSS-Protection, Permissions-Policy)
+- File size validation before processing
+- Logging of security violations
 
-1. Скопируйте пример конфигурации:
+### Reliability
+- Graceful shutdown with 30-second timeout
+- HTTP server timeouts (Read: 30s, Write: 30s, Idle: 120s)
+- Improved error handling with contextual logging
+
+### Architecture
+- Refactored into modules: `config`, `handlers`, `middleware`, `storage`, `utils`
+- Reduced main.go from 900+ to 80 lines
+- Better code readability and maintainability
+
+See [CHANGELOG.md](CHANGELOG.md) for details
+
+## Quick Start
+
+### Docker Compose (Recommended)
+
+1. Copy example configuration:
 ```bash
 cp docker-compose-example.yml docker-compose.yml
 cp config.example.json config.json
 ```
 
-2. Отредактируйте `config.json` и установите логин/пароль:
+2. Edit `config.json` and set credentials:
 ```json
 {
   "port": "8080",
@@ -33,24 +56,36 @@ cp config.example.json config.json
 }
 ```
 
-3. Запустите:
+3. Start:
 ```bash
 docker-compose up -d
 ```
 
-4. Откройте http://localhost:8080/admin
+4. Open http://localhost:8080/admin
 
-### Локальная сборка
+### Docker (Simple Run)
+
+```bash
+docker run -d \
+  -p 8080:8080 \
+  -e ADMIN_USER=admin \
+  -e ADMIN_PASS=secret \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/static:/app/static \
+  ptabi/lanpaper:latest
+```
+
+### Local Build
 
 ```bash
 go mod download
-go build -o lanpaper main.go
+go build -o lanpaper .
 ./lanpaper
 ```
 
-## Конфигурация
+## Configuration
 
-### Через config.json
+### Via config.json
 
 ```json
 {
@@ -77,7 +112,7 @@ go build -o lanpaper main.go
 }
 ```
 
-### Через переменные окружения
+### Via Environment Variables
 
 ```bash
 export PORT=8080
@@ -89,7 +124,7 @@ export DISABLE_AUTH=false
 export RATE_LIMIT=50
 export EXTERNAL_IMAGE_DIR=/path/to/images
 
-# Proxy настройки
+# Proxy settings
 export PROXY_TYPE=http
 export PROXY_HOST=proxy.example.com
 export PROXY_PORT=8080
@@ -98,93 +133,141 @@ export PROXY_PASS=password
 export INSECURE_SKIP_VERIFY=false
 ```
 
+## Project Structure
+
+```
+lanpaper/
+├── main.go              # Entry point and routing
+├── config/
+│   └── config.go        # Application configuration
+├── handlers/
+│   ├── admin.go         # Admin API handlers
+│   ├── upload.go        # Upload handlers
+│   ├── public.go        # Public access
+│   └── common.go        # Common utilities
+├── middleware/
+│   ├── auth.go          # Authentication
+│   ├── security.go      # Security headers and CSP
+│   └── ratelimit.go     # Rate limiting
+├── storage/
+│   └── wallpaper.go     # Data storage
+└── utils/
+    └── validation.go    # Path validation
+```
+
 ## API Endpoints
 
-### Публичные
+### Public
 
-- `GET /{linkName}` - Получить изображение/видео по короткой ссылке
+- `GET /{linkName}` - Get image/video by short link
 
-### Админские (требуют Basic Auth)
+### Admin (requires Basic Auth)
 
-- `GET /admin` - Админ-панель
-- `GET /api/wallpapers` - Список всех обоев
-- `POST /api/link` - Создать новую ссылку
+- `GET /admin` - Admin panel
+- `GET /api/wallpapers` - List all wallpapers
+- `POST /api/link` - Create new link
   ```json
   {"linkName": "my-wallpaper"}
   ```
-- `DELETE /api/link/{linkName}` - Удалить ссылку
-- `POST /api/upload` - Загрузить изображение
-  - Form data: `file` (файл) или `url` (URL/путь), `linkName`
-- `GET /api/external-images` - Список локальных изображений
-- `GET /api/external-image-preview?path=...` - Превью локального изображения
+- `DELETE /api/link/{linkName}` - Delete link
+- `POST /api/upload` - Upload image
+  - Form data: `file` (file) or `url` (URL/path), `linkName`
+- `GET /api/external-images` - List local images
+- `GET /api/external-image-preview?path=...` - Preview local image
 
-## Использование
+## Usage
 
-### 1. Создайте ссылку
+### 1. Create Link
 
-В админ-панели создайте новую ссылку с именем, например: `sunset`
+In admin panel, create a new link with name, e.g.: `sunset`
 
-### 2. Загрузите изображение
+### 2. Upload Image
 
-Загрузите изображение для этой ссылки:
-- Через форму загрузки файла
-- По URL из интернета
-- Из локальной директории на сервере
+Upload an image for this link:
+- Via file upload form
+- By URL from internet
+- From local server directory
 
-### 3. Получите доступ
+### 3. Access
 
-Теперь изображение доступно по адресу: `http://your-server:8080/sunset`
+Image is now available at: `http://your-server:8080/sunset`
 
-## Автоматическая очистка
+## Automatic Cleanup
 
-Если установлен `maxImages`, старые изображения автоматически удаляются при превышении лимита (сохраняются только ссылки).
+If `maxImages` is set, old images are automatically deleted when limit is exceeded (links are preserved).
 
-## Безопасность
+## Security
 
-⚠️ **Важно**: Используйте HTTPS в production! Рекомендуется:
-- Запускать за reverse proxy (nginx/Caddy/Traefik)
-- Настроить TLS сертификаты
-- Использовать сильные пароли
-- Настроить rate limiting под вашу нагрузку
+### Implemented Protection
 
-## Docker volumes
+- Content Security Policy without `unsafe-inline`
+- X-Frame-Options: DENY
+- X-Content-Type-Options: nosniff
+- X-XSS-Protection
+- Path traversal protection
+- All user paths validated
+- Rate limiting
+- Basic Authentication
+- HTTP timeouts
 
-- `./data` - Метаданные о обоях (JSON)
-- `./static/images` - Загруженные изображения и превью
-- `./external/images` - Внешняя директория с изображениями (опционально)
+### Production Recommendations
 
-## Технологии
+**Important**: Use HTTPS in production! Recommended:
+- Run behind reverse proxy (nginx/Caddy/Traefik)
+- Configure TLS certificates
+- Use strong passwords (minimum 16 characters)
+- Configure rate limiting for your load
+- Regularly update Docker images
+- Monitor logs for suspicious activity
 
-- Go 1.21+
-- [github.com/nfnt/resize](https://github.com/nfnt/resize) - Ресайз изображений
-- [github.com/chai2010/webp](https://github.com/chai2010/webp) - WebP поддержка
-- [github.com/joho/godotenv](https://github.com/joho/godotenv) - .env файлы
+## Docker Volumes
 
-## Лицензия
+- `./data` - Wallpaper metadata (JSON)
+- `./static/images` - Uploaded images and previews
+- `./external/images` - External image directory (optional)
 
-MIT License - см. [LICENSE](LICENSE)
+## Technologies
 
-## Разработка
+- Go 1.25+
+- [github.com/nfnt/resize](https://github.com/nfnt/resize) - Image resizing
+- [github.com/chai2010/webp](https://github.com/chai2010/webp) - WebP support
+- [github.com/joho/godotenv](https://github.com/joho/godotenv) - .env files
+
+## Development
 
 ```bash
-# Запуск в dev режиме
+# Run in dev mode
 go run main.go
 
-# Сборка
-go build -o lanpaper main.go
+# Build
+go build -o lanpaper .
 
-# Docker сборка
+# Docker build
 docker build -t lanpaper .
 
-# Запуск тестов
+# Run tests
 go test ./...
 ```
 
-## TODO
+## License
 
-- [ ] Unit тесты
+MIT License - see [LICENSE](LICENSE)
+
+## Support
+
+- Issues: [GitHub Issues](https://github.com/zoixc/lanpaper/issues)
+- Discussions: [GitHub Discussions](https://github.com/zoixc/lanpaper/discussions)
+- Changelog: [CHANGELOG.md](CHANGELOG.md)
+
+## Roadmap
+
+- [ ] Unit tests
+- [ ] Integration tests
 - [ ] GitHub Actions CI/CD
-- [ ] TLS поддержка
-- [ ] Поддержка S3/облачных хранилищ
-- [ ] Bulk операции в API
-- [ ] Поиск по обоям
+- [ ] Built-in TLS support
+- [ ] S3/cloud storage support
+- [ ] Bulk API operations
+- [ ] Wallpaper search
+- [ ] Tags and categories
+- [ ] Per-user API rate limiting
+- [ ] Metrics and Prometheus support
