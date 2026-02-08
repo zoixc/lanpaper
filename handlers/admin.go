@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zoixc/lanpaper/config"
-	"github.com/zoixc/lanpaper/storage"
-	"github.com/zoixc/lanpaper/utils"
+	"lanpaper/config"
+	"lanpaper/storage"
+	"lanpaper/utils"
 )
 
 func Admin(w http.ResponseWriter, r *http.Request) {

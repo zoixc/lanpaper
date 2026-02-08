@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/zoixc/lanpaper/storage"
+	"lanpaper/storage"
 )
 
 func Public(w http.ResponseWriter, r *http.Request) {

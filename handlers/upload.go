@@ -22,9 +22,9 @@ import (
 
 	"github.com/chai2010/webp"
 	"github.com/nfnt/resize"
-	"github.com/zoixc/lanpaper/config"
-	"github.com/zoixc/lanpaper/storage"
-	"github.com/zoixc/lanpaper/utils"
+	"lanpaper/config"
+	"lanpaper/storage"
+	"lanpaper/utils"
 )
 
 var uploadSem chan struct{}

@@ -4,7 +4,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/zoixc/lanpaper/config"
+	"lanpaper/config"
 )
 
 func MaybeBasicAuth(next http.HandlerFunc) http.HandlerFunc {

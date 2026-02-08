@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/zoixc/lanpaper/config"
+	"lanpaper/config"
 )
 
 func WithSecurity(next http.HandlerFunc) http.HandlerFunc {

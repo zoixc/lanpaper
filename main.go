@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/zoixc/lanpaper/config"
-	"github.com/zoixc/lanpaper/handlers"
-	"github.com/zoixc/lanpaper/middleware"
-	"github.com/zoixc/lanpaper/storage"
+	"lanpaper/config"
+	"lanpaper/handlers"
+	"lanpaper/middleware"
+	"lanpaper/storage"
 
 	_ "golang.org/x/image/bmp"
 	_ "golang.org/x/image/tiff"
