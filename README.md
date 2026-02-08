@@ -8,7 +8,7 @@ A web-based wallpaper management service with support for image and video upload
 - Create short links for wallpaper access
 - Automatic thumbnail generation
 - Load images from URL or local server directory
-- Basic Auth for admin panel protection
+- Basic Auth for admin panel protection (auto-disabled if no credentials provided)
 - Enhanced security (CSP, path traversal protection)
 - Rate limiting for abuse prevention
 - Docker support
@@ -28,6 +28,10 @@ A web-based wallpaper management service with support for image and video upload
 - Graceful shutdown with 30-second timeout
 - HTTP server timeouts (Read: 30s, Write: 30s, Idle: 120s)
 - Improved error handling with contextual logging
+
+### Quality of Life
+- Authentication automatically disabled if `ADMIN_USER` and `ADMIN_PASS` are not set
+- No need to manually set `DISABLE_AUTH=true` for setups behind external auth
 
 ### Architecture
 - Refactored into modules: `config`, `handlers`, `middleware`, `storage`, `utils`
@@ -65,11 +69,22 @@ docker-compose up -d
 
 ### Docker (Simple Run)
 
+**With authentication:**
 ```bash
 docker run -d \
   -p 8080:8080 \
   -e ADMIN_USER=admin \
   -e ADMIN_PASS=secret \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/static:/app/static \
+  ptabi/lanpaper:latest
+```
+
+**Without authentication (behind external auth like Nginx):**
+```bash
+# Just omit ADMIN_USER and ADMIN_PASS - auth will be auto-disabled
+docker run -d \
+  -p 8080:8080 \
   -v $(pwd)/data:/app/data \
   -v $(pwd)/static:/app/static \
   ptabi/lanpaper:latest
@@ -84,6 +99,15 @@ go build -o lanpaper .
 ```
 
 ## Configuration
+
+### Authentication Behavior
+
+**Important**: Authentication is automatically disabled if no credentials are provided:
+- If `ADMIN_USER` and `ADMIN_PASS` environment variables are not set
+- OR if `username` and `password` are empty in `config.json`
+- You will see a warning in logs: `"Warning: No credentials provided. Authentication is automatically disabled."`
+
+This is useful when running behind external authentication (Nginx Proxy Manager, Authelia, etc.)
 
 ### Via config.json
 
@@ -116,11 +140,11 @@ go build -o lanpaper .
 
 ```bash
 export PORT=8080
-export ADMIN_USER=admin
-export ADMIN_PASS=secret
+export ADMIN_USER=admin           # Optional - auth disabled if not set
+export ADMIN_PASS=secret          # Optional - auth disabled if not set
 export MAX_UPLOAD_MB=50
 export MAX_IMAGES=100
-export DISABLE_AUTH=false
+export DISABLE_AUTH=false         # Optional - auto-set if no credentials
 export RATE_LIMIT=50
 export EXTERNAL_IMAGE_DIR=/path/to/images
 
@@ -159,9 +183,9 @@ lanpaper/
 
 ### Public
 
-- `GET /{linkName}` - Get image/video by short link
+- `GET /{linkName}` - Get image/video by short link (always public)
 
-### Admin (requires Basic Auth)
+### Admin (requires Basic Auth if credentials are set)
 
 - `GET /admin` - Admin panel
 - `GET /api/wallpapers` - List all wallpapers
@@ -192,6 +216,40 @@ Upload an image for this link:
 
 Image is now available at: `http://your-server:8080/sunset`
 
+## Behind Reverse Proxy
+
+### Example: Nginx Proxy Manager with External Auth
+
+If you're using external authentication (Nginx Proxy Manager, Authelia, etc.):
+
+1. **Don't set `ADMIN_USER`/`ADMIN_PASS`** - auth will be auto-disabled
+2. Configure your reverse proxy to:
+   - Protect `/admin` and `/api/*` with external auth
+   - Allow public access to `/{linkName}` (direct image links)
+
+**Nginx example:**
+```nginx
+location /admin {
+    auth_request /auth;  # Your external auth
+    proxy_pass http://lanpaper:8080;
+}
+
+location /api/ {
+    auth_request /auth;  # Your external auth
+    proxy_pass http://lanpaper:8080;
+}
+
+location / {
+    # Public access for direct image links
+    proxy_pass http://lanpaper:8080;
+}
+```
+
+This way:
+- Admin panel requires external authentication
+- Direct image links (e.g., `/sunset`) work without auth
+- No need to manage Basic Auth credentials in Lanpaper
+
 ## Automatic Cleanup
 
 If `maxImages` is set, old images are automatically deleted when limit is exceeded (links are preserved).
@@ -207,7 +265,7 @@ If `maxImages` is set, old images are automatically deleted when limit is exceed
 - Path traversal protection
 - All user paths validated
 - Rate limiting
-- Basic Authentication
+- Basic Authentication (optional)
 - HTTP timeouts
 
 ### Production Recommendations
@@ -215,7 +273,8 @@ If `maxImages` is set, old images are automatically deleted when limit is exceed
 **Important**: Use HTTPS in production! Recommended:
 - Run behind reverse proxy (nginx/Caddy/Traefik)
 - Configure TLS certificates
-- Use strong passwords (minimum 16 characters)
+- Use external authentication system for better security
+- If using built-in auth, use strong passwords (minimum 16 characters)
 - Configure rate limiting for your load
 - Regularly update Docker images
 - Monitor logs for suspicious activity
