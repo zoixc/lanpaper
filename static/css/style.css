@@ -17,8 +17,8 @@
     --text: #37352f;
     --text-muted: #9b9a97;
     --text-secondary: #64625d;
-    --border: #e9e9e7;
-    --border-hover: #d3d1cb;
+    --border: #e3e2df;        /* Brighter - was #e9e9e7 */
+    --border-hover: #cfcdc7;  /* Brighter - was #d3d1cb */
     --grid-line: rgba(55, 53, 47, 0.03);
     
     /* Buttons */
@@ -30,13 +30,13 @@
     --btn-danger-hover: #d94343;
 
     /* Effects */
-    --shadow-sm: 0 1px 3px rgba(15, 15, 15, 0.03), 0 1px 2px rgba(15, 15, 15, 0.05);
-    --shadow-md: 0 4px 8px rgba(15, 15, 15, 0.07), 0 2px 4px rgba(15, 15, 15, 0.05);
+    --shadow-sm: 0 1px 2px rgba(15, 15, 15, 0.04);  /* Softer */
+    --shadow-md: 0 2px 4px rgba(15, 15, 15, 0.06);  /* Softer */
     --shadow-focus: 0 0 0 3px rgba(45, 45, 45, 0.08);
     --radius: 8px;
     --radius-sm: 6px;
-    --gap: 12px;
-    --padding: 20px;
+    --gap: 10px;              /* Compact - was 12px */
+    --padding: 18px;          /* Compact - was 20px */
     
     /* Accent */
     --accent-gradient: linear-gradient(135deg, #e0d4ba 0%, #d4c5a9 40%, #c9b991 100%);
@@ -57,8 +57,8 @@ body.dark {
     --text: #e8e6e3;
     --text-muted: #9b9a97;
     --text-secondary: #c7c5c1;
-    --border: #2f2f2f;
-    --border-hover: #404040;
+    --border: #363636;        /* Brighter - was #2f2f2f */
+    --border-hover: #4a4a4a;  /* Brighter - was #404040 */
     --grid-line: rgba(255, 255, 255, 0.04);
     
     --btn-primary: #e8e6e3;
@@ -68,8 +68,8 @@ body.dark {
     --btn-danger: #eb5757;
     --btn-danger-hover: #ff6b6b;
 
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
-    --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);   /* Softer */
+    --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.25);  /* Softer */
     --shadow-focus: 0 0 0 3px rgba(232, 230, 227, 0.1);
     
     --accent-gradient: linear-gradient(135deg, #d4c5a9 0%, #c9b991 40%, #b8a476 100%);
@@ -190,15 +190,15 @@ body.dark .network-bg::after {
 }
 
 .section { 
-    padding: 24px;
-    margin-bottom: 16px;
+    padding: 20px;             /* Compact - was 24px */
+    margin-bottom: 12px;       /* Compact - was 16px */
 }
 
 .section h2 { 
     font-family: 'Google', sans-serif;
     font-size: 0.75rem;
     font-weight: 600;
-    margin-bottom: 18px;
+    margin-bottom: 14px;       /* Compact - was 18px */
     letter-spacing: 0.06em;
     color: var(--text-muted);
     text-transform: uppercase;
@@ -208,9 +208,9 @@ body.dark .network-bg::after {
    LAYOUT & HEADER
 */
 .container {
-    max-width: 1000px; /* Notion-like width */
+    max-width: 1000px;
     width: 100%;
-    padding: 32px 24px;
+    padding: 28px 24px;        /* Compact - was 32px */
     margin: 0 auto;
 }
 
@@ -218,8 +218,8 @@ body.dark .network-bg::after {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 28px;
-    padding: 18px 24px;
+    margin-bottom: 24px;       /* Compact - was 28px */
+    padding: 16px 22px;        /* Compact - was 18px 24px */
     position: relative;
     z-index: var(--z-header);
 }
@@ -408,8 +408,8 @@ body.dark .view-icon.light-theme-icon {
 */
 .link-card, .create-card {
     display: grid;
-    gap: 18px;
-    padding: 18px;
+    gap: 16px;                 /* Compact - was 18px */
+    padding: 16px;             /* Compact - was 18px */
     align-items: center;
 }
 
@@ -556,7 +556,7 @@ body.dark .view-icon.light-theme-icon {
 .links-list {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;                  /* Compact - was 10px */
 }
 
 .link-card {
@@ -564,7 +564,7 @@ body.dark .view-icon.light-theme-icon {
 }
 
 /*
-   LANGUAGE SWITCHER
+   LANGUAGE SWITCHER - FIXED ALIGNMENT & SHADOW
 */
 .lang-switcher {
     position: relative;
@@ -617,7 +617,8 @@ body.dark #langIconDark {
 .lang-switcher ul.lang-list {
     position: absolute;
     top: calc(100% + 4px);
-    left: 0;
+    left: 50%;                                    /* CENTERED */
+    transform: translateX(-50%);                  /* CENTERED */
     min-width: 100%;
     padding: 4px;
     list-style: none;
@@ -628,7 +629,7 @@ body.dark #langIconDark {
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-sm);                 /* SOFTER - was shadow-md */
 }
 
 .lang-switcher ul.lang-list.open {
@@ -650,8 +651,8 @@ body.dark #langIconDark {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-4px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
 /*
@@ -680,7 +681,7 @@ body.dark #langIconDark {
 }
 
 .modal {
-    padding: 28px;
+    padding: 24px;             /* Compact - was 28px */
     width: 90%;
     max-width: 540px;
     transform: scale(0.96);
@@ -693,14 +694,14 @@ body.dark #langIconDark {
 }
 
 .modal h3 {
-    margin-bottom: 20px;
+    margin-bottom: 18px;       /* Compact - was 20px */
     font-size: 1.125rem;
     font-weight: 600;
     color: var(--text);
 }
 
 .modal-body {
-    margin-bottom: 24px;
+    margin-bottom: 20px;       /* Compact - was 24px */
     max-height: 50vh;
     overflow-y: auto;
 }
@@ -832,14 +833,14 @@ body.dark #langIconDark {
 .links-list.grid-view {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 14px;
+    gap: 12px;                 /* Compact - was 14px */
 }
 
 .links-list.grid-view .link-card {
     display: flex;
     flex-direction: column;
-    padding: 16px;
-    gap: 10px;
+    padding: 14px;             /* Compact - was 16px */
+    gap: 8px;                  /* Compact - was 10px */
     height: 100%;
     text-align: center;
 }
@@ -888,7 +889,7 @@ body.dark #langIconDark {
     flex-direction: column;
     width: 100%;
     gap: 5px;
-    margin-top: 10px;
+    margin-top: 8px;           /* Compact - was 10px */
 }
 
 .links-list.grid-view .btn {
@@ -963,7 +964,7 @@ body.dark #langIconDark {
    FOOTER
 */
 .footer {
-    margin-top: 24px;
+    margin-top: 20px;          /* Compact - was 24px */
     display: flex;
     align-items: center;
     justify-content: flex-end;
