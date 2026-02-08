@@ -15,6 +15,12 @@ func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 		w.Header().Set("X-XSS-Protection", "1; mode=block")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+		
+		// Additional security headers
+		w.Header().Set("X-Download-Options", "noopen") // Prevent IE from opening downloads in the zone of the site
+		w.Header().Set("Cross-Origin-Resource-Policy", "same-origin") // CORP protection
+		w.Header().Set("Cross-Origin-Embedder-Policy", "require-corp") // COEP protection
+		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin") // COOP protection
 
 		// Improved CSP - removed unsafe-inline for scripts
 		w.Header().Set("Content-Security-Policy",
