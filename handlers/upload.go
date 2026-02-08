@@ -46,6 +46,14 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	maxBytes := int64(config.Current.MaxUploadMB) << 20
+
+	// Check Content-Length header BEFORE reading body (bomb protection)
+	if r.ContentLength > maxBytes {
+		log.Printf("Security: rejected upload with Content-Length %d (max: %d)", r.ContentLength, maxBytes)
+		http.Error(w, "File too large", http.StatusRequestEntityTooLarge)
+		return
+	}
+
 	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
 
 	if err := r.ParseMultipartForm(maxBytes); err != nil {
@@ -70,6 +78,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		ext     string
 		err     error
 		isVideo bool
+		fileData []byte // For magic bytes validation
 	)
 
 	urlStr := r.FormValue("url")
@@ -77,7 +86,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	// Upload logic
 	if urlStr != "" {
 		if strings.HasPrefix(urlStr, "http://") || strings.HasPrefix(urlStr, "https://") {
-			img, ext, err = downloadImage(r.Context(), urlStr)
+			img, ext, fileData, err = downloadImage(r.Context(), urlStr)
 		} else {
 			// Local files from server - enhanced path validation
 			if !utils.IsValidLocalPath(urlStr) {
@@ -122,7 +131,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				isVideo = true
 				err = nil
 			} else {
-				img, ext, err = loadLocalImage(absPath)
+				img, ext, fileData, err = loadLocalImage(absPath)
 			}
 		}
 
@@ -142,9 +151,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 		// Validate file size from header
 		if header.Size > maxBytes {
-			http.Error(w, "File too large", http.StatusBadRequest)
+			log.Printf("Security: rejected file %s with size %d (max: %d)", header.Filename, header.Size, maxBytes)
+			http.Error(w, "File too large", http.StatusRequestEntityTooLarge)
 			return
 		}
+
+		// Sanitize original filename for logging
+		safeFilename := utils.SanitizeFilename(header.Filename)
 
 		head := make([]byte, 512)
 		if _, err := file.Read(head); err != nil {
@@ -157,7 +170,16 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Detect content type
 		contentType := http.DetectContentType(head)
+		
+		// Validate MIME type
+		if !utils.IsAllowedMimeType(contentType) {
+			log.Printf("Security: rejected file %s with unsupported MIME type: %s", safeFilename, contentType)
+			http.Error(w, "Unsupported file type: "+contentType, http.StatusBadRequest)
+			return
+		}
+
 		allowed := map[string]string{
 			"image/jpeg": "jpg", "image/png": "png",
 			"image/gif": "gif", "image/webp": "webp",
@@ -171,17 +193,34 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				isVideo = true
 			}
 		} else {
-			log.Printf("Rejected unsupported content type: %s", contentType)
+			log.Printf("Security: rejected unsupported content type: %s", contentType)
 			http.Error(w, "Unsupported image format: "+contentType, http.StatusBadRequest)
+			return
+		}
+
+		// Magic bytes validation
+		if err := utils.ValidateFileType(head, ext); err != nil {
+			log.Printf("Security: magic bytes validation failed for %s: %v", safeFilename, err)
+			http.Error(w, "File content does not match file type", http.StatusBadRequest)
 			return
 		}
 
 		if !isVideo {
 			img, _, err = image.Decode(file)
 			if err != nil {
+				log.Printf("Image decode error for %s: %v", safeFilename, err)
 				http.Error(w, "Invalid image decode", http.StatusBadRequest)
 				return
 			}
+		}
+	}
+
+	// Additional magic bytes validation for loaded files
+	if len(fileData) > 0 && !isVideo {
+		if err := utils.ValidateFileType(fileData, ext); err != nil {
+			log.Printf("Security: magic bytes validation failed for link %s: %v", linkName, err)
+			http.Error(w, "File content does not match file type", http.StatusBadRequest)
+			return
 		}
 	}
 
@@ -334,27 +373,37 @@ func saveImage(img image.Image, format, path string) error {
 	}
 }
 
-func loadLocalImage(path string) (image.Image, string, error) {
+func loadLocalImage(path string) (image.Image, string, []byte, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, "", fmt.Errorf("file not found on server")
+		return nil, "", nil, fmt.Errorf("file not found on server")
 	}
 	defer f.Close()
 
+	// Read first 512 bytes for magic bytes validation
+	head := make([]byte, 512)
+	n, _ := f.Read(head)
+	head = head[:n]
+
+	// Seek back to start for decoding
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return nil, "", nil, err
+	}
+
 	img, format, err := image.Decode(f)
 	if err != nil {
-		return nil, "", err
+		return nil, "", nil, err
 	}
 	if format == "jpeg" {
 		format = "jpg"
 	}
-	return img, format, nil
+	return img, format, head, nil
 }
 
-func downloadImage(ctx context.Context, urlStr string) (image.Image, string, error) {
+func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []byte, error) {
 	parsedURL, err := url_.Parse(urlStr)
 	if err != nil || !parsedURL.IsAbs() || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
-		return nil, "", fmt.Errorf("invalid URL")
+		return nil, "", nil, fmt.Errorf("invalid URL")
 	}
 
 	transport := &http.Transport{
@@ -384,30 +433,36 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, err
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
 	if err != nil {
-		return nil, "", err
+		return nil, "", nil, err
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Lanpaper/1.0)")
 	req.Header.Set("Accept", "image/*,*/*;q=0.8")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, "", fmt.Errorf("network error: %v", err)
+		return nil, "", nil, fmt.Errorf("network error: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, "", fmt.Errorf("HTTP %d", resp.StatusCode)
+		return nil, "", nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	// Check Content-Length header if available
+	if resp.ContentLength > 0 && resp.ContentLength > int64(config.Current.MaxUploadMB)<<20 {
+		log.Printf("Security: rejected download with Content-Length %d (max: %d)", resp.ContentLength, int64(config.Current.MaxUploadMB)<<20)
+		return nil, "", nil, fmt.Errorf("file too large: %d bytes", resp.ContentLength)
 	}
 
 	limitReader := io.LimitReader(resp.Body, int64(config.Current.MaxUploadMB)<<20)
 	buf, err := io.ReadAll(limitReader)
 	if err != nil {
-		return nil, "", fmt.Errorf("read error: %v", err)
+		return nil, "", nil, fmt.Errorf("read error: %v", err)
 	}
 
 	img, _, err := image.Decode(bytes.NewReader(buf))
 	if err != nil {
-		return nil, "", fmt.Errorf("decode error")
+		return nil, "", nil, fmt.Errorf("decode error")
 	}
 
 	ext := "jpg"
@@ -420,5 +475,5 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, err
 			ext = "webp"
 		}
 	}
-	return img, ext, nil
+	return img, ext, buf, nil
 }
