@@ -332,9 +332,9 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(urlStr, "http://") || strings.HasPrefix(urlStr, "https://") {
 			img, ext, err = downloadImage(r.Context(), urlStr)
 		} else {
-			// Local files from server
-			cleanRelPath := filepath.Clean(urlStr)
-			if strings.HasPrefix(cleanRelPath, "..") || strings.HasPrefix(cleanRelPath, "/") || strings.HasPrefix(cleanRelPath, "\\") {
+			// Local files from server - enhanced path validation
+			if !isValidLocalPath(urlStr) {
+				log.Printf("Security: blocked invalid path attempt: %s", urlStr)
 				http.Error(w, "Invalid path", http.StatusBadRequest)
 				return
 			}
@@ -344,8 +344,30 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 				baseDir = "external/images"
 			}
 
-			localPath := filepath.Join(baseDir, cleanRelPath)
-			ext = strings.ToLower(filepath.Ext(localPath))
+			// Resolve to absolute path and validate
+			absBase, err := filepath.Abs(baseDir)
+			if err != nil {
+				log.Printf("Error resolving base directory: %v", err)
+				http.Error(w, "Server configuration error", http.StatusInternalServerError)
+				return
+			}
+
+			localPath := filepath.Join(absBase, filepath.Clean(urlStr))
+			absPath, err := filepath.Abs(localPath)
+			if err != nil {
+				log.Printf("Error resolving file path: %v", err)
+				http.Error(w, "Invalid path", http.StatusBadRequest)
+				return
+			}
+
+			// Ensure path is within base directory
+			if !strings.HasPrefix(absPath, absBase) {
+				log.Printf("Security: blocked path traversal attempt: %s -> %s", urlStr, absPath)
+				http.Error(w, "Path outside allowed directory", http.StatusForbidden)
+				return
+			}
+
+			ext = strings.ToLower(filepath.Ext(absPath))
 			if len(ext) > 1 {
 				ext = ext[1:]
 			}
@@ -353,7 +375,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 				isVideo = true
 				err = nil
 			} else {
-				img, ext, err = loadLocalImage(localPath)
+				img, ext, err = loadLocalImage(absPath)
 			}
 		}
 
@@ -364,12 +386,18 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// Uploading from client
-		file, _, ferr := r.FormFile("file")
+		file, header, ferr := r.FormFile("file")
 		if ferr != nil {
 			http.Error(w, "No file provided", http.StatusBadRequest)
 			return
 		}
 		defer file.Close()
+
+		// Validate file size from header
+		if header.Size > maxBytes {
+			http.Error(w, "File too large", http.StatusBadRequest)
+			return
+		}
 
 		head := make([]byte, 512)
 		if _, err := file.Read(head); err != nil {
@@ -396,6 +424,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 				isVideo = true
 			}
 		} else {
+			log.Printf("Rejected unsupported content type: %s from %s", contentType, clientIP(r))
 			http.Error(w, "Unsupported image format: "+contentType, http.StatusBadRequest)
 			return
 		}
@@ -442,10 +471,14 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			out.Close()
 			file.Close()
 		} else if !strings.HasPrefix(urlStr, "http") {
-			srcPath := filepath.Join(cfg.ExternalImageDir, urlStr)
-			if cfg.ExternalImageDir == "" {
-				srcPath = filepath.Join("external/images", urlStr)
+			// Already validated path above
+			baseDir := cfg.ExternalImageDir
+			if baseDir == "" {
+				baseDir = "external/images"
 			}
+			absBase, _ := filepath.Abs(baseDir)
+			srcPath := filepath.Join(absBase, filepath.Clean(urlStr))
+			
 			in, err := os.Open(srcPath)
 			if err == nil {
 				out, err := os.Create(originalPath)
@@ -592,8 +625,9 @@ func externalImagePreviewHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cleanPath := filepath.Clean(pathParam)
-	if strings.Contains(cleanPath, "..") || strings.HasPrefix(cleanPath, "/") || strings.HasPrefix(cleanPath, "\\") {
+	// Enhanced path validation
+	if !isValidLocalPath(pathParam) {
+		log.Printf("Security: blocked invalid preview path: %s from %s", pathParam, clientIP(r))
 		http.Error(w, "Invalid path", http.StatusBadRequest)
 		return
 	}
@@ -602,13 +636,38 @@ func externalImagePreviewHandler(w http.ResponseWriter, r *http.Request) {
 	if root == "" {
 		root = "external/images"
 	}
-	fullPath := filepath.Join(root, cleanPath)
 
-	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+	// Resolve to absolute paths and validate
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		log.Printf("Error resolving root directory: %v", err)
+		http.Error(w, "Server configuration error", http.StatusInternalServerError)
+		return
+	}
+
+	fullPath := filepath.Join(absRoot, filepath.Clean(pathParam))
+	absPath, err := filepath.Abs(fullPath)
+	if err != nil {
+		log.Printf("Error resolving preview path: %v", err)
 		http.NotFound(w, r)
 		return
 	}
-	http.ServeFile(w, r, fullPath)
+
+	// Ensure path is within allowed directory
+	if !strings.HasPrefix(absPath, absRoot) {
+		log.Printf("Security: blocked path traversal in preview: %s -> %s from %s", pathParam, absPath, clientIP(r))
+		http.Error(w, "Path outside allowed directory", http.StatusForbidden)
+		return
+	}
+
+	if _, err := os.Stat(absPath); os.IsNotExist(err) {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Set security headers for served files
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	http.ServeFile(w, r, absPath)
 }
 
 func publicHandler(w http.ResponseWriter, r *http.Request) {
@@ -651,6 +710,7 @@ func publicHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	mime := "image/" + wp.MIMEType
 	if wp.MIMEType == "mp4" || wp.MIMEType == "webm" {
 		mime = "video/" + wp.MIMEType
@@ -667,21 +727,31 @@ func publicHandler(w http.ResponseWriter, r *http.Request) {
 
 func withSecurity(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Security headers
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+		
+		// Improved CSP - removed unsafe-inline for scripts
 		w.Header().Set("Content-Security-Policy",
 			"default-src 'none'; "+
-				"script-src 'self' 'unsafe-inline'; "+
+				"script-src 'self'; "+
 				"style-src 'self' 'unsafe-inline'; "+
-				"img-src 'self' https: data:; "+
-				"media-src 'self' https: data:; "+
+				"img-src 'self' https: data: blob:; "+
+				"media-src 'self' https: data: blob:; "+
 				"connect-src 'self'; "+
 				"font-src 'self'; "+
-				"manifest-src 'self';")
+				"manifest-src 'self'; "+
+				"form-action 'self'; "+
+				"base-uri 'self'; "+
+				"frame-ancestors 'none';")
 
 		ip := clientIP(r)
 		if !strings.HasPrefix(r.URL.Path, "/admin") && !strings.HasPrefix(r.URL.Path, "/api/") {
 			if isOverLimit(ip, cfg.Rate.PublicPerMin, cfg.Rate.Burst) {
+				log.Printf("Rate limit exceeded for IP: %s", ip)
 				http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 				return
 			}
@@ -701,6 +771,7 @@ func basicAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user, pass, ok := r.BasicAuth()
 		if !ok || user != cfg.Username || pass != cfg.Password {
+			log.Printf("Failed authentication attempt from %s", clientIP(r))
 			w.Header().Set("WWW-Authenticate", `Basic realm="Admin"`)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -710,6 +781,33 @@ func basicAuth(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // HELPERS
+
+// isValidLocalPath validates that a path doesn't contain dangerous patterns
+func isValidLocalPath(path string) bool {
+	// Check for null bytes
+	if strings.Contains(path, "\x00") {
+		return false
+	}
+	
+	cleanPath := filepath.Clean(path)
+	
+	// Reject absolute paths
+	if filepath.IsAbs(cleanPath) {
+		return false
+	}
+	
+	// Reject paths trying to escape (..)
+	if strings.HasPrefix(cleanPath, "..") || strings.Contains(cleanPath, "/..") {
+		return false
+	}
+	
+	// Reject UNC paths on Windows
+	if strings.HasPrefix(cleanPath, "\\\\") {
+		return false
+	}
+	
+	return true
+}
 
 func loadConfig() {
 	cfg = Config{
