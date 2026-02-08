@@ -123,8 +123,11 @@ func (s *Store) Load() error {
 	return nil
 }
 
+// PruneOldImages removes oldest images when exceeding max count
+// Fixed race condition: now saves data before releasing lock
 func PruneOldImages(max int) {
 	Global.Lock()
+	defer Global.Unlock()
 
 	var candidates []*Wallpaper
 	for _, wp := range Global.wallpapers {
@@ -134,7 +137,6 @@ func PruneOldImages(max int) {
 	}
 
 	if len(candidates) <= max {
-		Global.Unlock()
 		return
 	}
 
@@ -147,6 +149,7 @@ func PruneOldImages(max int) {
 		wp := candidates[i]
 		log.Printf("Pruning old image: %s", wp.ID)
 
+		// Remove physical files
 		if err := os.Remove(wp.ImagePath); err != nil && !os.IsNotExist(err) {
 			log.Printf("Error pruning image %s: %v", wp.ImagePath, err)
 		}
@@ -156,6 +159,7 @@ func PruneOldImages(max int) {
 			}
 		}
 
+		// Update metadata
 		wp.HasImage = false
 		wp.ImageURL = ""
 		wp.Preview = ""
@@ -165,8 +169,13 @@ func PruneOldImages(max int) {
 		wp.PreviewPath = ""
 	}
 
-	Global.Unlock()
-	if err := Global.Save(); err != nil {
+	// Save while still holding the lock to prevent race condition
+	data, err := json.MarshalIndent(Global.wallpapers, "", "  ")
+	if err != nil {
+		log.Printf("Error marshaling wallpapers after pruning: %v", err)
+		return
+	}
+	if err := os.WriteFile("data/wallpapers.json", data, 0644); err != nil {
 		log.Printf("Error saving wallpapers after pruning: %v", err)
 	}
 }
