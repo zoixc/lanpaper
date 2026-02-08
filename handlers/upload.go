@@ -36,6 +36,54 @@ func InitUploadSemaphore(maxConcurrent int) {
 	uploadSem = make(chan struct{}, maxConcurrent)
 }
 
+// copyVideoFile copies video from source to destination path
+func copyVideoFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open source: %w", err)
+	}
+	defer func() {
+		if cerr := in.Close(); cerr != nil {
+			log.Printf("Error closing source file %s: %v", src, cerr)
+		}
+	}()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("failed to create destination: %w", err)
+	}
+	defer func() {
+		if cerr := out.Close(); cerr != nil {
+			log.Printf("Error closing destination file %s: %v", dst, cerr)
+		}
+	}()
+
+	if _, err := io.Copy(out, in); err != nil {
+		return fmt.Errorf("failed to copy data: %w", err)
+	}
+
+	return nil
+}
+
+// copyVideoFromReader copies video from io.Reader to destination path
+func copyVideoFromReader(r io.Reader, dst string) error {
+	out, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("failed to create destination: %w", err)
+	}
+	defer func() {
+		if cerr := out.Close(); cerr != nil {
+			log.Printf("Error closing destination file %s: %v", dst, cerr)
+		}
+	}()
+
+	if _, err := io.Copy(out, r); err != nil {
+		return fmt.Errorf("failed to copy data: %w", err)
+	}
+
+	return nil
+}
+
 func Upload(w http.ResponseWriter, r *http.Request) {
 	select {
 	case uploadSem <- struct{}{}:
@@ -183,7 +231,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		allowed := map[string]string{
 			"image/jpeg": "jpg", "image/png": "png",
 			"image/gif": "gif", "image/webp": "webp",
-			"image/bmp": "bmp", "image/tiff": "tif",
+			"image/bmp": "bmp", "image/tiff": "tiff",
 			"video/mp4": "mp4", "video/webm": "webm",
 		}
 
@@ -239,25 +287,23 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	previewPath := filepath.Join("static", "images", "previews", linkName+".webp")
 
 	if isVideo {
-		// Copy video file
+		// Copy video file using refactored function
 		if urlStr == "" {
+			// From uploaded form file
 			file, _, _ := r.FormFile("file")
 			if _, err := file.Seek(0, 0); err != nil {
 				log.Printf("Error seeking file for video copy: %v", err)
+				http.Error(w, "Failed to prepare video file", http.StatusInternalServerError)
+				return
 			}
-			out, err := os.Create(originalPath)
-			if err != nil {
-				log.Printf("Error creating video file %s: %v", originalPath, err)
+			if err := copyVideoFromReader(file, originalPath); err != nil {
+				log.Printf("Error copying uploaded video to %s: %v", originalPath, err)
 				http.Error(w, "Failed to save video", http.StatusInternalServerError)
 				return
 			}
-			if _, err := io.Copy(out, file); err != nil {
-				log.Printf("Error copying video: %v", err)
-			}
-			out.Close()
 			file.Close()
 		} else if !strings.HasPrefix(urlStr, "http") {
-			// Already validated path above
+			// From external directory (already validated path above)
 			baseDir := config.Current.ExternalImageDir
 			if baseDir == "" {
 				baseDir = "external/images"
@@ -265,20 +311,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			absBase, _ := filepath.Abs(baseDir)
 			srcPath := filepath.Join(absBase, filepath.Clean(urlStr))
 
-			in, err := os.Open(srcPath)
-			if err == nil {
-				out, err := os.Create(originalPath)
-				if err != nil {
-					log.Printf("Error creating video file %s: %v", originalPath, err)
-				} else {
-					if _, err := io.Copy(out, in); err != nil {
-						log.Printf("Error copying video from external: %v", err)
-					}
-					out.Close()
-				}
-				in.Close()
-			} else {
-				log.Printf("Error opening external video %s: %v", srcPath, err)
+			if err := copyVideoFile(srcPath, originalPath); err != nil {
+				log.Printf("Error copying external video %s to %s: %v", srcPath, originalPath, err)
+				http.Error(w, "Failed to copy video from external source", http.StatusInternalServerError)
+				return
 			}
 		}
 		previewPath = "/static/icons/video-placeholder.png"
@@ -294,10 +330,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		thumb := resize.Thumbnail(200, 160, img, resize.Bilinear)
 		if err := saveImage(thumb, "webp", previewPath); err != nil {
 			log.Printf("Error saving preview %s: %v", previewPath, err)
-			if err := os.Remove(originalPath); err != nil {
-				log.Printf("Error removing original after preview fail: %v", err)
+			// Clean up the original image on preview failure
+			if removeErr := os.Remove(originalPath); removeErr != nil && !os.IsNotExist(removeErr) {
+				log.Printf("Error removing original after preview fail: %v", removeErr)
 			}
-			http.Error(w, "Preview failed", http.StatusInternalServerError)
+			http.Error(w, "Preview generation failed", http.StatusInternalServerError)
 			return
 		}
 		previewPath = "/static/images/previews/" + linkName + ".webp"
@@ -357,7 +394,11 @@ func saveImage(img image.Image, format, path string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create image file: %w", err)
 	}
-	defer out.Close()
+	defer func() {
+		if cerr := out.Close(); cerr != nil {
+			log.Printf("Error closing file %s: %v", path, cerr)
+		}
+	}()
 
 	switch format {
 	case "jpg", "jpeg":
@@ -378,7 +419,11 @@ func loadLocalImage(path string) (image.Image, string, []byte, error) {
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("file not found on server")
 	}
-	defer f.Close()
+	defer func() {
+		if cerr := f.Close(); cerr != nil {
+			log.Printf("Error closing file %s: %v", path, cerr)
+		}
+	}()
 
 	// Read first 512 bytes for magic bytes validation
 	head := make([]byte, 512)
@@ -406,6 +451,10 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 		return nil, "", nil, fmt.Errorf("invalid URL")
 	}
 
+	// Add timeout to context for download operation
+	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Current.InsecureSkipVerify},
 		DialContext: (&net.Dialer{
@@ -428,7 +477,7 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 
 	client := &http.Client{
 		Transport: transport,
-		Timeout:   60 * time.Second,
+		Timeout:   90 * time.Second,
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
