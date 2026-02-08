@@ -16,12 +16,14 @@ import (
 	"net/http"
 	url_ "net/url"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/chai2010/webp"
@@ -121,7 +123,7 @@ func main() {
 	dirs := []string{"static/images", "static/images/previews", "data", "external/images"}
 	for _, d := range dirs {
 		if err := os.MkdirAll(d, 0755); err != nil {
-			log.Fatal("Failed to create dir:", err)
+			log.Fatalf("Failed to create directory %s: %v", d, err)
 		}
 	}
 
@@ -151,13 +153,39 @@ func main() {
 	// Public Access
 	http.HandleFunc("/", withSecurity(publicHandler))
 
-	// Start
+	// Start server with graceful shutdown
 	port := cfg.Port
 	if !strings.HasPrefix(port, ":") {
 		port = ":" + port
 	}
+
+	server := &http.Server{
+		Addr:         port,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+
+	// Graceful shutdown
+	go func() {
+		sigint := make(chan os.Signal, 1)
+		signal.Notify(sigint, os.Interrupt, syscall.SIGTERM)
+		<-sigint
+
+		log.Println("Shutting down server...")
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		if err := server.Shutdown(ctx); err != nil {
+			log.Printf("Server shutdown error: %v", err)
+		}
+	}()
+
 	log.Printf("Lanpaper server running on %s (max upload %d MB)", port, cfg.MaxUploadMB)
-	log.Fatal(http.ListenAndServe(port, nil))
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("Server failed: %v", err)
+	}
+	log.Println("Server stopped")
 }
 
 // HANDLERS
@@ -193,7 +221,9 @@ func wallpapersHandler(w http.ResponseWriter, r *http.Request) {
 	})
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(wallpapers)
+	if err := json.NewEncoder(w).Encode(wallpapers); err != nil {
+		log.Printf("Error encoding wallpapers response: %v", err)
+	}
 }
 
 func linkHandler(w http.ResponseWriter, r *http.Request) {
@@ -221,7 +251,9 @@ func linkHandler(w http.ResponseWriter, r *http.Request) {
 			CreatedAt: time.Now().Unix(),
 		}
 		store.Unlock()
-		saveWallpapers()
+		if err := saveWallpapers(); err != nil {
+			log.Printf("Error saving wallpapers after link creation: %v", err)
+		}
 		log.Printf("Created link: %s", req.LinkName)
 		w.WriteHeader(http.StatusCreated)
 
@@ -235,13 +267,19 @@ func linkHandler(w http.ResponseWriter, r *http.Request) {
 		wp, exists := store.wallpapers[linkName]
 		if exists {
 			if wp.HasImage {
-				os.Remove(wp.ImagePath)
-				os.Remove(wp.PreviewPath)
+				if err := os.Remove(wp.ImagePath); err != nil && !os.IsNotExist(err) {
+					log.Printf("Error removing image %s: %v", wp.ImagePath, err)
+				}
+				if err := os.Remove(wp.PreviewPath); err != nil && !os.IsNotExist(err) {
+					log.Printf("Error removing preview %s: %v", wp.PreviewPath, err)
+				}
 			}
 			delete(store.wallpapers, linkName)
 		}
 		store.Unlock()
-		saveWallpapers()
+		if err := saveWallpapers(); err != nil {
+			log.Printf("Error saving wallpapers after link deletion: %v", err)
+		}
 		w.WriteHeader(http.StatusOK)
 
 	default:
@@ -320,7 +358,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err != nil {
-			log.Printf("Image load error: %v", err)
+			log.Printf("Image load error for link %s: %v", linkName, err)
 			http.Error(w, "Failed to load image: "+err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -338,7 +376,11 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Read error", http.StatusBadRequest)
 			return
 		}
-		_, _ = file.Seek(0, io.SeekStart)
+		if _, err := file.Seek(0, io.SeekStart); err != nil {
+			log.Printf("Error seeking file: %v", err)
+			http.Error(w, "File seek error", http.StatusInternalServerError)
+			return
+		}
 
 		contentType := http.DetectContentType(head)
 		allowed := map[string]string{
@@ -369,8 +411,12 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Remove old image
 	if oldWp != nil && oldWp.HasImage {
-		os.Remove(oldWp.ImagePath)
-		os.Remove(oldWp.PreviewPath)
+		if err := os.Remove(oldWp.ImagePath); err != nil && !os.IsNotExist(err) {
+			log.Printf("Error removing old image %s: %v", oldWp.ImagePath, err)
+		}
+		if err := os.Remove(oldWp.PreviewPath); err != nil && !os.IsNotExist(err) {
+			log.Printf("Error removing old preview %s: %v", oldWp.PreviewPath, err)
+		}
 	}
 
 	// Save new image
@@ -381,9 +427,18 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		// Copy video file
 		if urlStr == "" {
 			file, _, _ := r.FormFile("file")
-			file.Seek(0, 0)
-			out, _ := os.Create(originalPath)
-			io.Copy(out, file)
+			if _, err := file.Seek(0, 0); err != nil {
+				log.Printf("Error seeking file for video copy: %v", err)
+			}
+			out, err := os.Create(originalPath)
+			if err != nil {
+				log.Printf("Error creating video file %s: %v", originalPath, err)
+				http.Error(w, "Failed to save video", http.StatusInternalServerError)
+				return
+			}
+			if _, err := io.Copy(out, file); err != nil {
+				log.Printf("Error copying video: %v", err)
+			}
 			out.Close()
 			file.Close()
 		} else if !strings.HasPrefix(urlStr, "http") {
@@ -393,10 +448,18 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			in, err := os.Open(srcPath)
 			if err == nil {
-				out, _ := os.Create(originalPath)
-				io.Copy(out, in)
-				out.Close()
+				out, err := os.Create(originalPath)
+				if err != nil {
+					log.Printf("Error creating video file %s: %v", originalPath, err)
+				} else {
+					if _, err := io.Copy(out, in); err != nil {
+						log.Printf("Error copying video from external: %v", err)
+					}
+					out.Close()
+				}
 				in.Close()
+			} else {
+				log.Printf("Error opening external video %s: %v", srcPath, err)
 			}
 		}
 		previewPath = "/static/icons/video-placeholder.png"
@@ -404,20 +467,30 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// Save & pic resize
 		if err := saveImage(img, ext, originalPath); err != nil {
+			log.Printf("Error saving image %s: %v", originalPath, err)
 			http.Error(w, "Save failed", http.StatusInternalServerError)
 			return
 		}
 
 		thumb := resize.Thumbnail(200, 160, img, resize.Bilinear)
 		if err := saveImage(thumb, "webp", previewPath); err != nil {
-			os.Remove(originalPath)
+			log.Printf("Error saving preview %s: %v", previewPath, err)
+			if err := os.Remove(originalPath); err != nil {
+				log.Printf("Error removing original after preview fail: %v", err)
+			}
 			http.Error(w, "Preview failed", http.StatusInternalServerError)
 			return
 		}
 		previewPath = "/static/images/previews/" + linkName + ".webp"
 	}
 
-	fi, _ := os.Stat(originalPath)
+	fi, err := os.Stat(originalPath)
+	if err != nil {
+		log.Printf("Error stating uploaded file %s: %v", originalPath, err)
+		http.Error(w, "Failed to stat file", http.StatusInternalServerError)
+		return
+	}
+
 	createdAt := time.Now().Unix()
 	if oldWp != nil {
 		createdAt = oldWp.CreatedAt
@@ -446,7 +519,10 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	store.Lock()
 	store.wallpapers[linkName] = wp
 	store.Unlock()
-	saveWallpapers()
+	
+	if err := saveWallpapers(); err != nil {
+		log.Printf("Error saving wallpapers after upload: %v", err)
+	}
 
 	if cfg.MaxImages > 0 {
 		go func() { pruneOldImages(cfg.MaxImages) }()
@@ -454,7 +530,9 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Uploaded: %s (%s, %d KB)", linkName, ext, fi.Size()/1024)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(wp)
+	if err := json.NewEncoder(w).Encode(wp); err != nil {
+		log.Printf("Error encoding upload response: %v", err)
+	}
 }
 
 func externalImagesHandler(w http.ResponseWriter, r *http.Request) {
@@ -469,7 +547,7 @@ func externalImagesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var files []string
-	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -494,11 +572,17 @@ func externalImagesHandler(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 
+	if err != nil {
+		log.Printf("Error walking external images directory: %v", err)
+	}
+
 	if files == nil {
 		files = []string{}
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(files)
+	if err := json.NewEncoder(w).Encode(files); err != nil {
+		log.Printf("Error encoding external images response: %v", err)
+	}
 }
 
 func externalImagePreviewHandler(w http.ResponseWriter, r *http.Request) {
@@ -642,7 +726,9 @@ func loadConfig() {
 	}
 
 	if data, err := os.ReadFile("config.json"); err == nil {
-		json.Unmarshal(data, &cfg)
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			log.Printf("Warning: failed to parse config.json: %v", err)
+		}
 	}
 
 	override := func(target *string, keys ...string) {
@@ -665,7 +751,7 @@ func loadConfig() {
 	override(&cfg.ExternalImageDir, "EXTERNAL_IMAGE_DIR", "IMAGE_FOLDER")
 
 	if v := os.Getenv("MAX_UPLOAD_MB"); v != "" {
-		if n, _ := strconv.Atoi(v); n > 0 {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			cfg.MaxUploadMB = n
 		}
 	}
@@ -673,7 +759,7 @@ func loadConfig() {
 		cfg.InsecureSkipVerify = true
 	}
 	if v := os.Getenv("RATE_LIMIT"); v != "" {
-		if n, _ := strconv.Atoi(v); n > 0 {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			cfg.Rate.PublicPerMin = n
 			cfg.Rate.AdminPerMin = n
 			cfg.Rate.UploadPerMin = n
@@ -683,7 +769,7 @@ func loadConfig() {
 		cfg.DisableAuth = true
 	}
 	if v := os.Getenv("MAX_IMAGES"); v != "" {
-		if n, _ := strconv.Atoi(v); n > 0 {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			cfg.MaxImages = n
 		}
 	}
@@ -692,8 +778,14 @@ func loadConfig() {
 func saveWallpapers() error {
 	store.RLock()
 	defer store.RUnlock()
-	data, _ := json.MarshalIndent(store.wallpapers, "", "  ")
-	return os.WriteFile("data/wallpapers.json", data, 0644)
+	data, err := json.MarshalIndent(store.wallpapers, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal wallpapers: %w", err)
+	}
+	if err := os.WriteFile("data/wallpapers.json", data, 0644); err != nil {
+		return fmt.Errorf("failed to write wallpapers.json: %w", err)
+	}
+	return nil
 }
 
 func loadWallpapers() error {
@@ -731,7 +823,7 @@ func loadWallpapers() error {
 func saveImage(img image.Image, format, path string) error {
 	out, err := os.Create(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create image file: %w", err)
 	}
 	defer out.Close()
 
@@ -863,9 +955,13 @@ func pruneOldImages(max int) {
 		wp := candidates[i]
 		log.Printf("Pruning old image: %s", wp.ID)
 
-		os.Remove(wp.ImagePath)
+		if err := os.Remove(wp.ImagePath); err != nil && !os.IsNotExist(err) {
+			log.Printf("Error pruning image %s: %v", wp.ImagePath, err)
+		}
 		if wp.PreviewPath != "" && !strings.HasPrefix(wp.PreviewPath, "/static/") {
-			os.Remove(wp.PreviewPath)
+			if err := os.Remove(wp.PreviewPath); err != nil && !os.IsNotExist(err) {
+				log.Printf("Error pruning preview %s: %v", wp.PreviewPath, err)
+			}
 		}
 
 		wp.HasImage = false
@@ -878,7 +974,9 @@ func pruneOldImages(max int) {
 	}
 
 	store.Unlock()
-	saveWallpapers()
+	if err := saveWallpapers(); err != nil {
+		log.Printf("Error saving wallpapers after pruning: %v", err)
+	}
 }
 
 func clientIP(r *http.Request) string {
