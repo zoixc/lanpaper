@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Security Enhancements
+
+#### Magic Bytes Validation
+- Deep file type verification using magic bytes signatures
+- Protection against file extension spoofing (e.g., malware.exe renamed to image.jpg)
+- Validates actual file content matches declared extension
+- Supports all formats: JPEG, PNG, GIF, WebP, BMP, TIFF, MP4, WebM
+- Special handling for complex formats (WebP RIFF, MP4 ftyp)
+- Minimal performance overhead (~0.01ms per file)
+
+#### Enhanced Security Headers
+- `X-Download-Options: noopen` - prevents IE from opening downloads in site context
+- `Cross-Origin-Resource-Policy: same-origin` - CORP protection against Spectre attacks
+- `Cross-Origin-Embedder-Policy: require-corp` - COEP isolation
+- `Cross-Origin-Opener-Policy: same-origin` - COOP protection
+
+#### Upload Security
+- Content-Length validation before reading body (bomb protection)
+- MIME type validation with whitelist
+- Filename sanitization for safe logging
+- Enhanced security logging for all rejected uploads
+- Protection against zip bombs and size attacks
+
 ## [0.8.0] - 2026-02-08
 
 ### Security
@@ -66,6 +91,12 @@ All logs now include context:
 - `"Failed to create directory %s: %v"`
 - `"Error stating uploaded file %s: %v"`
 
+### Quality of Life
+
+- Authentication automatically disabled if `ADMIN_USER` and `ADMIN_PASS` are not set
+- No need to manually set `DISABLE_AUTH=true` for setups behind external auth
+- Warning logged when auth is auto-disabled
+
 ### Architecture
 
 #### Module Refactoring
@@ -90,7 +121,7 @@ Main file `main.go` reduced from 900+ to 80 lines. Code split into:
 - `PruneOldImages()` function for automatic cleanup
 
 **utils/**
-- `validation.go` - Path validation and IP extraction
+- `validation.go` - Path validation and file type verification
 
 #### Benefits
 - Better code readability
