@@ -21,9 +21,9 @@
     --border-hover: #cfcdc7;
     --grid-line: rgba(55, 53, 47, 0.03);
     
-    /* Buttons */
-    --btn-primary: #2d2d2d;
-    --btn-primary-hover: #1f1f1f;
+    /* Buttons - Softer contrast for light mode */
+    --btn-primary: #5a5a5a;
+    --btn-primary-hover: #404040;
     --btn-secondary: #f1f1ef;
     --btn-secondary-hover: #e9e9e7;
     --btn-danger: #eb5757;
@@ -32,16 +32,19 @@
     /* Effects */
     --shadow-sm: 0 1px 2px rgba(15, 15, 15, 0.04);
     --shadow-md: 0 2px 4px rgba(15, 15, 15, 0.06);
-    --shadow-focus: 0 0 0 3px rgba(45, 45, 45, 0.08);
+    --shadow-focus: 0 0 0 3px rgba(90, 90, 90, 0.08);
     --radius: 8px;
     --radius-sm: 6px;
-    --gap: 12px;              /* Unified section gap */
-    --padding: 16px;          /* Smaller internal padding */
+    --gap: 12px;
+    --padding: 16px;
     
     /* Accent */
     --accent-gradient: linear-gradient(135deg, #e0d4ba 0%, #d4c5a9 40%, #c9b991 100%);
     --card-bg: #ffffff;
     --card-hover: #fafaf9;
+
+    /* Logo */
+    --logo-color: #2d2d2d;
 
     /* Z-Index */
     --z-toast: 9999;
@@ -75,6 +78,9 @@ body.dark {
     --accent-gradient: linear-gradient(135deg, #d4c5a9 0%, #c9b991 40%, #b8a476 100%);
     --card-bg: #232323;
     --card-hover: #2a2a2a;
+
+    /* Logo color for dark mode */
+    --logo-color: #e8e6e3;
 }
 
 /*
@@ -190,15 +196,15 @@ body.dark .network-bg::after {
 }
 
 .section { 
-    padding: var(--padding);      /* 16px - compact */
-    margin-bottom: var(--gap);    /* 12px - unified */
+    padding: var(--padding);
+    margin-bottom: var(--gap);
 }
 
 .section h2 { 
     font-family: 'Google', sans-serif;
     font-size: 0.75rem;
     font-weight: 600;
-    margin-bottom: 12px;          /* Smaller than before */
+    margin-bottom: 12px;
     letter-spacing: 0.06em;
     color: var(--text-muted);
     text-transform: uppercase;
@@ -218,10 +224,26 @@ body.dark .network-bg::after {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: var(--gap);    /* 12px - unified with sections */
+    margin-bottom: var(--gap);
     padding: 16px 22px;
     position: relative;
     z-index: var(--z-header);
+}
+
+/* Logo styling with dynamic color */
+.logo-wrapper {
+    display: flex;
+    align-items: center;
+}
+
+.logo {
+    color: var(--logo-color);
+    transition: color 0.3s ease, opacity 0.2s ease;
+    opacity: 0.9;
+}
+
+.logo:hover {
+    opacity: 1;
 }
 
 h1 {
@@ -286,6 +308,7 @@ h1::before {
     border-color: var(--border);
 }
 
+/* Icon animations */
 .theme-icon, .view-icon {
     position: absolute;
     top: 50%;
@@ -293,15 +316,29 @@ h1::before {
     transform: translate(-50%, -50%);
     width: 18px;
     height: 18px;
-    transition: opacity 0.2s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: opacity 0.3s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), rotate 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
     opacity: 0;
     pointer-events: none;
 }
 
 .theme-icon.active, .view-icon.active {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
     pointer-events: auto;
+}
+
+/* Rotating animation for theme toggle */
+#themeToggle .theme-icon:not(.active) {
+    transform: translate(-50%, -50%) scale(0.5) rotate(-180deg);
+}
+
+/* Flip animation for view toggle */
+#viewToggle .view-icon:not(.active) {
+    transform: translate(-50%, -50%) scale(0.8) rotateY(90deg);
+}
+
+#viewToggle .view-icon.active {
+    transform: translate(-50%, -50%) scale(1) rotateY(0deg);
 }
 
 body:not(.dark) .view-icon.dark-theme-icon,
