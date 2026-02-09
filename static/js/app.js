@@ -82,6 +82,12 @@ function applyTheme() {
         themeColorMeta.content = STATE.isDark ? '#191919' : '#ffffff';
     }
     
+    // Update logo based on theme
+    const logo = document.querySelector('.logo');
+    if (logo) {
+        logo.src = STATE.isDark ? '/static/logo-dark.svg' : '/static/logo.svg';
+    }
+    
     const icons = DOM.themeBtn.querySelectorAll('.theme-icon');
     icons.forEach(icon => icon.classList.remove('active'));
     
