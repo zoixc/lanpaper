@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- Rate limit logic in security middleware - now correctly blocks requests when limit exceeded
+- Docker healthcheck now uses dedicated `/health` endpoint instead of root path
+- Race condition in `PruneOldImages` - now saves data before releasing lock
+
 ### Security Enhancements
 
 #### Magic Bytes Validation
@@ -26,6 +31,23 @@ All notable changes to this project will be documented in this file.
 - Filename sanitization for safe logging
 - Enhanced security logging for all rejected uploads
 - Protection against zip bombs and size attacks
+
+### Testing
+- Added comprehensive unit tests for validation functions
+- Added unit tests for configuration validation
+- Benchmark tests for performance-critical functions
+- Test coverage for security-critical components
+
+### Documentation
+- Complete API documentation with examples (curl, Python, JavaScript, Shell)
+- Added security considerations and best practices
+- Updated README with latest features and configuration options
+
+### UI Improvements
+- Logo now adapts to theme (visible in both light and dark modes)
+- Softer button contrast in light theme
+- Smooth animations for theme and view toggle icons
+- Professional Notion-inspired design
 
 ## [0.8.0] - 2026-02-08
 
@@ -56,6 +78,7 @@ All notable changes to this project will be documented in this file.
 - File size check from header before processing
 - Content-type validation for uploaded files
 - Logging of rejected files
+- Link name validation with reserved names check
 
 #### Security Logging
 - `"Security: blocked invalid path attempt"`
@@ -83,6 +106,7 @@ All previously ignored errors (`_`) are now handled:
 - `os.Stat` - return HTTP 500 on errors
 - `io.Copy` - copy error logging
 - `file.Seek` - positioning error handling
+- Deferred file close with error checking
 
 #### Contextual Logging
 All logs now include context:
@@ -91,11 +115,27 @@ All logs now include context:
 - `"Failed to create directory %s: %v"`
 - `"Error stating uploaded file %s: %v"`
 
+### Features
+
+#### Health Check Endpoint
+- Added `/health` endpoint for monitoring
+- Returns JSON with status and timestamp
+- No authentication required
+- Docker healthcheck integration
+
+#### Video Upload Refactoring
+- Extracted video copy logic into separate functions
+- `copyVideoFile()` - copy from file system
+- `copyVideoFromReader()` - copy from HTTP stream
+- Improved error handling for video operations
+
 ### Quality of Life
 
 - Authentication automatically disabled if `ADMIN_USER` and `ADMIN_PASS` are not set
 - No need to manually set `DISABLE_AUTH=true` for setups behind external auth
 - Warning logged when auth is auto-disabled
+- Configuration validation with warnings for invalid values
+- Security warnings for weak passwords and InsecureSkipVerify
 
 ### Architecture
 
@@ -103,7 +143,7 @@ All logs now include context:
 Main file `main.go` reduced from 900+ to 80 lines. Code split into:
 
 **config/**
-- `config.go` - Configuration loading and storage
+- `config.go` - Configuration loading, validation, and storage
 
 **handlers/**
 - `admin.go` - Admin API (wallpapers, links, external images)
@@ -128,18 +168,21 @@ Main file `main.go` reduced from 900+ to 80 lines. Code split into:
 - Simplified testing
 - Isolated changes
 - Explicit dependencies via imports
+- Easier maintenance and debugging
 
 ### Documentation
 - Updated README.md with new features description
 - Added modular structure documentation
 - Improved security recommendations
 - Added this CHANGELOG
+- Examples for reverse proxy configuration
 
 ### Technical Improvements
 - Fixed all Go compiler warnings
 - Removed unused imports
 - Consistent code formatting
 - Correct module paths in imports
+- Unified TIFF extension handling
 
 ## [0.7.7] - 2024-XX-XX
 
