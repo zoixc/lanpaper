@@ -644,6 +644,10 @@ body.dark #langIconDark {
     min-width: 42px;
     height: 32px;
     transition: all 0.15s ease;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
 }
 
 .lang-switcher button:hover {
@@ -681,6 +685,10 @@ body.dark #langIconDark {
     font-size: 0.8125rem;
     color: var(--text);
     transition: all 0.1s;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
 }
 
 .lang-switcher ul.lang-list li:hover {
