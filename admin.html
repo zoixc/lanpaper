@@ -132,6 +132,17 @@
     </article>
   </template>
 
+  <!-- PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/sw.js')
+          .then(reg => console.log('[PWA] Service Worker registered'))
+          .catch(err => console.error('[PWA] SW registration failed:', err));
+      });
+    }
+  </script>
+
   <script src="/static/js/app.js" defer></script>
 </body>
 </html>
