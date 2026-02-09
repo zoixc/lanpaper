@@ -36,10 +36,11 @@ func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 				"base-uri 'self'; "+
 				"frame-ancestors 'none';")
 
+		// Rate limiting for public endpoints
 		ip := clientIP(r)
 		if !strings.HasPrefix(r.URL.Path, "/admin") && !strings.HasPrefix(r.URL.Path, "/api/") {
 			if isOverLimit(ip, config.Current.Rate.PublicPerMin, config.Current.Rate.Burst) {
-				next(w, r)
+				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 				return
 			}
 		}
