@@ -2,16 +2,16 @@
   <defs>
     <radialGradient id="dotGradient">
       <stop offset="0%" style="stop-color:#d4c5a9;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#b8a476;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#b8a476;stop-opacity:1" />
     </radialGradient>
   </defs>
   
-  <!-- Horizontal line (horizon) -->
-  <line x1="8" y1="23" x2="38" y2="23" stroke="#9b9a97" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Horizontal line (horizon) - thicker -->
+  <line x1="8" y1="23" x2="38" y2="23" stroke="#9b9a97" stroke-width="2.5" stroke-linecap="round"/>
   
-  <!-- Dot (network node) -->
-  <circle cx="23" cy="13" r="3" fill="url(#dotGradient)"/>
+  <!-- Dot (network node) - bigger -->
+  <circle cx="23" cy="13" r="4" fill="url(#dotGradient)"/>
   
-  <!-- Text LANPAPER -->
-  <text x="44" y="24" font-family="'Disket-Mono-Bold', monospace" font-size="11" fill="currentColor" font-weight="600">LANPAPER</text>
+  <!-- Text LANPAPER - bigger and bolder -->
+  <text x="44" y="25" font-family="'Disket-Mono-Bold', monospace" font-size="13" fill="#2d2d2d" font-weight="700">LANPAPER</text>
 </svg>
