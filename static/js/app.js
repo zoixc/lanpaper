@@ -76,6 +76,12 @@ function initTheme() {
 function applyTheme() {
     document.body.classList.toggle('dark', STATE.isDark);
     
+    // Update theme-color meta tag for PWA
+    const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeColorMeta) {
+        themeColorMeta.content = STATE.isDark ? '#191919' : '#ffffff';
+    }
+    
     const icons = DOM.themeBtn.querySelectorAll('.theme-icon');
     icons.forEach(icon => icon.classList.remove('active'));
     
