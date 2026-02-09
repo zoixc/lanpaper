@@ -214,7 +214,7 @@ body.dark .network-bg::after {
    LAYOUT & HEADER
 */
 .container {
-    max-width: 1000px;
+    max-width: 1400px;
     width: 100%;
     padding: 28px 24px;
     margin: 0 auto;
