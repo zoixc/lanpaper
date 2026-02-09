@@ -1,25 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40" fill="none">
-  <!-- Minimalist LP monogram with subtle grid reference -->
-  
-  <!-- Grid pattern (very subtle) -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40" width="120" height="40">
   <defs>
-    <pattern id="grid" width="8" height="8" patternUnits="userSpaceOnUse">
-      <path d="M 8 0 L 0 0 0 8" fill="none" stroke="currentColor" stroke-width="0.3" opacity="0.15"/>
-    </pattern>
+    <radialGradient id="dotGradient">
+      <stop offset="0%" style="stop-color:#d4c5a9;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#b8a476;stop-opacity:0.8" />
+    </radialGradient>
   </defs>
   
-  <!-- Background subtle grid -->
-  <rect width="120" height="40" fill="url(#grid)" opacity="0.3"/>
+  <!-- Horizontal line (horizon) -->
+  <line x1="8" y1="23" x2="38" y2="23" stroke="#9b9a97" stroke-width="1.5" stroke-linecap="round"/>
   
-  <!-- L -->
-  <path d="M 12 10 L 12 30 L 24 30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Dot (network node) -->
+  <circle cx="23" cy="13" r="3" fill="url(#dotGradient)"/>
   
-  <!-- P -->
-  <path d="M 30 30 L 30 10 L 38 10 C 41 10 43 12 43 15 C 43 18 41 20 38 20 L 30 20" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  
-  <!-- Divider -->
-  <line x1="52" y1="15" x2="52" y2="25" stroke="currentColor" stroke-width="1.5" opacity="0.3" stroke-linecap="round"/>
-  
-  <!-- Text: "lanpaper" -->
-  <text x="60" y="25" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" font-weight="500" fill="currentColor" opacity="0.85">lanpaper</text>
+  <!-- Text LANPAPER -->
+  <text x="44" y="24" font-family="'Disket-Mono-Bold', monospace" font-size="11" fill="currentColor" font-weight="600">LANPAPER</text>
 </svg>
