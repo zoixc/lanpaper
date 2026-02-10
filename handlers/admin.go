@@ -24,7 +24,7 @@ type WallpaperResponse struct {
 	Category    string `json:"category"`
 	HasImage    bool   `json:"hasImage"`
 	ImagePath   string `json:"imagePath"`
-	PreviewPath string `json:"previewPath"`
+	PreviewPath string `json:"previewPath,omitempty"`
 	CreatedAt   int64  `json:"createdAt"`
 }
 

@@ -487,30 +487,34 @@ function renderLinks(wallpapers) {
 }
 
 function updateCard(card, link) {
-    card.querySelector('.link-id').textContent = link.linkName || link.id;
+    const linkName = link.linkName || link.id;
+    card.querySelector('.link-id').textContent = linkName;
 
-    const fullUrl = `${window.location.origin}/${link.linkName || link.id}`;
-    const previewLink = card.querySelector('.preview-link');
-    previewLink.href = fullUrl;
+    const fullUrl = `${window.location.origin}/${linkName}`;
+    card.querySelector('.preview-link').href = fullUrl;
 
-    // Meta info
     card.querySelector('.link-meta').textContent = 
-        `${link.category || 'other'} · ${link.hasImage ? 'Has image' : 'No image'}`;
+        `${link.category || 'other'} · ${link.hasImage ? 'Image' : 'No image'}`;
 
-    // ✅ ПРЯМАЯ ПРОВЕРКА hasImage из Backend
     const previewWrapper = card.querySelector('.preview-wrapper');
-    previewWrapper.innerHTML = ''; 
-    
-    if (link.hasImage) {
-        // ✅ ПУТЬ К ПРЕВЬЮ ИЗ BACKEND
+    previewWrapper.innerHTML = '';
+
+    if (link.hasImage && link.previewPath) {
+        // ✅ Backend дал путь к превью
         const img = document.createElement('img');
-        img.src = `/static/images/previews/${link.linkName || link.id}.jpg?t=${Date.now()}`;
+        img.src = link.previewPath + `?t=${Date.now()}`;
         img.alt = "Preview";
-        img.loading = "lazy";
         img.className = "preview";
-        img.onerror = () => {  // ✅ Если превью нет
-            previewWrapper.innerHTML = '<div class="no-image">Preview not found</div>';
-        };
+        img.onerror = () => previewWrapper.innerHTML = '<div class="no-image">Preview unavailable</div>';
+        previewWrapper.appendChild(img);
+    } else if (link.hasImage) {
+        // ✅ Fallback — главная картинка
+        const img = document.createElement('img');
+        img.src = fullUrl;
+        img.alt = "Image";
+        img.className = "preview";
+        img.style.maxHeight = '200px';
+        img.onerror = () => previewWrapper.innerHTML = '<div class="no-image">Image unavailable</div>';
         previewWrapper.appendChild(img);
     } else {
         const noImg = document.createElement('div');
@@ -523,12 +527,11 @@ function updateCard(card, link) {
     const copyBtn = card.querySelector('.copy-url-btn');
     const newCopyBtn = copyBtn.cloneNode(true);
     copyBtn.parentNode.replaceChild(newCopyBtn, copyBtn);
-    
     newCopyBtn.onclick = (e) => {
         e.preventDefault();
         navigator.clipboard.writeText(fullUrl).then(() => {
-            newCopyBtn.classList.add('copied');
             newCopyBtn.textContent = 'Copied!';
+            newCopyBtn.classList.add('copied');
             setTimeout(() => {
                 newCopyBtn.classList.remove('copied');
                 newCopyBtn.textContent = 'Copy';

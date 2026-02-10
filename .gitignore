@@ -44,4 +44,4 @@ docker-compose.yml
 !docker-compose-example.yml
 
 # old
-style-ols.css
+style-old.css
