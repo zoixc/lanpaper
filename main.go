@@ -11,11 +11,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/joho/godotenv"
 	"lanpaper/config"
 	"lanpaper/handlers"
 	"lanpaper/middleware"
 	"lanpaper/storage"
+
+	"github.com/joho/godotenv"
 
 	_ "golang.org/x/image/bmp"
 	_ "golang.org/x/image/tiff"
@@ -59,7 +60,7 @@ func main() {
 	http.HandleFunc("/api/external-image-preview", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImagePreview)))
 
 	// Public Access
-	http.HandleFunc("/", middleware.WithSecurity(handlers.Public))
+	http.HandleFunc("/", handlers.Public)
 
 	// Start server with graceful shutdown
 	port := config.Current.Port
@@ -100,13 +101,13 @@ func main() {
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-	
+
 	response := map[string]interface{}{
 		"status":  "ok",
 		"service": "lanpaper",
 		"time":    time.Now().Unix(),
 	}
-	
+
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Error encoding health check response: %v", err)
 		http.Error(w, "Internal error", http.StatusInternalServerError)
