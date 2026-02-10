@@ -1009,7 +1009,7 @@ body.dark #langIconDark {
    FOOTER
 */
 .footer {
-    margin-top: 20px;
+    margin-top: 12px;
     display: flex;
     align-items: center;
     justify-content: flex-end;
