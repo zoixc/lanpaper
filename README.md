@@ -15,7 +15,7 @@ A web-based wallpaper management service with support for image and video upload
 - Proxy support for external image downloads
 - Modular code architecture
 
-## What's New in v0.8.0
+## What's New in v0.8.3
 
 ### Security Improvements
 - Strict Content Security Policy (no `unsafe-inline` for scripts)
