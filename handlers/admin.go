@@ -18,6 +18,16 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "admin.html")
 }
 
+type WallpaperResponse struct {
+	ID          string `json:"id"`
+	LinkName    string `json:"linkName"`
+	Category    string `json:"category"`
+	HasImage    bool   `json:"hasImage"`
+	ImagePath   string `json:"imagePath"`
+	PreviewPath string `json:"previewPath"`
+	CreatedAt   int64  `json:"createdAt"`
+}
+
 func Wallpapers(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -25,22 +35,53 @@ func Wallpapers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	wallpapers := storage.Global.GetAll()
+	var resp []WallpaperResponse
+	for _, wp := range wallpapers {
+		resp = append(resp, WallpaperResponse{
+			ID:          wp.ID,
+			LinkName:    wp.LinkName,
+			Category:    "other",
+			HasImage:    wp.HasImage,
+			ImagePath:   wp.ImagePath,
+			PreviewPath: wp.PreviewPath,
+			CreatedAt:   wp.CreatedAt,
+		})
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(wallpapers); err != nil {
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("Error encoding wallpapers response: %v", err)
 	}
+}
+
+func isValidCategory(cat string) bool {
+	valid := map[string]bool{
+		"tech":  true,
+		"life":  true,
+		"work":  true,
+		"other": true,
+	}
+	return valid[cat]
 }
 
 func Link(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
-		var req struct{ LinkName string }
+		var req struct {
+			LinkName string `json:"linkName"`
+			Category string `json:"category"`
+		}
+
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
 			return
 		}
 		if !isValidLinkName(req.LinkName) {
 			http.Error(w, "Invalid link name", http.StatusBadRequest)
+			return
+		}
+		if req.Category == "" || !isValidCategory(req.Category) {
+			http.Error(w, "Invalid category", http.StatusBadRequest)
 			return
 		}
 		if _, exists := storage.Global.Get(req.LinkName); exists {
@@ -59,7 +100,7 @@ func Link(w http.ResponseWriter, r *http.Request) {
 		if err := storage.Global.Save(); err != nil {
 			log.Printf("Error saving wallpapers after link creation: %v", err)
 		}
-		log.Printf("Created link: %s", req.LinkName)
+		log.Printf("Created link: %s (category: %s)", req.LinkName, req.Category)
 		w.WriteHeader(http.StatusCreated)
 
 	case http.MethodDelete:
@@ -89,6 +130,20 @@ func Link(w http.ResponseWriter, r *http.Request) {
 
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func Tags(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	tags := []string{"дизайн", "природа", "город", "абстракция", "минимализм", "темная тема"}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(tags); err != nil {
+		log.Printf("Error encoding tags: %v", err)
+		return
 	}
 }
 

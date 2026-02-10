@@ -65,6 +65,34 @@
       </form>
     </section>
 
+    <!-- 🔍 SEARCH + SORT BAR (НОВОЕ!) -->
+    <section class="section">
+      <div class="search-sort-bar">
+        <!-- Search -->
+        <div class="search-container">
+          <input 
+            type="text" 
+            id="searchInput" 
+            class="search-input"
+            placeholder="🔍 Search by link name or file..."
+            aria-label="Search wallpapers"
+          >
+          <div id="searchStats" class="search-stats"></div>
+        </div>
+
+        <!-- Sort -->
+        <div class="sort-container">
+          <label for="sortSelect" class="sort-label" data-i18n="sort_by">Sort by:</label>
+          <select id="sortSelect" class="sort-select">
+            <option value="name_asc" data-i18n="name_asc">Name (A-Z)</option>
+            <option value="name_desc" data-i18n="name_desc">Name (Z-A)</option>
+            <option value="date_desc" data-i18n="date_new">Newest first</option>
+            <option value="date_asc" data-i18n="date_old">Oldest first</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
     <!-- Existing links -->
     <section class="section">
       <h2 data-i18n="existing_links">Existing links</h2>
@@ -73,6 +101,7 @@
       </div>
       <div class="empty-state" id="emptyState" data-i18n="no_links">No links yet</div>
     </section>
+    
     <footer class="footer">
       <a href="https://github.com/zoixc/lanpaper" target="_blank" rel="noopener noreferrer" class="github-link">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

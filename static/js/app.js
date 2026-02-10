@@ -8,7 +8,11 @@ const STATE = {
     translations: {},
     lang: localStorage.getItem('lang') || navigator.language.slice(0, 2) || 'en',
     isDark: false,
-    viewMode: localStorage.getItem('viewMode') || 'list'
+    viewMode: localStorage.getItem('viewMode') || 'list',
+    searchQuery: '',
+    sortBy: 'date_desc',
+    wallpapers: [],
+    filteredWallpapers: [],
 };
 
 // DOM ELEMENTS
@@ -22,6 +26,9 @@ const DOM = {
     linksList: document.getElementById('linksList'),
     emptyState: document.getElementById('emptyState'),
     toastContainer: document.getElementById('toastContainer'),
+    searchInput: document.getElementById('searchInput'),
+    searchStats: document.getElementById('searchStats'),
+    sortSelect: document.getElementById('sortSelect'),
     
     // Modal Elements
     modalOverlay: document.getElementById('modalOverlay'),
@@ -45,6 +52,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initTheme();
     initLanguage();
     initView();
+    initSearchSort();
     await loadLinks();
     setupGlobalListeners();
 });
@@ -206,6 +214,84 @@ function t(key, defaultText) {
     return STATE.translations[key] || defaultText;
 }
 
+// ===== 🔍 SEARCH & SORT FUNCTIONS (НОВЫЕ) =====
+function initSearchSort() {
+    const searchInput = DOM.searchInput;
+    const sortSelect = DOM.sortSelect;
+    if (!searchInput || !sortSelect) return;
+
+    // Restore state
+    STATE.searchQuery = localStorage.getItem('searchQuery') || '';
+    STATE.sortBy = localStorage.getItem('sortBy') || 'date_desc';
+    searchInput.value = STATE.searchQuery;
+    sortSelect.value = STATE.sortBy;
+
+    // Search debounce
+    let timer;
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+            STATE.searchQuery = e.target.value.toLowerCase().trim();
+            localStorage.setItem('searchQuery', STATE.searchQuery);
+            filterAndSort();
+        }, 250);
+    });
+
+    // Sort change
+    sortSelect.addEventListener('change', (e) => {
+        STATE.sortBy = e.target.value;
+        localStorage.setItem('sortBy', STATE.sortBy);
+        filterAndSort();
+    });
+}
+
+function filterWallpapers() {
+    const query = STATE.searchQuery;
+    if (!query) {
+        STATE.filteredWallpapers = [...STATE.wallpapers];
+    } else {
+        STATE.filteredWallpapers = STATE.wallpapers.filter(wp => {
+            const linkName = (wp.linkName || '').toLowerCase();
+            const fileName = (wp.fileName || wp.linkName || '').toLowerCase();
+            return linkName.includes(query) || fileName.includes(query);
+        });
+    }
+}
+
+function sortWallpapers(list) {
+    const sorted = [...list];
+    switch (STATE.sortBy) {
+        case 'name_asc': 
+            sorted.sort((a, b) => a.linkName.localeCompare(b.linkName)); break;
+        case 'name_desc': 
+            sorted.sort((a, b) => b.linkName.localeCompare(a.linkName)); break;
+        case 'date_desc': 
+            sorted.sort((a, b) => (b.modTime || 0) - (a.modTime || 0)); break;
+        case 'date_asc': 
+            sorted.sort((a, b) => (a.modTime || 0) - (b.modTime || 0)); break;
+    }
+    return sorted;
+}
+
+function filterAndSort() {
+    filterWallpapers();
+    STATE.filteredWallpapers = sortWallpapers(STATE.filteredWallpapers);
+    updateSearchStats();
+    renderLinks(STATE.filteredWallpapers);
+}
+
+function updateSearchStats() {
+    const statsEl = DOM.searchStats;
+    if (!statsEl) return;
+    
+    const total = STATE.wallpapers.length;
+    const shown = STATE.filteredWallpapers.length;
+    
+    statsEl.textContent = STATE.searchQuery 
+        ? `Found ${shown} of ${total}` 
+        : `Total: ${total}`;
+}
+
 // NOTIFICATIONS (TOASTS)
 function showToast(message, type = 'success') {
     const toast = document.createElement('div');
@@ -360,17 +446,19 @@ async function apiCall(url, method = 'GET', body = null, isFormData = false) {
 // APP LOGIC
 async function loadLinks() {
     try {
-        const links = await apiCall(`/api/wallpapers?no_cache=${Date.now()}`);
-        renderLinks(links);
+        const wallpapers = await apiCall(`/api/wallpapers?no_cache=${Date.now()}`);
+        STATE.wallpapers = wallpapers;
+        filterAndSort();
     } catch (e) {
         console.error(e);
     }
 }
 
-function renderLinks(links) {
+
+function renderLinks(wallpapers) {
     DOM.linksList.innerHTML = '';
     
-    if (!links || links.length === 0) {
+    if (!wallpapers || wallpapers.length === 0) {
         DOM.emptyState.style.display = 'block';
         return;
     }
@@ -526,6 +614,8 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
         updateCard(card, updatedLink);
         reorderCard(card, updatedLink);
         showToast(t('upload_success', 'Uploaded!'), 'success');
+        filterAndSort();  // ← перерисовать с учетом поиска/сортировки
+        showToast(t('upload_success', 'Uploaded!'), 'success');
     } catch (e) {
         console.error(e);
     }
@@ -575,6 +665,8 @@ function setupGlobalListeners() {
 
             DOM.emptyState.style.display = 'none';
             DOM.linksList.appendChild(article); 
+            STATE.wallpapers.push(newLinkObj);
+            filterAndSort();  
             
             article.animate([
                 { opacity: 0, transform: 'translateY(10px)' },
