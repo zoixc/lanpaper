@@ -1041,3 +1041,80 @@ body.dark #langIconDark {
     background: var(--btn-secondary);
     color: var(--text);
 }
+
+/* 🔍 Search & Filters */
+.search-filter-container {
+    display: flex;
+    gap: 1rem;
+    margin: 2rem 0 1rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    flex-wrap: wrap;
+}
+
+#searchInput {
+    flex: 1;
+    min-width: 250px;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 1rem;
+    transition: all 0.2s;
+}
+
+#searchInput:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+#categoryFilter, #sortFilter {
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+#categoryFilter:focus, #sortFilter:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* 🏷️ Category badges */
+.post-item {
+    position: relative;
+}
+
+.category-badge {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.category-tech { background: #3b82f6; color: white; }
+.category-life { background: #10b981; color: white; }
+.category-work { background: #f59e0b; color: white; }
+.category-other { background: #6b7280; color: white; }
+
+/* 📱 Responsive */
+@media (max-width: 768px) {
+    .search-filter-container {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    #searchInput {
+        min-width: 100%;
+    }
+}

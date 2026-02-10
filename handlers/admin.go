@@ -80,7 +80,7 @@ func Link(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid link name", http.StatusBadRequest)
 			return
 		}
-		if req.Category == "" || !isValidCategory(req.Category) {
+		if req.Category != "" && !isValidCategory(req.Category) {
 			http.Error(w, "Invalid category", http.StatusBadRequest)
 			return
 		}

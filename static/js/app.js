@@ -251,9 +251,8 @@ function filterWallpapers() {
         STATE.filteredWallpapers = [...STATE.wallpapers];
     } else {
         STATE.filteredWallpapers = STATE.wallpapers.filter(wp => {
-            const linkName = (wp.linkName || '').toLowerCase();
-            const fileName = (wp.fileName || wp.linkName || '').toLowerCase();
-            return linkName.includes(query) || fileName.includes(query);
+            const name = (wp.linkName || wp.id || '').toLowerCase();
+            return name.includes(query);
         });
     }
 }
@@ -446,11 +445,18 @@ async function apiCall(url, method = 'GET', body = null, isFormData = false) {
 // APP LOGIC
 async function loadLinks() {
     try {
-        const wallpapers = await apiCall(`/api/wallpapers?no_cache=${Date.now()}`);
-        STATE.wallpapers = wallpapers;
+        console.log('🔄 Loading wallpapers...');  // ✅ ЛОГ
+        
+        const wallpapers = await apiCall('/api/wallpapers');  // ✅ УБРАЛ no_cache
+        console.log('📥 Loaded:', wallpapers);  // ✅ ЛОГ
+        
+        STATE.wallpapers = wallpapers || [];
         filterAndSort();
     } catch (e) {
-        console.error(e);
+        console.error('❌ LoadLinks error:', e);
+        showToast('Failed to load links', 'error');
+        STATE.wallpapers = [];
+        renderLinks([]);
     }
 }
 
@@ -466,7 +472,7 @@ function renderLinks(wallpapers) {
 
     const fragment = document.createDocumentFragment();
 
-    links.forEach(link => {
+    wallpapers.forEach(link => {
         const clone = DOM.template.content.cloneNode(true);
         const article = clone.querySelector('article');
         
@@ -481,56 +487,39 @@ function renderLinks(wallpapers) {
 }
 
 function updateCard(card, link) {
-    card.querySelector('.link-id').textContent = link.linkName;
+    card.querySelector('.link-id').textContent = link.linkName || link.id;
 
-    const fullUrl = `${window.location.origin}/${link.linkName}`;
-    
-    // Link the preview image
+    const fullUrl = `${window.location.origin}/${link.linkName || link.id}`;
     const previewLink = card.querySelector('.preview-link');
     previewLink.href = fullUrl;
 
     // Meta info
     card.querySelector('.link-meta').textContent = 
-        `${link.mimeType || '—'} · ${formatKB(link.sizeBytes)} · ${formatDate(link.modTime)}`;
+        `${link.category || 'other'} · ${link.hasImage ? 'Has image' : 'No image'}`;
 
-    // Preview Handler
+    // ✅ ПРЯМАЯ ПРОВЕРКА hasImage из Backend
     const previewWrapper = card.querySelector('.preview-wrapper');
     previewWrapper.innerHTML = ''; 
     
-    const noImg = document.createElement('div');
-    noImg.className = 'no-image';
-    noImg.setAttribute('data-i18n', 'no_image');
-    noImg.textContent = t('no_image', 'No image');
-    previewWrapper.appendChild(noImg);
-
     if (link.hasImage) {
-        const isVideo = link.mimeType === 'mp4' || link.mimeType === 'webm';
-        
-        if (isVideo) {
-            const video = document.createElement('video');
-            video.src = fullUrl;
-            video.muted = true;
-            video.loop = true;
-            video.playsInline = true;
-            video.className = 'preview';
-            video.addEventListener('mouseover', () => video.play());
-            video.addEventListener('mouseout', () => { video.pause(); video.currentTime = 0; });
-            previewWrapper.appendChild(video);
-        } else {
-            const img = document.createElement('img');
-            img.src = `${link.preview}?t=${link.modTime}`;
-            img.alt = "Preview";
-            img.loading = "lazy";
-            img.className = "preview";
-            previewWrapper.appendChild(img);
-        }
-        
-        noImg.style.display = 'none';
+        // ✅ ПУТЬ К ПРЕВЬЮ ИЗ BACKEND
+        const img = document.createElement('img');
+        img.src = `/static/images/previews/${link.linkName || link.id}.jpg?t=${Date.now()}`;
+        img.alt = "Preview";
+        img.loading = "lazy";
+        img.className = "preview";
+        img.onerror = () => {  // ✅ Если превью нет
+            previewWrapper.innerHTML = '<div class="no-image">Preview not found</div>';
+        };
+        previewWrapper.appendChild(img);
     } else {
-        noImg.style.display = 'flex';
+        const noImg = document.createElement('div');
+        noImg.className = 'no-image';
+        noImg.textContent = 'No image';
+        previewWrapper.appendChild(noImg);
     }
-    
-    // Copy Button with Translation
+
+    // Copy button
     const copyBtn = card.querySelector('.copy-url-btn');
     const newCopyBtn = copyBtn.cloneNode(true);
     copyBtn.parentNode.replaceChild(newCopyBtn, copyBtn);
@@ -539,13 +528,10 @@ function updateCard(card, link) {
         e.preventDefault();
         navigator.clipboard.writeText(fullUrl).then(() => {
             newCopyBtn.classList.add('copied');
-            const originalText = newCopyBtn.textContent;
-            // Copy button translation
-            newCopyBtn.textContent = t('copied', 'Copied!'); 
-            
+            newCopyBtn.textContent = 'Copied!';
             setTimeout(() => {
                 newCopyBtn.classList.remove('copied');
-                newCopyBtn.textContent = originalText;
+                newCopyBtn.textContent = 'Copy';
             }, 1500);
         });
     };
