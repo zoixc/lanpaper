@@ -1041,15 +1041,15 @@ body.dark #langIconDark {
 .search-stats {
     white-space: nowrap;
     padding: 0 10px;
-    height: 32px;
+    height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 0.8rem;
     font-weight: 500;
     color: var(--text-secondary);
-    background: var(--bg-secondary);
-    border-radius: 999px;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
     border: 1px solid var(--border);
 }
 
