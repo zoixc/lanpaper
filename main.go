@@ -22,7 +22,7 @@ import (
 	_ "golang.org/x/image/tiff"
 )
 
-const Version = "v0.8.7"
+var Version = "dev"
 
 func main() {
 	_ = godotenv.Load()
