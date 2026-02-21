@@ -31,6 +31,8 @@ config_test.go
 
 # IDEs
 .vscode/
+.old/
+./lanpaper
 .idea/
 *.swp
 *.swo
