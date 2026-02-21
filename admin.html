@@ -65,7 +65,7 @@
       </form>
     </section>
 
-    <!-- 🔍 SEARCH + SORT BAR (НОВОЕ!) -->
+    <!-- 🔍 SEARCH + SORT BAR -->
     <section class="section">
       <div class="search-sort-bar">
         <!-- Search -->
@@ -74,10 +74,16 @@
             type="text" 
             id="searchInput" 
             class="search-input"
+            data-i18n-placeholder="search_placeholder"
             placeholder="🔍 Search by link name or file..."
             aria-label="Search wallpapers"
           >
-          <div id="searchStats" class="search-stats"></div>
+          <div 
+            id="searchStats" 
+            class="search-stats"
+          >
+            Total: 0
+          </div>
         </div>
 
         <!-- Sort -->

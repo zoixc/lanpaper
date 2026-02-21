@@ -1,34 +1,44 @@
 {
-  "create_new_link": "Nouveau lien",
-  "input_placeholder": "ID du lien (a-z, 0-9, -, _)",
+  "create_new_link": "Créer un nouveau lien",
+  "input_placeholder": "ID du lien (lettres, chiffres, - ou _)",
   "create_btn": "Créer",
   "existing_links": "Liens",
-  "no_links": "Aucun lien",
-  "no_image": "Aucune image",
-  "copy_url": "Copier",
-  "set_image": "Importer",
+  "no_links": "Aucun lien pour l’instant",
+  "no_image": "Pas d’image",
+  "copy_url": "Copier l’URL",
+  "set_image": "Téléverser",
   "paste_url": "URL",
   "select_server": "Serveur",
   "remove": "Supprimer",
-  
-  "enter_image_url_title": "Coller l'URL",
-  "select_server_title": "Choisir sur le serveur",
-  "enter_image_url": "URL de l'image :",
-  
-  "invalid_id": "ID requis",
-  "invalid_id_chars": "Utilisez a-z, 0-9, -, _",
-  "invalid_image": "Format invalide",
-  
-  "upload_success": "Téléchargé !",
-  "created_success": "Créé",
-  "deleted_success": "Supprimé",
+
+  "enter_image_url_title": "Coller depuis une URL",
+  "select_server_title": "Sélection depuis le serveur",
+  "enter_image_url": "URL de l’image :",
+
+  "invalid_id": "L’ID est requis",
+  "invalid_id_chars": "Utilisez a-z, 0-9, - ou _",
+  "invalid_image": "Format de fichier invalide",
+
+  "upload_success": "Téléversé !",
+  "created_success": "Lien créé",
+  "deleted_success": "Lien supprimé",
   "confirm_delete": "Supprimer ce lien ?",
-  
+
   "loading": "Chargement...",
   "server_empty": "Dossier vide",
-  "server_error": "Erreur d'accès",
+  "server_error": "Erreur d’accès",
   "copied": "Copié !",
-  
+
   "modal_cancel": "Annuler",
-  "modal_ok": "OK"
+  "modal_ok": "OK",
+
+  "search_placeholder": "Rechercher par nom de lien ou fichier...",
+  "search_total": "Total: {{total}}",
+  "search_found": "Trouvé {{shown}} sur {{total}}",
+
+  "sort_by": "Trier par :",
+  "name_asc": "Nom (A–Z)",
+  "name_desc": "Nom (Z–A)",
+  "date_new": "Les plus récents d’abord",
+  "date_old": "Les plus anciens d’abord"
 }

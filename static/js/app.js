@@ -3,6 +3,7 @@
  * Handles UI interactions, API calls, and state management.
  */
 
+
 // STATE & CONFIG
 const STATE = {
     translations: {},
@@ -14,6 +15,7 @@ const STATE = {
     wallpapers: [],
     filteredWallpapers: [],
 };
+
 
 // DOM ELEMENTS
 const DOM = {
@@ -47,6 +49,7 @@ const DOM = {
     template: document.getElementById('linkCardTemplate'),
 };
 
+
 // INITIALIZATION
 document.addEventListener('DOMContentLoaded', async () => {
     initTheme();
@@ -56,6 +59,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadLinks();
     setupGlobalListeners();
 });
+
 
 // THEME MANAGER
 function initTheme() {
@@ -81,6 +85,7 @@ function initTheme() {
     });
 }
 
+
 function applyTheme() {
     document.body.classList.toggle('dark', STATE.isDark);
     
@@ -101,12 +106,13 @@ function applyTheme() {
     
     if (STATE.isDark) {
         const sun = DOM.themeBtn.querySelector('img[alt="Light"]');
-        if(sun) sun.classList.add('active');
+        if (sun) sun.classList.add('active');
     } else {
         const moon = DOM.themeBtn.querySelector('img[alt="Dark"]');
-        if(moon) moon.classList.add('active');
+        if (moon) moon.classList.add('active');
     }
 }
+
 
 // VIEW MODE MANAGER
 function initView() {
@@ -119,6 +125,7 @@ function initView() {
         applyViewMode(newMode, true);
     });
 }
+
 
 function applyViewMode(mode, animate = false) {
     if (animate) {
@@ -134,6 +141,7 @@ function applyViewMode(mode, animate = false) {
     }
 }
 
+
 function updateClasses(mode) {
     if (mode === 'grid') {
         DOM.linksList.classList.add('grid-view');
@@ -146,9 +154,10 @@ function updateClasses(mode) {
     }
 }
 
+
 // LANGUAGE MANAGER
 async function initLanguage() {
-    const langs = ['en', 'ru', 'de', 'fr', 'it'];
+    const langs = ['en', 'ru', 'de', 'fr', 'it', 'es'];
     
     langs.forEach(lang => {
         const li = document.createElement('li');
@@ -178,6 +187,7 @@ async function initLanguage() {
     });
 }
 
+
 async function setLanguage(lang) {
     STATE.lang = lang;
     localStorage.setItem('lang', lang);
@@ -197,6 +207,7 @@ async function setLanguage(lang) {
     }
     
     applyTranslations();
+    updateSearchStats();
 }
 
 function applyTranslations(root = document) {
@@ -210,11 +221,13 @@ function applyTranslations(root = document) {
     });
 }
 
+
 function t(key, defaultText) {
     return STATE.translations[key] || defaultText;
 }
 
-// ===== 🔍 SEARCH & SORT FUNCTIONS (НОВЫЕ) =====
+
+// ===== 🔍 SEARCH & SORT FUNCTIONS =====
 function initSearchSort() {
     const searchInput = DOM.searchInput;
     const sortSelect = DOM.sortSelect;
@@ -245,6 +258,7 @@ function initSearchSort() {
     });
 }
 
+
 function filterWallpapers() {
     const query = STATE.searchQuery;
     if (!query) {
@@ -256,6 +270,7 @@ function filterWallpapers() {
         });
     }
 }
+
 
 function sortWallpapers(list) {
     const sorted = [...list];
@@ -272,6 +287,7 @@ function sortWallpapers(list) {
     return sorted;
 }
 
+
 function filterAndSort() {
     filterWallpapers();
     STATE.filteredWallpapers = sortWallpapers(STATE.filteredWallpapers);
@@ -279,17 +295,27 @@ function filterAndSort() {
     renderLinks(STATE.filteredWallpapers);
 }
 
+
 function updateSearchStats() {
     const statsEl = DOM.searchStats;
     if (!statsEl) return;
     
     const total = STATE.wallpapers.length;
     const shown = STATE.filteredWallpapers.length;
-    
-    statsEl.textContent = STATE.searchQuery 
-        ? `Found ${shown} of ${total}` 
-        : `Total: ${total}`;
+
+    if (STATE.searchQuery) {
+        // search_found: "Found {{shown}} of {{total}}" / "Найдено {{shown}} из {{total}}"
+        const tpl = t('search_found', 'Found {{shown}} of {{total}}');
+        statsEl.textContent = tpl
+            .replace('{{shown}}', shown)
+            .replace('{{total}}', total);
+    } else {
+        // search_total: "Total: {{total}}" / "Всего: {{total}}"
+        const tpl = t('search_total', 'Total: {{total}}');
+        statsEl.textContent = tpl.replace('{{total}}', total);
+    }
 }
+
 
 // NOTIFICATIONS (TOASTS)
 function showToast(message, type = 'success') {
@@ -307,8 +333,10 @@ function showToast(message, type = 'success') {
     }, 3000);
 }
 
+
 // MODAL MANAGER
 let modalResolve = null;
+
 
 function showModal(type, titleKey, placeholderKey = '') {
     return new Promise((resolve) => {
@@ -346,12 +374,14 @@ function showModal(type, titleKey, placeholderKey = '') {
     });
 }
 
+
 function closeModal() {
     DOM.modalOverlay.classList.add('hidden');
     DOM.modalOverlay.setAttribute('aria-hidden', 'true');
     if (modalResolve) modalResolve(null);
     modalResolve = null;
 }
+
 
 function confirmModal() {
     let result = null;
@@ -374,6 +404,7 @@ function confirmModal() {
         setTimeout(() => DOM.modalInput.classList.remove('shake'), 300);
     }
 }
+
 
 async function loadExternalImages() {
     // Uploading status translation
@@ -416,6 +447,7 @@ async function loadExternalImages() {
     }
 }
 
+
 // API HELPERS
 async function apiCall(url, method = 'GET', body = null, isFormData = false) {
     const options = {
@@ -442,15 +474,16 @@ async function apiCall(url, method = 'GET', body = null, isFormData = false) {
     }
 }
 
+
 // APP LOGIC
 async function loadLinks() {
     try {
-        console.log('🔄 Loading wallpapers...');  // ✅ ЛОГ
-        
-        const wallpapers = await apiCall('/api/wallpapers');  // ✅ УБРАЛ no_cache
-        console.log('📥 Loaded:', wallpapers);  // ✅ ЛОГ
+        console.log('🔄 Loading wallpapers...');
+        const wallpapers = await apiCall('/api/wallpapers');
+        console.log('📥 Loaded:', wallpapers);
         
         STATE.wallpapers = wallpapers || [];
+        updateSearchStats();
         filterAndSort();
     } catch (e) {
         console.error('❌ LoadLinks error:', e);
@@ -486,6 +519,7 @@ function renderLinks(wallpapers) {
     applyTranslations(DOM.linksList);
 }
 
+
 function updateCard(card, link) {
     const linkName = link.linkName || link.id;
     card.querySelector('.link-id').textContent = linkName;
@@ -500,7 +534,7 @@ function updateCard(card, link) {
     previewWrapper.innerHTML = '';
 
     if (link.hasImage && link.previewPath) {
-        // ✅ Backend дал путь к превью
+        // Backend provided preview path
         const img = document.createElement('img');
         img.src = link.previewPath + `?t=${Date.now()}`;
         img.alt = "Preview";
@@ -508,7 +542,7 @@ function updateCard(card, link) {
         img.onerror = () => previewWrapper.innerHTML = '<div class="no-image">Preview unavailable</div>';
         previewWrapper.appendChild(img);
     } else if (link.hasImage) {
-        // ✅ Fallback — главная картинка
+        // Fallback — main image
         const img = document.createElement('img');
         img.src = fullUrl;
         img.alt = "Image";
@@ -539,6 +573,7 @@ function updateCard(card, link) {
         });
     };
 }
+
 
 function setupCardEvents(card, link) {
     const fileInput = card.querySelector('.file-input');
@@ -584,6 +619,7 @@ function setupCardEvents(card, link) {
     };
 }
 
+
 async function handleUpload(link, fileOrUrl, card, isUrl = false) {
     const formData = new FormData();
     formData.append('linkName', link.linkName);
@@ -600,10 +636,18 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
 
     try {
         const updatedLink = await apiCall('/api/upload', 'POST', formData, true);
+
+        // обновляем стейт, чтобы фильтрация/сортировка работали с актуальными данными
+        const idx = STATE.wallpapers.findIndex(wp => wp.linkName === updatedLink.linkName);
+        if (idx !== -1) {
+            STATE.wallpapers[idx] = updatedLink;
+        } else {
+            STATE.wallpapers.push(updatedLink);
+        }
+
         updateCard(card, updatedLink);
         reorderCard(card, updatedLink);
-        showToast(t('upload_success', 'Uploaded!'), 'success');
-        filterAndSort();  // ← перерисовать с учетом поиска/сортировки
+        filterAndSort();
         showToast(t('upload_success', 'Uploaded!'), 'success');
     } catch (e) {
         console.error(e);

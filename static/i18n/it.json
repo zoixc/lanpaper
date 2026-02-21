@@ -1,34 +1,44 @@
 {
-  "create_new_link": "Nuovo link",
-  "input_placeholder": "ID Link (a-z, 0-9, -, _)",
+  "create_new_link": "Crea nuovo link",
+  "input_placeholder": "ID link (lettere, numeri, - o _)",
   "create_btn": "Crea",
   "existing_links": "Link",
   "no_links": "Nessun link",
-  "no_image": "No immagine",
-  "copy_url": "Copia",
+  "no_image": "Nessuna immagine",
+  "copy_url": "Copia URL",
   "set_image": "Carica",
   "paste_url": "URL",
   "select_server": "Server",
-  "remove": "Rimuovi",
-  
-  "enter_image_url_title": "Incolla URL",
-  "select_server_title": "Scegli dal server",
+  "remove": "Elimina",
+
+  "enter_image_url_title": "Incolla da URL",
+  "select_server_title": "Seleziona dal server",
   "enter_image_url": "URL immagine:",
-  
-  "invalid_id": "ID richiesto",
-  "invalid_id_chars": "Solo a-z, 0-9, -, _",
-  "invalid_image": "Formato non valido",
-  
+
+  "invalid_id": "ID obbligatorio",
+  "invalid_id_chars": "Usa a-z, 0-9, - o _",
+  "invalid_image": "Formato file non valido",
+
   "upload_success": "Caricato!",
-  "created_success": "Creato",
-  "deleted_success": "Eliminato",
-  "confirm_delete": "Eliminare?",
-  
+  "created_success": "Link creato",
+  "deleted_success": "Link eliminato",
+  "confirm_delete": "Eliminare questo link?",
+
   "loading": "Caricamento...",
   "server_empty": "Cartella vuota",
   "server_error": "Errore di accesso",
   "copied": "Copiato!",
-  
+
   "modal_cancel": "Annulla",
-  "modal_ok": "OK"
+  "modal_ok": "OK",
+
+  "search_placeholder": "Cerca per nome link o file...",
+  "search_total": "Totale: {{total}}",
+  "search_found": "Trovati {{shown}} di {{total}}",
+
+  "sort_by": "Ordina per:",
+  "name_asc": "Nome (A–Z)",
+  "name_desc": "Nome (Z–A)",
+  "date_new": "Prima i più recenti",
+  "date_old": "Prima i più vecchi"
 }
