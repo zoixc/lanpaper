@@ -22,6 +22,8 @@ import (
 	_ "golang.org/x/image/tiff"
 )
 
+const Version = "v0.8.7"
+
 func main() {
 	_ = godotenv.Load()
 	config.Load()
@@ -42,26 +44,29 @@ func main() {
 
 	go middleware.StartCleaner()
 
+	// Router
+	mux := http.NewServeMux()
+
 	// Static files
-	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	// Health check
-	http.HandleFunc("/health", healthCheckHandler)
+	mux.HandleFunc("/health", healthCheckHandler)
 
 	// Admin UI (NO AUTH - для тестов)
-	http.HandleFunc("/admin", handlers.Admin)
+	mux.HandleFunc("/admin", handlers.Admin)
 
 	// API - PUBLIC для тестов (убрал middleware.WithSecurity)
-	http.HandleFunc("/api/wallpapers", handlers.Wallpapers)
-	http.HandleFunc("/api/tags", handlers.Tags)
-	http.HandleFunc("/api/link/", handlers.Link)
-	http.HandleFunc("/api/link", handlers.Link)
-	http.HandleFunc("/api/upload", handlers.Upload)
-	http.HandleFunc("/api/external-images", handlers.ExternalImages)
-	http.HandleFunc("/api/external-image-preview", handlers.ExternalImagePreview)
+	mux.HandleFunc("/api/wallpapers", handlers.Wallpapers)
+	mux.HandleFunc("/api/tags", handlers.Tags)
+	mux.HandleFunc("/api/link/", handlers.Link)
+	mux.HandleFunc("/api/link", handlers.Link)
+	mux.HandleFunc("/api/upload", handlers.Upload)
+	mux.HandleFunc("/api/external-images", handlers.ExternalImages)
+	mux.HandleFunc("/api/external-image-preview", handlers.ExternalImagePreview)
 
 	// Public pages
-	http.HandleFunc("/", handlers.Public)
+	mux.HandleFunc("/", handlers.Public)
 
 	// Server config
 	port := config.Current.Port
@@ -71,6 +76,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:         port,
+		Handler:      mux,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,
@@ -91,9 +97,9 @@ func main() {
 		}
 	}()
 
-	log.Printf("🚀 Lanpaper server running on %s (max upload %d MB)", port, config.Current.MaxUploadMB)
-	log.Printf("📱 Admin: http://localhost%s/admin", port)
-	log.Printf("🔧 API endpoints ready!")
+	log.Printf("Lanpaper %s running on %s (max upload %d MB)", Version, port, config.Current.MaxUploadMB)
+	log.Printf("Admin: http://localhost%s/admin", port)
+	log.Printf("API endpoints ready")
 
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Server failed: %v", err)
@@ -108,7 +114,9 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	response := map[string]interface{}{
 		"status":  "ok",
 		"service": "lanpaper",
+		"version": Version,
 		"time":    time.Now().Unix(),
+		"uptime":  time.Since(time.Now().Add(-5 * time.Minute)).String(), // пример
 	}
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
