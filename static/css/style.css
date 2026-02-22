@@ -966,7 +966,6 @@ body.dark #langIconDark {
     justify-content: space-between;
     align-items: center;
     gap: 16px;
-    margin-top: 8px;
     flex-wrap: wrap; /* FIX: на узких экранах не выезжает за пределы */
 }
 
