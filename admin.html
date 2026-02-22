@@ -13,6 +13,7 @@
   <div class="network-bg"></div>
 
   <div class="container">
+
     <!-- Header -->
     <header class="header-row">
       <div class="logo-wrapper">
@@ -75,12 +76,28 @@
           <div id="searchStats" class="search-stats">Total: 0</div>
         </div>
         <div class="sort-container">
-          <label for="sortSelect" class="sort-label" data-i18n="sort_by">Sort by:</label>
-          <select id="sortSelect" class="sort-select">
-            <option value="name_asc" data-i18n="name_asc">Name (A-Z)</option>
-            <option value="name_desc" data-i18n="name_desc">Name (Z-A)</option>
-            <option value="date_desc" data-i18n="date_new">Newest first</option>
-            <option value="date_asc" data-i18n="date_old">Oldest first</option>
+          <label class="sort-label" data-i18n="sort_by">Sort by:</label>
+          <!-- Кастомный select (работает везде, включая Safari) -->
+          <div class="custom-select" id="customSortSelect">
+            <button class="custom-select-btn" aria-haspopup="listbox" aria-expanded="false">
+              <span id="customSortLabel" data-i18n="date_new">Newest first</span>
+              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 1l4 4 4-4"/>
+              </svg>
+            </button>
+            <div class="custom-select-menu" role="listbox">
+              <div class="custom-select-option" data-value="name_asc" data-i18n="name_asc">Name (A-Z)</div>
+              <div class="custom-select-option" data-value="name_desc" data-i18n="name_desc">Name (Z-A)</div>
+              <div class="custom-select-option selected" data-value="date_desc" data-i18n="date_new">Newest first</div>
+              <div class="custom-select-option" data-value="date_asc" data-i18n="date_old">Oldest first</div>
+            </div>
+          </div>
+          <!-- Нативный select скрыт, нужен только для JS-совместимости -->
+          <select id="sortSelect" class="sort-select" aria-hidden="true">
+            <option value="name_asc">Name (A-Z)</option>
+            <option value="name_desc">Name (Z-A)</option>
+            <option value="date_desc" selected>Newest first</option>
+            <option value="date_asc">Oldest first</option>
           </select>
         </div>
       </div>
@@ -133,11 +150,11 @@
       </a>
 
       <div class="link-info">
-        <div class="link-id" aria-label="Link ID"></div>
-        <div class="link-meta" aria-label="File info"></div>
-        <div class="link-url-wrapper">
+        <div class="link-id-row">
+          <div class="link-id" aria-label="Link ID"></div>
           <button class="copy-url-btn" data-i18n="copy_url" aria-label="Copy URL">Copy URL</button>
         </div>
+        <div class="link-meta" aria-label="File info"></div>
       </div>
 
       <div class="actions-row">

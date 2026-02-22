@@ -130,6 +130,7 @@ function applyViewMode(mode, animate = false) {
         DOM.linksList.classList.add('switching');
         setTimeout(() => {
             updateClasses(mode);
+            void DOM.linksList.offsetHeight;
             requestAnimationFrame(() => {
                 DOM.linksList.classList.remove('switching');
             });
@@ -205,6 +206,7 @@ async function setLanguage(lang) {
     }
 
     applyTranslations();
+    syncCustomSelectLabels();
     updateSearchStats();
 }
 
@@ -230,12 +232,12 @@ function t(key, defaultText) {
 function initSearchSort() {
     const searchInput = DOM.searchInput;
     const sortSelect = DOM.sortSelect;
-    if (!searchInput || !sortSelect) return;
+    if (!searchInput) return;
 
     STATE.searchQuery = localStorage.getItem('searchQuery') || '';
     STATE.sortBy = localStorage.getItem('sortBy') || 'date_desc';
     searchInput.value = STATE.searchQuery;
-    sortSelect.value = STATE.sortBy;
+    if (sortSelect) sortSelect.value = STATE.sortBy;
 
     let timer;
     searchInput.addEventListener('input', (e) => {
@@ -247,10 +249,95 @@ function initSearchSort() {
         }, 250);
     });
 
-    sortSelect.addEventListener('change', (e) => {
-        STATE.sortBy = e.target.value;
-        localStorage.setItem('sortBy', STATE.sortBy);
-        filterAndSort();
+    // Нативный select — на случай если кастомный не инициализировался
+    if (sortSelect) {
+        sortSelect.addEventListener('change', (e) => {
+            STATE.sortBy = e.target.value;
+            localStorage.setItem('sortBy', STATE.sortBy);
+            filterAndSort();
+        });
+    }
+
+    initCustomSelect();
+}
+
+
+// CUSTOM SELECT
+function initCustomSelect() {
+    const customSelect = document.getElementById('customSortSelect');
+    if (!customSelect) return;
+
+    const btn = customSelect.querySelector('.custom-select-btn');
+    const label = document.getElementById('customSortLabel');
+    const options = customSelect.querySelectorAll('.custom-select-option');
+
+    // Синхронизируем начальное состояние с STATE.sortBy
+    syncCustomSelectLabels();
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = customSelect.classList.contains('open');
+        customSelect.classList.toggle('open', !isOpen);
+        btn.setAttribute('aria-expanded', String(!isOpen));
+    });
+
+    options.forEach(opt => {
+        opt.addEventListener('click', () => {
+            const val = opt.dataset.value;
+
+            // Обновляем визуал
+            options.forEach(o => o.classList.remove('selected'));
+            opt.classList.add('selected');
+            if (label) label.textContent = opt.textContent;
+
+            // Закрываем
+            customSelect.classList.remove('open');
+            btn.setAttribute('aria-expanded', 'false');
+
+            // Синхронизируем с нативным select и STATE
+            if (DOM.sortSelect) DOM.sortSelect.value = val;
+            STATE.sortBy = val;
+            localStorage.setItem('sortBy', val);
+            filterAndSort();
+        });
+    });
+
+    // Закрытие по клику вне
+    document.addEventListener('click', (e) => {
+        if (!customSelect.contains(e.target)) {
+            customSelect.classList.remove('open');
+            btn.setAttribute('aria-expanded', 'false');
+        }
+    });
+
+    // Закрытие по Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && customSelect.classList.contains('open')) {
+            customSelect.classList.remove('open');
+            btn.setAttribute('aria-expanded', 'false');
+        }
+    });
+}
+
+
+// Синхронизация label кастомного select при смене языка или состояния
+function syncCustomSelectLabels() {
+    const customSelect = document.getElementById('customSortSelect');
+    if (!customSelect) return;
+
+    const label = document.getElementById('customSortLabel');
+    const options = customSelect.querySelectorAll('.custom-select-option');
+
+    options.forEach(opt => {
+        const i18nKey = opt.dataset.i18n;
+        if (i18nKey && STATE.translations[i18nKey]) {
+            opt.textContent = STATE.translations[i18nKey];
+        }
+        const isSelected = opt.dataset.value === STATE.sortBy;
+        opt.classList.toggle('selected', isSelected);
+        if (isSelected && label) {
+            label.textContent = opt.textContent;
+        }
     });
 }
 
@@ -563,7 +650,6 @@ function updateCard(card, link) {
         previewWrapper.appendChild(noImg);
     }
 
-    // Copy button
     const copyBtn = card.querySelector('.copy-url-btn');
     const newCopyBtn = copyBtn.cloneNode(true);
     copyBtn.parentNode.replaceChild(newCopyBtn, copyBtn);
@@ -574,7 +660,7 @@ function updateCard(card, link) {
             newCopyBtn.classList.add('copied');
             setTimeout(() => {
                 newCopyBtn.classList.remove('copied');
-                newCopyBtn.textContent = t('copy_url', 'Copy');
+                newCopyBtn.textContent = t('copy_url', 'Copy URL');
             }, 1500);
         });
     };
@@ -586,17 +672,14 @@ function setupCardEvents(card, link) {
     const dropdown = card.querySelector('.upload-dropdown');
     const toggleBtn = card.querySelector('.upload-toggle-btn');
 
-    // Открыть/закрыть дропдаун
     toggleBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const isOpen = dropdown.classList.contains('open');
-        // Закрыть все остальные открытые дропдауны
         document.querySelectorAll('.upload-dropdown.open').forEach(d => d.classList.remove('open'));
         if (!isOpen) dropdown.classList.add('open');
         toggleBtn.setAttribute('aria-expanded', String(!isOpen));
     });
 
-    // Закрыть при клике вне дропдауна
     document.addEventListener('click', (e) => {
         if (!dropdown.contains(e.target)) {
             dropdown.classList.remove('open');
@@ -604,7 +687,6 @@ function setupCardEvents(card, link) {
         }
     });
 
-    // Кнопки внутри меню
     card.querySelector('.upload-file-btn').addEventListener('click', () => {
         dropdown.classList.remove('open');
         fileInput.click();
@@ -628,7 +710,6 @@ function setupCardEvents(card, link) {
         if (filename) await handleUpload(link, filename, card, true);
     });
 
-    // Drag & drop
     card.ondragover = e => { e.preventDefault(); card.style.borderColor = 'var(--border-focus)'; };
     card.ondragleave = () => { card.style.borderColor = 'var(--border)'; };
     card.ondrop = async e => {
