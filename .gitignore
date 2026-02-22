@@ -33,6 +33,7 @@ config_test.go
 .vscode/
 .old/
 ./lanpaper
+./homepage
 .idea/
 *.swp
 *.swo

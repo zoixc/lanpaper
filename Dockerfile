@@ -1,7 +1,7 @@
-FROM --platform=$BUILDPLATFORM golang:1.25.3-alpine AS builder
+# --- Stage 1: Builder ---
+FROM golang:1.25-alpine AS builder
 
-# Устанавливаем необходимые инструменты для сборки
-RUN apk add --no-cache gcc musl-dev libwebp-dev
+RUN apk add --no-cache git gcc musl-dev
 
 WORKDIR /app
 
@@ -10,29 +10,24 @@ RUN go mod download
 
 COPY . .
 
-ARG VERSION=v0.8.7
-ARG TARGETARCH
-ARG TARGETOS
+RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w -extldflags '-static'" -o lanpaper .
 
-# Включаем CGO для работы с webp
-RUN CGO_ENABLED=1 \
-    GOOS=${TARGETOS} \
-    GOARCH=${TARGETARCH} \
-    go build \
-    -ldflags="-w -s -X main.Version=${VERSION} -linkmode external -extldflags '-static'" \
-    -trimpath \
-    -o /lanpaper \
-    ./main.go
+# --- Stage 2: Runner ---
+FROM alpine:latest
 
-FROM alpine:3.20
+RUN apk --no-cache add ca-certificates wget
 
-# Добавляем runtime библиотеки
-RUN apk --no-cache add ca-certificates tzdata libwebp
+WORKDIR /app
 
-COPY --from=builder /lanpaper /lanpaper
-COPY --from=builder /app/static /static
-COPY --from=builder /app/config /config
+COPY --from=builder /app/lanpaper .
+COPY admin.html .
+COPY static ./static
+
+RUN mkdir -p data static/images/previews external/images
 
 EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=3s CMD ["/lanpaper", "health"] || exit 1
-ENTRYPOINT ["/lanpaper"]
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/ || exit 1
+
+CMD ["./lanpaper"]

@@ -27,14 +27,15 @@ var Version = "dev"
 func main() {
 	_ = godotenv.Load()
 	config.Load()
+	log.Printf("DEBUG config.Current.Port=%s", config.Current.Port)
 
 	handlers.InitUploadSemaphore(config.Current.MaxConcurrentUploads)
 
 	// Directories
-	dirs := []string{"static/images", "static/images/previews", "data", "external/images"}
+	dirs := []string{"data", "external/images"}
 	for _, d := range dirs {
 		if err := os.MkdirAll(d, 0755); err != nil {
-			log.Fatalf("Failed to create directory %s: %v", d, err)
+			log.Printf("Warning: failed to create %s: %v", d, err)
 		}
 	}
 
