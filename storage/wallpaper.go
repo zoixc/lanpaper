@@ -14,6 +14,7 @@ import (
 type Wallpaper struct {
 	ID        string `json:"id"`
 	LinkName  string `json:"linkName"`
+	Category  string `json:"category"`
 	ImageURL  string `json:"imageUrl"`
 	Preview   string `json:"preview"`
 	HasImage  bool   `json:"hasImage"`
@@ -22,9 +23,8 @@ type Wallpaper struct {
 	ModTime   int64  `json:"modTime"`
 	CreatedAt int64  `json:"createdAt"`
 
-	// Internal paths
-	ImagePath   string `json:"-"`
-	PreviewPath string `json:"-"`
+	ImagePath   string `json:"imagePath"`
+	PreviewPath string `json:"previewPath"`
 }
 
 type Store struct {
@@ -111,9 +111,13 @@ func (s *Store) Load() error {
 
 			if ext == "mp4" || ext == "webm" {
 				wp.PreviewPath = ""
+				wp.Category = "video" // FIX
 			} else {
 				wp.PreviewPath = filepath.Join("static", "images", "previews", wp.LinkName+".webp")
+				wp.Category = "image" // FIX
 			}
+		} else {
+			wp.Category = "other" // FIX
 		}
 	}
 

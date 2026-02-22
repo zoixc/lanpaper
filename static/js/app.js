@@ -3,7 +3,6 @@
  * Handles UI interactions, API calls, and state management.
  */
 
-
 // STATE & CONFIG
 const STATE = {
     translations: {},
@@ -15,7 +14,6 @@ const STATE = {
     wallpapers: [],
     filteredWallpapers: [],
 };
-
 
 // DOM ELEMENTS
 const DOM = {
@@ -31,7 +29,7 @@ const DOM = {
     searchInput: document.getElementById('searchInput'),
     searchStats: document.getElementById('searchStats'),
     sortSelect: document.getElementById('sortSelect'),
-    
+
     // Modal Elements
     modalOverlay: document.getElementById('modalOverlay'),
     modalTitle: document.getElementById('modalTitle'),
@@ -39,16 +37,15 @@ const DOM = {
     modalList: document.getElementById('modalList'),
     modalCancel: document.getElementById('modalCancelBtn'),
     modalConfirm: document.getElementById('modalConfirmBtn'),
-    
+
     // Creation
     createBtn: document.getElementById('createLinkBtn'),
     createInput: document.getElementById('newLinkId'),
     createForm: document.getElementById('createForm'),
-    
+
     // Templates
     template: document.getElementById('linkCardTemplate'),
 };
-
 
 // INITIALIZATION
 document.addEventListener('DOMContentLoaded', async () => {
@@ -59,7 +56,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadLinks();
     setupGlobalListeners();
 });
-
 
 // THEME MANAGER
 function initTheme() {
@@ -85,25 +81,22 @@ function initTheme() {
     });
 }
 
-
 function applyTheme() {
     document.body.classList.toggle('dark', STATE.isDark);
-    
-    // Update theme-color meta tag for PWA
+
     const themeColorMeta = document.querySelector('meta[name="theme-color"]');
     if (themeColorMeta) {
         themeColorMeta.content = STATE.isDark ? '#191919' : '#ffffff';
     }
-    
-    // Update logo based on theme
+
     const logo = document.querySelector('.logo');
     if (logo) {
         logo.src = STATE.isDark ? '/static/logo-dark.svg' : '/static/logo.svg';
     }
-    
+
     const icons = DOM.themeBtn.querySelectorAll('.theme-icon');
     icons.forEach(icon => icon.classList.remove('active'));
-    
+
     if (STATE.isDark) {
         const sun = DOM.themeBtn.querySelector('img[alt="Light"]');
         if (sun) sun.classList.add('active');
@@ -112,7 +105,6 @@ function applyTheme() {
         if (moon) moon.classList.add('active');
     }
 }
-
 
 // VIEW MODE MANAGER
 function initView() {
@@ -126,7 +118,6 @@ function initView() {
     });
 }
 
-
 function applyViewMode(mode, animate = false) {
     if (animate) {
         DOM.linksList.classList.add('switching');
@@ -135,12 +126,11 @@ function applyViewMode(mode, animate = false) {
             requestAnimationFrame(() => {
                 DOM.linksList.classList.remove('switching');
             });
-        }, 200); 
+        }, 200);
     } else {
         updateClasses(mode);
     }
 }
-
 
 function updateClasses(mode) {
     if (mode === 'grid') {
@@ -154,11 +144,10 @@ function updateClasses(mode) {
     }
 }
 
-
 // LANGUAGE MANAGER
 async function initLanguage() {
     const langs = ['en', 'ru', 'de', 'fr', 'it', 'es'];
-    
+
     langs.forEach(lang => {
         const li = document.createElement('li');
         li.textContent = lang.toUpperCase();
@@ -187,7 +176,6 @@ async function initLanguage() {
     });
 }
 
-
 async function setLanguage(lang) {
     STATE.lang = lang;
     localStorage.setItem('lang', lang);
@@ -205,7 +193,7 @@ async function setLanguage(lang) {
         console.warn('Translation load failed', e);
         STATE.translations = {};
     }
-    
+
     applyTranslations();
     updateSearchStats();
 }
@@ -221,25 +209,21 @@ function applyTranslations(root = document) {
     });
 }
 
-
 function t(key, defaultText) {
     return STATE.translations[key] || defaultText;
 }
 
-
-// ===== 🔍 SEARCH & SORT FUNCTIONS =====
+// SEARCH & SORT
 function initSearchSort() {
     const searchInput = DOM.searchInput;
     const sortSelect = DOM.sortSelect;
     if (!searchInput || !sortSelect) return;
 
-    // Restore state
     STATE.searchQuery = localStorage.getItem('searchQuery') || '';
     STATE.sortBy = localStorage.getItem('sortBy') || 'date_desc';
     searchInput.value = STATE.searchQuery;
     sortSelect.value = STATE.sortBy;
 
-    // Search debounce
     let timer;
     searchInput.addEventListener('input', (e) => {
         clearTimeout(timer);
@@ -250,14 +234,12 @@ function initSearchSort() {
         }, 250);
     });
 
-    // Sort change
     sortSelect.addEventListener('change', (e) => {
         STATE.sortBy = e.target.value;
         localStorage.setItem('sortBy', STATE.sortBy);
         filterAndSort();
     });
 }
-
 
 function filterWallpapers() {
     const query = STATE.searchQuery;
@@ -271,22 +253,20 @@ function filterWallpapers() {
     }
 }
 
-
 function sortWallpapers(list) {
     const sorted = [...list];
     switch (STATE.sortBy) {
-        case 'name_asc': 
+        case 'name_asc':
             sorted.sort((a, b) => a.linkName.localeCompare(b.linkName)); break;
-        case 'name_desc': 
+        case 'name_desc':
             sorted.sort((a, b) => b.linkName.localeCompare(a.linkName)); break;
-        case 'date_desc': 
-            sorted.sort((a, b) => (b.modTime || 0) - (a.modTime || 0)); break;
-        case 'date_asc': 
-            sorted.sort((a, b) => (a.modTime || 0) - (b.modTime || 0)); break;
+        case 'date_desc':
+            sorted.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); break;
+        case 'date_asc':
+            sorted.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); break;
     }
     return sorted;
 }
-
 
 function filterAndSort() {
     filterWallpapers();
@@ -295,34 +275,30 @@ function filterAndSort() {
     renderLinks(STATE.filteredWallpapers);
 }
 
-
 function updateSearchStats() {
     const statsEl = DOM.searchStats;
     if (!statsEl) return;
-    
+
     const total = STATE.wallpapers.length;
     const shown = STATE.filteredWallpapers.length;
 
     if (STATE.searchQuery) {
-        // search_found: "Found {{shown}} of {{total}}" / "Найдено {{shown}} из {{total}}"
         const tpl = t('search_found', 'Found {{shown}} of {{total}}');
         statsEl.textContent = tpl
             .replace('{{shown}}', shown)
             .replace('{{total}}', total);
     } else {
-        // search_total: "Total: {{total}}" / "Всего: {{total}}"
         const tpl = t('search_total', 'Total: {{total}}');
         statsEl.textContent = tpl.replace('{{total}}', total);
     }
 }
-
 
 // NOTIFICATIONS (TOASTS)
 function showToast(message, type = 'success') {
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.innerHTML = `<span>${message}</span>`;
-    
+
     DOM.toastContainer.appendChild(toast);
 
     setTimeout(() => {
@@ -333,18 +309,15 @@ function showToast(message, type = 'success') {
     }, 3000);
 }
 
-
 // MODAL MANAGER
 let modalResolve = null;
-
 
 function showModal(type, titleKey, placeholderKey = '') {
     return new Promise((resolve) => {
         modalResolve = resolve;
-        
-        // Header translation
-        DOM.modalTitle.textContent = t(titleKey, 'Input'); 
-        
+
+        DOM.modalTitle.textContent = t(titleKey, 'Input');
+
         DOM.modalOverlay.classList.remove('hidden');
         DOM.modalOverlay.setAttribute('aria-hidden', 'false');
 
@@ -356,15 +329,13 @@ function showModal(type, titleKey, placeholderKey = '') {
 
         if (type === 'input') {
             DOM.modalInput.style.display = 'block';
-            // Placeholder translation
-            DOM.modalInput.placeholder = t(placeholderKey, 'https://...'); 
+            DOM.modalInput.placeholder = t(placeholderKey, 'https://...');
             DOM.modalInput.focus();
-            
+
             DOM.modalInput.onkeydown = (e) => {
                 if (e.key === 'Enter') confirmModal();
             };
-        } 
-        else if (type === 'grid') {
+        } else if (type === 'grid') {
             DOM.modalList.classList.remove('hidden');
             loadExternalImages();
         }
@@ -374,7 +345,6 @@ function showModal(type, titleKey, placeholderKey = '') {
     });
 }
 
-
 function closeModal() {
     DOM.modalOverlay.classList.add('hidden');
     DOM.modalOverlay.setAttribute('aria-hidden', 'true');
@@ -382,10 +352,9 @@ function closeModal() {
     modalResolve = null;
 }
 
-
 function confirmModal() {
     let result = null;
-    
+
     if (DOM.modalInput.style.display !== 'none') {
         result = DOM.modalInput.value.trim();
     } else {
@@ -394,7 +363,7 @@ function confirmModal() {
             result = selected.dataset.value;
         }
     }
-    
+
     if (result) {
         DOM.modalOverlay.classList.add('hidden');
         if (modalResolve) modalResolve(result);
@@ -405,20 +374,17 @@ function confirmModal() {
     }
 }
 
-
 async function loadExternalImages() {
-    // Uploading status translation
     DOM.modalList.innerHTML = `<div style="grid-column: 1/-1; text-align: center;">${t('loading', 'Loading...')}</div>`;
-    
+
     try {
         const res = await fetch('/api/external-images');
         if (!res.ok) throw new Error('Failed');
         const files = await res.json();
-        
+
         DOM.modalList.innerHTML = '';
-        
+
         if (!files || files.length === 0) {
-            // Empty list translation
             DOM.modalList.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">${t('server_empty', 'No images found')}</div>`;
             return;
         }
@@ -427,14 +393,14 @@ async function loadExternalImages() {
             const div = document.createElement('div');
             div.className = 'image-option';
             div.dataset.value = file;
-            
+
             const previewUrl = `/api/external-image-preview?path=${encodeURIComponent(file)}`;
 
             div.innerHTML = `
                 <img src="${previewUrl}" loading="lazy" alt="${file}">
                 <div class="image-name">${file}</div>
             `;
-            
+
             div.onclick = () => {
                 DOM.modalList.querySelectorAll('.image-option').forEach(el => el.classList.remove('selected'));
                 div.classList.add('selected');
@@ -442,11 +408,9 @@ async function loadExternalImages() {
             DOM.modalList.appendChild(div);
         });
     } catch (e) {
-        // Error translation
         DOM.modalList.innerHTML = `<div style="color:red; text-align:center;">${t('server_error', 'Error loading images')}</div>`;
     }
 }
-
 
 // API HELPERS
 async function apiCall(url, method = 'GET', body = null, isFormData = false) {
@@ -474,14 +438,10 @@ async function apiCall(url, method = 'GET', body = null, isFormData = false) {
     }
 }
 
-
 // APP LOGIC
 async function loadLinks() {
     try {
-        console.log('🔄 Loading wallpapers...');
         const wallpapers = await apiCall('/api/wallpapers');
-        console.log('📥 Loaded:', wallpapers);
-        
         STATE.wallpapers = wallpapers || [];
         updateSearchStats();
         filterAndSort();
@@ -493,10 +453,9 @@ async function loadLinks() {
     }
 }
 
-
 function renderLinks(wallpapers) {
     DOM.linksList.innerHTML = '';
-    
+
     if (!wallpapers || wallpapers.length === 0) {
         DOM.emptyState.style.display = 'block';
         return;
@@ -508,10 +467,10 @@ function renderLinks(wallpapers) {
     wallpapers.forEach(link => {
         const clone = DOM.template.content.cloneNode(true);
         const article = clone.querySelector('article');
-        
+
         updateCard(article, link);
         setupCardEvents(article, link);
-        
+
         fragment.appendChild(article);
     });
 
@@ -519,6 +478,18 @@ function renderLinks(wallpapers) {
     applyTranslations(DOM.linksList);
 }
 
+// FIX: определяем категорию по mimeType и путям, не доверяем пустому полю из API
+function detectCategory(link) {
+    const mime = link.mimeType || '';
+    if (mime.startsWith('video/')) return 'video';
+    if (mime.startsWith('image/')) return 'image';
+    // FIX: смотрим и imagePath и imageUrl (API отдаёт imageUrl)
+    const path = link.imagePath || link.imageUrl || '';
+    const ext = path.split('.').pop().toLowerCase();
+    if (['mp4', 'webm'].includes(ext)) return 'video';
+    if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) return 'image';
+    return 'other';
+}
 
 function updateCard(card, link) {
     const linkName = link.linkName || link.id;
@@ -527,33 +498,51 @@ function updateCard(card, link) {
     const fullUrl = `${window.location.origin}/${linkName}`;
     card.querySelector('.preview-link').href = fullUrl;
 
-    card.querySelector('.link-meta').textContent = 
-        `${link.category || 'other'} · ${link.hasImage ? 'Image' : 'No image'}`;
+    const category = link.hasImage ? detectCategory(link) : 'other';
+
+    // FIX: защита от undefined — mimeType может отсутствовать после загрузки
+    let fileType;
+    if (link.mimeType) {
+        fileType = (link.mimeType.split('/')[1] || link.mimeType).toUpperCase();
+    } else if (link.hasImage) {
+        // FIX: берём расширение из imageUrl если imagePath пустой
+        const path = link.imagePath || link.imageUrl || '';
+        fileType = path.split('.').pop().toUpperCase() || 'IMAGE';
+    } else {
+        fileType = t('no_image_short', 'No image');
+    }
+
+    const dateStr = link.createdAt ? formatDate(link.createdAt) : '—';
+    const sizeStr = link.sizeBytes ? ` · ${formatKB(link.sizeBytes)}` : '';
+
+    card.querySelector('.link-meta').textContent =
+        `${category} · ${fileType}${sizeStr} · ${dateStr}`;
 
     const previewWrapper = card.querySelector('.preview-wrapper');
     previewWrapper.innerHTML = '';
 
-    if (link.hasImage && link.previewPath) {
-        // Backend provided preview path
+    // FIX: API после загрузки отдаёт поле preview, а не previewPath
+    const resolvedPreview = link.previewPath || link.preview || '';
+
+    if (link.hasImage && resolvedPreview) {
         const img = document.createElement('img');
-        img.src = link.previewPath + `?t=${Date.now()}`;
+        img.src = '/' + resolvedPreview.replace(/^\//, '') + `?t=${Date.now()}`;
         img.alt = "Preview";
         img.className = "preview";
         img.onerror = () => previewWrapper.innerHTML = '<div class="no-image">Preview unavailable</div>';
         previewWrapper.appendChild(img);
     } else if (link.hasImage) {
-        // Fallback — main image
+        // FIX: fallback на imageUrl если нет preview
         const img = document.createElement('img');
-        img.src = fullUrl;
+        img.src = '/' + (link.imageUrl || '').replace(/^\//, '') || fullUrl;
         img.alt = "Image";
         img.className = "preview";
-        img.style.maxHeight = '200px';
         img.onerror = () => previewWrapper.innerHTML = '<div class="no-image">Image unavailable</div>';
         previewWrapper.appendChild(img);
     } else {
         const noImg = document.createElement('div');
         noImg.className = 'no-image';
-        noImg.textContent = 'No image';
+        noImg.textContent = t('no_image_short', 'No image');
         previewWrapper.appendChild(noImg);
     }
 
@@ -564,22 +553,21 @@ function updateCard(card, link) {
     newCopyBtn.onclick = (e) => {
         e.preventDefault();
         navigator.clipboard.writeText(fullUrl).then(() => {
-            newCopyBtn.textContent = 'Copied!';
+            newCopyBtn.textContent = t('copied', 'Copied!');
             newCopyBtn.classList.add('copied');
             setTimeout(() => {
                 newCopyBtn.classList.remove('copied');
-                newCopyBtn.textContent = 'Copy';
+                newCopyBtn.textContent = t('copy_url', 'Copy');
             }, 1500);
         });
     };
 }
 
-
 function setupCardEvents(card, link) {
     const fileInput = card.querySelector('.file-input');
-    
+
     card.querySelector('.upload-file-btn').onclick = () => fileInput.click();
-    
+
     fileInput.onchange = async () => {
         if (!fileInput.files.length) return;
         await handleUpload(link, fileInput.files[0], card);
@@ -596,7 +584,6 @@ function setupCardEvents(card, link) {
         }
     };
 
-    // Modal header translation
     card.querySelector('.paste-url-btn').onclick = async () => {
         const url = await showModal('input', 'enter_image_url_title', 'url_placeholder');
         if (url) await handleUpload(link, url, card, true);
@@ -604,26 +591,26 @@ function setupCardEvents(card, link) {
 
     card.querySelector('.select-server-btn').onclick = async () => {
         const filename = await showModal('grid', 'select_server_title');
-        if (filename) {
-            await handleUpload(link, filename, card, true);
-        }
+        if (filename) await handleUpload(link, filename, card, true);
     };
 
     card.querySelector('.delete-btn').onclick = async () => {
         if (confirm(t('confirm_delete', 'Delete link?'))) {
             await apiCall(`/api/link/${link.linkName}`, 'DELETE');
             card.remove();
+            // FIX: обновляем STATE после удаления
+            STATE.wallpapers = STATE.wallpapers.filter(wp => wp.linkName !== link.linkName);
+            updateSearchStats();
             if (DOM.linksList.children.length === 0) DOM.emptyState.style.display = 'block';
             showToast(t('deleted_success', 'Link deleted'), 'success');
         }
     };
 }
 
-
 async function handleUpload(link, fileOrUrl, card, isUrl = false) {
     const formData = new FormData();
     formData.append('linkName', link.linkName);
-    
+
     if (isUrl) {
         formData.append('url', fileOrUrl);
     } else {
@@ -637,7 +624,11 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
     try {
         const updatedLink = await apiCall('/api/upload', 'POST', formData, true);
 
-        // обновляем стейт, чтобы фильтрация/сортировка работали с актуальными данными
+        // FIX: сохраняем createdAt из старого объекта если API не вернул
+        if (!updatedLink.createdAt && link.createdAt) {
+            updatedLink.createdAt = link.createdAt;
+        }
+
         const idx = STATE.wallpapers.findIndex(wp => wp.linkName === updatedLink.linkName);
         if (idx !== -1) {
             STATE.wallpapers[idx] = updatedLink;
@@ -665,10 +656,10 @@ function setupGlobalListeners() {
         e.preventDefault();
         const id = DOM.createInput.value.trim();
         if (!id) {
-            showToast(t('invalid_id', 'ID is required'), 'error'); 
+            showToast(t('invalid_id', 'ID is required'), 'error');
             return;
         }
-        
+
         const idRe = /^[a-zA-Z0-9_-]{1,64}$/;
         if (!idRe.test(id)) {
             showToast(t('invalid_id_chars', 'Invalid ID format'), 'error');
@@ -677,37 +668,38 @@ function setupGlobalListeners() {
 
         try {
             await apiCall('/api/link', 'POST', { linkName: id });
-            
+
             DOM.createInput.value = '';
-            
+
             const newLinkObj = {
                 linkName: id,
                 hasImage: false,
                 mimeType: '',
                 sizeBytes: 0,
-                modTime: Math.floor(Date.now() / 1000),
-                preview: ''
+                createdAt: Math.floor(Date.now() / 1000),
+                imageUrl: '',
+                preview: '',
             };
 
             const clone = DOM.template.content.cloneNode(true);
             const article = clone.querySelector('article');
             updateCard(article, newLinkObj);
             setupCardEvents(article, newLinkObj);
-            
+
             applyTranslations(article);
 
             DOM.emptyState.style.display = 'none';
-            DOM.linksList.appendChild(article); 
+            DOM.linksList.appendChild(article);
             STATE.wallpapers.push(newLinkObj);
-            filterAndSort();  
-            
+            filterAndSort();
+
             article.animate([
                 { opacity: 0, transform: 'translateY(10px)' },
                 { opacity: 1, transform: 'translateY(0)' }
             ], { duration: 300 });
 
             showToast(t('created_success', 'Link created'), 'success');
-            
+
         } catch (e) {
             console.error(e);
         }

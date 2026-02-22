@@ -25,6 +25,8 @@ type WallpaperResponse struct {
 	HasImage    bool   `json:"hasImage"`
 	ImagePath   string `json:"imagePath"`
 	PreviewPath string `json:"previewPath,omitempty"`
+	MIMEType    string `json:"mimeType"`  // FIX: добавлено
+	SizeBytes   int64  `json:"sizeBytes"` // FIX: добавлено
 	CreatedAt   int64  `json:"createdAt"`
 }
 
@@ -37,13 +39,26 @@ func Wallpapers(w http.ResponseWriter, r *http.Request) {
 	wallpapers := storage.Global.GetAll()
 	var resp []WallpaperResponse
 	for _, wp := range wallpapers {
+		category := wp.Category
+		if category == "" {
+			if wp.MIMEType == "mp4" || wp.MIMEType == "webm" {
+				category = "video"
+			} else if wp.HasImage {
+				category = "image"
+			} else {
+				category = "other"
+			}
+		}
+
 		resp = append(resp, WallpaperResponse{
 			ID:          wp.ID,
 			LinkName:    wp.LinkName,
-			Category:    "other",
+			Category:    category,
 			HasImage:    wp.HasImage,
 			ImagePath:   wp.ImagePath,
 			PreviewPath: wp.PreviewPath,
+			MIMEType:    wp.MIMEType,
+			SizeBytes:   wp.SizeBytes,
 			CreatedAt:   wp.CreatedAt,
 		})
 	}
