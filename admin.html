@@ -3,15 +3,13 @@
 <head>
   <meta charset="utf-8">
   <title>Lanpaper</title>
-  <!-- <link rel="icon" href="/static/icons/favicon.svg" type="image/svg+xml"> -->
-  <link rel="alternate icon" href="/static/icons/favicon.png" type="image/png">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="manifest" href="/static/manifest.json">
   <meta name="theme-color" content="#ffffff">
 </head>
 <body>
-  <!-- Background -->
   <div class="network-bg"></div>
 
   <div class="container">
@@ -21,7 +19,6 @@
         <img src="/static/logo.svg" alt="Lanpaper" class="logo" width="120" height="40">
       </div>
       <div class="controls">
-        <!-- Language -->
         <div id="langSwitcher" class="lang-switcher">
           <div class="lang-controls">
             <img id="langIconLight" src="/static/icons/lang-light.png" class="lang-icon" alt="Language">
@@ -33,15 +30,13 @@
           <ul id="langList" class="lang-list" role="listbox" aria-label="Language selector"></ul>
         </div>
 
-        <!-- View Toggle -->
         <button id="viewToggle" class="theme-switcher" aria-label="Toggle view">
-           <img src="/static/icons/grid-dark.png" class="view-icon list-icon light-theme-icon" alt="List">
-           <img src="/static/icons/grid-light.png" class="view-icon list-icon dark-theme-icon" alt="List">
-           <img src="/static/icons/list-dark.png" class="view-icon grid-icon light-theme-icon active" alt="Grid">
-           <img src="/static/icons/list-light.png" class="view-icon grid-icon dark-theme-icon active" alt="Grid">
+          <img src="/static/icons/grid-dark.png" class="view-icon list-icon light-theme-icon" alt="List">
+          <img src="/static/icons/grid-light.png" class="view-icon list-icon dark-theme-icon" alt="List">
+          <img src="/static/icons/list-dark.png" class="view-icon grid-icon light-theme-icon active" alt="Grid">
+          <img src="/static/icons/list-light.png" class="view-icon grid-icon dark-theme-icon active" alt="Grid">
         </button>
 
-        <!-- Theme Toggle -->
         <button id="themeToggle" class="theme-switcher" aria-label="Toggle dark mode">
           <img src="/static/icons/sun.png" alt="Dark" class="theme-icon active">
           <img src="/static/icons/moon.png" alt="Light" class="theme-icon">
@@ -54,10 +49,10 @@
       <h2 data-i18n="create_new_link">Create new link</h2>
       <form class="create-card" id="createForm" onsubmit="return false;">
         <div class="create-row">
-          <input type="text" id="newLinkId" class="input-field" 
-                 data-i18n-placeholder="input_placeholder" 
-                 placeholder="Link ID (letters, numbers, - or _)" 
-                 autocomplete="off" 
+          <input type="text" id="newLinkId" class="input-field"
+                 data-i18n-placeholder="input_placeholder"
+                 placeholder="Link ID (letters, numbers, - or _)"
+                 autocomplete="off"
                  pattern="[a-zA-Z0-9_-]+"
                  aria-label="Link ID">
         </div>
@@ -65,28 +60,20 @@
       </form>
     </section>
 
-    <!-- 🔍 SEARCH + SORT BAR -->
+    <!-- Search + Sort -->
     <section class="section">
       <div class="search-sort-bar">
-        <!-- Search -->
         <div class="search-container">
-          <input 
-            type="text" 
-            id="searchInput" 
+          <input
+            type="text"
+            id="searchInput"
             class="search-input"
             data-i18n-placeholder="search_placeholder"
             placeholder="Search by link name or file..."
             aria-label="Search wallpapers"
           >
-          <div 
-            id="searchStats" 
-            class="search-stats"
-          >
-            Total: 0
-          </div>
+          <div id="searchStats" class="search-stats">Total: 0</div>
         </div>
-
-        <!-- Sort -->
         <div class="sort-container">
           <label for="sortSelect" class="sort-label" data-i18n="sort_by">Sort by:</label>
           <select id="sortSelect" class="sort-select">
@@ -99,15 +86,13 @@
       </div>
     </section>
 
-    <!-- Existing links -->
+    <!-- Links -->
     <section class="section">
       <h2 data-i18n="existing_links">Existing links</h2>
-      <div class="links-list" id="linksList">
-        <!-- JS will populate this -->
-      </div>
+      <div class="links-list" id="linksList"></div>
       <div class="empty-state" id="emptyState" data-i18n="no_links">No links yet</div>
     </section>
-    
+
     <footer class="footer">
       <a href="https://github.com/zoixc/lanpaper" target="_blank" rel="noopener noreferrer" class="github-link">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -118,7 +103,7 @@
     </footer>
   </div>
 
-  <!-- Toast Container -->
+  <!-- Toast -->
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Modal -->
@@ -139,7 +124,7 @@
   <!-- Link Card Template -->
   <template id="linkCardTemplate">
     <article class="link-card" role="article">
-      <!-- Clickable Preview -->
+
       <a class="preview-link" target="_blank" rel="noopener noreferrer" aria-label="Open image">
         <div class="preview-wrapper">
           <img class="preview" src="" alt="Preview" loading="lazy">
@@ -156,18 +141,48 @@
       </div>
 
       <div class="actions-row">
-        <button class="btn btn--primary upload-file-btn" data-i18n="set_image" aria-label="Upload image">Upload</button>
-        <input type="file" class="file-input" 
-               accept="image/*,video/mp4,video/webm" 
-               style="display:none;" aria-label="Choose file">
-        <button class="btn btn--primary paste-url-btn" data-i18n="paste_url" aria-label="Paste image URL">URL</button>
-        <button class="btn btn--primary select-server-btn" data-i18n="select_server" aria-label="Select from server">Server</button>
-        <button class="btn btn--danger delete-btn" data-i18n="remove" aria-label="Delete link">Remove</button>
+        <div class="upload-dropdown">
+          <button class="btn btn--primary upload-toggle-btn" aria-haspopup="true" aria-expanded="false">
+            <span data-i18n="set_image">Upload</span>
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 1l4 4 4-4"/>
+            </svg>
+          </button>
+          <div class="upload-menu">
+            <button class="upload-menu-item upload-file-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              <span data-i18n="set_image">File</span>
+            </button>
+            <input type="file" class="file-input" accept="image/*,video/mp4,video/webm" style="display:none;">
+            <button class="upload-menu-item paste-url-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+              </svg>
+              <span data-i18n="paste_url">URL</span>
+            </button>
+            <button class="upload-menu-item select-server-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="2" width="20" height="8" rx="2"/>
+                <rect x="2" y="14" width="20" height="8" rx="2"/>
+                <line x1="6" y1="6" x2="6.01" y2="6"/>
+                <line x1="6" y1="18" x2="6.01" y2="18"/>
+              </svg>
+              <span data-i18n="select_server">Server</span>
+            </button>
+          </div>
+        </div>
+
+        <button class="btn btn--danger delete-btn" data-i18n="remove">Remove</button>
       </div>
+
     </article>
   </template>
 
-  <!-- PWA Service Worker Registration -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

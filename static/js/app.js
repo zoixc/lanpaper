@@ -3,6 +3,7 @@
  * Handles UI interactions, API calls, and state management.
  */
 
+
 // STATE & CONFIG
 const STATE = {
     translations: {},
@@ -14,6 +15,7 @@ const STATE = {
     wallpapers: [],
     filteredWallpapers: [],
 };
+
 
 // DOM ELEMENTS
 const DOM = {
@@ -47,6 +49,7 @@ const DOM = {
     template: document.getElementById('linkCardTemplate'),
 };
 
+
 // INITIALIZATION
 document.addEventListener('DOMContentLoaded', async () => {
     initTheme();
@@ -56,6 +59,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadLinks();
     setupGlobalListeners();
 });
+
 
 // THEME MANAGER
 function initTheme() {
@@ -80,6 +84,7 @@ function initTheme() {
         applyTheme();
     });
 }
+
 
 function applyTheme() {
     document.body.classList.toggle('dark', STATE.isDark);
@@ -106,6 +111,7 @@ function applyTheme() {
     }
 }
 
+
 // VIEW MODE MANAGER
 function initView() {
     applyViewMode(STATE.viewMode, false);
@@ -117,6 +123,7 @@ function initView() {
         applyViewMode(newMode, true);
     });
 }
+
 
 function applyViewMode(mode, animate = false) {
     if (animate) {
@@ -132,6 +139,7 @@ function applyViewMode(mode, animate = false) {
     }
 }
 
+
 function updateClasses(mode) {
     if (mode === 'grid') {
         DOM.linksList.classList.add('grid-view');
@@ -143,6 +151,7 @@ function updateClasses(mode) {
         DOM.viewBtn.querySelectorAll('.grid-icon').forEach(el => el.classList.add('active'));
     }
 }
+
 
 // LANGUAGE MANAGER
 async function initLanguage() {
@@ -176,6 +185,7 @@ async function initLanguage() {
     });
 }
 
+
 async function setLanguage(lang) {
     STATE.lang = lang;
     localStorage.setItem('lang', lang);
@@ -198,6 +208,7 @@ async function setLanguage(lang) {
     updateSearchStats();
 }
 
+
 function applyTranslations(root = document) {
     root.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.dataset.i18n;
@@ -209,9 +220,11 @@ function applyTranslations(root = document) {
     });
 }
 
+
 function t(key, defaultText) {
     return STATE.translations[key] || defaultText;
 }
+
 
 // SEARCH & SORT
 function initSearchSort() {
@@ -241,6 +254,7 @@ function initSearchSort() {
     });
 }
 
+
 function filterWallpapers() {
     const query = STATE.searchQuery;
     if (!query) {
@@ -252,6 +266,7 @@ function filterWallpapers() {
         });
     }
 }
+
 
 function sortWallpapers(list) {
     const sorted = [...list];
@@ -268,12 +283,14 @@ function sortWallpapers(list) {
     return sorted;
 }
 
+
 function filterAndSort() {
     filterWallpapers();
     STATE.filteredWallpapers = sortWallpapers(STATE.filteredWallpapers);
     updateSearchStats();
     renderLinks(STATE.filteredWallpapers);
 }
+
 
 function updateSearchStats() {
     const statsEl = DOM.searchStats;
@@ -293,6 +310,7 @@ function updateSearchStats() {
     }
 }
 
+
 // NOTIFICATIONS (TOASTS)
 function showToast(message, type = 'success') {
     const toast = document.createElement('div');
@@ -309,15 +327,16 @@ function showToast(message, type = 'success') {
     }, 3000);
 }
 
+
 // MODAL MANAGER
 let modalResolve = null;
+
 
 function showModal(type, titleKey, placeholderKey = '') {
     return new Promise((resolve) => {
         modalResolve = resolve;
 
         DOM.modalTitle.textContent = t(titleKey, 'Input');
-
         DOM.modalOverlay.classList.remove('hidden');
         DOM.modalOverlay.setAttribute('aria-hidden', 'false');
 
@@ -331,7 +350,6 @@ function showModal(type, titleKey, placeholderKey = '') {
             DOM.modalInput.style.display = 'block';
             DOM.modalInput.placeholder = t(placeholderKey, 'https://...');
             DOM.modalInput.focus();
-
             DOM.modalInput.onkeydown = (e) => {
                 if (e.key === 'Enter') confirmModal();
             };
@@ -345,12 +363,14 @@ function showModal(type, titleKey, placeholderKey = '') {
     });
 }
 
+
 function closeModal() {
     DOM.modalOverlay.classList.add('hidden');
     DOM.modalOverlay.setAttribute('aria-hidden', 'true');
     if (modalResolve) modalResolve(null);
     modalResolve = null;
 }
+
 
 function confirmModal() {
     let result = null;
@@ -359,9 +379,7 @@ function confirmModal() {
         result = DOM.modalInput.value.trim();
     } else {
         const selected = DOM.modalList.querySelector('.selected');
-        if (selected) {
-            result = selected.dataset.value;
-        }
+        if (selected) result = selected.dataset.value;
     }
 
     if (result) {
@@ -373,6 +391,7 @@ function confirmModal() {
         setTimeout(() => DOM.modalInput.classList.remove('shake'), 300);
     }
 }
+
 
 async function loadExternalImages() {
     DOM.modalList.innerHTML = `<div style="grid-column: 1/-1; text-align: center;">${t('loading', 'Loading...')}</div>`;
@@ -395,7 +414,6 @@ async function loadExternalImages() {
             div.dataset.value = file;
 
             const previewUrl = `/api/external-image-preview?path=${encodeURIComponent(file)}`;
-
             div.innerHTML = `
                 <img src="${previewUrl}" loading="lazy" alt="${file}">
                 <div class="image-name">${file}</div>
@@ -411,6 +429,7 @@ async function loadExternalImages() {
         DOM.modalList.innerHTML = `<div style="color:red; text-align:center;">${t('server_error', 'Error loading images')}</div>`;
     }
 }
+
 
 // API HELPERS
 async function apiCall(url, method = 'GET', body = null, isFormData = false) {
@@ -438,6 +457,7 @@ async function apiCall(url, method = 'GET', body = null, isFormData = false) {
     }
 }
 
+
 // APP LOGIC
 async function loadLinks() {
     try {
@@ -452,6 +472,7 @@ async function loadLinks() {
         renderLinks([]);
     }
 }
+
 
 function renderLinks(wallpapers) {
     DOM.linksList.innerHTML = '';
@@ -478,18 +499,18 @@ function renderLinks(wallpapers) {
     applyTranslations(DOM.linksList);
 }
 
-// FIX: определяем категорию по mimeType и путям, не доверяем пустому полю из API
+
 function detectCategory(link) {
     const mime = link.mimeType || '';
     if (mime.startsWith('video/')) return 'video';
     if (mime.startsWith('image/')) return 'image';
-    // FIX: смотрим и imagePath и imageUrl (API отдаёт imageUrl)
     const path = link.imagePath || link.imageUrl || '';
     const ext = path.split('.').pop().toLowerCase();
     if (['mp4', 'webm'].includes(ext)) return 'video';
     if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) return 'image';
     return 'other';
 }
+
 
 function updateCard(card, link) {
     const linkName = link.linkName || link.id;
@@ -500,12 +521,10 @@ function updateCard(card, link) {
 
     const category = link.hasImage ? detectCategory(link) : 'other';
 
-    // FIX: защита от undefined — mimeType может отсутствовать после загрузки
     let fileType;
     if (link.mimeType) {
         fileType = (link.mimeType.split('/')[1] || link.mimeType).toUpperCase();
     } else if (link.hasImage) {
-        // FIX: берём расширение из imageUrl если imagePath пустой
         const path = link.imagePath || link.imageUrl || '';
         fileType = path.split('.').pop().toUpperCase() || 'IMAGE';
     } else {
@@ -521,7 +540,6 @@ function updateCard(card, link) {
     const previewWrapper = card.querySelector('.preview-wrapper');
     previewWrapper.innerHTML = '';
 
-    // FIX: API после загрузки отдаёт поле preview, а не previewPath
     const resolvedPreview = link.previewPath || link.preview || '';
 
     if (link.hasImage && resolvedPreview) {
@@ -532,7 +550,6 @@ function updateCard(card, link) {
         img.onerror = () => previewWrapper.innerHTML = '<div class="no-image">Preview unavailable</div>';
         previewWrapper.appendChild(img);
     } else if (link.hasImage) {
-        // FIX: fallback на imageUrl если нет preview
         const img = document.createElement('img');
         img.src = '/' + (link.imageUrl || '').replace(/^\//, '') || fullUrl;
         img.alt = "Image";
@@ -563,10 +580,35 @@ function updateCard(card, link) {
     };
 }
 
+
 function setupCardEvents(card, link) {
     const fileInput = card.querySelector('.file-input');
+    const dropdown = card.querySelector('.upload-dropdown');
+    const toggleBtn = card.querySelector('.upload-toggle-btn');
 
-    card.querySelector('.upload-file-btn').onclick = () => fileInput.click();
+    // Открыть/закрыть дропдаун
+    toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = dropdown.classList.contains('open');
+        // Закрыть все остальные открытые дропдауны
+        document.querySelectorAll('.upload-dropdown.open').forEach(d => d.classList.remove('open'));
+        if (!isOpen) dropdown.classList.add('open');
+        toggleBtn.setAttribute('aria-expanded', String(!isOpen));
+    });
+
+    // Закрыть при клике вне дропдауна
+    document.addEventListener('click', (e) => {
+        if (!dropdown.contains(e.target)) {
+            dropdown.classList.remove('open');
+            toggleBtn.setAttribute('aria-expanded', 'false');
+        }
+    });
+
+    // Кнопки внутри меню
+    card.querySelector('.upload-file-btn').addEventListener('click', () => {
+        dropdown.classList.remove('open');
+        fileInput.click();
+    });
 
     fileInput.onchange = async () => {
         if (!fileInput.files.length) return;
@@ -574,6 +616,19 @@ function setupCardEvents(card, link) {
         fileInput.value = '';
     };
 
+    card.querySelector('.paste-url-btn').addEventListener('click', async () => {
+        dropdown.classList.remove('open');
+        const url = await showModal('input', 'enter_image_url_title', 'url_placeholder');
+        if (url) await handleUpload(link, url, card, true);
+    });
+
+    card.querySelector('.select-server-btn').addEventListener('click', async () => {
+        dropdown.classList.remove('open');
+        const filename = await showModal('grid', 'select_server_title');
+        if (filename) await handleUpload(link, filename, card, true);
+    });
+
+    // Drag & drop
     card.ondragover = e => { e.preventDefault(); card.style.borderColor = 'var(--border-focus)'; };
     card.ondragleave = () => { card.style.borderColor = 'var(--border)'; };
     card.ondrop = async e => {
@@ -584,21 +639,10 @@ function setupCardEvents(card, link) {
         }
     };
 
-    card.querySelector('.paste-url-btn').onclick = async () => {
-        const url = await showModal('input', 'enter_image_url_title', 'url_placeholder');
-        if (url) await handleUpload(link, url, card, true);
-    };
-
-    card.querySelector('.select-server-btn').onclick = async () => {
-        const filename = await showModal('grid', 'select_server_title');
-        if (filename) await handleUpload(link, filename, card, true);
-    };
-
     card.querySelector('.delete-btn').onclick = async () => {
         if (confirm(t('confirm_delete', 'Delete link?'))) {
             await apiCall(`/api/link/${link.linkName}`, 'DELETE');
             card.remove();
-            // FIX: обновляем STATE после удаления
             STATE.wallpapers = STATE.wallpapers.filter(wp => wp.linkName !== link.linkName);
             updateSearchStats();
             if (DOM.linksList.children.length === 0) DOM.emptyState.style.display = 'block';
@@ -606,6 +650,7 @@ function setupCardEvents(card, link) {
         }
     };
 }
+
 
 async function handleUpload(link, fileOrUrl, card, isUrl = false) {
     const formData = new FormData();
@@ -624,7 +669,6 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
     try {
         const updatedLink = await apiCall('/api/upload', 'POST', formData, true);
 
-        // FIX: сохраняем createdAt из старого объекта если API не вернул
         if (!updatedLink.createdAt && link.createdAt) {
             updatedLink.createdAt = link.createdAt;
         }
@@ -645,11 +689,13 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
     }
 }
 
+
 function reorderCard(card, link) {
     if (link.hasImage) {
         DOM.linksList.prepend(card);
     }
 }
+
 
 function setupGlobalListeners() {
     DOM.createForm.onsubmit = async (e) => {
@@ -685,7 +731,6 @@ function setupGlobalListeners() {
             const article = clone.querySelector('article');
             updateCard(article, newLinkObj);
             setupCardEvents(article, newLinkObj);
-
             applyTranslations(article);
 
             DOM.emptyState.style.display = 'none';
@@ -699,7 +744,6 @@ function setupGlobalListeners() {
             ], { duration: 300 });
 
             showToast(t('created_success', 'Link created'), 'success');
-
         } catch (e) {
             console.error(e);
         }
@@ -710,12 +754,14 @@ function setupGlobalListeners() {
     };
 }
 
+
 // UTILS
 function formatKB(bytes) {
     if (!bytes) return '0 KB';
     const kb = bytes / 1024;
     return kb < 10 ? `${kb.toFixed(1)} KB` : `${Math.round(kb)} KB`;
 }
+
 
 function formatDate(ts) {
     if (!ts) return '—';

@@ -1,17 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40" width="120" height="40">
-  <defs>
-    <radialGradient id="dotGradient">
-      <stop offset="0%" style="stop-color:#d4c5a9;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#b8a476;stop-opacity:1" />
-    </radialGradient>
-  </defs>
-  
-  <!-- Horizontal line (horizon) - thicker -->
-  <line x1="8" y1="23" x2="38" y2="23" stroke="#9b9a97" stroke-width="2.5" stroke-linecap="round"/>
-  
-  <!-- Dot (network node) - bigger -->
-  <circle cx="23" cy="13" r="4" fill="url(#dotGradient)"/>
-  
-  <!-- Text LANPAPER - bigger and bolder -->
-  <text x="44" y="25" font-family="'Disket-Mono-Bold', monospace" font-size="13" fill="#2d2d2d" font-weight="700">LANPAPER</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 32" fill="none">
+  <!-- Иконка: рамка картинки -->
+  <rect x="1" y="1" width="28" height="28" rx="5" stroke="#2a2a28" stroke-width="2"/>
+  <!-- Горизонт -->
+  <line x1="1" y1="20" x2="29" y2="20" stroke="#2a2a28" stroke-width="2"/>
+  <!-- Солнце -->
+  <circle cx="10" cy="13" r="3" fill="#e8541a"/>
+  <!-- Горы -->
+  <polyline points="14,20 20,12 26,20" fill="#2a2a28" stroke="none"/>
+
+  <!-- Надпись -->
+  <text x="40" y="22"
+    font-family="system-ui, -apple-system, sans-serif"
+    font-size="16"
+    font-weight="600"
+    letter-spacing="0.5"
+    fill="#2a2a28">Lanpaper</text>
 </svg>
