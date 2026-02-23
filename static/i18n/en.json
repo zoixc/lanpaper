@@ -10,35 +10,45 @@
   "paste_url": "URL",
   "select_server": "Server",
   "remove": "Remove",
-  
+
   "enter_image_url_title": "Paste from URL",
   "select_server_title": "Select from Server",
   "enter_image_url": "Image URL:",
-  
+  "url_placeholder": "https://...",
+
   "invalid_id": "ID is required",
   "invalid_id_chars": "Use a-z, 0-9, - or _",
   "invalid_image": "Invalid file format",
-  
+
   "upload_success": "Uploaded!",
   "created_success": "Link created",
   "deleted_success": "Link deleted",
   "confirm_delete": "Delete this link?",
-  
+
   "loading": "Loading...",
   "server_empty": "Folder is empty",
   "server_error": "Access error",
   "copied": "Copied!",
-  
+
   "modal_cancel": "Cancel",
   "modal_ok": "OK",
+  "modal_default_title": "Input",
 
   "search_placeholder": "Search by link name or file...",
   "search_total": "Total: {{total}}",
   "search_found": "Found {{shown}} of {{total}}",
 
   "sort_by": "Sort by:",
-  "name_asc": "Name (A–Z)",
-  "name_desc": "Name (Z–A)",
+  "name_asc": "Name (A\u2013Z)",
+  "name_desc": "Name (Z\u2013A)",
   "date_new": "Newest first",
-  "date_old": "Oldest first"
+  "date_old": "Oldest first",
+
+  "load_error": "Failed to load links",
+  "preview_unavailable": "Preview unavailable",
+  "image_unavailable": "Image unavailable",
+
+  "aria_open_image": "Open image",
+  "aria_link_id": "Link ID",
+  "aria_file_info": "File info"
 }
