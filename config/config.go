@@ -34,56 +34,114 @@ type Config struct {
 var Current Config
 
 func Load() {
-	Current = Config{
-		Port:                 getEnv("PORT", "8080"),
-		MaxUploadMB:          getEnvInt("MAX_UPLOAD_MB", 50),
-		MaxImages:            getEnvInt("MAX_IMAGES", 0),
-		MaxConcurrentUploads: getEnvInt("MAX_CONCURRENT_UPLOADS", 2),
-		ExternalImageDir:     getEnv("EXTERNAL_IMAGE_DIR", "external/images"),
-		AdminUser:            getEnv("ADMIN_USER", ""),
-		AdminPass:            getEnv("ADMIN_PASS", ""),
-		DisableAuth:          getEnvBool("DISABLE_AUTH", false),
-		InsecureSkipVerify:   getEnvBool("INSECURE_SKIP_VERIFY", false),
-		ProxyHost:            getEnv("PROXY_HOST", ""),
-		ProxyPort:            getEnv("PROXY_PORT", ""),
-		ProxyType:            getEnv("PROXY_TYPE", "http"),
-		ProxyUsername:        getEnv("PROXY_USERNAME", ""),
-		ProxyPassword:        getEnv("PROXY_PASSWORD", ""),
-		Rate: RateConfig{
-			PublicPerMin: getEnvInt("RATE_PUBLIC_PER_MIN", 120),
-			UploadPerMin: getEnvInt("RATE_UPLOAD_PER_MIN", 20),
-			Burst:        getEnvInt("RATE_BURST", 10),
-		},
-	}
-
+	// Step 1: load config.json as base (lowest priority)
 	if data, err := os.ReadFile("config.json"); err == nil {
 		if err := json.Unmarshal(data, &Current); err != nil {
 			log.Printf("Warning: failed to parse config.json: %v", err)
 		}
 	}
-}
 
-func getEnv(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
+	// Step 2: env variables override config.json (highest priority)
+	if v := os.Getenv("PORT"); v != "" {
+		Current.Port = v
 	}
-	return fallback
-}
+	if Current.Port == "" {
+		Current.Port = "8080"
+	}
 
-func getEnvInt(key string, fallback int) int {
-	if v := os.Getenv(key); v != "" {
+	if v := os.Getenv("MAX_UPLOAD_MB"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
-			return n
+			Current.MaxUploadMB = n
 		}
 	}
-	return fallback
-}
+	if Current.MaxUploadMB == 0 {
+		Current.MaxUploadMB = 50
+	}
 
-func getEnvBool(key string, fallback bool) bool {
-	if v := os.Getenv(key); v != "" {
-		if b, err := strconv.ParseBool(v); err == nil {
-			return b
+	if v := os.Getenv("MAX_IMAGES"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			Current.MaxImages = n
 		}
 	}
-	return fallback
+
+	if v := os.Getenv("MAX_CONCURRENT_UPLOADS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			Current.MaxConcurrentUploads = n
+		}
+	}
+	if Current.MaxConcurrentUploads == 0 {
+		Current.MaxConcurrentUploads = 2
+	}
+
+	if v := os.Getenv("EXTERNAL_IMAGE_DIR"); v != "" {
+		Current.ExternalImageDir = v
+	}
+	if Current.ExternalImageDir == "" {
+		Current.ExternalImageDir = "external/images"
+	}
+
+	if v := os.Getenv("ADMIN_USER"); v != "" {
+		Current.AdminUser = v
+	}
+	if v := os.Getenv("ADMIN_PASS"); v != "" {
+		Current.AdminPass = v
+	}
+
+	// Booleans: only override if env is explicitly set
+	if v := os.Getenv("DISABLE_AUTH"); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			Current.DisableAuth = b
+		}
+	}
+	if v := os.Getenv("INSECURE_SKIP_VERIFY"); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			Current.InsecureSkipVerify = b
+		}
+	}
+
+	if v := os.Getenv("PROXY_HOST"); v != "" {
+		Current.ProxyHost = v
+	}
+	if v := os.Getenv("PROXY_PORT"); v != "" {
+		Current.ProxyPort = v
+	}
+	if v := os.Getenv("PROXY_TYPE"); v != "" {
+		Current.ProxyType = v
+	}
+	if Current.ProxyType == "" {
+		Current.ProxyType = "http"
+	}
+	if v := os.Getenv("PROXY_USERNAME"); v != "" {
+		Current.ProxyUsername = v
+	}
+	if v := os.Getenv("PROXY_PASSWORD"); v != "" {
+		Current.ProxyPassword = v
+	}
+
+	if v := os.Getenv("RATE_PUBLIC_PER_MIN"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			Current.Rate.PublicPerMin = n
+		}
+	}
+	if Current.Rate.PublicPerMin == 0 {
+		Current.Rate.PublicPerMin = 120
+	}
+
+	if v := os.Getenv("RATE_UPLOAD_PER_MIN"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			Current.Rate.UploadPerMin = n
+		}
+	}
+	if Current.Rate.UploadPerMin == 0 {
+		Current.Rate.UploadPerMin = 20
+	}
+
+	if v := os.Getenv("RATE_BURST"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			Current.Rate.Burst = n
+		}
+	}
+	if Current.Rate.Burst == 0 {
+		Current.Rate.Burst = 10
+	}
 }
