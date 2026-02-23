@@ -25,10 +25,20 @@ import (
 
 	"github.com/chai2010/webp"
 	xdraw "golang.org/x/image/draw"
+
+	// Register additional image decoders into image.Decode registry
+	_ "golang.org/x/image/bmp"
+	_ "golang.org/x/image/tiff"
+
 	"lanpaper/config"
 	"lanpaper/storage"
 	"lanpaper/utils"
 )
+
+func init() {
+	// Register WebP decoder so image.Decode can handle WebP URLs
+	image.RegisterFormat("webp", "RIFF????WEBP", webp.Decode, webp.DecodeConfig)
+}
 
 var uploadSem chan struct{}
 
@@ -40,12 +50,11 @@ func InitUploadSemaphore(maxConcurrent int) {
 }
 
 // httpTransport is a shared transport so connections are pooled across downloads.
-// It is rebuilt lazily when proxy/TLS settings change (guarded by transportMu).
 var (
-	transportMu      sync.Mutex
-	cachedTransport  *http.Transport
-	cachedProxyHost  string
-	cachedInsecure   bool
+	transportMu     sync.Mutex
+	cachedTransport *http.Transport
+	cachedProxyHost string
+	cachedInsecure  bool
 )
 
 func getTransport() *http.Transport {
@@ -55,7 +64,6 @@ func getTransport() *http.Transport {
 	proxyHost := config.Current.ProxyHost
 	insecure := config.Current.InsecureSkipVerify
 
-	// Rebuild only when relevant settings differ from last build
 	if cachedTransport != nil && cachedProxyHost == proxyHost && cachedInsecure == insecure {
 		return cachedTransport
 	}
@@ -143,6 +151,20 @@ var mimeToExt = map[string]string{
 	"image/tiff": "tiff",
 	"video/mp4":  "mp4",
 	"video/webm": "webm",
+}
+
+// normalizeFormat maps image.Decode format names to our internal extensions.
+func normalizeFormat(format string) string {
+	switch format {
+	case "jpeg":
+		return "jpg"
+	case "tiff":
+		return "tiff"
+	case "bmp":
+		return "bmp"
+	default:
+		return format // png, gif, webp — already correct
+	}
 }
 
 // thumbnail resizes src to fit within maxW x maxH using golang.org/x/image/draw
@@ -313,9 +335,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if !isVideo {
-			img, _, err = image.Decode(uploadedFile)
-			if err != nil {
-				log.Printf("Image decode error for %s: %v", safeFilename, err)
+			var decodeErr error
+			img, _, decodeErr = image.Decode(uploadedFile)
+			if decodeErr != nil {
+				log.Printf("Image decode error for %s: %v", safeFilename, decodeErr)
 				http.Error(w, "Invalid image decode", http.StatusBadRequest)
 				return
 			}
@@ -457,6 +480,10 @@ func saveImage(img image.Image, format, path string) error {
 		return gif.Encode(out, img, &gif.Options{NumColors: 256})
 	case "webp":
 		return webp.Encode(out, img, &webp.Options{Quality: 85})
+	case "bmp", "tiff":
+		// Re-encode as JPEG to avoid needing x/image encode support.
+		// The original format is already validated; we store as jpg for wide compatibility.
+		return jpeg.Encode(out, img, &jpeg.Options{Quality: 90})
 	default:
 		return jpeg.Encode(out, img, &jpeg.Options{Quality: 85})
 	}
@@ -485,10 +512,7 @@ func loadLocalImage(path string) (image.Image, string, []byte, error) {
 	if err != nil {
 		return nil, "", nil, err
 	}
-	if format == "jpeg" {
-		format = "jpg"
-	}
-	return img, format, head, nil
+	return img, normalizeFormat(format), head, nil
 }
 
 func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []byte, error) {
@@ -518,7 +542,7 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, "", nil, fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
@@ -533,20 +557,12 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 		return nil, "", nil, fmt.Errorf("read error: %v", err)
 	}
 
-	img, _, err := image.Decode(bytes.NewReader(buf))
+	// Decode image and use the format reported by the decoder (not Content-Type).
+	// This correctly handles CDN links with application/octet-stream Content-Type.
+	img, format, err := image.Decode(bytes.NewReader(buf))
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("decode error")
+		return nil, "", nil, fmt.Errorf("unsupported or invalid image format (decode error: %v)", err)
 	}
 
-	ext := "jpg"
-	if ct := resp.Header.Get("Content-Type"); ct != "" {
-		if strings.Contains(ct, "png") {
-			ext = "png"
-		} else if strings.Contains(ct, "gif") {
-			ext = "gif"
-		} else if strings.Contains(ct, "webp") {
-			ext = "webp"
-		}
-	}
-	return img, ext, buf, nil
+	return img, normalizeFormat(format), buf, nil
 }
