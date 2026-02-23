@@ -7,11 +7,16 @@ import (
 	"lanpaper/config"
 )
 
+// MaybeBasicAuth applies Basic Auth only when auth is enabled.
+// The check is performed per-request so that runtime config changes are respected.
 func MaybeBasicAuth(next http.HandlerFunc) http.HandlerFunc {
-	if config.Current.DisableAuth {
-		return next
+	return func(w http.ResponseWriter, r *http.Request) {
+		if config.Current.DisableAuth {
+			next(w, r)
+			return
+		}
+		BasicAuth(next)(w, r)
 	}
-	return BasicAuth(next)
 }
 
 func BasicAuth(next http.HandlerFunc) http.HandlerFunc {

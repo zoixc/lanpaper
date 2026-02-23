@@ -5,184 +5,95 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Fixed
-- Rate limit logic in security middleware - now correctly blocks requests when limit exceeded
-- Docker healthcheck now uses dedicated `/health` endpoint instead of root path
-- Race condition in `PruneOldImages` - now saves data before releasing lock
+- Rate limit counters are now isolated per endpoint group (`public` vs `upload`),
+  preventing upload activity from consuming the public rate limit for the same IP
+- `MaybeBasicAuth` now evaluates `DisableAuth` per-request instead of once at
+  middleware registration (closure bug)
+- `isValidLinkName` regex is now compiled once at startup (`regexp.MustCompile`)
+  instead of on every request
+- `public.go` now uses `http.ServeContent` instead of `http.ServeFile` so that
+  manually set headers (`Cache-Control`, `Content-Type`, `Content-Disposition`)
+  are not silently overwritten
+- `ImagePath` / `PreviewPath` are no longer persisted to `wallpapers.json`
+  (tagged `json:"-"`); they are derived at load time via `derivePaths()`
+- Removed `Cross-Origin-Embedder-Policy: require-corp` header that broke
+  loading of external images in the admin panel
+- `validate()` extracted from `Load()` and made package-level so tests can call
+  it directly without triggering env/file I/O
 
-### Security Enhancements
+### Added
+- `validate()` function in `config/config.go` — sanitises port, upload limits,
+  rate limits, proxy type, and auto-disables auth when no credentials are set
+- Config validation unit tests (`config_test.go`) covering port, MaxUploadMB,
+  MaxConcurrentUploads, rate limits, proxy type, and auth auto-disable logic
+- Startup log warnings when auth is auto-disabled or `DISABLE_AUTH=true`
+- `uptime` field in `/health` response
 
-#### Magic Bytes Validation
-- Deep file type verification using magic bytes signatures
-- Protection against file extension spoofing (e.g., malware.exe renamed to image.jpg)
-- Validates actual file content matches declared extension
-- Supports all formats: JPEG, PNG, GIF, WebP, BMP, TIFF, MP4, WebM
-- Special handling for complex formats (WebP RIFF, MP4 ftyp)
-- Minimal performance overhead (~0.01ms per file)
+### Changed
+- Unified environment variable naming:
+  - `PROXY_USER` → `PROXY_USERNAME` (old name still accepted as fallback)
+  - `PROXY_PASS` → `PROXY_PASSWORD` (old name still accepted as fallback)
+  - `RATE_LIMIT` removed; replaced by `RATE_PUBLIC_PER_MIN`, `RATE_UPLOAD_PER_MIN`, `RATE_BURST`
+- `config.example.json` field names aligned with Go struct tags:
+  - `username` → `adminUser`, `password` → `adminPass`
+  - `public_per_min` / `admin_per_min` → `publicPerMin` / `uploadPerMin`
+- `docker-compose-example.yml` updated: proxy section commented out by default,
+  `PORT` set to `8080` inside container, all rate limit vars explicit
+- README rewritten: env variable reference table, removed stale `config.json`
+  Quick Start steps, accurate auth behaviour docs
 
-#### Enhanced Security Headers
-- `X-Download-Options: noopen` - prevents IE from opening downloads in site context
-- `Cross-Origin-Resource-Policy: same-origin` - CORP protection against Spectre attacks
-- `Cross-Origin-Embedder-Policy: require-corp` - COEP isolation
-- `Cross-Origin-Opener-Policy: same-origin` - COOP protection
+### Removed
+- `Cross-Origin-Embedder-Policy: require-corp` security header (incompatible
+  with external image loading without CORP headers on remote servers)
+- `admin_per_min` rate limit field (admin endpoints are not separately rate-limited)
 
-#### Upload Security
-- Content-Length validation before reading body (bomb protection)
-- MIME type validation with whitelist
-- Filename sanitization for safe logging
-- Enhanced security logging for all rejected uploads
-- Protection against zip bombs and size attacks
-
-### Testing
-- Added comprehensive unit tests for validation functions
-- Added unit tests for configuration validation
-- Benchmark tests for performance-critical functions
-- Test coverage for security-critical components
-
-### Documentation
-- Complete API documentation with examples (curl, Python, JavaScript, Shell)
-- Added security considerations and best practices
-- Updated README with latest features and configuration options
-
-### UI Improvements
-- Logo now adapts to theme (visible in both light and dark modes)
-- Softer button contrast in light theme
-- Smooth animations for theme and view toggle icons
-- Professional Notion-inspired design
+---
 
 ## [0.8.0] - 2026-02-08
 
 ### Security
 
-#### Enhanced Content Security Policy
-- Removed `unsafe-inline` for scripts - inline JavaScript now prohibited
-- Added `form-action 'self'` - protection against form submissions to external sites
-- Added `base-uri 'self'` - protection against base URL manipulation
-- Added `frame-ancestors 'none'` - clickjacking protection
-- Added `blob:` support for media/img - for blob URLs
+#### Magic Bytes Validation
+- Deep file type verification using magic bytes signatures
+- Protection against file extension spoofing (e.g., malware.exe renamed to image.jpg)
+- Supports all formats: JPEG, PNG, GIF, WebP, BMP, TIFF, MP4, WebM
+- Special handling for complex formats (WebP RIFF, MP4 ftyp box)
 
-#### Path Traversal Protection
-- New `IsValidLocalPath()` function with checks for:
-  - Null bytes (`\x00`)
-  - Absolute paths
-  - Directory traversal attempts (`..`)
-  - UNC paths on Windows (`\\`)
-- Double validation via `filepath.Abs()` - path must stay within base directory
-- Logging of all path traversal attempts
-
-#### Additional Security Headers
+#### Enhanced Security Headers
+- Strict Content Security Policy (no `unsafe-inline` for scripts)
+- `X-Download-Options: noopen`
+- `Cross-Origin-Resource-Policy: same-origin`
+- `Cross-Origin-Opener-Policy: same-origin`
 - `X-XSS-Protection: 1; mode=block`
 - `Referrer-Policy: strict-origin-when-cross-origin`
 - `Permissions-Policy: geolocation=(), microphone=(), camera=()`
 
-#### Input Validation
-- File size check from header before processing
-- Content-type validation for uploaded files
-- Logging of rejected files
-- Link name validation with reserved names check
+#### Path Traversal Protection
+- `IsValidLocalPath()` with null-byte, absolute path, `..`, and UNC path checks
+- Double validation via `filepath.Abs()` — path must stay within base directory
+- All traversal attempts logged
 
-#### Security Logging
-- `"Security: blocked invalid path attempt"`
-- `"Security: blocked path traversal attempt"`
-- `"Failed authentication attempt from IP"`
-- `"Rate limit exceeded for IP"`
-- `"Rejected unsupported content type"`
+#### Upload Security
+- Content-Length validation before reading body
+- MIME type whitelist
+- Filename sanitization
+- Magic bytes validation for all uploaded files
 
 ### Reliability
-
-#### Graceful Shutdown
-- Proper handling of `SIGTERM` and `SIGINT` signals
-- 30-second timeout for completing current requests
-- Shutdown process logging
-
-#### HTTP Server Timeouts
-- `ReadTimeout: 30s` - protection against slow clients
-- `WriteTimeout: 30s` - response time limitation
-- `IdleTimeout: 120s` - automatic closure of idle connections
-
-#### Improved Error Handling
-All previously ignored errors (`_`) are now handled:
-- `json.Marshal/Encode` - serialization error logging
-- `os.Remove` - check for `os.IsNotExist` before logging
-- `os.Stat` - return HTTP 500 on errors
-- `io.Copy` - copy error logging
-- `file.Seek` - positioning error handling
-- Deferred file close with error checking
-
-#### Contextual Logging
-All logs now include context:
-- `"Error saving wallpapers after upload: %v"`
-- `"Error removing old image %s: %v"`
-- `"Failed to create directory %s: %v"`
-- `"Error stating uploaded file %s: %v"`
+- Graceful shutdown with 30-second timeout (`SIGTERM` / `SIGINT`)
+- HTTP server timeouts: Read 30s, Write 30s, Idle 120s
+- Atomic writes for `wallpapers.json` (temp file + rename)
+- All previously ignored errors now handled with contextual logging
 
 ### Features
-
-#### Health Check Endpoint
-- Added `/health` endpoint for monitoring
-- Returns JSON with status and timestamp
-- No authentication required
-- Docker healthcheck integration
-
-#### Video Upload Refactoring
-- Extracted video copy logic into separate functions
-- `copyVideoFile()` - copy from file system
-- `copyVideoFromReader()` - copy from HTTP stream
-- Improved error handling for video operations
-
-### Quality of Life
-
-- Authentication automatically disabled if `ADMIN_USER` and `ADMIN_PASS` are not set
-- No need to manually set `DISABLE_AUTH=true` for setups behind external auth
-- Warning logged when auth is auto-disabled
-- Configuration validation with warnings for invalid values
-- Security warnings for weak passwords and InsecureSkipVerify
+- `/health` endpoint returning JSON status, version, and timestamp
+- Video upload support (MP4, WebM) with separate copy helpers
+- `PruneOldImages()` for automatic cleanup when `MAX_IMAGES` is set
+- Authentication auto-disabled when `ADMIN_USER` / `ADMIN_PASS` are not set
 
 ### Architecture
-
-#### Module Refactoring
-Main file `main.go` reduced from 900+ to 80 lines. Code split into:
-
-**config/**
-- `config.go` - Configuration loading, validation, and storage
-
-**handlers/**
-- `admin.go` - Admin API (wallpapers, links, external images)
-- `upload.go` - File upload logic (upload, download, local)
-- `public.go` - Public image access
-- `common.go` - Common utilities (name validation)
-
-**middleware/**
-- `auth.go` - Basic Authentication
-- `security.go` - Security headers and CSP
-- `ratelimit.go` - Rate limiting with cleanup
-
-**storage/**
-- `wallpaper.go` - Data storage with Get/Set/Delete/GetAll methods
-- `PruneOldImages()` function for automatic cleanup
-
-**utils/**
-- `validation.go` - Path validation and file type verification
-
-#### Benefits
-- Better code readability
-- Simplified testing
-- Isolated changes
-- Explicit dependencies via imports
-- Easier maintenance and debugging
-
-### Documentation
-- Updated README.md with new features description
-- Added modular structure documentation
-- Improved security recommendations
-- Added this CHANGELOG
-- Examples for reverse proxy configuration
-
-### Technical Improvements
-- Fixed all Go compiler warnings
-- Removed unused imports
-- Consistent code formatting
-- Correct module paths in imports
-- Unified TIFF extension handling
+- `main.go` reduced from 900+ to ~80 lines
+- Split into modules: `config`, `handlers`, `middleware`, `storage`, `utils`
 
 ## [0.7.7] - 2024-XX-XX
 

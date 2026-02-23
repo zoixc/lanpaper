@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 
 	"lanpaper/storage"
@@ -46,16 +45,24 @@ func Public(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
 	mime := "image/" + wp.MIMEType
 	if wp.MIMEType == "mp4" || wp.MIMEType == "webm" {
 		mime = "video/" + wp.MIMEType
 	}
+
+	// Set headers before ServeContent so they are not overwritten.
+	// We do NOT set Content-Length manually — ServeContent handles that.
 	w.Header().Set("Content-Type", mime)
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s.%s"`, wp.LinkName, wp.MIMEType))
-	w.Header().Set("Content-Length", strconv.FormatInt(fi.Size(), 10))
-	w.Header().Set("Accept-Ranges", "bytes")
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 
-	http.ServeFile(w, r, wp.ImagePath)
+	f, err := os.Open(wp.ImagePath)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer f.Close()
+
+	http.ServeContent(w, r, wp.LinkName+"."+wp.MIMEType, fi.ModTime(), f)
 }
