@@ -27,7 +27,9 @@ jobs:
         run: go test -v -race ./...
 
       - name: Build
-        run: go build ./...
+        run: |
+          VERSION=$(cat VERSION)
+          go build -ldflags="-X main.Version=${VERSION}" ./...
 
   docker:
     needs: test
@@ -40,11 +42,9 @@ jobs:
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
 
-      - name: Determine version
+      - name: Read version
         id: version
-        run: |
-          VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        run: echo "VERSION=$(cat VERSION)" >> $GITHUB_OUTPUT
 
       - name: Build & smoke-test (amd64 only)
         run: |

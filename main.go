@@ -22,6 +22,11 @@ import (
 	_ "golang.org/x/image/tiff"
 )
 
+// Version is injected at build time via:
+//
+//	go build -ldflags "-X main.Version=$(cat VERSION)"
+//
+// Falls back to "dev" when building without ldflags.
 var (
 	Version   = "dev"
 	startTime = time.Now()
@@ -145,7 +150,6 @@ func readinessHandler(w http.ResponseWriter, r *http.Request) {
 	checks := map[string]check{}
 	ready := true
 
-	// Check 1: storage loaded (at least one wallpaper key exists, or data dir is accessible)
 	dataDir := "data"
 	if _, err := os.Stat(dataDir); err != nil {
 		checks["storage"] = check{OK: false, Message: "data directory not accessible"}
@@ -154,7 +158,6 @@ func readinessHandler(w http.ResponseWriter, r *http.Request) {
 		checks["storage"] = check{OK: true}
 	}
 
-	// Check 2: static images directory accessible
 	staticDir := "static/images"
 	if _, err := os.Stat(staticDir); err != nil {
 		checks["static"] = check{OK: false, Message: "static/images directory not accessible"}
