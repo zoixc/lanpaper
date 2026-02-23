@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"image"
+	"image/draw"
 	"image/gif"
 	"image/jpeg"
 	"image/png"
@@ -22,7 +23,7 @@ import (
 	"time"
 
 	"github.com/chai2010/webp"
-	"github.com/nfnt/resize"
+	"golang.org/x/image/draw"
 	"lanpaper/config"
 	"lanpaper/storage"
 	"lanpaper/utils"
@@ -37,7 +38,6 @@ func InitUploadSemaphore(maxConcurrent int) {
 	uploadSem = make(chan struct{}, maxConcurrent)
 }
 
-// copyVideoFile copies video from source to destination path
 func copyVideoFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
@@ -62,11 +62,9 @@ func copyVideoFile(src, dst string) error {
 	if _, err := io.Copy(out, in); err != nil {
 		return fmt.Errorf("failed to copy data: %w", err)
 	}
-
 	return nil
 }
 
-// copyVideoFromReader copies video from io.Reader to destination path
 func copyVideoFromReader(r io.Reader, dst string) error {
 	out, err := os.Create(dst)
 	if err != nil {
@@ -81,11 +79,9 @@ func copyVideoFromReader(r io.Reader, dst string) error {
 	if _, err := io.Copy(out, r); err != nil {
 		return fmt.Errorf("failed to copy data: %w", err)
 	}
-
 	return nil
 }
 
-// mimeToExt maps allowed MIME types to file extensions
 var mimeToExt = map[string]string{
 	"image/jpeg": "jpg",
 	"image/png":  "png",
@@ -95,6 +91,25 @@ var mimeToExt = map[string]string{
 	"image/tiff": "tiff",
 	"video/mp4":  "mp4",
 	"video/webm": "webm",
+}
+
+// thumbnail resizes src to fit within maxW x maxH using stdlib x/image/draw
+func thumbnail(src image.Image, maxW, maxH int) image.Image {
+	srcB := src.Bounds()
+	scaleX := float64(maxW) / float64(srcB.Dx())
+	scaleY := float64(maxH) / float64(srcB.Dy())
+	scale := scaleX
+	if scaleY < scale {
+		scale = scaleY
+	}
+	if scale >= 1 {
+		return src
+	}
+	newW := int(float64(srcB.Dx()) * scale)
+	newH := int(float64(srcB.Dy()) * scale)
+	dst := image.NewRGBA(image.Rect(0, 0, newW, newH))
+	xdraw.BiLinear.Scale(dst, dst.Bounds(), src, srcB, draw.Over, nil)
+	return dst
 }
 
 func Upload(w http.ResponseWriter, r *http.Request) {
@@ -108,7 +123,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	maxBytes := int64(config.Current.MaxUploadMB) << 20
 
-	// Check Content-Length header BEFORE reading body (bomb protection)
 	if r.ContentLength > maxBytes {
 		log.Printf("Security: rejected upload with Content-Length %d (max: %d)", r.ContentLength, maxBytes)
 		http.Error(w, "File too large", http.StatusRequestEntityTooLarge)
@@ -135,23 +149,20 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var (
-		img      image.Image
-		ext      string
-		err      error
-		isVideo  bool
-		fileData []byte
-		// Keep reference to uploaded multipart file for video handling
+		img          image.Image
+		ext          string
+		err          error
+		isVideo      bool
+		fileData     []byte
 		uploadedFile multipart.File
 	)
 
 	urlStr := r.FormValue("url")
 
-	// Upload logic
 	if urlStr != "" {
 		if strings.HasPrefix(urlStr, "http://") || strings.HasPrefix(urlStr, "https://") {
 			img, ext, fileData, err = downloadImage(r.Context(), urlStr)
 		} else {
-			// Local files from server - enhanced path validation
 			if !utils.IsValidLocalPath(urlStr) {
 				log.Printf("Security: blocked invalid path attempt: %s", urlStr)
 				http.Error(w, "Invalid path", http.StatusBadRequest)
@@ -163,7 +174,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				baseDir = "external/images"
 			}
 
-			// Resolve to absolute path and validate
 			absBase, absErr := filepath.Abs(baseDir)
 			if absErr != nil {
 				log.Printf("Error resolving base directory: %v", absErr)
@@ -179,7 +189,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// Ensure path is within base directory
 			if !strings.HasPrefix(absPath, absBase+string(filepath.Separator)) && absPath != absBase {
 				log.Printf("Security: blocked path traversal attempt: %s -> %s", urlStr, absPath)
 				http.Error(w, "Path outside allowed directory", http.StatusForbidden)
@@ -203,7 +212,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		// Uploading from client
 		var header *multipart.FileHeader
 		var ferr error
 		uploadedFile, header, ferr = r.FormFile("file")
@@ -213,14 +221,12 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 		defer uploadedFile.Close()
 
-		// Validate file size from header
 		if header.Size > maxBytes {
 			log.Printf("Security: rejected file %s with size %d (max: %d)", header.Filename, header.Size, maxBytes)
 			http.Error(w, "File too large", http.StatusRequestEntityTooLarge)
 			return
 		}
 
-		// Sanitize original filename for logging
 		safeFilename := utils.SanitizeFilename(header.Filename)
 
 		head := make([]byte, 512)
@@ -236,7 +242,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Detect content type and map to extension in one step
 		contentType := http.DetectContentType(head)
 		e, ok := mimeToExt[contentType]
 		if !ok {
@@ -249,7 +254,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			isVideo = true
 		}
 
-		// Magic bytes validation
 		if err := utils.ValidateFileType(head, ext); err != nil {
 			log.Printf("Security: magic bytes validation failed for %s: %v", safeFilename, err)
 			http.Error(w, "File content does not match file type", http.StatusBadRequest)
@@ -266,7 +270,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Additional magic bytes validation for remotely loaded files
 	if len(fileData) > 0 && !isVideo {
 		if err := utils.ValidateFileType(fileData, ext); err != nil {
 			log.Printf("Security: magic bytes validation failed for link %s: %v", linkName, err)
@@ -275,7 +278,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Remove old image
 	if oldWp != nil && oldWp.HasImage {
 		if err := os.Remove(oldWp.ImagePath); err != nil && !os.IsNotExist(err) {
 			log.Printf("Error removing old image %s: %v", oldWp.ImagePath, err)
@@ -287,13 +289,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Save new image
 	originalPath := filepath.Join("static", "images", linkName+"."+ext)
 	previewPath := filepath.Join("static", "images", "previews", linkName+".webp")
 
 	if isVideo {
 		if urlStr == "" {
-			// From uploaded form file — reuse already-opened uploadedFile
 			if _, err := uploadedFile.Seek(0, io.SeekStart); err != nil {
 				log.Printf("Error seeking file for video copy: %v", err)
 				http.Error(w, "Failed to prepare video file", http.StatusInternalServerError)
@@ -305,32 +305,28 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		} else if !strings.HasPrefix(urlStr, "http") {
-			// From external directory (path already validated above)
 			baseDir := config.Current.ExternalImageDir
 			if baseDir == "" {
 				baseDir = "external/images"
 			}
 			absBase, _ := filepath.Abs(baseDir)
 			srcPath := filepath.Join(absBase, filepath.Clean(urlStr))
-
 			if err := copyVideoFile(srcPath, originalPath); err != nil {
 				log.Printf("Error copying external video %s to %s: %v", srcPath, originalPath, err)
 				http.Error(w, "Failed to copy video from external source", http.StatusInternalServerError)
 				return
 			}
 		}
-		// Videos have no generated preview
 		previewPath = ""
 
 	} else {
-		// Save image & generate preview
 		if err := saveImage(img, ext, originalPath); err != nil {
 			log.Printf("Error saving image %s: %v", originalPath, err)
 			http.Error(w, "Save failed", http.StatusInternalServerError)
 			return
 		}
 
-		thumb := resize.Thumbnail(200, 160, img, resize.Bilinear)
+		thumb := thumbnail(img, 200, 160)
 		if err := saveImage(thumb, "webp", previewPath); err != nil {
 			log.Printf("Error saving preview %s: %v", previewPath, err)
 			if removeErr := os.Remove(originalPath); removeErr != nil && !os.IsNotExist(removeErr) {
@@ -353,16 +349,16 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		createdAt = oldWp.CreatedAt
 	}
 
+	previewURL := ""
+	if previewPath != "" {
+		previewURL = "/static/images/previews/" + linkName + ".webp"
+	}
+
 	wp := &storage.Wallpaper{
 		ID:          linkName,
 		LinkName:    linkName,
 		ImageURL:    "/static/images/" + linkName + "." + ext,
-		Preview:     func() string {
-			if previewPath == "" {
-				return ""
-			}
-			return "/static/images/previews/" + linkName + ".webp"
-		}(),
+		Preview:     previewURL,
 		HasImage:    true,
 		MIMEType:    ext,
 		SizeBytes:   fi.Size(),
@@ -425,12 +421,10 @@ func loadLocalImage(path string) (image.Image, string, []byte, error) {
 		}
 	}()
 
-	// Read first 512 bytes for magic bytes validation
 	head := make([]byte, 512)
 	n, _ := f.Read(head)
 	head = head[:n]
 
-	// Seek back to start for decoding
 	if _, err := f.Seek(0, io.SeekStart); err != nil {
 		return nil, "", nil, err
 	}
@@ -451,7 +445,6 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 		return nil, "", nil, fmt.Errorf("invalid URL")
 	}
 
-	// Add timeout to context for download operation
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 
@@ -497,7 +490,6 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 		return nil, "", nil, fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	// Check Content-Length header if available
 	if resp.ContentLength > 0 && resp.ContentLength > int64(config.Current.MaxUploadMB)<<20 {
 		log.Printf("Security: rejected download with Content-Length %d (max: %d)", resp.ContentLength, int64(config.Current.MaxUploadMB)<<20)
 		return nil, "", nil, fmt.Errorf("file too large: %d bytes", resp.ContentLength)

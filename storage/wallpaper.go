@@ -32,6 +32,8 @@ type Store struct {
 	wallpapers map[string]*Wallpaper
 }
 
+const dataFile = "data/wallpapers.json"
+
 var Global = &Store{wallpapers: make(map[string]*Wallpaper)}
 
 func (s *Store) Get(id string) (*Wallpaper, bool) {
@@ -78,21 +80,44 @@ func (s *Store) GetAll() []*Wallpaper {
 	return wallpapers
 }
 
-func (s *Store) Save() error {
-	s.RLock()
-	defer s.RUnlock()
-	data, err := json.MarshalIndent(s.wallpapers, "", "  ")
+// atomicWrite marshals data and writes it atomically via a temp file + rename.
+func atomicWrite(path string, data map[string]*Wallpaper) error {
+	body, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal wallpapers: %w", err)
 	}
-	if err := os.WriteFile("data/wallpapers.json", data, 0644); err != nil {
-		return fmt.Errorf("failed to write wallpapers.json: %w", err)
+
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".wallpapers-*.json")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpName := tmp.Name()
+
+	if _, err := tmp.Write(body); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return fmt.Errorf("failed to write temp file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpName)
+		return fmt.Errorf("failed to close temp file: %w", err)
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		os.Remove(tmpName)
+		return fmt.Errorf("failed to rename temp file: %w", err)
 	}
 	return nil
 }
 
+func (s *Store) Save() error {
+	s.RLock()
+	defer s.RUnlock()
+	return atomicWrite(dataFile, s.wallpapers)
+}
+
 func (s *Store) Load() error {
-	data, err := os.ReadFile("data/wallpapers.json")
+	data, err := os.ReadFile(dataFile)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -111,13 +136,13 @@ func (s *Store) Load() error {
 
 			if ext == "mp4" || ext == "webm" {
 				wp.PreviewPath = ""
-				wp.Category = "video" // FIX
+				wp.Category = "video"
 			} else {
 				wp.PreviewPath = filepath.Join("static", "images", "previews", wp.LinkName+".webp")
-				wp.Category = "image" // FIX
+				wp.Category = "image"
 			}
 		} else {
-			wp.Category = "other" // FIX
+			wp.Category = "other"
 		}
 	}
 
@@ -127,8 +152,7 @@ func (s *Store) Load() error {
 	return nil
 }
 
-// PruneOldImages removes oldest images when exceeding max count
-// Fixed race condition: now saves data before releasing lock
+// PruneOldImages removes oldest images when exceeding max count.
 func PruneOldImages(max int) {
 	Global.Lock()
 	defer Global.Unlock()
@@ -153,7 +177,6 @@ func PruneOldImages(max int) {
 		wp := candidates[i]
 		log.Printf("Pruning old image: %s", wp.ID)
 
-		// Remove physical files
 		if err := os.Remove(wp.ImagePath); err != nil && !os.IsNotExist(err) {
 			log.Printf("Error pruning image %s: %v", wp.ImagePath, err)
 		}
@@ -163,7 +186,6 @@ func PruneOldImages(max int) {
 			}
 		}
 
-		// Update metadata
 		wp.HasImage = false
 		wp.ImageURL = ""
 		wp.Preview = ""
@@ -173,13 +195,7 @@ func PruneOldImages(max int) {
 		wp.PreviewPath = ""
 	}
 
-	// Save while still holding the lock to prevent race condition
-	data, err := json.MarshalIndent(Global.wallpapers, "", "  ")
-	if err != nil {
-		log.Printf("Error marshaling wallpapers after pruning: %v", err)
-		return
-	}
-	if err := os.WriteFile("data/wallpapers.json", data, 0644); err != nil {
+	if err := atomicWrite(dataFile, Global.wallpapers); err != nil {
 		log.Printf("Error saving wallpapers after pruning: %v", err)
 	}
 }
