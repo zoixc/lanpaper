@@ -16,7 +16,8 @@ type counter struct {
 
 var (
 	muCounts sync.Mutex
-	counts   = map[string]*counter{}
+	// key format: "<namespace>:<ip>" to isolate rate limits per endpoint group
+	counts = map[string]*counter{}
 )
 
 func StartCleaner() {
@@ -24,25 +25,26 @@ func StartCleaner() {
 	for range ticker.C {
 		muCounts.Lock()
 		now := time.Now()
-		for ip, c := range counts {
+		for key, c := range counts {
 			if now.Sub(c.WindowFrom) > 5*time.Minute {
-				delete(counts, ip)
+				delete(counts, key)
 			}
 		}
 		muCounts.Unlock()
 	}
 }
 
-func isOverLimit(ip string, perMin, burst int) bool {
+func isOverLimitNS(ns, ip string, perMin, burst int) bool {
 	if perMin <= 0 {
 		return false
 	}
+	key := ns + ":" + ip
 	now := time.Now()
 	muCounts.Lock()
 	defer muCounts.Unlock()
-	c, ok := counts[ip]
+	c, ok := counts[key]
 	if !ok || now.Sub(c.WindowFrom) > time.Minute {
-		counts[ip] = &counter{Count: 1, WindowFrom: now}
+		counts[key] = &counter{Count: 1, WindowFrom: now}
 		return false
 	}
 	if c.Count >= perMin+burst {
@@ -50,6 +52,11 @@ func isOverLimit(ip string, perMin, burst int) bool {
 	}
 	c.Count++
 	return false
+}
+
+// isOverLimit is kept for backward compatibility (uses "default" namespace)
+func isOverLimit(ip string, perMin, burst int) bool {
+	return isOverLimitNS("public", ip, perMin, burst)
 }
 
 func clientIP(r *http.Request) string {
@@ -63,11 +70,12 @@ func clientIP(r *http.Request) string {
 	return host
 }
 
+// RateLimit returns middleware with its own isolated namespace per registration.
 func RateLimit(perMin, burst int) func(http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			ip := clientIP(r)
-			if isOverLimit(ip, perMin, burst) {
+			if isOverLimitNS("upload", ip, perMin, burst) {
 				log.Printf("Rate limit exceeded for IP: %s", ip)
 				http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 				return

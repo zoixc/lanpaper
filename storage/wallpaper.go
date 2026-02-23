@@ -23,8 +23,9 @@ type Wallpaper struct {
 	ModTime   int64  `json:"modTime"`
 	CreatedAt int64  `json:"createdAt"`
 
-	ImagePath   string `json:"imagePath"`
-	PreviewPath string `json:"previewPath"`
+	// Runtime-only fields: not persisted to JSON, derived from MIMEType on Load()
+	ImagePath   string `json:"-"`
+	PreviewPath string `json:"-"`
 }
 
 type Store struct {
@@ -116,6 +117,19 @@ func (s *Store) Save() error {
 	return atomicWrite(dataFile, s.wallpapers)
 }
 
+// derivePaths fills runtime-only ImagePath/PreviewPath from persisted fields.
+func derivePaths(wp *Wallpaper) {
+	if !wp.HasImage || wp.MIMEType == "" {
+		return
+	}
+	wp.ImagePath = filepath.Join("static", "images", wp.LinkName+"."+wp.MIMEType)
+	if wp.MIMEType == "mp4" || wp.MIMEType == "webm" {
+		wp.PreviewPath = ""
+	} else {
+		wp.PreviewPath = filepath.Join("static", "images", "previews", wp.LinkName+".webp")
+	}
+}
+
 func (s *Store) Load() error {
 	data, err := os.ReadFile(dataFile)
 	if err != nil {
@@ -130,20 +144,7 @@ func (s *Store) Load() error {
 	}
 
 	for _, wp := range m {
-		if wp.HasImage {
-			ext := wp.MIMEType
-			wp.ImagePath = filepath.Join("static", "images", wp.LinkName+"."+ext)
-
-			if ext == "mp4" || ext == "webm" {
-				wp.PreviewPath = ""
-				wp.Category = "video"
-			} else {
-				wp.PreviewPath = filepath.Join("static", "images", "previews", wp.LinkName+".webp")
-				wp.Category = "image"
-			}
-		} else {
-			wp.Category = "other"
-		}
+		derivePaths(wp)
 	}
 
 	s.Lock()
