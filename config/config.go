@@ -47,8 +47,10 @@ func Load() {
 		ProxyHost:            getEnv("PROXY_HOST", ""),
 		ProxyPort:            getEnv("PROXY_PORT", ""),
 		ProxyType:            getEnv("PROXY_TYPE", "http"),
-		ProxyUsername:        getEnv("PROXY_USERNAME", ""),
-		ProxyPassword:        getEnv("PROXY_PASSWORD", ""),
+		// Support both PROXY_USERNAME and PROXY_USER
+		ProxyUsername:        getEnvAny("PROXY_USERNAME", "PROXY_USER", ""),
+		// Support both PROXY_PASSWORD and PROXY_PASS
+		ProxyPassword:        getEnvAny("PROXY_PASSWORD", "PROXY_PASS", ""),
 		Rate: RateConfig{
 			PublicPerMin: getEnvInt("RATE_PUBLIC_PER_MIN", 120),
 			UploadPerMin: getEnvInt("RATE_UPLOAD_PER_MIN", 20),
@@ -66,6 +68,18 @@ func Load() {
 func getEnv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return fallback
+}
+
+// getEnvAny returns the first non-empty value among the given keys.
+func getEnvAny(keys ...string) string {
+	// last argument is the fallback
+	fallback := keys[len(keys)-1]
+	for _, key := range keys[:len(keys)-1] {
+		if v := os.Getenv(key); v != "" {
+			return v
+		}
 	}
 	return fallback
 }
