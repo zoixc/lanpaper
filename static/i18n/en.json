@@ -6,13 +6,13 @@
   "no_links": "No links yet",
   "no_image": "No image",
   "copy_url": "Copy URL",
-  "set_image": "Upload",
-  "paste_url": "URL",
-  "select_server": "Server",
+  "set_image": "From device",
+  "paste_url": "From URL",
+  "select_server": "From gallery",
   "remove": "Remove",
 
   "enter_image_url_title": "Paste from URL",
-  "select_server_title": "Select from Server",
+  "select_server_title": "Select from gallery",
   "enter_image_url": "Image URL:",
   "url_placeholder": "https://...",
 
