@@ -59,6 +59,7 @@ func main() {
 
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 	mux.HandleFunc("/health", healthCheckHandler)
+	mux.HandleFunc("/health/ready", readinessHandler)
 
 	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Admin)))
 
@@ -66,8 +67,6 @@ func main() {
 	mux.HandleFunc("/api/link/", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Link)))
 	mux.HandleFunc("/api/link", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Link)))
 
-	// Rate limit values are read per-request inside the middleware closure,
-	// so they always reflect the current config without needing a restart.
 	uploadRate := middleware.RateLimit(
 		func() (int, int) {
 			return config.Current.Rate.UploadPerMin, config.Current.Rate.Burst
@@ -132,5 +131,51 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Error encoding health check response: %v", err)
 		http.Error(w, "Internal error", http.StatusInternalServerError)
+	}
+}
+
+func readinessHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+
+	type check struct {
+		OK      bool   `json:"ok"`
+		Message string `json:"message,omitempty"`
+	}
+	checks := map[string]check{}
+	ready := true
+
+	// Check 1: storage loaded (at least one wallpaper key exists, or data dir is accessible)
+	dataDir := "data"
+	if _, err := os.Stat(dataDir); err != nil {
+		checks["storage"] = check{OK: false, Message: "data directory not accessible"}
+		ready = false
+	} else {
+		checks["storage"] = check{OK: true}
+	}
+
+	// Check 2: static images directory accessible
+	staticDir := "static/images"
+	if _, err := os.Stat(staticDir); err != nil {
+		checks["static"] = check{OK: false, Message: "static/images directory not accessible"}
+		ready = false
+	} else {
+		checks["static"] = check{OK: true}
+	}
+
+	status := "ready"
+	code := http.StatusOK
+	if !ready {
+		status = "not ready"
+		code = http.StatusServiceUnavailable
+	}
+
+	w.WriteHeader(code)
+	response := map[string]interface{}{
+		"status": status,
+		"checks": checks,
+	}
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("Error encoding readiness response: %v", err)
 	}
 }
