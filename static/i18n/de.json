@@ -1,34 +1,44 @@
 {
-  "create_new_link": "Neuer Link",
-  "input_placeholder": "Link-ID (a-z, 0-9, -, _)",
+  "create_new_link": "Neuen Link erstellen",
+  "input_placeholder": "Link-ID (Buchstaben, Zahlen, - oder _)",
   "create_btn": "Erstellen",
   "existing_links": "Links",
-  "no_links": "Keine Links",
+  "no_links": "Noch keine Links",
   "no_image": "Kein Bild",
-  "copy_url": "Kopieren",
-  "set_image": "Upload",
+  "copy_url": "URL kopieren",
+  "set_image": "Hochladen",
   "paste_url": "URL",
   "select_server": "Server",
   "remove": "Löschen",
-  
-  "enter_image_url_title": "Bild-URL eingeben",
-  "select_server_title": "Vom Server wählen",
+
+  "enter_image_url_title": "Aus URL einfügen",
+  "select_server_title": "Vom Server auswählen",
   "enter_image_url": "Bild-URL:",
-  
-  "invalid_id": "ID erforderlich",
-  "invalid_id_chars": "Nur a-z, 0-9, -, _",
-  "invalid_image": "Ungültiges Format",
-  
+
+  "invalid_id": "ID ist erforderlich",
+  "invalid_id_chars": "Verwende a-z, 0-9, - oder _",
+  "invalid_image": "Ungültiges Dateiformat",
+
   "upload_success": "Hochgeladen!",
-  "created_success": "Erstellt",
-  "deleted_success": "Gelöscht",
-  "confirm_delete": "Wirklich löschen?",
-  
+  "created_success": "Link erstellt",
+  "deleted_success": "Link gelöscht",
+  "confirm_delete": "Diesen Link löschen?",
+
   "loading": "Laden...",
   "server_empty": "Ordner ist leer",
   "server_error": "Zugriffsfehler",
   "copied": "Kopiert!",
-  
+
   "modal_cancel": "Abbrechen",
-  "modal_ok": "OK"
+  "modal_ok": "OK",
+
+  "search_placeholder": "Nach Linkname oder Datei suchen...",
+  "search_total": "Gesamt: {{total}}",
+  "search_found": "{{shown}} von {{total}} gefunden",
+
+  "sort_by": "Sortieren nach:",
+  "name_asc": "Name (A–Z)",
+  "name_desc": "Name (Z–A)",
+  "date_new": "Neueste zuerst",
+  "date_old": "Älteste zuerst"
 }

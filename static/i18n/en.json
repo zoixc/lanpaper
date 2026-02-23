@@ -30,5 +30,15 @@
   "copied": "Copied!",
   
   "modal_cancel": "Cancel",
-  "modal_ok": "OK"
+  "modal_ok": "OK",
+
+  "search_placeholder": "Search by link name or file...",
+  "search_total": "Total: {{total}}",
+  "search_found": "Found {{shown}} of {{total}}",
+
+  "sort_by": "Sort by:",
+  "name_asc": "Name (A–Z)",
+  "name_desc": "Name (Z–A)",
+  "date_new": "Newest first",
+  "date_old": "Oldest first"
 }

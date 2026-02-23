@@ -1,0 +1,76 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ improvements, main ]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -v -race ./...
+
+      - name: Build
+        run: go build ./...
+
+  docker:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Determine version
+        id: version
+        run: |
+          VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build & smoke-test (amd64 only)
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --build-arg VERSION=${{ steps.version.outputs.VERSION }} \
+            -t lanpaper:test --load .
+          docker run -d --name lp_test -p 8080:8080 lanpaper:test
+          sleep 3
+          curl -sf http://localhost:8080/health || (docker logs lp_test && exit 1)
+          docker rm -f lp_test
+
+      - name: Login to Docker Hub
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push to Docker Hub
+        if: github.ref == 'refs/heads/main'
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          docker buildx build \
+            --build-arg VERSION=$VERSION \
+            --platform linux/amd64,linux/arm64 \
+            -t ptabi/lanpaper:$VERSION \
+            -t ptabi/lanpaper:latest \
+            --push .

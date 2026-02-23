@@ -1,0 +1,52 @@
+# Binaries
+lanpaper
+lanpaper.exe
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work
+
+# Application data
+data/
+static/images/*
+!static/images/.gitkeep
+static/images/previews/*
+!static/images/previews/.gitkeep
+external/images/*
+!external/images/.gitkeep
+
+# Configuration
+config.json
+.env
+
+# IDEs
+.vscode/
+.idea/
+.old/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+
+# Docker
+docker-compose.yml
+!docker-compose-example.yml
+
+# Local dev dirs
+lanpaper/
+homepage/
+
+# Misc
+style-old.css
