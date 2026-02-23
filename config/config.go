@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type RateConfig struct {
@@ -47,9 +48,7 @@ func Load() {
 		ProxyHost:            getEnv("PROXY_HOST", ""),
 		ProxyPort:            getEnv("PROXY_PORT", ""),
 		ProxyType:            getEnv("PROXY_TYPE", "http"),
-		// Support both PROXY_USERNAME and PROXY_USER
 		ProxyUsername:        getEnvAny("PROXY_USERNAME", "PROXY_USER", ""),
-		// Support both PROXY_PASSWORD and PROXY_PASS
 		ProxyPassword:        getEnvAny("PROXY_PASSWORD", "PROXY_PASS", ""),
 		Rate: RateConfig{
 			PublicPerMin: getEnvInt("RATE_PUBLIC_PER_MIN", 120),
@@ -63,6 +62,57 @@ func Load() {
 			log.Printf("Warning: failed to parse config.json: %v", err)
 		}
 	}
+
+	validate()
+}
+
+// validate sanitises Current in-place, resetting any out-of-range values to
+// safe defaults. It is called by Load() and is also available to tests.
+func validate() {
+	// Port
+	portStr := strings.TrimPrefix(Current.Port, ":")
+	if n, err := strconv.Atoi(portStr); err != nil || n < 1 || n > 65535 {
+		log.Printf("Warning: invalid port %q, using 8080", Current.Port)
+		Current.Port = "8080"
+	}
+
+	// MaxUploadMB
+	if Current.MaxUploadMB <= 0 {
+		log.Printf("Warning: invalid MaxUploadMB %d, using 10", Current.MaxUploadMB)
+		Current.MaxUploadMB = 10
+	}
+
+	// MaxConcurrentUploads
+	if Current.MaxConcurrentUploads <= 0 {
+		Current.MaxConcurrentUploads = 2
+	}
+
+	// Rate limits
+	if Current.Rate.PublicPerMin < 0 {
+		Current.Rate.PublicPerMin = 120
+	}
+	if Current.Rate.UploadPerMin < 0 {
+		Current.Rate.UploadPerMin = 20
+	}
+	if Current.Rate.Burst <= 0 {
+		Current.Rate.Burst = 10
+	}
+
+	// Proxy type
+	if Current.ProxyHost != "" {
+		switch Current.ProxyType {
+		case "http", "https", "socks5":
+			// valid
+		default:
+			log.Printf("Warning: invalid proxy type %q, using http", Current.ProxyType)
+			Current.ProxyType = "http"
+		}
+	}
+
+	// Auto-disable auth when no credentials are provided
+	if !Current.DisableAuth && Current.AdminUser == "" && Current.AdminPass == "" {
+		Current.DisableAuth = true
+	}
 }
 
 func getEnv(key, fallback string) string {
@@ -72,9 +122,9 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-// getEnvAny returns the first non-empty value among the given keys.
+// getEnvAny returns the first non-empty value among the given env keys.
+// The last argument is the fallback value.
 func getEnvAny(keys ...string) string {
-	// last argument is the fallback
 	fallback := keys[len(keys)-1]
 	for _, key := range keys[:len(keys)-1] {
 		if v := os.Getenv(key); v != "" {
