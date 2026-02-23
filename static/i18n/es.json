@@ -1,9 +1,9 @@
 {
   "create_new_link": "Crear nuevo enlace",
-  "input_placeholder": "ID del enlace (letras, n\u00fameros, - o _)",
+  "input_placeholder": "ID del enlace (letras, números, - o _)",
   "create_btn": "Crear",
   "existing_links": "Enlaces",
-  "no_links": "A\u00fan no hay enlaces",
+  "no_links": "Aún no hay enlaces",
   "no_image": "Sin imagen",
   "copy_url": "Copiar URL",
   "set_image": "Subir",
@@ -18,17 +18,17 @@
 
   "invalid_id": "ID obligatorio",
   "invalid_id_chars": "Usa a-z, 0-9, - o _",
-  "invalid_image": "Formato de archivo no v\u00e1lido",
+  "invalid_image": "Formato de archivo no válido",
 
   "upload_success": "Subido",
   "created_success": "Enlace creado",
   "deleted_success": "Enlace eliminado",
-  "confirm_delete": "\u00bfEliminar este enlace?",
+  "confirm_delete": "¿Eliminar este enlace?",
 
   "loading": "Cargando...",
-  "server_empty": "Carpeta vac\u00eda",
+  "server_empty": "Carpeta vacía",
   "server_error": "Error de acceso",
-  "copied": "\u00a1Copiado!",
+  "copied": "¡Copiado!",
 
   "modal_cancel": "Cancelar",
   "modal_ok": "OK",
@@ -39,10 +39,10 @@
   "search_found": "Encontrados {{shown}} de {{total}}",
 
   "sort_by": "Ordenar por:",
-  "name_asc": "Nombre (A\u2013Z)",
-  "name_desc": "Nombre (Z\u2013A)",
-  "date_new": "M\u00e1s recientes primero",
-  "date_old": "M\u00e1s antiguos primero",
+  "name_asc": "Nombre (A–Z)",
+  "name_desc": "Nombre (Z–A)",
+  "date_new": "Más recientes primero",
+  "date_old": "Más antiguos primero",
 
   "load_error": "Error al cargar los enlaces",
   "preview_unavailable": "Vista previa no disponible",

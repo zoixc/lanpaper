@@ -39,10 +39,10 @@
   "search_found": "Trovati {{shown}} di {{total}}",
 
   "sort_by": "Ordina per:",
-  "name_asc": "Nome (A\u2013Z)",
-  "name_desc": "Nome (Z\u2013A)",
-  "date_new": "Prima i pi\u00f9 recenti",
-  "date_old": "Prima i pi\u00f9 vecchi",
+  "name_asc": "Nome (A–Z)",
+  "name_desc": "Nome (Z–A)",
+  "date_new": "Prima i più recenti",
+  "date_old": "Prima i più vecchi",
 
   "load_error": "Impossibile caricare i link",
   "preview_unavailable": "Anteprima non disponibile",

@@ -9,21 +9,21 @@
   "set_image": "Hochladen",
   "paste_url": "URL",
   "select_server": "Server",
-  "remove": "L\u00f6schen",
+  "remove": "Löschen",
 
-  "enter_image_url_title": "Aus URL einf\u00fcgen",
-  "select_server_title": "Vom Server ausw\u00e4hlen",
+  "enter_image_url_title": "Aus URL einfügen",
+  "select_server_title": "Vom Server auswählen",
   "enter_image_url": "Bild-URL:",
   "url_placeholder": "https://...",
 
   "invalid_id": "ID ist erforderlich",
   "invalid_id_chars": "Verwende a-z, 0-9, - oder _",
-  "invalid_image": "Ung\u00fcltiges Dateiformat",
+  "invalid_image": "Ungültiges Dateiformat",
 
   "upload_success": "Hochgeladen!",
   "created_success": "Link erstellt",
-  "deleted_success": "Link gel\u00f6scht",
-  "confirm_delete": "Diesen Link l\u00f6schen?",
+  "deleted_success": "Link gelöscht",
+  "confirm_delete": "Diesen Link löschen?",
 
   "loading": "Laden...",
   "server_empty": "Ordner ist leer",
@@ -39,16 +39,16 @@
   "search_found": "{{shown}} von {{total}} gefunden",
 
   "sort_by": "Sortieren nach:",
-  "name_asc": "Name (A\u2013Z)",
-  "name_desc": "Name (Z\u2013A)",
+  "name_asc": "Name (A–Z)",
+  "name_desc": "Name (Z–A)",
   "date_new": "Neueste zuerst",
-  "date_old": "\u00c4lteste zuerst",
+  "date_old": "Älteste zuerst",
 
   "load_error": "Links konnten nicht geladen werden",
-  "preview_unavailable": "Vorschau nicht verf\u00fcgbar",
-  "image_unavailable": "Bild nicht verf\u00fcgbar",
+  "preview_unavailable": "Vorschau nicht verfügbar",
+  "image_unavailable": "Bild nicht verfügbar",
 
-  "aria_open_image": "Bild \u00f6ffnen",
+  "aria_open_image": "Bild öffnen",
   "aria_link_id": "Link-ID",
   "aria_file_info": "Dateiinfo"
 }
