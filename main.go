@@ -32,11 +32,12 @@ func main() {
 	config.Load()
 
 	// Startup warnings
-	if !config.Current.DisableAuth && config.Current.AdminUser == "" && config.Current.AdminPass == "" {
-		log.Println("Warning: No credentials provided. Authentication is automatically disabled.")
-	}
 	if config.Current.DisableAuth {
-		log.Println("Warning: Authentication is disabled (DISABLE_AUTH=true).")
+		if config.Current.AdminUser == "" && config.Current.AdminPass == "" {
+			log.Println("Warning: No credentials provided. Authentication is automatically disabled.")
+		} else {
+			log.Println("Warning: Authentication is disabled (DISABLE_AUTH=true).")
+		}
 	}
 
 	handlers.InitUploadSemaphore(config.Current.MaxConcurrentUploads)
@@ -64,10 +65,18 @@ func main() {
 	mux.HandleFunc("/api/wallpapers", middleware.WithSecurity(handlers.Wallpapers))
 	mux.HandleFunc("/api/link/", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Link)))
 	mux.HandleFunc("/api/link", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Link)))
+
+	// Rate limit values are read per-request inside the middleware closure,
+	// so they always reflect the current config without needing a restart.
+	uploadRate := middleware.RateLimit(
+		func() (int, int) {
+			return config.Current.Rate.UploadPerMin, config.Current.Rate.Burst
+		},
+	)
 	mux.HandleFunc("/api/upload",
 		middleware.WithSecurity(
 			middleware.MaybeBasicAuth(
-				middleware.RateLimit(config.Current.Rate.UploadPerMin, config.Current.Rate.Burst)(handlers.Upload),
+				uploadRate(handlers.Upload),
 			),
 		),
 	)

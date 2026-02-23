@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/chai2010/webp"
@@ -36,6 +37,57 @@ func InitUploadSemaphore(maxConcurrent int) {
 		maxConcurrent = 2
 	}
 	uploadSem = make(chan struct{}, maxConcurrent)
+}
+
+// httpTransport is a shared transport so connections are pooled across downloads.
+// It is rebuilt lazily when proxy/TLS settings change (guarded by transportMu).
+var (
+	transportMu      sync.Mutex
+	cachedTransport  *http.Transport
+	cachedProxyHost  string
+	cachedInsecure   bool
+)
+
+func getTransport() *http.Transport {
+	transportMu.Lock()
+	defer transportMu.Unlock()
+
+	proxyHost := config.Current.ProxyHost
+	insecure := config.Current.InsecureSkipVerify
+
+	// Rebuild only when relevant settings differ from last build
+	if cachedTransport != nil && cachedProxyHost == proxyHost && cachedInsecure == insecure {
+		return cachedTransport
+	}
+
+	t := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		TLSHandshakeTimeout:   10 * time.Second,
+		MaxIdleConns:          20,
+		MaxIdleConnsPerHost:   5,
+		IdleConnTimeout:       90 * time.Second,
+		ResponseHeaderTimeout: 30 * time.Second,
+	}
+
+	if proxyHost != "" {
+		proxyURL := &url_.URL{
+			Scheme: config.Current.ProxyType,
+			Host:   net.JoinHostPort(proxyHost, config.Current.ProxyPort),
+		}
+		if config.Current.ProxyUsername != "" {
+			proxyURL.User = url_.UserPassword(config.Current.ProxyUsername, config.Current.ProxyPassword)
+		}
+		t.Proxy = http.ProxyURL(proxyURL)
+	}
+
+	cachedTransport = t
+	cachedProxyHost = proxyHost
+	cachedInsecure = insecure
+	return t
 }
 
 func copyVideoFile(src, dst string) error {
@@ -448,28 +500,8 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Current.InsecureSkipVerify},
-		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).DialContext,
-		TLSHandshakeTimeout: 10 * time.Second,
-	}
-
-	if config.Current.ProxyHost != "" {
-		proxyURL := &url_.URL{
-			Scheme: config.Current.ProxyType,
-			Host:   net.JoinHostPort(config.Current.ProxyHost, config.Current.ProxyPort),
-		}
-		if config.Current.ProxyUsername != "" {
-			proxyURL.User = url_.UserPassword(config.Current.ProxyUsername, config.Current.ProxyPassword)
-		}
-		transport.Proxy = http.ProxyURL(proxyURL)
-	}
-
 	client := &http.Client{
-		Transport: transport,
+		Transport: getTransport(),
 		Timeout:   90 * time.Second,
 	}
 

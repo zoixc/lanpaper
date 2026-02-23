@@ -9,10 +9,13 @@ import (
 	"strings"
 	"time"
 
+	"lanpaper/config"
 	"lanpaper/storage"
 	"lanpaper/utils"
-	"lanpaper/config"
 )
+
+// maxWalkDepth limits how deep ExternalImages will recurse into subdirectories.
+const maxWalkDepth = 3
 
 func Admin(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "admin.html")
@@ -177,9 +180,18 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return nil
 		}
+
+		// Skip hidden directories and enforce max depth
 		if d.IsDir() {
 			if strings.HasPrefix(d.Name(), ".") && d.Name() != "." {
 				return filepath.SkipDir
+			}
+			rel, relErr := filepath.Rel(root, path)
+			if relErr == nil {
+				depth := len(strings.Split(rel, string(filepath.Separator)))
+				if rel != "." && depth > maxWalkDepth {
+					return filepath.SkipDir
+				}
 			}
 			return nil
 		}
@@ -244,7 +256,6 @@ func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// п.9: проверка с разделителем, чтобы исключить /allowed-dir-extra
 	if !strings.HasPrefix(absPath, absRoot+string(filepath.Separator)) && absPath != absRoot {
 		log.Printf("Security: blocked path traversal in preview: %s -> %s", pathParam, absPath)
 		http.Error(w, "Path outside allowed directory", http.StatusForbidden)

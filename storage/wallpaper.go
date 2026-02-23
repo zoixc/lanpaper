@@ -192,6 +192,7 @@ func PruneOldImages(max int) {
 		wp.Preview = ""
 		wp.MIMEType = ""
 		wp.SizeBytes = 0
+		wp.ModTime = 0
 		wp.ImagePath = ""
 		wp.PreviewPath = ""
 	}
