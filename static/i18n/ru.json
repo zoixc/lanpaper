@@ -6,13 +6,13 @@
   "no_links": "Список пуст",
   "no_image": "Нет картинки",
   "copy_url": "Копировать",
-  "set_image": "Загрузить",
-  "paste_url": "Ссылка",
-  "select_server": "Сервер",
+  "set_image": "С устройства",
+  "paste_url": "По ссылке",
+  "select_server": "Из галереи",
   "remove": "Удалить",
 
   "enter_image_url_title": "Вставить по ссылке",
-  "select_server_title": "Выбор с сервера",
+  "select_server_title": "Выбор из галереи",
   "enter_image_url": "URL картинки:",
   "url_placeholder": "https://...",
 
