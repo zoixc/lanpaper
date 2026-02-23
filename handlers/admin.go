@@ -198,7 +198,7 @@ func Link(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if req.Category != nil {
-			// Empty string resets to "other"; non-empty must be a valid category.
+			// Empty string resets category to "other" instead of storing an invalid blank value.
 			if *req.Category == "" {
 				wp.Category = "other"
 			} else if !isValidCategory(*req.Category) {
@@ -227,6 +227,7 @@ func Link(w http.ResponseWriter, r *http.Request) {
 		}
 		wp, exists := storage.Global.Get(linkName)
 		if !exists {
+			// Return 404 so the caller can distinguish "deleted" from "never existed".
 			http.Error(w, "Link not found", http.StatusNotFound)
 			return
 		}
