@@ -220,12 +220,12 @@ body.dark .network-bg::after {
 
 .section h2 {
     font-family: var(--font-ui);
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     font-weight: var(--fw-semibold);
     margin-bottom: 12px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--text-muted);
+    color: var(--text);
 }
 
 
