@@ -71,8 +71,8 @@ func Wallpapers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// --- sorting ---
-	sortField := r.URL.Query().Get("sort")   // "created" | "updated"
-	sortOrder := r.URL.Query().Get("order")  // "asc" | "desc"
+	sortField := r.URL.Query().Get("sort")  // "created" | "updated"
+	sortOrder := r.URL.Query().Get("order") // "asc" | "desc"
 	if sortField != "" {
 		desc := sortOrder != "asc"
 		sort.Slice(wallpapers, func(i, j int) bool {
@@ -198,11 +198,15 @@ func Link(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if req.Category != nil {
-			if *req.Category != "" && !isValidCategory(*req.Category) {
+			// Empty string resets to "other"; non-empty must be a valid category.
+			if *req.Category == "" {
+				wp.Category = "other"
+			} else if !isValidCategory(*req.Category) {
 				http.Error(w, "Invalid category", http.StatusBadRequest)
 				return
+			} else {
+				wp.Category = *req.Category
 			}
-			wp.Category = *req.Category
 		}
 
 		storage.Global.Set(linkName, wp)
@@ -222,19 +226,21 @@ func Link(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		wp, exists := storage.Global.Get(linkName)
-		if exists {
-			if wp.HasImage {
-				if err := os.Remove(wp.ImagePath); err != nil && !os.IsNotExist(err) {
-					log.Printf("Error removing image %s: %v", wp.ImagePath, err)
-				}
-				if wp.PreviewPath != "" {
-					if err := os.Remove(wp.PreviewPath); err != nil && !os.IsNotExist(err) {
-						log.Printf("Error removing preview %s: %v", wp.PreviewPath, err)
-					}
+		if !exists {
+			http.Error(w, "Link not found", http.StatusNotFound)
+			return
+		}
+		if wp.HasImage {
+			if err := os.Remove(wp.ImagePath); err != nil && !os.IsNotExist(err) {
+				log.Printf("Error removing image %s: %v", wp.ImagePath, err)
+			}
+			if wp.PreviewPath != "" {
+				if err := os.Remove(wp.PreviewPath); err != nil && !os.IsNotExist(err) {
+					log.Printf("Error removing preview %s: %v", wp.PreviewPath, err)
 				}
 			}
-			storage.Global.Delete(linkName)
 		}
+		storage.Global.Delete(linkName)
 		if err := storage.Global.Save(); err != nil {
 			log.Printf("Error saving wallpapers after link deletion: %v", err)
 		}

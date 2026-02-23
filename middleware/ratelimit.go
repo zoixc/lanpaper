@@ -20,13 +20,17 @@ var (
 	counts = map[string]*counter{}
 )
 
+// cleanerWindow matches the rate-limit window so stale entries are evicted
+// promptly instead of sitting in memory for minutes after expiry.
+const cleanerWindow = 2 * time.Minute
+
 func StartCleaner() {
-	ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(cleanerWindow)
 	for range ticker.C {
 		muCounts.Lock()
 		now := time.Now()
 		for key, c := range counts {
-			if now.Sub(c.WindowFrom) > 5*time.Minute {
+			if now.Sub(c.WindowFrom) > cleanerWindow {
 				delete(counts, key)
 			}
 		}
