@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/chai2010/webp"
-	"golang.org/x/image/draw"
+	xdraw "golang.org/x/image/draw"
 	"lanpaper/config"
 	"lanpaper/storage"
 	"lanpaper/utils"
@@ -93,7 +93,7 @@ var mimeToExt = map[string]string{
 	"video/webm": "webm",
 }
 
-// thumbnail resizes src to fit within maxW x maxH using stdlib x/image/draw
+// thumbnail resizes src to fit within maxW x maxH using golang.org/x/image/draw
 func thumbnail(src image.Image, maxW, maxH int) image.Image {
 	srcB := src.Bounds()
 	scaleX := float64(maxW) / float64(srcB.Dx())
