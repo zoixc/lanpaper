@@ -31,6 +31,7 @@ const DOM = {
     searchInput: document.getElementById('searchInput'),
     searchStats: document.getElementById('searchStats'),
     sortSelect: document.getElementById('sortSelect'),
+    appVersion: document.getElementById('appVersion'),
 
     // Modal Elements
     modalOverlay: document.getElementById('modalOverlay'),
@@ -56,9 +57,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     initLanguage();
     initView();
     initSearchSort();
+    loadAppVersion();
     await loadLinks();
     setupGlobalListeners();
 });
+
+
+// VERSION
+async function loadAppVersion() {
+    try {
+        const res = await fetch('/health');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.version && DOM.appVersion) {
+            DOM.appVersion.textContent = `v${data.version}`;
+        }
+    } catch (e) {
+        // silently ignore — footer will show 'v...'
+    }
+}
 
 
 // THEME MANAGER
