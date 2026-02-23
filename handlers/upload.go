@@ -12,6 +12,7 @@ import (
 	"image/png"
 	"io"
 	"log"
+	"mime/multipart"
 	"net"
 	"net/http"
 	url_ "net/url"
@@ -84,6 +85,18 @@ func copyVideoFromReader(r io.Reader, dst string) error {
 	return nil
 }
 
+// mimeToExt maps allowed MIME types to file extensions
+var mimeToExt = map[string]string{
+	"image/jpeg": "jpg",
+	"image/png":  "png",
+	"image/gif":  "gif",
+	"image/webp": "webp",
+	"image/bmp":  "bmp",
+	"image/tiff": "tiff",
+	"video/mp4":  "mp4",
+	"video/webm": "webm",
+}
+
 func Upload(w http.ResponseWriter, r *http.Request) {
 	select {
 	case uploadSem <- struct{}{}:
@@ -122,11 +135,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var (
-		img     image.Image
-		ext     string
-		err     error
-		isVideo bool
-		fileData []byte // For magic bytes validation
+		img      image.Image
+		ext      string
+		err      error
+		isVideo  bool
+		fileData []byte
+		// Keep reference to uploaded multipart file for video handling
+		uploadedFile multipart.File
 	)
 
 	urlStr := r.FormValue("url")
@@ -149,23 +164,23 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Resolve to absolute path and validate
-			absBase, err := filepath.Abs(baseDir)
-			if err != nil {
-				log.Printf("Error resolving base directory: %v", err)
+			absBase, absErr := filepath.Abs(baseDir)
+			if absErr != nil {
+				log.Printf("Error resolving base directory: %v", absErr)
 				http.Error(w, "Server configuration error", http.StatusInternalServerError)
 				return
 			}
 
 			localPath := filepath.Join(absBase, filepath.Clean(urlStr))
-			absPath, err := filepath.Abs(localPath)
-			if err != nil {
-				log.Printf("Error resolving file path: %v", err)
+			absPath, absErr := filepath.Abs(localPath)
+			if absErr != nil {
+				log.Printf("Error resolving file path: %v", absErr)
 				http.Error(w, "Invalid path", http.StatusBadRequest)
 				return
 			}
 
 			// Ensure path is within base directory
-			if !strings.HasPrefix(absPath, absBase) {
+			if !strings.HasPrefix(absPath, absBase+string(filepath.Separator)) && absPath != absBase {
 				log.Printf("Security: blocked path traversal attempt: %s -> %s", urlStr, absPath)
 				http.Error(w, "Path outside allowed directory", http.StatusForbidden)
 				return
@@ -177,7 +192,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 			if ext == "mp4" || ext == "webm" {
 				isVideo = true
-				err = nil
 			} else {
 				img, ext, fileData, err = loadLocalImage(absPath)
 			}
@@ -190,12 +204,14 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// Uploading from client
-		file, header, ferr := r.FormFile("file")
+		var header *multipart.FileHeader
+		var ferr error
+		uploadedFile, header, ferr = r.FormFile("file")
 		if ferr != nil {
 			http.Error(w, "No file provided", http.StatusBadRequest)
 			return
 		}
-		defer file.Close()
+		defer uploadedFile.Close()
 
 		// Validate file size from header
 		if header.Size > maxBytes {
@@ -208,42 +224,29 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		safeFilename := utils.SanitizeFilename(header.Filename)
 
 		head := make([]byte, 512)
-		if _, err := file.Read(head); err != nil {
+		n, readErr := uploadedFile.Read(head)
+		if readErr != nil && readErr != io.EOF {
 			http.Error(w, "Read error", http.StatusBadRequest)
 			return
 		}
-		if _, err := file.Seek(0, io.SeekStart); err != nil {
+		head = head[:n]
+		if _, err := uploadedFile.Seek(0, io.SeekStart); err != nil {
 			log.Printf("Error seeking file: %v", err)
 			http.Error(w, "File seek error", http.StatusInternalServerError)
 			return
 		}
 
-		// Detect content type
+		// Detect content type and map to extension in one step
 		contentType := http.DetectContentType(head)
-		
-		// Validate MIME type
-		if !utils.IsAllowedMimeType(contentType) {
+		e, ok := mimeToExt[contentType]
+		if !ok {
 			log.Printf("Security: rejected file %s with unsupported MIME type: %s", safeFilename, contentType)
 			http.Error(w, "Unsupported file type: "+contentType, http.StatusBadRequest)
 			return
 		}
-
-		allowed := map[string]string{
-			"image/jpeg": "jpg", "image/png": "png",
-			"image/gif": "gif", "image/webp": "webp",
-			"image/bmp": "bmp", "image/tiff": "tiff",
-			"video/mp4": "mp4", "video/webm": "webm",
-		}
-
-		if e, ok := allowed[contentType]; ok {
-			ext = e
-			if ext == "mp4" || ext == "webm" {
-				isVideo = true
-			}
-		} else {
-			log.Printf("Security: rejected unsupported content type: %s", contentType)
-			http.Error(w, "Unsupported image format: "+contentType, http.StatusBadRequest)
-			return
+		ext = e
+		if ext == "mp4" || ext == "webm" {
+			isVideo = true
 		}
 
 		// Magic bytes validation
@@ -254,7 +257,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if !isVideo {
-			img, _, err = image.Decode(file)
+			img, _, err = image.Decode(uploadedFile)
 			if err != nil {
 				log.Printf("Image decode error for %s: %v", safeFilename, err)
 				http.Error(w, "Invalid image decode", http.StatusBadRequest)
@@ -263,7 +266,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Additional magic bytes validation for loaded files
+	// Additional magic bytes validation for remotely loaded files
 	if len(fileData) > 0 && !isVideo {
 		if err := utils.ValidateFileType(fileData, ext); err != nil {
 			log.Printf("Security: magic bytes validation failed for link %s: %v", linkName, err)
@@ -277,8 +280,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		if err := os.Remove(oldWp.ImagePath); err != nil && !os.IsNotExist(err) {
 			log.Printf("Error removing old image %s: %v", oldWp.ImagePath, err)
 		}
-		if err := os.Remove(oldWp.PreviewPath); err != nil && !os.IsNotExist(err) {
-			log.Printf("Error removing old preview %s: %v", oldWp.PreviewPath, err)
+		if oldWp.PreviewPath != "" {
+			if err := os.Remove(oldWp.PreviewPath); err != nil && !os.IsNotExist(err) {
+				log.Printf("Error removing old preview %s: %v", oldWp.PreviewPath, err)
+			}
 		}
 	}
 
@@ -287,23 +292,20 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	previewPath := filepath.Join("static", "images", "previews", linkName+".webp")
 
 	if isVideo {
-		// Copy video file using refactored function
 		if urlStr == "" {
-			// From uploaded form file
-			file, _, _ := r.FormFile("file")
-			if _, err := file.Seek(0, 0); err != nil {
+			// From uploaded form file — reuse already-opened uploadedFile
+			if _, err := uploadedFile.Seek(0, io.SeekStart); err != nil {
 				log.Printf("Error seeking file for video copy: %v", err)
 				http.Error(w, "Failed to prepare video file", http.StatusInternalServerError)
 				return
 			}
-			if err := copyVideoFromReader(file, originalPath); err != nil {
+			if err := copyVideoFromReader(uploadedFile, originalPath); err != nil {
 				log.Printf("Error copying uploaded video to %s: %v", originalPath, err)
 				http.Error(w, "Failed to save video", http.StatusInternalServerError)
 				return
 			}
-			file.Close()
 		} else if !strings.HasPrefix(urlStr, "http") {
-			// From external directory (already validated path above)
+			// From external directory (path already validated above)
 			baseDir := config.Current.ExternalImageDir
 			if baseDir == "" {
 				baseDir = "external/images"
@@ -317,10 +319,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		previewPath = "/static/icons/video-placeholder.png"
+		// Videos have no generated preview
+		previewPath = ""
 
 	} else {
-		// Save & pic resize
+		// Save image & generate preview
 		if err := saveImage(img, ext, originalPath); err != nil {
 			log.Printf("Error saving image %s: %v", originalPath, err)
 			http.Error(w, "Save failed", http.StatusInternalServerError)
@@ -330,14 +333,12 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		thumb := resize.Thumbnail(200, 160, img, resize.Bilinear)
 		if err := saveImage(thumb, "webp", previewPath); err != nil {
 			log.Printf("Error saving preview %s: %v", previewPath, err)
-			// Clean up the original image on preview failure
 			if removeErr := os.Remove(originalPath); removeErr != nil && !os.IsNotExist(removeErr) {
 				log.Printf("Error removing original after preview fail: %v", removeErr)
 			}
 			http.Error(w, "Preview generation failed", http.StatusInternalServerError)
 			return
 		}
-		previewPath = "/static/images/previews/" + linkName + ".webp"
 	}
 
 	fi, err := os.Stat(originalPath)
@@ -356,7 +357,12 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		ID:          linkName,
 		LinkName:    linkName,
 		ImageURL:    "/static/images/" + linkName + "." + ext,
-		Preview:     previewPath,
+		Preview:     func() string {
+			if previewPath == "" {
+				return ""
+			}
+			return "/static/images/previews/" + linkName + ".webp"
+		}(),
 		HasImage:    true,
 		MIMEType:    ext,
 		SizeBytes:   fi.Size(),
@@ -364,12 +370,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:   createdAt,
 		ImagePath:   originalPath,
 		PreviewPath: previewPath,
-	}
-
-	if isVideo {
-		wp.PreviewPath = ""
-	} else {
-		wp.PreviewPath = filepath.Join("static", "images", "previews", linkName+".webp")
 	}
 
 	storage.Global.Set(linkName, wp)

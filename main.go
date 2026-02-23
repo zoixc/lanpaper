@@ -22,17 +22,19 @@ import (
 	_ "golang.org/x/image/tiff"
 )
 
-var Version = "dev"
+var (
+	Version   = "dev"
+	startTime = time.Now()
+)
 
 func main() {
 	_ = godotenv.Load()
 	config.Load()
-	log.Printf("DEBUG config.Current.Port=%s", config.Current.Port)
 
 	handlers.InitUploadSemaphore(config.Current.MaxConcurrentUploads)
 
 	// Directories
-	dirs := []string{"data", "external/images"}
+	dirs := []string{"data", "external/images", "static/images/previews"}
 	for _, d := range dirs {
 		if err := os.MkdirAll(d, 0755); err != nil {
 			log.Printf("Warning: failed to create %s: %v", d, err)
@@ -54,17 +56,17 @@ func main() {
 	// Health check
 	mux.HandleFunc("/health", healthCheckHandler)
 
-	// Admin UI (NO AUTH - для тестов)
-	mux.HandleFunc("/admin", handlers.Admin)
+	// Admin UI
+	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Admin)))
 
-	// API - PUBLIC для тестов (убрал middleware.WithSecurity)
-	mux.HandleFunc("/api/wallpapers", handlers.Wallpapers)
-	mux.HandleFunc("/api/tags", handlers.Tags)
-	mux.HandleFunc("/api/link/", handlers.Link)
-	mux.HandleFunc("/api/link", handlers.Link)
-	mux.HandleFunc("/api/upload", handlers.Upload)
-	mux.HandleFunc("/api/external-images", handlers.ExternalImages)
-	mux.HandleFunc("/api/external-image-preview", handlers.ExternalImagePreview)
+	// API endpoints — protected by security middleware
+	mux.HandleFunc("/api/wallpapers", middleware.WithSecurity(handlers.Wallpapers))
+	mux.HandleFunc("/api/tags", middleware.WithSecurity(handlers.Tags))
+	mux.HandleFunc("/api/link/", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Link)))
+	mux.HandleFunc("/api/link", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Link)))
+	mux.HandleFunc("/api/upload", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Upload)))
+	mux.HandleFunc("/api/external-images", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImages)))
+	mux.HandleFunc("/api/external-image-preview", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImagePreview)))
 
 	// Public pages
 	mux.HandleFunc("/", handlers.Public)
@@ -117,7 +119,7 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 		"service": "lanpaper",
 		"version": Version,
 		"time":    time.Now().Unix(),
-		"uptime":  time.Since(time.Now().Add(-5 * time.Minute)).String(), // пример
+		"uptime":  time.Since(startTime).String(),
 	}
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {

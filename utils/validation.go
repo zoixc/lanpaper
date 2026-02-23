@@ -24,7 +24,7 @@ func IsValidLocalPath(path string) bool {
 	}
 
 	// Reject paths trying to escape (..)
-	if strings.HasPrefix(cleanPath, "..") || strings.Contains(cleanPath, "/..") {
+	if strings.HasPrefix(cleanPath, "..") || strings.Contains(cleanPath, "/.." ) {
 		return false
 	}
 
@@ -59,8 +59,8 @@ var magicBytes = map[string][]byte{
 	"bmp":  {0x42, 0x4D},
 	"tif":  {0x49, 0x49, 0x2A, 0x00}, // Little-endian TIFF
 	"tiff": {0x4D, 0x4D, 0x00, 0x2A}, // Big-endian TIFF
-	"mp4":  {0x00, 0x00, 0x00}, // MP4 starts with ftyp at offset 4
 	"webm": {0x1A, 0x45, 0xDF, 0xA3}, // EBML header for WebM/Matroska
+	// mp4 is handled separately via ftyp box check
 }
 
 // ValidateFileType checks if file content matches expected type using magic bytes
@@ -76,14 +76,10 @@ func ValidateFileType(data []byte, expectedExt string) error {
 		expectedExt = "jpg"
 	}
 
-	magic, exists := magicBytes[expectedExt]
-	if !exists {
-		return fmt.Errorf("unsupported file type: %s", expectedExt)
-	}
-
 	// Special case for WebP (needs RIFF and WEBP check)
 	if expectedExt == "webp" {
-		if !bytes.HasPrefix(data, magic) {
+		riffMagic := magicBytes["webp"]
+		if !bytes.HasPrefix(data, riffMagic) {
 			return fmt.Errorf("file does not match WebP magic bytes")
 		}
 		// Check for WEBP signature at offset 8
@@ -93,22 +89,30 @@ func ValidateFileType(data []byte, expectedExt string) error {
 		return nil
 	}
 
-	// Special case for MP4 (ftyp box check)
+	// Special case for MP4: validate ftyp box at offset 4
 	if expectedExt == "mp4" {
 		if len(data) < 12 {
 			return fmt.Errorf("file too small for MP4 validation")
 		}
-		// Check for ftyp at offset 4
 		if string(data[4:8]) != "ftyp" {
 			return fmt.Errorf("file does not match MP4 structure")
 		}
 		return nil
 	}
 
+	magic, exists := magicBytes[expectedExt]
+	if !exists {
+		return fmt.Errorf("unsupported file type: %s", expectedExt)
+	}
+
 	// Standard magic bytes check
 	if !bytes.HasPrefix(data, magic) {
+		maxShow := len(magic)
+		if len(data) < maxShow {
+			maxShow = len(data)
+		}
 		log.Printf("Security: file extension '%s' does not match magic bytes. Expected: %v, Got: %v",
-			expectedExt, magic, data[:min(len(magic), len(data))])
+			expectedExt, magic, data[:maxShow])
 		return fmt.Errorf("file content does not match extension %s", expectedExt)
 	}
 
@@ -148,11 +152,4 @@ func SanitizeFilename(filename string) string {
 	}
 
 	return filename
-}
-
-func min(a, b int) int {
-	if a < b {
-			return a
-	}
-	return b
 }
