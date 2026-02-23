@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.9.0] - 2026-02-23
 
 ### Fixed
 - Rate limit counters are now isolated per endpoint group (`public` vs `upload`),
@@ -18,8 +18,14 @@ All notable changes to this project will be documented in this file.
   (tagged `json:"-"`); they are derived at load time via `derivePaths()`
 - Removed `Cross-Origin-Embedder-Policy: require-corp` header that broke
   loading of external images in the admin panel
-- `validate()` extracted from `Load()` and made package-level so tests can call
-  it directly without triggering env/file I/O
+- HTTP transport for image downloads is now shared across requests (connection
+  pooling); rebuilt only when proxy/TLS settings change
+- `ModTime` is correctly zeroed when an image is pruned, fixing sort order
+  in the admin panel after cleanup
+- `ExternalImages` directory walk now capped at `maxWalkDepth = 3` levels
+- Rate limit values (`UploadPerMin`, `Burst`) are read per-request via a
+  `RateLimitFunc` closure instead of being captured once at server start
+- `config_test.go` removed from `.gitignore` so tests are tracked and run in CI
 
 ### Added
 - `validate()` function in `config/config.go` — sanitises port, upload limits,
@@ -28,6 +34,7 @@ All notable changes to this project will be documented in this file.
   MaxConcurrentUploads, rate limits, proxy type, and auth auto-disable logic
 - Startup log warnings when auth is auto-disabled or `DISABLE_AUTH=true`
 - `uptime` field in `/health` response
+- `-race` flag added to CI test step
 
 ### Changed
 - Unified environment variable naming:
@@ -39,13 +46,13 @@ All notable changes to this project will be documented in this file.
   - `public_per_min` / `admin_per_min` → `publicPerMin` / `uploadPerMin`
 - `docker-compose-example.yml` updated: proxy section commented out by default,
   `PORT` set to `8080` inside container, all rate limit vars explicit
-- README rewritten: env variable reference table, removed stale `config.json`
-  Quick Start steps, accurate auth behaviour docs
+- CI/CD pipeline now pushes to Docker Hub (`ptabi/lanpaper`) on merge to `main`
+  instead of GHCR; smoke-test uses real HTTP health check
+- README updated: accurate Go version, full fixes list, `/health` in API docs
 
 ### Removed
-- `Cross-Origin-Embedder-Policy: require-corp` security header (incompatible
-  with external image loading without CORP headers on remote servers)
-- `admin_per_min` rate limit field (admin endpoints are not separately rate-limited)
+- `Cross-Origin-Embedder-Policy: require-corp` security header
+- `admin_per_min` rate limit field
 
 ---
 
@@ -94,6 +101,8 @@ All notable changes to this project will be documented in this file.
 ### Architecture
 - `main.go` reduced from 900+ to ~80 lines
 - Split into modules: `config`, `handlers`, `middleware`, `storage`, `utils`
+
+---
 
 ## [0.7.7] - 2024-XX-XX
 

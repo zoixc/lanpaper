@@ -9,36 +9,37 @@ A web-based wallpaper management service with support for image and video upload
 - Automatic thumbnail generation
 - Load images from URL or local server directory
 - Basic Auth for admin panel protection (auto-disabled if no credentials provided)
-- Enhanced security (CSP, path traversal protection)
+- Enhanced security (CSP, path traversal protection, magic bytes validation)
 - Rate limiting for abuse prevention
-- Docker support
+- Docker support with multi-arch images (amd64, arm64)
 - Proxy support for external image downloads
 - Modular code architecture
 
-## What's New in v0.8.3
+## What's New in v0.9.0
 
-### Security Improvements
-- Strict Content Security Policy (no `unsafe-inline` for scripts)
-- Enhanced path traversal protection with absolute path validation
-- Additional security headers (X-XSS-Protection, Permissions-Policy)
-- File size validation before processing
-- Logging of security violations
+### Fixes
+- Rate limit counters are now isolated per endpoint group — upload activity no longer consumes the public rate limit for the same IP
+- `MaybeBasicAuth` evaluates `DisableAuth` per-request instead of once at middleware registration
+- `isValidLinkName` regex compiled once at startup instead of on every request
+- `public.go` uses `http.ServeContent` so manually set headers are not silently overwritten
+- `ImagePath` / `PreviewPath` no longer persisted to `wallpapers.json` — derived at load time
+- Removed `Cross-Origin-Embedder-Policy: require-corp` header that broke external image loading in admin panel
+- HTTP transport for image downloads is now shared and reuses connections (connection pooling)
+- `ModTime` correctly zeroed when an image is pruned, fixing sort order in admin panel
+- `ExternalImages` directory walk now capped at 3 levels deep
+- Rate limit values read per-request so config changes take effect without restart
 
-### Reliability
-- Graceful shutdown with 30-second timeout
-- HTTP server timeouts (Read: 30s, Write: 30s, Idle: 120s)
-- Improved error handling with contextual logging
+### Added
+- Config validation (`validate()`) covering port, upload limits, rate limits, proxy type, and auth auto-disable
+- Config unit tests (`config_test.go`)
+- `uptime` field in `/health` response
 
-### Quality of Life
-- Authentication automatically disabled if `ADMIN_USER` and `ADMIN_PASS` are not set
-- No need to manually set `DISABLE_AUTH=true` for setups behind external auth
+### Changed
+- Unified environment variable naming: `PROXY_USER` → `PROXY_USERNAME`, `PROXY_PASS` → `PROXY_PASSWORD`
+- `RATE_LIMIT` removed; replaced by `RATE_PUBLIC_PER_MIN`, `RATE_UPLOAD_PER_MIN`, `RATE_BURST`
+- CI/CD pushes to Docker Hub (`ptabi/lanpaper`) on merge to `main`
 
-### Architecture
-- Refactored into modules: `config`, `handlers`, `middleware`, `storage`, `utils`
-- Reduced main.go from 900+ to 80 lines
-- Better code readability and maintainability
-
-See [CHANGELOG.md](CHANGELOG.md) for details
+See [CHANGELOG.md](CHANGELOG.md) for full history.
 
 ## Quick Start
 
@@ -188,6 +189,7 @@ lanpaper/
   - Form data: `file` (file) or `url` (URL/path), `linkName`
 - `GET /api/external-images` - List local images
 - `GET /api/external-image-preview?path=...` - Preview local image
+- `GET /health` - Health check (JSON: status, version, uptime)
 
 ## Usage
 
@@ -241,6 +243,7 @@ If `MAX_IMAGES` is set, old images are automatically deleted when the limit is e
 - Content Security Policy without `unsafe-inline`
 - X-Frame-Options: DENY
 - X-Content-Type-Options: nosniff
+- Magic bytes validation for all uploaded files
 - Path traversal protection
 - Rate limiting
 - Basic Authentication (optional)
@@ -262,7 +265,7 @@ If `MAX_IMAGES` is set, old images are automatically deleted when the limit is e
 
 ## Technologies
 
-- Go 1.21+
+- Go 1.25+
 - [golang.org/x/image](https://pkg.go.dev/golang.org/x/image) - Image resizing
 - [github.com/chai2010/webp](https://github.com/chai2010/webp) - WebP support
 - [github.com/joho/godotenv](https://github.com/joho/godotenv) - .env files
