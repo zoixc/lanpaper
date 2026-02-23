@@ -47,18 +47,9 @@ See [CHANGELOG.md](CHANGELOG.md) for details
 1. Copy example configuration:
 ```bash
 cp docker-compose-example.yml docker-compose.yml
-cp config.example.json config.json
 ```
 
-2. Edit `config.json` and set credentials:
-```json
-{
-  "port": "8080",
-  "username": "admin",
-  "password": "your_secure_password",
-  "maxUploadMB": 50
-}
-```
+2. Edit `docker-compose.yml` and set your credentials.
 
 3. Start:
 ```bash
@@ -80,9 +71,9 @@ docker run -d \
   ptabi/lanpaper:latest
 ```
 
-**Without authentication (behind external auth like Nginx):**
+**Without authentication (behind external auth like Tinyauth/Authelia):**
 ```bash
-# Just omit ADMIN_USER and ADMIN_PASS - auth will be auto-disabled
+# Omit ADMIN_USER and ADMIN_PASS - auth will be auto-disabled
 docker run -d \
   -p 8080:8080 \
   -v $(pwd)/data:/app/data \
@@ -102,29 +93,27 @@ go build -o lanpaper .
 
 ### Authentication Behavior
 
-**Important**: Authentication is automatically disabled if no credentials are provided:
+Authentication is automatically disabled if no credentials are provided:
 - If `ADMIN_USER` and `ADMIN_PASS` environment variables are not set
-- OR if `username` and `password` are empty in `config.json`
 - You will see a warning in logs: `"Warning: No credentials provided. Authentication is automatically disabled."`
 
-This is useful when running behind external authentication (Nginx Proxy Manager, Authelia, etc.)
+This is useful when running behind external authentication (Tinyauth, Nginx Proxy Manager, Authelia, etc.)
 
 ### Via config.json
 
 ```json
 {
   "port": "8080",
-  "username": "admin",
-  "password": "secret",
+  "adminUser": "admin",
+  "adminPass": "secret",
   "maxUploadMB": 50,
   "maxImages": 100,
-  "max_concurrent_uploads": 3,
+  "maxConcurrentUploads": 2,
   "disableAuth": false,
   "externalImageDir": "external/images",
   "rate": {
-    "public_per_min": 50,
-    "admin_per_min": 0,
-    "upload_per_min": 20,
+    "publicPerMin": 120,
+    "uploadPerMin": 20,
     "burst": 10
   },
   "proxyType": "http",
@@ -138,24 +127,25 @@ This is useful when running behind external authentication (Nginx Proxy Manager,
 
 ### Via Environment Variables
 
-```bash
-export PORT=8080
-export ADMIN_USER=admin           # Optional - auth disabled if not set
-export ADMIN_PASS=secret          # Optional - auth disabled if not set
-export MAX_UPLOAD_MB=50
-export MAX_IMAGES=100
-export DISABLE_AUTH=false         # Optional - auto-set if no credentials
-export RATE_LIMIT=50
-export EXTERNAL_IMAGE_DIR=/path/to/images
-
-# Proxy settings
-export PROXY_TYPE=http
-export PROXY_HOST=proxy.example.com
-export PROXY_PORT=8080
-export PROXY_USER=username
-export PROXY_PASS=password
-export INSECURE_SKIP_VERIFY=false
-```
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `8080` | Server port |
+| `ADMIN_USER` | `` | Admin username (omit to disable auth) |
+| `ADMIN_PASS` | `` | Admin password (omit to disable auth) |
+| `DISABLE_AUTH` | `false` | Force-disable auth regardless of credentials |
+| `MAX_UPLOAD_MB` | `50` | Max upload file size in MB |
+| `MAX_IMAGES` | `0` | Max stored images (0 = unlimited) |
+| `MAX_CONCURRENT_UPLOADS` | `2` | Max parallel uploads |
+| `EXTERNAL_IMAGE_DIR` | `external/images` | Path to external image directory |
+| `RATE_PUBLIC_PER_MIN` | `120` | Public endpoint rate limit (req/min) |
+| `RATE_UPLOAD_PER_MIN` | `20` | Upload rate limit (req/min) |
+| `RATE_BURST` | `10` | Rate limit burst size |
+| `PROXY_TYPE` | `http` | Proxy type: `http`, `socks5` |
+| `PROXY_HOST` | `` | Proxy host |
+| `PROXY_PORT` | `` | Proxy port |
+| `PROXY_USERNAME` | `` | Proxy username |
+| `PROXY_PASSWORD` | `` | Proxy password |
+| `INSECURE_SKIP_VERIFY` | `false` | Skip TLS verification for external requests |
 
 ## Project Structure
 
@@ -220,62 +210,47 @@ Image is now available at: `http://your-server:8080/sunset`
 
 ### Example: Nginx Proxy Manager with External Auth
 
-If you're using external authentication (Nginx Proxy Manager, Authelia, etc.):
+If you're using external authentication (Tinyauth, Nginx Proxy Manager, Authelia, etc.):
 
 1. **Don't set `ADMIN_USER`/`ADMIN_PASS`** - auth will be auto-disabled
-2. Configure your reverse proxy to:
-   - Protect `/admin` and `/api/*` with external auth
-   - Allow public access to `/{linkName}` (direct image links)
+2. Configure your reverse proxy to protect `/admin` and `/api/*`
 
 **Nginx example:**
 ```nginx
 location /admin {
-    auth_request /auth;  # Your external auth
+    auth_request /auth;
     proxy_pass http://lanpaper:8080;
 }
 
 location /api/ {
-    auth_request /auth;  # Your external auth
+    auth_request /auth;
     proxy_pass http://lanpaper:8080;
 }
 
 location / {
-    # Public access for direct image links
     proxy_pass http://lanpaper:8080;
 }
 ```
 
-This way:
-- Admin panel requires external authentication
-- Direct image links (e.g., `/sunset`) work without auth
-- No need to manage Basic Auth credentials in Lanpaper
-
 ## Automatic Cleanup
 
-If `maxImages` is set, old images are automatically deleted when limit is exceeded (links are preserved).
+If `MAX_IMAGES` is set, old images are automatically deleted when the limit is exceeded (links are preserved).
 
 ## Security
-
-### Implemented Protection
 
 - Content Security Policy without `unsafe-inline`
 - X-Frame-Options: DENY
 - X-Content-Type-Options: nosniff
-- X-XSS-Protection
 - Path traversal protection
-- All user paths validated
 - Rate limiting
 - Basic Authentication (optional)
 - HTTP timeouts
 
 ### Production Recommendations
 
-**Important**: Use HTTPS in production! Recommended:
-- Run behind reverse proxy (nginx/Caddy/Traefik)
-- Configure TLS certificates
-- Use external authentication system for better security
-- If using built-in auth, use strong passwords (minimum 16 characters)
-- Configure rate limiting for your load
+- Run behind a reverse proxy (nginx/Caddy/Traefik) with HTTPS
+- Use external authentication (Tinyauth, Authelia) for better security
+- Use strong passwords (minimum 16 characters)
 - Regularly update Docker images
 - Monitor logs for suspicious activity
 
@@ -287,16 +262,16 @@ If `maxImages` is set, old images are automatically deleted when limit is exceed
 
 ## Technologies
 
-- Go 1.25+
-- [github.com/nfnt/resize](https://github.com/nfnt/resize) - Image resizing
+- Go 1.21+
+- [golang.org/x/image](https://pkg.go.dev/golang.org/x/image) - Image resizing
 - [github.com/chai2010/webp](https://github.com/chai2010/webp) - WebP support
 - [github.com/joho/godotenv](https://github.com/joho/godotenv) - .env files
 
 ## Development
 
 ```bash
-# Run in dev mode
-go run main.go
+# Run
+go run .
 
 # Build
 go build -o lanpaper .
@@ -315,18 +290,4 @@ MIT License - see [LICENSE](LICENSE)
 ## Support
 
 - Issues: [GitHub Issues](https://github.com/zoixc/lanpaper/issues)
-- Discussions: [GitHub Discussions](https://github.com/zoixc/lanpaper/discussions)
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
-
-## Roadmap
-
-- [ ] Unit tests
-- [ ] Integration tests
-- [ ] GitHub Actions CI/CD
-- [ ] Built-in TLS support
-- [ ] S3/cloud storage support
-- [ ] Bulk API operations
-- [ ] Wallpaper search
-- [ ] Tags and categories
-- [ ] Per-user API rate limiting
-- [ ] Metrics and Prometheus support

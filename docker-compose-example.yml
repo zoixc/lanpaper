@@ -7,31 +7,41 @@ services:
       - "9350:8080"
 
     environment:
+      - PORT=8080
+
+      # Admin credentials - omit both to auto-disable auth (useful behind Tinyauth/Authelia/etc.)
       - ADMIN_USER=admin
       - ADMIN_PASS=password
-      - PORT=9350
-      
+
+      # Set to true to disable built-in auth entirely (e.g. behind external auth proxy)
+      # - DISABLE_AUTH=true
+
       - MAX_UPLOAD_MB=200
-      - RATE_LIMIT=200
       - MAX_IMAGES=100
-      
-      # Set path inside the container where your images will be mounted
+      - MAX_CONCURRENT_UPLOADS=2
+
+      # Rate limiting
+      - RATE_PUBLIC_PER_MIN=120
+      - RATE_UPLOAD_PER_MIN=20
+      - RATE_BURST=10
+
+      # Path inside the container where your external images will be mounted
       - EXTERNAL_IMAGE_DIR=/app/gallery
 
-      # If true, disables authentication (not recommended for public servers)
-      - DISABLE_AUTH=true
-      - GOMEMLIMIT=15MiB 
+      # Go runtime tuning (optional)
+      - GOMEMLIMIT=150MiB
       - GOGC=50
-      
-      # Optinal proxy settings
-      - PROXY_TYPE=socks5
-      - PROXY_HOST=123.45.67.89
-      - PROXY_PORT=33186
-      - PROXY_USER=proxy_username
-      - PROXY_PASS=proxy_password
+
+      # Proxy settings (optional)
+      # - PROXY_TYPE=socks5
+      # - PROXY_HOST=123.45.67.89
+      # - PROXY_PORT=33186
+      # - PROXY_USERNAME=proxy_username
+      # - PROXY_PASSWORD=proxy_password
+      # - INSECURE_SKIP_VERIFY=false
 
     volumes:
-      # Example path mappings - adjust these paths as needed
+      # Adjust these paths as needed
       - ./lanpaper/data:/app/data
       - ./lanpaper/images:/app/static/images
       - ./homepage/images:/app/gallery:ro
