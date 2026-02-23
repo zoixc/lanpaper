@@ -20,8 +20,9 @@ var (
 	counts = map[string]*counter{}
 )
 
-// cleanerWindow matches the rate-limit window so stale entries are evicted
-// promptly instead of sitting in memory for minutes after expiry.
+// cleanerWindow is how long an idle entry is kept before being evicted.
+// Set to 2× the rate-limit window (1 min) so entries expire soon after
+// the window rolls over, keeping memory usage low.
 const cleanerWindow = 2 * time.Minute
 
 func StartCleaner() {
