@@ -109,8 +109,9 @@ func validate() {
 		}
 	}
 
-	// Auto-disable auth when no credentials are provided
-	if !Current.DisableAuth && Current.AdminUser == "" && Current.AdminPass == "" {
+	// Auto-disable auth when either credential is missing.
+	// Both username AND password must be provided for auth to work.
+	if !Current.DisableAuth && (Current.AdminUser == "" || Current.AdminPass == "") {
 		Current.DisableAuth = true
 	}
 }

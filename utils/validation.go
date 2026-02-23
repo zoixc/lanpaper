@@ -6,13 +6,23 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
+
+// windowsAbsPath matches Windows-style absolute paths like C:\ or D:/
+var windowsAbsPath = regexp.MustCompile(`(?i)^[a-z]:[/\\]`)
 
 // IsValidLocalPath validates that a path doesn't contain dangerous patterns
 func IsValidLocalPath(path string) bool {
 	// Check for null bytes
 	if strings.Contains(path, "\x00") {
+		return false
+	}
+
+	// Reject Windows absolute paths (e.g. C:\Windows) — filepath.IsAbs
+	// returns false for these on Linux, so we check explicitly.
+	if windowsAbsPath.MatchString(path) {
 		return false
 	}
 
@@ -24,7 +34,7 @@ func IsValidLocalPath(path string) bool {
 	}
 
 	// Reject paths trying to escape (..)
-	if strings.HasPrefix(cleanPath, "..") || strings.Contains(cleanPath, "/.." ) {
+	if strings.HasPrefix(cleanPath, "..") || strings.Contains(cleanPath, "/..") {
 		return false
 	}
 
