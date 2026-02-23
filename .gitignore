@@ -27,14 +27,11 @@ external/images/*
 # Configuration
 config.json
 .env
-config_test.go
 
 # IDEs
 .vscode/
-.old/
-./lanpaper
-./homepage
 .idea/
+.old/
 *.swp
 *.swo
 *~
@@ -47,5 +44,9 @@ config_test.go
 docker-compose.yml
 !docker-compose-example.yml
 
-# old
+# Local dev dirs
+lanpaper/
+homepage/
+
+# Misc
 style-old.css
