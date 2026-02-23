@@ -1,19 +1,21 @@
 {
   "port": "8080",
-  "username": "admin",
-  "password": "password",
+  "adminUser": "admin",
+  "adminPass": "password",
   "maxUploadMB": 200,
   "maxImages": 20,
+  "maxConcurrentUploads": 2,
+  "disableAuth": false,
+  "externalImageDir": "external/images",
   "rate": {
-    "public_per_min": 200,
-    "admin_per_min": 300,
-    "upload_per_min": 10,
-    "burst": 50
+    "publicPerMin": 120,
+    "uploadPerMin": 20,
+    "burst": 10
   },
-  "externalImageDir": "./images",
-  "proxyType": "socks5",
-  "proxyHost": "123.45.67.89",
-  "proxyPort": "33186",
-  "proxyUsername": "proxy_username",
-  "proxyPassword": "proxy_password"
+  "proxyType": "http",
+  "proxyHost": "",
+  "proxyPort": "",
+  "proxyUsername": "",
+  "proxyPassword": "",
+  "insecureSkipVerify": false
 }

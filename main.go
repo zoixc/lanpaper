@@ -31,6 +31,14 @@ func main() {
 	_ = godotenv.Load()
 	config.Load()
 
+	// Startup warnings
+	if !config.Current.DisableAuth && config.Current.AdminUser == "" && config.Current.AdminPass == "" {
+		log.Println("Warning: No credentials provided. Authentication is automatically disabled.")
+	}
+	if config.Current.DisableAuth {
+		log.Println("Warning: Authentication is disabled (DISABLE_AUTH=true).")
+	}
+
 	handlers.InitUploadSemaphore(config.Current.MaxConcurrentUploads)
 
 	dirs := []string{"data", "external/images", "static/images/previews"}
