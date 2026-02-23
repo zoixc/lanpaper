@@ -205,10 +205,11 @@ body.dark .network-bg::after {
 
 .section h2 {
     font-family: 'Google', sans-serif;
-    font-size: 0.7rem;
-    font-weight: 500;
+    font-size: 0.625rem;
+    font-weight: 600;
     margin-bottom: 12px;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     color: var(--text-muted);
 }
 
