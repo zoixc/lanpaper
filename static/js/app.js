@@ -31,6 +31,7 @@ const DOM = {
     searchInput: document.getElementById('searchInput'),
     searchStats: document.getElementById('searchStats'),
     sortSelect: document.getElementById('sortSelect'),
+    appVersion: document.getElementById('appVersion'),
 
     // Modal Elements
     modalOverlay: document.getElementById('modalOverlay'),
@@ -56,9 +57,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     initLanguage();
     initView();
     initSearchSort();
+    loadAppVersion();
     await loadLinks();
     setupGlobalListeners();
 });
+
+
+// VERSION
+async function loadAppVersion() {
+    try {
+        const res = await fetch('/health');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.version && DOM.appVersion) {
+            DOM.appVersion.textContent = `v${data.version}`;
+        }
+    } catch (e) {
+        // silently ignore — footer will show 'v...'
+    }
+}
 
 
 // THEME MANAGER
@@ -208,6 +225,7 @@ async function setLanguage(lang) {
     applyTranslations();
     syncCustomSelectLabels();
     updateSearchStats();
+    updateAriaLabels();
 }
 
 
@@ -225,6 +243,15 @@ function applyTranslations(root = document) {
 
 function t(key, defaultText) {
     return STATE.translations[key] || defaultText;
+}
+
+
+// Update dynamic aria-labels after language switch
+function updateAriaLabels() {
+    document.querySelectorAll('[data-i18n-aria]').forEach(el => {
+        const key = el.dataset.i18nAria;
+        if (STATE.translations[key]) el.setAttribute('aria-label', STATE.translations[key]);
+    });
 }
 
 
@@ -249,7 +276,6 @@ function initSearchSort() {
         }, 250);
     });
 
-    // Нативный select — на случай если кастомный не инициализировался
     if (sortSelect) {
         sortSelect.addEventListener('change', (e) => {
             STATE.sortBy = e.target.value;
@@ -271,7 +297,6 @@ function initCustomSelect() {
     const label = document.getElementById('customSortLabel');
     const options = customSelect.querySelectorAll('.custom-select-option');
 
-    // Синхронизируем начальное состояние с STATE.sortBy
     syncCustomSelectLabels();
 
     btn.addEventListener('click', (e) => {
@@ -285,16 +310,13 @@ function initCustomSelect() {
         opt.addEventListener('click', () => {
             const val = opt.dataset.value;
 
-            // Обновляем визуал
             options.forEach(o => o.classList.remove('selected'));
             opt.classList.add('selected');
             if (label) label.textContent = opt.textContent;
 
-            // Закрываем
             customSelect.classList.remove('open');
             btn.setAttribute('aria-expanded', 'false');
 
-            // Синхронизируем с нативным select и STATE
             if (DOM.sortSelect) DOM.sortSelect.value = val;
             STATE.sortBy = val;
             localStorage.setItem('sortBy', val);
@@ -302,7 +324,6 @@ function initCustomSelect() {
         });
     });
 
-    // Закрытие по клику вне
     document.addEventListener('click', (e) => {
         if (!customSelect.contains(e.target)) {
             customSelect.classList.remove('open');
@@ -310,7 +331,6 @@ function initCustomSelect() {
         }
     });
 
-    // Закрытие по Escape
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && customSelect.classList.contains('open')) {
             customSelect.classList.remove('open');
@@ -320,7 +340,6 @@ function initCustomSelect() {
 }
 
 
-// Синхронизация label кастомного select при смене языка или состояния
 function syncCustomSelectLabels() {
     const customSelect = document.getElementById('customSortSelect');
     if (!customSelect) return;
@@ -423,7 +442,7 @@ function showModal(type, titleKey, placeholderKey = '') {
     return new Promise((resolve) => {
         modalResolve = resolve;
 
-        DOM.modalTitle.textContent = t(titleKey, 'Input');
+        DOM.modalTitle.textContent = t(titleKey, t('modal_default_title', 'Input'));
         DOM.modalOverlay.classList.remove('hidden');
         DOM.modalOverlay.setAttribute('aria-hidden', 'false');
 
@@ -435,7 +454,7 @@ function showModal(type, titleKey, placeholderKey = '') {
 
         if (type === 'input') {
             DOM.modalInput.style.display = 'block';
-            DOM.modalInput.placeholder = t(placeholderKey, 'https://...');
+            DOM.modalInput.placeholder = placeholderKey ? t(placeholderKey, 'https://...') : t('url_placeholder', 'https://...');
             DOM.modalInput.focus();
             DOM.modalInput.onkeydown = (e) => {
                 if (e.key === 'Enter') confirmModal();
@@ -553,8 +572,8 @@ async function loadLinks() {
         updateSearchStats();
         filterAndSort();
     } catch (e) {
-        console.error('❌ LoadLinks error:', e);
-        showToast('Failed to load links', 'error');
+        console.error('LoadLinks error:', e);
+        showToast(t('load_error', 'Failed to load links'), 'error');
         STATE.wallpapers = [];
         renderLinks([]);
     }
@@ -584,6 +603,7 @@ function renderLinks(wallpapers) {
 
     DOM.linksList.appendChild(fragment);
     applyTranslations(DOM.linksList);
+    updateAriaLabels();
 }
 
 
@@ -604,7 +624,13 @@ function updateCard(card, link) {
     card.querySelector('.link-id').textContent = linkName;
 
     const fullUrl = `${window.location.origin}/${linkName}`;
-    card.querySelector('.preview-link').href = fullUrl;
+
+    const previewLink = card.querySelector('.preview-link');
+    previewLink.href = fullUrl;
+    previewLink.setAttribute('aria-label', t('aria_open_image', 'Open image'));
+
+    const linkIdEl = card.querySelector('.link-id');
+    linkIdEl.setAttribute('aria-label', t('aria_link_id', 'Link ID'));
 
     const category = link.hasImage ? detectCategory(link) : 'other';
 
@@ -615,14 +641,15 @@ function updateCard(card, link) {
         const path = link.imagePath || link.imageUrl || '';
         fileType = path.split('.').pop().toUpperCase() || 'IMAGE';
     } else {
-        fileType = t('no_image_short', 'No image');
+        fileType = t('no_image', 'No image');
     }
 
-    const dateStr = link.createdAt ? formatDate(link.createdAt) : '—';
-    const sizeStr = link.sizeBytes ? ` · ${formatKB(link.sizeBytes)}` : '';
+    const dateStr = link.createdAt ? formatDate(link.createdAt) : '\u2014';
+    const sizeStr = link.sizeBytes ? ` \u00b7 ${formatKB(link.sizeBytes)}` : '';
 
-    card.querySelector('.link-meta').textContent =
-        `${category} · ${fileType}${sizeStr} · ${dateStr}`;
+    const linkMeta = card.querySelector('.link-meta');
+    linkMeta.textContent = `${category} \u00b7 ${fileType}${sizeStr} \u00b7 ${dateStr}`;
+    linkMeta.setAttribute('aria-label', t('aria_file_info', 'File info'));
 
     const previewWrapper = card.querySelector('.preview-wrapper');
     previewWrapper.innerHTML = '';
@@ -632,21 +659,25 @@ function updateCard(card, link) {
     if (link.hasImage && resolvedPreview) {
         const img = document.createElement('img');
         img.src = '/' + resolvedPreview.replace(/^\//, '') + `?t=${Date.now()}`;
-        img.alt = "Preview";
-        img.className = "preview";
-        img.onerror = () => previewWrapper.innerHTML = '<div class="no-image">Preview unavailable</div>';
+        img.alt = 'Preview';
+        img.className = 'preview';
+        img.onerror = () => {
+            previewWrapper.innerHTML = `<div class="no-image">${t('preview_unavailable', 'Preview unavailable')}</div>`;
+        };
         previewWrapper.appendChild(img);
     } else if (link.hasImage) {
         const img = document.createElement('img');
         img.src = '/' + (link.imageUrl || '').replace(/^\//, '') || fullUrl;
-        img.alt = "Image";
-        img.className = "preview";
-        img.onerror = () => previewWrapper.innerHTML = '<div class="no-image">Image unavailable</div>';
+        img.alt = 'Image';
+        img.className = 'preview';
+        img.onerror = () => {
+            previewWrapper.innerHTML = `<div class="no-image">${t('image_unavailable', 'Image unavailable')}</div>`;
+        };
         previewWrapper.appendChild(img);
     } else {
         const noImg = document.createElement('div');
         noImg.className = 'no-image';
-        noImg.textContent = t('no_image_short', 'No image');
+        noImg.textContent = t('no_image', 'No image');
         previewWrapper.appendChild(noImg);
     }
 
@@ -813,6 +844,7 @@ function setupGlobalListeners() {
             updateCard(article, newLinkObj);
             setupCardEvents(article, newLinkObj);
             applyTranslations(article);
+            updateAriaLabels();
 
             DOM.emptyState.style.display = 'none';
             DOM.linksList.appendChild(article);
@@ -845,6 +877,6 @@ function formatKB(bytes) {
 
 
 function formatDate(ts) {
-    if (!ts) return '—';
+    if (!ts) return '\u2014';
     return new Date(ts * 1000).toLocaleDateString();
 }

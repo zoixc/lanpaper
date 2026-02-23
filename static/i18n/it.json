@@ -14,6 +14,7 @@
   "enter_image_url_title": "Incolla da URL",
   "select_server_title": "Seleziona dal server",
   "enter_image_url": "URL immagine:",
+  "url_placeholder": "https://...",
 
   "invalid_id": "ID obbligatorio",
   "invalid_id_chars": "Usa a-z, 0-9, - o _",
@@ -31,14 +32,23 @@
 
   "modal_cancel": "Annulla",
   "modal_ok": "OK",
+  "modal_default_title": "Inserimento",
 
   "search_placeholder": "Cerca per nome link o file...",
   "search_total": "Totale: {{total}}",
   "search_found": "Trovati {{shown}} di {{total}}",
 
   "sort_by": "Ordina per:",
-  "name_asc": "Nome (A–Z)",
-  "name_desc": "Nome (Z–A)",
-  "date_new": "Prima i più recenti",
-  "date_old": "Prima i più vecchi"
+  "name_asc": "Nome (A\u2013Z)",
+  "name_desc": "Nome (Z\u2013A)",
+  "date_new": "Prima i pi\u00f9 recenti",
+  "date_old": "Prima i pi\u00f9 vecchi",
+
+  "load_error": "Impossibile caricare i link",
+  "preview_unavailable": "Anteprima non disponibile",
+  "image_unavailable": "Immagine non disponibile",
+
+  "aria_open_image": "Apri immagine",
+  "aria_link_id": "ID link",
+  "aria_file_info": "Info file"
 }
