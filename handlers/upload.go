@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"image/draw"
@@ -201,6 +202,27 @@ func normalizeFormat(format string) string {
 	}
 }
 
+// maxImageDimension is the maximum allowed width or height of a decoded image.
+// Images exceeding this are rejected before decoding to prevent image-bomb
+// (decompression bomb) attacks that could exhaust server memory.
+// 16384 px covers all practical wallpaper resolutions (8K = 7680 px wide).
+const maxImageDimension = 16384
+
+// checkImageDimensions peeks at the image config (width/height only, no full
+// decode) and returns an error if either dimension exceeds maxImageDimension.
+func checkImageDimensions(r io.ReadSeeker) error {
+	cfg, _, err := image.DecodeConfig(r)
+	if err != nil {
+		// If we can't read config, let the full decode fail later with its own error.
+		return nil
+	}
+	if cfg.Width > maxImageDimension || cfg.Height > maxImageDimension {
+		return fmt.Errorf("image dimensions %dx%d exceed maximum allowed %dx%d",
+			cfg.Width, cfg.Height, maxImageDimension, maxImageDimension)
+	}
+	return nil
+}
+
 // thumbnail resizes src to fit within maxW x maxH using golang.org/x/image/draw
 func thumbnail(src image.Image, maxW, maxH int) image.Image {
 	srcB := src.Bounds()
@@ -314,6 +336,20 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+			// Resolve symlinks and re-check the real path is still inside absBase.
+			// This prevents a symlink in the gallery pointing to /etc/passwd etc.
+			realPath, realErr := filepath.EvalSymlinks(absPath)
+			if realErr != nil {
+				log.Printf("Security: cannot resolve symlink %s: %v", absPath, realErr)
+				http.Error(w, "Invalid path", http.StatusBadRequest)
+				return
+			}
+			if !strings.HasPrefix(realPath, absBase+string(filepath.Separator)) && realPath != absBase {
+				log.Printf("Security: blocked symlink escape: %s -> %s", absPath, realPath)
+				http.Error(w, "Path outside allowed directory", http.StatusForbidden)
+				return
+			}
+
 			ext = strings.ToLower(filepath.Ext(absPath))
 			if len(ext) > 1 {
 				ext = ext[1:]
@@ -327,7 +363,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 		if err != nil {
 			log.Printf("Image load error for link %s: %v", linkName, err)
-			http.Error(w, "Failed to load image: "+err.Error(), http.StatusBadRequest)
+			// Return a generic message — do not forward internal error details to the client.
+			http.Error(w, "Failed to load image", http.StatusBadRequest)
 			return
 		}
 	} else {
@@ -365,7 +402,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		e, ok := mimeToExt[contentType]
 		if !ok {
 			log.Printf("Security: rejected file %s with unsupported MIME type: %s", safeFilename, contentType)
-			http.Error(w, "Unsupported file type: "+contentType, http.StatusBadRequest)
+			http.Error(w, "Unsupported file type", http.StatusBadRequest)
 			return
 		}
 		ext = e
@@ -380,11 +417,23 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if !isVideo {
+			// Check image dimensions before full decode to prevent decompression bombs.
+			if dimErr := checkImageDimensions(uploadedFile); dimErr != nil {
+				log.Printf("Security: rejected oversized image from %s: %v", safeFilename, dimErr)
+				http.Error(w, "Image dimensions too large", http.StatusBadRequest)
+				return
+			}
+			if _, err := uploadedFile.Seek(0, io.SeekStart); err != nil {
+				log.Printf("Error seeking file after dimension check: %v", err)
+				http.Error(w, "File seek error", http.StatusInternalServerError)
+				return
+			}
+
 			var decodeErr error
 			img, _, decodeErr = image.Decode(uploadedFile)
 			if decodeErr != nil {
 				log.Printf("Image decode error for %s: %v", safeFilename, decodeErr)
-				http.Error(w, "Invalid image decode", http.StatusBadRequest)
+				http.Error(w, "Invalid image", http.StatusBadRequest)
 				return
 			}
 		}
@@ -433,7 +482,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			srcPath := filepath.Join(absBase, filepath.Clean(urlStr))
 			if err := copyVideoFile(srcPath, originalPath); err != nil {
 				log.Printf("Error copying external video %s to %s: %v", srcPath, originalPath, err)
-				http.Error(w, "Failed to copy video from external source", http.StatusInternalServerError)
+				http.Error(w, "Failed to copy video", http.StatusInternalServerError)
 				return
 			}
 		}
@@ -537,7 +586,8 @@ func saveImage(img image.Image, format, path string) error {
 func loadLocalImage(path string) (image.Image, string, []byte, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("file not found on server")
+		// Do not expose internal path or OS error details to callers.
+		return nil, "", nil, errors.New("file not found")
 	}
 	defer func() {
 		if cerr := f.Close(); cerr != nil {
@@ -550,12 +600,23 @@ func loadLocalImage(path string) (image.Image, string, []byte, error) {
 	head = head[:n]
 
 	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		return nil, "", nil, err
+		return nil, "", nil, errors.New("failed to read file")
+	}
+
+	// Check dimensions before full decode to prevent decompression bombs.
+	if dimErr := checkImageDimensions(f); dimErr != nil {
+		log.Printf("Security: rejected oversized local image %s: %v", path, dimErr)
+		return nil, "", nil, errors.New("image dimensions too large")
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return nil, "", nil, errors.New("failed to read file")
 	}
 
 	img, format, err := image.Decode(f)
 	if err != nil {
-		return nil, "", nil, err
+		// Log full error internally; return generic message to caller.
+		log.Printf("Image decode error for %s: %v", path, err)
+		return nil, "", nil, errors.New("invalid or unsupported image format")
 	}
 	return img, normalizeFormat(format), head, nil
 }
@@ -583,7 +644,7 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("network error: %v", err)
+		return nil, "", nil, fmt.Errorf("network error")
 	}
 	defer resp.Body.Close()
 
@@ -593,20 +654,26 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 
 	if resp.ContentLength > 0 && resp.ContentLength > int64(config.Current.MaxUploadMB)<<20 {
 		log.Printf("Security: rejected download with Content-Length %d (max: %d)", resp.ContentLength, int64(config.Current.MaxUploadMB)<<20)
-		return nil, "", nil, fmt.Errorf("file too large: %d bytes", resp.ContentLength)
+		return nil, "", nil, fmt.Errorf("file too large")
 	}
 
 	limitReader := io.LimitReader(resp.Body, int64(config.Current.MaxUploadMB)<<20)
 	buf, err := io.ReadAll(limitReader)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("read error: %v", err)
+		return nil, "", nil, fmt.Errorf("read error")
+	}
+
+	// Check image dimensions before full decode to prevent decompression bombs.
+	if dimErr := checkImageDimensions(bytes.NewReader(buf)); dimErr != nil {
+		log.Printf("Security: rejected oversized remote image from %s: %v", urlStr, dimErr)
+		return nil, "", nil, errors.New("image dimensions too large")
 	}
 
 	// Decode image and use the format reported by the decoder (not Content-Type).
 	// This correctly handles CDN links with application/octet-stream Content-Type.
 	img, format, err := image.Decode(bytes.NewReader(buf))
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("unsupported or invalid image format (decode error: %v)", err)
+		return nil, "", nil, fmt.Errorf("invalid or unsupported image format")
 	}
 
 	return img, normalizeFormat(format), buf, nil

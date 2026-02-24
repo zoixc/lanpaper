@@ -263,8 +263,23 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 		root = "external/images"
 	}
 
+	// Resolve the root itself so we have a real path for symlink containment checks.
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		log.Printf("Error resolving external image root: %v", err)
+		http.Error(w, "Server configuration error", http.StatusInternalServerError)
+		return
+	}
+	realRoot, err := filepath.EvalSymlinks(absRoot)
+	if err != nil {
+		// Directory may not exist yet; return empty list gracefully.
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode([]string{})
+		return
+	}
+
 	var files []string
-	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+	walkErr := filepath.WalkDir(absRoot, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -272,7 +287,7 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 			if strings.HasPrefix(d.Name(), ".") && d.Name() != "." {
 				return filepath.SkipDir
 			}
-			rel, relErr := filepath.Rel(root, path)
+			rel, relErr := filepath.Rel(absRoot, path)
 			if relErr == nil {
 				depth := len(strings.Split(rel, string(filepath.Separator)))
 				if rel != "." && depth > maxWalkDepth {
@@ -282,20 +297,33 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 			return nil
 		}
 
+		// Resolve symlinks for every file and verify the real path is still
+		// inside realRoot. This prevents a symlink in the gallery pointing
+		// to /etc/passwd or files belonging to other containers/services.
+		realPath, symlinkErr := filepath.EvalSymlinks(path)
+		if symlinkErr != nil {
+			// Broken symlink — skip silently.
+			return nil
+		}
+		if !strings.HasPrefix(realPath, realRoot+string(filepath.Separator)) && realPath != realRoot {
+			log.Printf("Security: skipping symlink escape in gallery: %s -> %s", path, realPath)
+			return nil
+		}
+
 		ext := strings.ToLower(filepath.Ext(d.Name()))
 		if ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".gif" ||
 			ext == ".webp" || ext == ".bmp" || ext == ".tiff" || ext == ".tif" ||
 			ext == ".mp4" || ext == ".webm" {
-			relPath, err := filepath.Rel(root, path)
-			if err == nil {
+			relPath, relErr := filepath.Rel(absRoot, path)
+			if relErr == nil {
 				relPath = filepath.ToSlash(relPath)
 				files = append(files, relPath)
 			}
 		}
 		return nil
 	})
-	if err != nil {
-		log.Printf("Error walking external images directory: %v", err)
+	if walkErr != nil {
+		log.Printf("Error walking external images directory: %v", walkErr)
 	}
 	if files == nil {
 		files = []string{}
@@ -328,6 +356,14 @@ func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Server configuration error", http.StatusInternalServerError)
 		return
 	}
+
+	// Resolve gallery root symlinks once.
+	realRoot, err := filepath.EvalSymlinks(absRoot)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
 	fullPath := filepath.Join(absRoot, filepath.Clean(pathParam))
 	absPath, err := filepath.Abs(fullPath)
 	if err != nil {
@@ -340,10 +376,19 @@ func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Path outside allowed directory", http.StatusForbidden)
 		return
 	}
-	if _, err := os.Stat(absPath); os.IsNotExist(err) {
+
+	// Resolve symlinks and verify the real target is still inside the gallery root.
+	realPath, err := filepath.EvalSymlinks(absPath)
+	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
+	if !strings.HasPrefix(realPath, realRoot+string(filepath.Separator)) && realPath != realRoot {
+		log.Printf("Security: blocked symlink escape in preview: %s -> %s", absPath, realPath)
+		http.Error(w, "Path outside allowed directory", http.StatusForbidden)
+		return
+	}
+
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	http.ServeFile(w, r, absPath)
 }
