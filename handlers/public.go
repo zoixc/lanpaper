@@ -12,11 +12,13 @@ import (
 func Public(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 
-	if path == "/" {
+	switch {
+	case path == "/":
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 		return
-	}
-	if path == "/admin" || strings.HasPrefix(path, "/api/") || strings.HasPrefix(path, "/static/") {
+	case path == "/admin",
+		strings.HasPrefix(path, "/api/"),
+		strings.HasPrefix(path, "/static/"):
 		http.NotFound(w, r)
 		return
 	}
@@ -39,7 +41,7 @@ func Public(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Open the file once for both Stat and ServeContent to avoid a TOCTOU race.
+	// Open once for both Stat and ServeContent to avoid a TOCTOU race.
 	f, err := os.Open(wp.ImagePath)
 	if err != nil {
 		http.NotFound(w, r)
@@ -58,10 +60,11 @@ func Public(w http.ResponseWriter, r *http.Request) {
 		mime = "video/" + wp.MIMEType
 	}
 
-	w.Header().Set("Content-Type", mime)
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s.%s"`, wp.LinkName, wp.MIMEType))
-	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
+	h := w.Header()
+	h.Set("Content-Type", mime)
+	h.Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s.%s"`, wp.LinkName, wp.MIMEType))
+	h.Set("Cache-Control", "public, max-age=31536000, immutable")
+	h.Set("X-Content-Type-Options", "nosniff")
 
 	http.ServeContent(w, r, wp.LinkName+"."+wp.MIMEType, fi.ModTime(), f)
 }

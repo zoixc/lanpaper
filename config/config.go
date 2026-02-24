@@ -161,13 +161,12 @@ func getEnv(key, fallback string) string {
 // getEnvAny returns the first non-empty value among the given env keys.
 // The last argument is the fallback.
 func getEnvAny(keys ...string) string {
-	fallback := keys[len(keys)-1]
 	for _, key := range keys[:len(keys)-1] {
 		if v := os.Getenv(key); v != "" {
 			return v
 		}
 	}
-	return fallback
+	return keys[len(keys)-1]
 }
 
 func getEnvInt(key string, fallback int) int {

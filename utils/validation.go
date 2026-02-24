@@ -15,25 +15,14 @@ var windowsAbsPath = regexp.MustCompile(`(?i)^[a-z]:[/\\]`)
 // IsValidLocalPath reports whether path is a safe relative path with no
 // traversal, absolute, or Windows-style components.
 func IsValidLocalPath(path string) bool {
-	if strings.Contains(path, "\x00") {
+	if strings.Contains(path, "\x00") || windowsAbsPath.MatchString(path) {
 		return false
 	}
-	if windowsAbsPath.MatchString(path) {
-		return false
-	}
-
-	cleanPath := filepath.Clean(path)
-
-	if filepath.IsAbs(cleanPath) {
-		return false
-	}
-	if strings.HasPrefix(cleanPath, "..") || strings.Contains(cleanPath, "/\..") {
-		return false
-	}
-	if strings.HasPrefix(cleanPath, "\\\\") {
-		return false
-	}
-	return true
+	clean := filepath.Clean(path)
+	return !filepath.IsAbs(clean) &&
+		!strings.HasPrefix(clean, "..") &&
+		!strings.Contains(clean, "/\..") &&
+		!strings.HasPrefix(clean, "\\\\")
 }
 
 // magicBytes holds the expected file signatures for supported types.
@@ -41,12 +30,12 @@ var magicBytes = map[string][]byte{
 	"jpg":  {0xFF, 0xD8, 0xFF},
 	"png":  {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A},
 	"gif":  {0x47, 0x49, 0x46, 0x38},
-	"webp": {0x52, 0x49, 0x46, 0x46}, // RIFF prefix; WEBP marker at offset 8 is checked separately
+	"webp": {0x52, 0x49, 0x46, 0x46}, // RIFF prefix; WEBP marker at offset 8 checked separately
 	"bmp":  {0x42, 0x4D},
 	"tif":  {0x49, 0x49, 0x2A, 0x00}, // little-endian TIFF
 	"tiff": {0x4D, 0x4D, 0x00, 0x2A}, // big-endian TIFF
 	"webm": {0x1A, 0x45, 0xDF, 0xA3}, // EBML header
-	// mp4 is validated via the ftyp box check below
+	// mp4 validated via ftyp box check below
 }
 
 // ValidateFileType verifies that the first bytes of data match the expected
@@ -56,13 +45,13 @@ func ValidateFileType(data []byte, expectedExt string) error {
 		return fmt.Errorf("file too small to validate")
 	}
 
-	expectedExt = strings.ToLower(strings.TrimPrefix(expectedExt, "."))
-	if expectedExt == "jpeg" {
-		expectedExt = "jpg"
+	ext := strings.ToLower(strings.TrimPrefix(expectedExt, "."))
+	if ext == "jpeg" {
+		ext = "jpg"
 	}
 
-	// WebP: RIFF header + WEBP marker at offset 8.
-	if expectedExt == "webp" {
+	switch ext {
+	case "webp":
 		if !bytes.HasPrefix(data, magicBytes["webp"]) {
 			return fmt.Errorf("file does not match WebP magic bytes")
 		}
@@ -70,10 +59,7 @@ func ValidateFileType(data []byte, expectedExt string) error {
 			return fmt.Errorf("file has RIFF header but not WEBP format")
 		}
 		return nil
-	}
-
-	// MP4: ftyp box at offset 4.
-	if expectedExt == "mp4" {
+	case "mp4":
 		if len(data) < 12 {
 			return fmt.Errorf("file too small for MP4 validation")
 		}
@@ -83,25 +69,20 @@ func ValidateFileType(data []byte, expectedExt string) error {
 		return nil
 	}
 
-	magic, exists := magicBytes[expectedExt]
-	if !exists {
-		return fmt.Errorf("unsupported file type: %s", expectedExt)
+	magic, ok := magicBytes[ext]
+	if !ok {
+		return fmt.Errorf("unsupported file type: %s", ext)
 	}
-
 	if !bytes.HasPrefix(data, magic) {
-		maxShow := len(magic)
-		if len(data) < maxShow {
-			maxShow = len(data)
+		n := len(magic)
+		if len(data) < n {
+			n = len(data)
 		}
-		log.Printf("Security: magic bytes mismatch for '%s'. Expected: %v, Got: %v",
-			expectedExt, magic, data[:maxShow])
-		return fmt.Errorf("file content does not match extension %s", expectedExt)
+		log.Printf("Security: magic bytes mismatch for %q: expected %v, got %v", ext, magic, data[:n])
+		return fmt.Errorf("file content does not match extension %s", ext)
 	}
-
 	return nil
 }
 
 // SanitizeFilename returns the base name of filename, used only for safe logging.
-func SanitizeFilename(filename string) string {
-	return filepath.Base(filename)
-}
+func SanitizeFilename(filename string) string { return filepath.Base(filename) }

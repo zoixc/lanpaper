@@ -32,8 +32,8 @@ func StartCleaner() {
 	ticker := time.NewTicker(cleanerInterval)
 	defer ticker.Stop()
 	for range ticker.C {
-		muCounts.Lock()
 		now := time.Now()
+		muCounts.Lock()
 		for key, c := range counts {
 			if now.Sub(c.windowFrom) > cleanerInterval {
 				delete(counts, key)
@@ -65,7 +65,6 @@ func isOverLimitNS(ns, ip string, perMin, burst int) bool {
 	return false
 }
 
-// isOverLimit checks the "public" namespace, used by WithSecurity.
 func isOverLimit(ip string, perMin, burst int) bool {
 	return isOverLimitNS("public", ip, perMin, burst)
 }

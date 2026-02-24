@@ -42,8 +42,8 @@ var Global = &Store{wallpapers: make(map[string]*Wallpaper)}
 func (s *Store) Get(id string) (*Wallpaper, bool) {
 	s.RLock()
 	defer s.RUnlock()
-	wp, exists := s.wallpapers[id]
-	return wp, exists
+	wp, ok := s.wallpapers[id]
+	return wp, ok
 }
 
 func (s *Store) Set(id string, wp *Wallpaper) {
@@ -62,27 +62,25 @@ func (s *Store) Delete(id string) {
 // ModTime), then empty slots (newest CreatedAt).
 func (s *Store) GetAll() []*Wallpaper {
 	s.RLock()
-	defer s.RUnlock()
-
-	wallpapers := make([]*Wallpaper, 0, len(s.wallpapers))
+	snap := make([]*Wallpaper, 0, len(s.wallpapers))
 	for _, wp := range s.wallpapers {
 		if wp != nil {
 			clone := *wp
-			wallpapers = append(wallpapers, &clone)
+			snap = append(snap, &clone)
 		}
 	}
+	s.RUnlock()
 
-	sort.Slice(wallpapers, func(i, j int) bool {
-		if wallpapers[i].HasImage != wallpapers[j].HasImage {
-			return wallpapers[i].HasImage
+	sort.Slice(snap, func(i, j int) bool {
+		if snap[i].HasImage != snap[j].HasImage {
+			return snap[i].HasImage
 		}
-		if wallpapers[i].HasImage {
-			return wallpapers[i].ModTime > wallpapers[j].ModTime
+		if snap[i].HasImage {
+			return snap[i].ModTime > snap[j].ModTime
 		}
-		return wallpapers[i].CreatedAt > wallpapers[j].CreatedAt
+		return snap[i].CreatedAt > snap[j].CreatedAt
 	})
-
-	return wallpapers
+	return snap
 }
 
 // atomicWrite marshals data and writes it via a temp-file + rename so that a
@@ -90,28 +88,25 @@ func (s *Store) GetAll() []*Wallpaper {
 func atomicWrite(path string, data map[string]*Wallpaper) error {
 	body, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal wallpapers: %w", err)
+		return fmt.Errorf("marshal: %w", err)
 	}
-
-	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, ".wallpapers-*.json")
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".wallpapers-*.json")
 	if err != nil {
-		return fmt.Errorf("failed to create temp file: %w", err)
+		return fmt.Errorf("create temp: %w", err)
 	}
 	tmpName := tmp.Name()
-
 	if _, err := tmp.Write(body); err != nil {
 		tmp.Close()
 		os.Remove(tmpName)
-		return fmt.Errorf("failed to write temp file: %w", err)
+		return fmt.Errorf("write temp: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
 		os.Remove(tmpName)
-		return fmt.Errorf("failed to close temp file: %w", err)
+		return fmt.Errorf("close temp: %w", err)
 	}
 	if err := os.Rename(tmpName, path); err != nil {
 		os.Remove(tmpName)
-		return fmt.Errorf("failed to rename temp file: %w", err)
+		return fmt.Errorf("rename temp: %w", err)
 	}
 	return nil
 }
@@ -129,9 +124,7 @@ func derivePaths(wp *Wallpaper) {
 		return
 	}
 	wp.ImagePath = filepath.Join("static", "images", wp.LinkName+"."+wp.MIMEType)
-	if wp.MIMEType == "mp4" || wp.MIMEType == "webm" {
-		wp.PreviewPath = ""
-	} else {
+	if wp.MIMEType != "mp4" && wp.MIMEType != "webm" {
 		wp.PreviewPath = filepath.Join("static", "images", "previews", wp.LinkName+".webp")
 	}
 }
@@ -170,19 +163,16 @@ func PruneOldImages(max int) {
 			candidates = append(candidates, wp)
 		}
 	}
-
 	if len(candidates) <= max {
 		return
 	}
 
-	// Sort oldest-first so we delete from the front.
 	sort.Slice(candidates, func(i, j int) bool {
 		return candidates[i].ModTime < candidates[j].ModTime
 	})
 
 	for _, wp := range candidates[:len(candidates)-max] {
 		log.Printf("Pruning old image: %s", wp.ID)
-
 		if err := os.Remove(wp.ImagePath); err != nil && !os.IsNotExist(err) {
 			log.Printf("Error pruning image %s: %v", wp.ImagePath, err)
 		}
@@ -191,18 +181,10 @@ func PruneOldImages(max int) {
 				log.Printf("Error pruning preview %s: %v", wp.PreviewPath, err)
 			}
 		}
-
-		wp.HasImage = false
-		wp.ImageURL = ""
-		wp.Preview = ""
-		wp.MIMEType = ""
-		wp.SizeBytes = 0
-		wp.ModTime = 0
-		wp.ImagePath = ""
-		wp.PreviewPath = ""
+		*wp = Wallpaper{ID: wp.ID, LinkName: wp.LinkName, Category: wp.Category, CreatedAt: wp.CreatedAt}
 	}
 
 	if err := atomicWrite(dataFile, Global.wallpapers); err != nil {
-		log.Printf("Error saving wallpapers after pruning: %v", err)
+		log.Printf("Error saving after pruning: %v", err)
 	}
 }

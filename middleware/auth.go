@@ -24,7 +24,7 @@ func BasicAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user, pass, ok := r.BasicAuth()
 		if !ok || !secureCompare(user, config.Current.AdminUser) || !secureCompare(pass, config.Current.AdminPass) {
-			log.Printf("Failed authentication attempt from %s", clientIP(r))
+			log.Printf("Failed auth attempt from %s", clientIP(r))
 			w.Header().Set("WWW-Authenticate", `Basic realm="Admin"`)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -33,7 +33,6 @@ func BasicAuth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// secureCompare compares two strings in constant time to prevent timing attacks.
 func secureCompare(a, b string) bool {
 	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }

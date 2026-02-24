@@ -27,7 +27,6 @@ import (
 	"github.com/chai2010/webp"
 	xdraw "golang.org/x/image/draw"
 
-	// Register additional image decoders into the image.Decode registry.
 	_ "golang.org/x/image/bmp"
 	_ "golang.org/x/image/tiff"
 
@@ -37,17 +36,16 @@ import (
 )
 
 func init() {
-	// Register the WebP decoder so image.Decode handles WebP input.
 	image.RegisterFormat("webp", "RIFF????WEBP", webp.Decode, webp.DecodeConfig)
 }
 
 var uploadSem chan struct{}
 
-func InitUploadSemaphore(maxConcurrent int) {
-	if maxConcurrent <= 0 {
-		maxConcurrent = 2
+func InitUploadSemaphore(n int) {
+	if n <= 0 {
+		n = 2
 	}
-	uploadSem = make(chan struct{}, maxConcurrent)
+	uploadSem = make(chan struct{}, n)
 }
 
 var (
@@ -65,7 +63,6 @@ func getTransport() *http.Transport {
 
 	proxyHost := config.Current.ProxyHost
 	insecure := config.Current.InsecureSkipVerify
-
 	if cachedTransport != nil && cachedProxyHost == proxyHost && cachedInsecure == insecure {
 		return cachedTransport
 	}
@@ -83,7 +80,6 @@ func getTransport() *http.Transport {
 		IdleConnTimeout:       90 * time.Second,
 		ResponseHeaderTimeout: 30 * time.Second,
 	}
-
 	if proxyHost != "" {
 		proxyURL := &url.URL{
 			Scheme: config.Current.ProxyType,
@@ -94,7 +90,6 @@ func getTransport() *http.Transport {
 		}
 		t.Proxy = http.ProxyURL(proxyURL)
 	}
-
 	cachedTransport = t
 	cachedProxyHost = proxyHost
 	cachedInsecure = insecure
@@ -102,21 +97,17 @@ func getTransport() *http.Transport {
 }
 
 // ssrfSafeDialer wraps net.Dialer and blocks connections to private/internal IPs.
-type ssrfSafeDialer struct {
-	inner *net.Dialer
-}
+type ssrfSafeDialer struct{ inner *net.Dialer }
 
 func (d *ssrfSafeDialer) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid address: %w", err)
 	}
-
 	ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
 	if err != nil || len(ips) == 0 {
 		return nil, fmt.Errorf("DNS resolution failed for %s", host)
 	}
-
 	for _, ipAddr := range ips {
 		ip := ipAddr.IP
 		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
@@ -128,38 +119,36 @@ func (d *ssrfSafeDialer) DialContext(ctx context.Context, network, addr string) 
 			}
 		}
 	}
-
 	// Pin to the first resolved IP to prevent DNS rebinding attacks.
-	resolvedAddr := net.JoinHostPort(ips[0].IP.String(), port)
-	return d.inner.DialContext(ctx, network, resolvedAddr)
+	return d.inner.DialContext(ctx, network, net.JoinHostPort(ips[0].IP.String(), port))
 }
 
-// copyVideoToFile copies from r into a new file at dst.
+// copyVideoToFile streams r into a new file at dst.
 func copyVideoToFile(r io.Reader, dst string) error {
 	out, err := os.Create(dst)
 	if err != nil {
-		return fmt.Errorf("failed to create destination: %w", err)
+		return fmt.Errorf("create: %w", err)
 	}
 	defer func() {
 		if cerr := out.Close(); cerr != nil {
-			log.Printf("Error closing destination file %s: %v", dst, cerr)
+			log.Printf("Error closing %s: %v", dst, cerr)
 		}
 	}()
 	if _, err := io.Copy(out, r); err != nil {
-		return fmt.Errorf("failed to copy data: %w", err)
+		return fmt.Errorf("copy: %w", err)
 	}
 	return nil
 }
 
-// copyVideoFile copies a video from src path to dst path.
+// copyVideoFile copies a video from src to dst.
 func copyVideoFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
-		return fmt.Errorf("failed to open source: %w", err)
+		return fmt.Errorf("open: %w", err)
 	}
 	defer func() {
 		if cerr := in.Close(); cerr != nil {
-			log.Printf("Error closing source file %s: %v", src, cerr)
+			log.Printf("Error closing %s: %v", src, cerr)
 		}
 	}()
 	return copyVideoToFile(in, dst)
@@ -176,17 +165,14 @@ var mimeToExt = map[string]string{
 	"video/webm": "webm",
 }
 
-// normalizeFormat maps image.Decode format names to internal extensions.
 func normalizeFormat(format string) string {
-	switch format {
-	case "jpeg":
+	if format == "jpeg" {
 		return "jpg"
-	default:
-		return format
 	}
+	return format
 }
 
-// storedExt returns the extension written to disk.
+// storedExt returns the on-disk extension.
 // bmp and tiff are re-encoded as JPEG, so their stored extension is "jpg".
 func storedExt(ext string) string {
 	if ext == "bmp" || ext == "tiff" {
@@ -195,42 +181,39 @@ func storedExt(ext string) string {
 	return ext
 }
 
-// maxImageDimension is the maximum allowed image width or height.
-// Larger images are rejected before decoding to prevent decompression bombs.
-// 16384 px covers all practical wallpaper sizes (8K = 7680 px wide).
+// maxImageDimension is the maximum allowed image width or height (decompression bomb guard).
 const maxImageDimension = 16384
 
-// checkImageDimensions peeks at the image config without a full decode and
-// returns an error if either dimension exceeds maxImageDimension.
 func checkImageDimensions(r io.ReadSeeker) error {
 	cfg, _, err := image.DecodeConfig(r)
 	if err != nil {
-		return nil // let the full decode fail with its own error
+		return nil // let the full decode produce the real error
 	}
 	if cfg.Width > maxImageDimension || cfg.Height > maxImageDimension {
-		return fmt.Errorf("image dimensions %dx%d exceed maximum allowed %dx%d",
-			cfg.Width, cfg.Height, maxImageDimension, maxImageDimension)
+		return fmt.Errorf("image %dx%d exceeds %dx%d limit", cfg.Width, cfg.Height, maxImageDimension, maxImageDimension)
 	}
 	return nil
 }
 
 // thumbnail resizes src to fit within maxW×maxH using bilinear scaling.
 func thumbnail(src image.Image, maxW, maxH int) image.Image {
-	srcB := src.Bounds()
-	scaleX := float64(maxW) / float64(srcB.Dx())
-	scaleY := float64(maxH) / float64(srcB.Dy())
-	scale := scaleX
-	if scaleY < scale {
-		scale = scaleY
-	}
+	b := src.Bounds()
+	scale := min(float64(maxW)/float64(b.Dx()), float64(maxH)/float64(b.Dy()))
 	if scale >= 1 {
 		return src
 	}
-	newW := int(float64(srcB.Dx()) * scale)
-	newH := int(float64(srcB.Dy()) * scale)
-	dst := image.NewRGBA(image.Rect(0, 0, newW, newH))
-	xdraw.BiLinear.Scale(dst, dst.Bounds(), src, srcB, draw.Over, nil)
+	dst := image.NewRGBA(image.Rect(0, 0, int(float64(b.Dx())*scale), int(float64(b.Dy())*scale)))
+	xdraw.BiLinear.Scale(dst, dst.Bounds(), src, b, draw.Over, nil)
 	return dst
+}
+
+func isVideo(ext string) bool { return ext == "mp4" || ext == "webm" }
+
+func externalBase() string {
+	if d := config.Current.ExternalImageDir; d != "" {
+		return d
+	}
+	return "external/images"
 }
 
 func Upload(w http.ResponseWriter, r *http.Request) {
@@ -245,13 +228,12 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	maxBytes := int64(config.Current.MaxUploadMB) << 20
 
 	if r.ContentLength > maxBytes {
-		log.Printf("Security: rejected upload with Content-Length %d (max: %d)", r.ContentLength, maxBytes)
+		log.Printf("Security: rejected upload with Content-Length %d (max %d)", r.ContentLength, maxBytes)
 		http.Error(w, "File too large", http.StatusRequestEntityTooLarge)
 		return
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
-
 	if err := r.ParseMultipartForm(maxBytes); err != nil {
 		http.Error(w, "File too large", http.StatusBadRequest)
 		return
@@ -262,7 +244,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid link name", http.StatusBadRequest)
 		return
 	}
-
 	oldWp, exists := storage.Global.Get(linkName)
 	if !exists {
 		http.Error(w, "Link does not exist", http.StatusBadRequest)
@@ -270,62 +251,52 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var (
-		img          image.Image
-		ext          string
-		err          error
-		isVideo      bool
-		fileData     []byte
-		uploadedFile multipart.File
+		img      image.Image
+		ext      string
+		err      error
+		video    bool
+		fileData []byte
+		upFile   multipart.File
 	)
 
 	urlStr := r.FormValue("url")
 
 	if urlStr != "" {
 		if strings.HasPrefix(urlStr, "http://") || strings.HasPrefix(urlStr, "https://") {
-			parsedURL, parseErr := url.Parse(urlStr)
+			parsed, parseErr := url.Parse(urlStr)
 			if parseErr != nil {
 				http.Error(w, "Invalid URL", http.StatusBadRequest)
 				return
 			}
-			if err := utils.ValidateRemoteURL(parsedURL.Hostname()); err != nil {
-				log.Printf("Security: blocked SSRF attempt to %s", parsedURL.Hostname())
+			if err := utils.ValidateRemoteURL(parsed.Hostname()); err != nil {
+				log.Printf("Security: blocked SSRF attempt to %s", parsed.Hostname())
 				http.Error(w, "URL not allowed", http.StatusForbidden)
 				return
 			}
 			img, ext, fileData, err = downloadImage(r.Context(), urlStr)
 		} else {
 			if !utils.IsValidLocalPath(urlStr) {
-				log.Printf("Security: blocked invalid path attempt: %s", urlStr)
+				log.Printf("Security: blocked invalid path: %s", urlStr)
 				http.Error(w, "Invalid path", http.StatusBadRequest)
 				return
 			}
-
-			baseDir := config.Current.ExternalImageDir
-			if baseDir == "" {
-				baseDir = "external/images"
-			}
-
-			absBase, absErr := filepath.Abs(baseDir)
+			absBase, absErr := filepath.Abs(externalBase())
 			if absErr != nil {
-				log.Printf("Error resolving base directory: %v", absErr)
+				log.Printf("Error resolving base dir: %v", absErr)
 				http.Error(w, "Server configuration error", http.StatusInternalServerError)
 				return
 			}
-
-			localPath := filepath.Join(absBase, filepath.Clean(urlStr))
-			absPath, absErr := filepath.Abs(localPath)
+			absPath, absErr := filepath.Abs(filepath.Join(absBase, filepath.Clean(urlStr)))
 			if absErr != nil {
 				log.Printf("Error resolving file path: %v", absErr)
 				http.Error(w, "Invalid path", http.StatusBadRequest)
 				return
 			}
-
 			if !strings.HasPrefix(absPath, absBase+string(filepath.Separator)) && absPath != absBase {
-				log.Printf("Security: blocked path traversal attempt: %s -> %s", urlStr, absPath)
+				log.Printf("Security: path traversal: %s -> %s", urlStr, absPath)
 				http.Error(w, "Path outside allowed directory", http.StatusForbidden)
 				return
 			}
-
 			// Resolve symlinks to prevent escape to arbitrary paths.
 			realPath, realErr := filepath.EvalSymlinks(absPath)
 			if realErr != nil {
@@ -334,144 +305,118 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if !strings.HasPrefix(realPath, absBase+string(filepath.Separator)) && realPath != absBase {
-				log.Printf("Security: blocked symlink escape: %s -> %s", absPath, realPath)
+				log.Printf("Security: symlink escape: %s -> %s", absPath, realPath)
 				http.Error(w, "Path outside allowed directory", http.StatusForbidden)
 				return
 			}
-
-			ext = strings.ToLower(filepath.Ext(absPath))
-			if len(ext) > 1 {
-				ext = ext[1:]
-			}
-			if ext == "mp4" || ext == "webm" {
-				isVideo = true
+			ext = strings.TrimPrefix(strings.ToLower(filepath.Ext(absPath)), ".")
+			if isVideo(ext) {
+				video = true
 			} else {
 				img, ext, fileData, err = loadLocalImage(absPath)
 			}
 		}
-
 		if err != nil {
-			log.Printf("Image load error for link %s: %v", linkName, err)
+			log.Printf("Image load error for %s: %v", linkName, err)
 			http.Error(w, "Failed to load image", http.StatusBadRequest)
 			return
 		}
 	} else {
 		var header *multipart.FileHeader
-		var ferr error
-		uploadedFile, header, ferr = r.FormFile("file")
-		if ferr != nil {
+		upFile, header, err = r.FormFile("file")
+		if err != nil {
 			http.Error(w, "No file provided", http.StatusBadRequest)
 			return
 		}
-		defer uploadedFile.Close()
+		defer upFile.Close()
 
 		if header.Size > maxBytes {
-			log.Printf("Security: rejected file %s with size %d (max: %d)", header.Filename, header.Size, maxBytes)
+			log.Printf("Security: rejected file %s size %d (max %d)", header.Filename, header.Size, maxBytes)
 			http.Error(w, "File too large", http.StatusRequestEntityTooLarge)
 			return
 		}
-
-		// SanitizeFilename is used only for safe log output; actual storage uses linkName.
 		safeFilename := utils.SanitizeFilename(header.Filename)
 
 		head := make([]byte, 512)
-		n, readErr := uploadedFile.Read(head)
+		n, readErr := upFile.Read(head)
 		if readErr != nil && readErr != io.EOF {
 			http.Error(w, "Read error", http.StatusBadRequest)
 			return
 		}
 		head = head[:n]
-		if _, err := uploadedFile.Seek(0, io.SeekStart); err != nil {
+		if _, err := upFile.Seek(0, io.SeekStart); err != nil {
 			log.Printf("Error seeking file: %v", err)
 			http.Error(w, "File seek error", http.StatusInternalServerError)
 			return
 		}
 
-		contentType := http.DetectContentType(head)
-		e, ok := mimeToExt[contentType]
+		e, ok := mimeToExt[http.DetectContentType(head)]
 		if !ok {
-			log.Printf("Security: rejected file %s with unsupported MIME type: %s", safeFilename, contentType)
+			log.Printf("Security: rejected %s — unsupported MIME type", safeFilename)
 			http.Error(w, "Unsupported file type", http.StatusBadRequest)
 			return
 		}
 		ext = e
-		if ext == "mp4" || ext == "webm" {
-			isVideo = true
-		}
+		video = isVideo(ext)
 
 		if err := utils.ValidateFileType(head, ext); err != nil {
-			log.Printf("Security: magic bytes validation failed for %s: %v", safeFilename, err)
+			log.Printf("Security: magic bytes failed for %s: %v", safeFilename, err)
 			http.Error(w, "File content does not match file type", http.StatusBadRequest)
 			return
 		}
 
-		if !isVideo {
-			if dimErr := checkImageDimensions(uploadedFile); dimErr != nil {
-				log.Printf("Security: rejected oversized image from %s: %v", safeFilename, dimErr)
+		if !video {
+			if dimErr := checkImageDimensions(upFile); dimErr != nil {
+				log.Printf("Security: oversized image %s: %v", safeFilename, dimErr)
 				http.Error(w, "Image dimensions too large", http.StatusBadRequest)
 				return
 			}
-			if _, err := uploadedFile.Seek(0, io.SeekStart); err != nil {
-				log.Printf("Error seeking file after dimension check: %v", err)
+			if _, err := upFile.Seek(0, io.SeekStart); err != nil {
+				log.Printf("Seek error after dimension check: %v", err)
 				http.Error(w, "File seek error", http.StatusInternalServerError)
 				return
 			}
-
-			var decodeErr error
-			img, _, decodeErr = image.Decode(uploadedFile)
-			if decodeErr != nil {
-				log.Printf("Image decode error for %s: %v", safeFilename, decodeErr)
+			if img, _, err = image.Decode(upFile); err != nil {
+				log.Printf("Image decode error for %s: %v", safeFilename, err)
 				http.Error(w, "Invalid image", http.StatusBadRequest)
 				return
 			}
 		}
 	}
 
-	if len(fileData) > 0 && !isVideo {
+	if len(fileData) > 0 && !video {
 		if err := utils.ValidateFileType(fileData, ext); err != nil {
-			log.Printf("Security: magic bytes validation failed for link %s: %v", linkName, err)
+			log.Printf("Security: magic bytes failed for link %s: %v", linkName, err)
 			http.Error(w, "File content does not match file type", http.StatusBadRequest)
 			return
 		}
 	}
 
 	if oldWp != nil && oldWp.HasImage {
-		if err := os.Remove(oldWp.ImagePath); err != nil && !os.IsNotExist(err) {
-			log.Printf("Error removing old image %s: %v", oldWp.ImagePath, err)
-		}
-		if oldWp.PreviewPath != "" {
-			if err := os.Remove(oldWp.PreviewPath); err != nil && !os.IsNotExist(err) {
-				log.Printf("Error removing old preview %s: %v", oldWp.PreviewPath, err)
-			}
-		}
+		removeFiles(oldWp.ImagePath, oldWp.PreviewPath)
 	}
 
-	// bmp/tiff are re-encoded as JPEG, so the on-disk extension is "jpg".
+	// bmp/tiff are re-encoded as JPEG; the on-disk extension is "jpg".
 	saveExt := storedExt(ext)
 	originalPath := filepath.Join("static", "images", linkName+"."+saveExt)
 	previewPath := filepath.Join("static", "images", "previews", linkName+".webp")
 
-	if isVideo {
+	if video {
 		if urlStr == "" {
-			if _, err := uploadedFile.Seek(0, io.SeekStart); err != nil {
-				log.Printf("Error seeking file for video copy: %v", err)
+			if _, err := upFile.Seek(0, io.SeekStart); err != nil {
+				log.Printf("Seek error before video copy: %v", err)
 				http.Error(w, "Failed to prepare video file", http.StatusInternalServerError)
 				return
 			}
-			if err := copyVideoToFile(uploadedFile, originalPath); err != nil {
-				log.Printf("Error copying uploaded video to %s: %v", originalPath, err)
+			if err := copyVideoToFile(upFile, originalPath); err != nil {
+				log.Printf("Error copying video to %s: %v", originalPath, err)
 				http.Error(w, "Failed to save video", http.StatusInternalServerError)
 				return
 			}
 		} else if !strings.HasPrefix(urlStr, "http") {
-			baseDir := config.Current.ExternalImageDir
-			if baseDir == "" {
-				baseDir = "external/images"
-			}
-			absBase, _ := filepath.Abs(baseDir)
-			srcPath := filepath.Join(absBase, filepath.Clean(urlStr))
-			if err := copyVideoFile(srcPath, originalPath); err != nil {
-				log.Printf("Error copying external video %s to %s: %v", srcPath, originalPath, err)
+			absBase, _ := filepath.Abs(externalBase())
+			if err := copyVideoFile(filepath.Join(absBase, filepath.Clean(urlStr)), originalPath); err != nil {
+				log.Printf("Error copying external video to %s: %v", originalPath, err)
 				http.Error(w, "Failed to copy video", http.StatusInternalServerError)
 				return
 			}
@@ -483,9 +428,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Save failed", http.StatusInternalServerError)
 			return
 		}
-
-		thumb := thumbnail(img, 200, 160)
-		if err := saveImage(thumb, "webp", previewPath); err != nil {
+		if err := saveImage(thumbnail(img, 200, 160), "webp", previewPath); err != nil {
 			log.Printf("Error saving preview %s: %v", previewPath, err)
 			if removeErr := os.Remove(originalPath); removeErr != nil && !os.IsNotExist(removeErr) {
 				log.Printf("Error removing original after preview fail: %v", removeErr)
@@ -497,7 +440,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	fi, err := os.Stat(originalPath)
 	if err != nil {
-		log.Printf("Error stating uploaded file %s: %v", originalPath, err)
+		log.Printf("Error stating %s: %v", originalPath, err)
 		http.Error(w, "Failed to stat file", http.StatusInternalServerError)
 		return
 	}
@@ -506,7 +449,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	if oldWp != nil {
 		createdAt = oldWp.CreatedAt
 	}
-
 	previewURL := ""
 	if previewPath != "" {
 		previewURL = "/static/images/previews/" + linkName + ".webp"
@@ -525,15 +467,12 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		ImagePath:   originalPath,
 		PreviewPath: previewPath,
 	}
-
 	storage.Global.Set(linkName, wp)
-
 	if err := storage.Global.Save(); err != nil {
-		log.Printf("Error saving wallpapers after upload: %v", err)
+		log.Printf("Error saving after upload: %v", err)
 	}
-
 	if config.Current.MaxImages > 0 {
-		go func() { storage.PruneOldImages(config.Current.MaxImages) }()
+		go storage.PruneOldImages(config.Current.MaxImages)
 	}
 
 	log.Printf("Uploaded: %s (%s, %d KB)", linkName, saveExt, fi.Size()/1024)
@@ -546,14 +485,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 func saveImage(img image.Image, format, path string) error {
 	out, err := os.Create(path)
 	if err != nil {
-		return fmt.Errorf("failed to create image file: %w", err)
+		return fmt.Errorf("create: %w", err)
 	}
 	defer func() {
 		if cerr := out.Close(); cerr != nil {
-			log.Printf("Error closing file %s: %v", path, cerr)
+			log.Printf("Error closing %s: %v", path, cerr)
 		}
 	}()
-
 	switch format {
 	case "jpg", "jpeg":
 		return jpeg.Encode(out, img, &jpeg.Options{Quality: 85})
@@ -575,7 +513,7 @@ func loadLocalImage(path string) (image.Image, string, []byte, error) {
 	}
 	defer func() {
 		if cerr := f.Close(); cerr != nil {
-			log.Printf("Error closing file %s: %v", path, cerr)
+			log.Printf("Error closing %s: %v", path, cerr)
 		}
 	}()
 
@@ -583,16 +521,18 @@ func loadLocalImage(path string) (image.Image, string, []byte, error) {
 	n, _ := f.Read(head)
 	head = head[:n]
 
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		return nil, "", nil, errors.New("failed to read file")
-	}
-
-	if dimErr := checkImageDimensions(f); dimErr != nil {
-		log.Printf("Security: rejected oversized local image %s: %v", path, dimErr)
-		return nil, "", nil, errors.New("image dimensions too large")
-	}
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		return nil, "", nil, errors.New("failed to read file")
+	for _, seek := range []struct{ msg string }{{"rewind"}, {"post-dim rewind"}} {
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			return nil, "", nil, fmt.Errorf("%s: %w", seek.msg, err)
+		}
+		if seek.msg == "rewind" {
+			if dimErr := checkImageDimensions(f); dimErr != nil {
+				log.Printf("Security: oversized local image %s: %v", path, dimErr)
+				return nil, "", nil, errors.New("image dimensions too large")
+			}
+		} else {
+			break
+		}
 	}
 
 	img, format, err := image.Decode(f)
@@ -604,16 +544,14 @@ func loadLocalImage(path string) (image.Image, string, []byte, error) {
 }
 
 func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []byte, error) {
-	parsedURL, err := url.Parse(urlStr)
-	if err != nil || !parsedURL.IsAbs() || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
-		return nil, "", nil, fmt.Errorf("invalid URL")
+	parsed, err := url.Parse(urlStr)
+	if err != nil || !parsed.IsAbs() || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return nil, "", nil, errors.New("invalid URL")
 	}
 
-	// One context timeout governs the entire download.
+	// One timeout governs the entire download.
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
-
-	client := &http.Client{Transport: getTransport()}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
 	if err != nil {
@@ -622,9 +560,9 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Lanpaper/1.0)")
 	req.Header.Set("Accept", "image/*,*/*;q=0.8")
 
-	resp, err := client.Do(req)
+	resp, err := (&http.Client{Transport: getTransport()}).Do(req)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("network error")
+		return nil, "", nil, errors.New("network error")
 	}
 	defer resp.Body.Close()
 
@@ -634,26 +572,24 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 
 	maxBytes := int64(config.Current.MaxUploadMB) << 20
 	if resp.ContentLength > 0 && resp.ContentLength > maxBytes {
-		log.Printf("Security: rejected download with Content-Length %d (max: %d)", resp.ContentLength, maxBytes)
-		return nil, "", nil, fmt.Errorf("file too large")
+		log.Printf("Security: rejected download Content-Length %d (max %d)", resp.ContentLength, maxBytes)
+		return nil, "", nil, errors.New("file too large")
 	}
 
 	buf, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes))
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("read error")
+		return nil, "", nil, errors.New("read error")
 	}
 
 	if dimErr := checkImageDimensions(bytes.NewReader(buf)); dimErr != nil {
-		log.Printf("Security: rejected oversized remote image from %s: %v", urlStr, dimErr)
+		log.Printf("Security: oversized remote image %s: %v", urlStr, dimErr)
 		return nil, "", nil, errors.New("image dimensions too large")
 	}
 
-	// Use the format reported by the decoder, not Content-Type —
-	// CDNs often serve images with application/octet-stream.
+	// Use the decoder-reported format, not Content-Type — CDNs often send application/octet-stream.
 	img, format, err := image.Decode(bytes.NewReader(buf))
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("invalid or unsupported image format")
+		return nil, "", nil, errors.New("invalid or unsupported image format")
 	}
-
 	return img, normalizeFormat(format), buf, nil
 }

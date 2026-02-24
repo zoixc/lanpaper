@@ -7,6 +7,18 @@ import (
 	"lanpaper/config"
 )
 
+const csp = "default-src 'none'; " +
+	"script-src 'self'; " +
+	"style-src 'self'; " +
+	"img-src 'self' https: data: blob:; " +
+	"media-src 'self' https: data: blob:; " +
+	"connect-src 'self'; " +
+	"font-src 'self'; " +
+	"manifest-src 'self'; " +
+	"form-action 'self'; " +
+	"base-uri 'self'; " +
+	"frame-ancestors 'none';"
+
 // WithSecurity attaches security headers and applies public-endpoint rate limiting.
 // Must wrap every handler reachable without authentication.
 func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
@@ -22,23 +34,11 @@ func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 		h.Set("Cross-Origin-Opener-Policy", "same-origin")
 		// Cross-Origin-Embedder-Policy: require-corp is intentionally omitted —
 		// it breaks loading of external images in the admin panel.
-		h.Set("Content-Security-Policy",
-			"default-src 'none'; "+
-				"script-src 'self'; "+
-				"style-src 'self'; "+
-				"img-src 'self' https: data: blob:; "+
-				"media-src 'self' https: data: blob:; "+
-				"connect-src 'self'; "+
-				"font-src 'self'; "+
-				"manifest-src 'self'; "+
-				"form-action 'self'; "+
-				"base-uri 'self'; "+
-				"frame-ancestors 'none';")
+		h.Set("Content-Security-Policy", csp)
 
 		// /api/* and /admin are rate-limited separately (upload middleware).
 		if !strings.HasPrefix(r.URL.Path, "/admin") && !strings.HasPrefix(r.URL.Path, "/api/") {
-			ip := clientIP(r)
-			if isOverLimit(ip, config.Current.Rate.PublicPerMin, config.Current.Rate.Burst) {
+			if isOverLimit(clientIP(r), config.Current.Rate.PublicPerMin, config.Current.Rate.Burst) {
 				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 				return
 			}
