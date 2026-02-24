@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"crypto/subtle"
 	"log"
 	"net/http"
 
@@ -22,7 +23,7 @@ func MaybeBasicAuth(next http.HandlerFunc) http.HandlerFunc {
 func BasicAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user, pass, ok := r.BasicAuth()
-		if !ok || user != config.Current.AdminUser || pass != config.Current.AdminPass {
+		if !ok || !secureCompare(user, config.Current.AdminUser) || !secureCompare(pass, config.Current.AdminPass) {
 			log.Printf("Failed authentication attempt from %s", clientIP(r))
 			w.Header().Set("WWW-Authenticate", `Basic realm="Admin"`)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -30,4 +31,9 @@ func BasicAuth(next http.HandlerFunc) http.HandlerFunc {
 		}
 		next(w, r)
 	}
+}
+
+// secureCompare compares two strings in constant time to prevent timing attacks.
+func secureCompare(a, b string) bool {
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }

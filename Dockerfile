@@ -20,13 +20,19 @@ FROM alpine:latest
 
 RUN apk --no-cache add ca-certificates wget
 
+# Run as non-root user for security
+RUN addgroup -S lanpaper && adduser -S lanpaper -G lanpaper
+
 WORKDIR /app
 
 COPY --from=builder /app/lanpaper .
 COPY admin.html .
 COPY static ./static
 
-RUN mkdir -p data static/images/previews external/images
+RUN mkdir -p data static/images/previews external/images \
+    && chown -R lanpaper:lanpaper /app
+
+USER lanpaper
 
 EXPOSE 8080
 

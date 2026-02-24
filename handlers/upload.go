@@ -70,10 +70,11 @@ func getTransport() *http.Transport {
 
 	t := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
-		DialContext: (&net.Dialer{
+		// DialContext with SSRF-aware dialer: resolves DNS and blocks private IPs
+		DialContext: (&ssrfSafeDialer{inner: &net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
-		}).DialContext,
+		}}).DialContext,
 		TLSHandshakeTimeout:   10 * time.Second,
 		MaxIdleConns:          20,
 		MaxIdleConnsPerHost:   5,
@@ -96,6 +97,39 @@ func getTransport() *http.Transport {
 	cachedProxyHost = proxyHost
 	cachedInsecure = insecure
 	return t
+}
+
+// ssrfSafeDialer wraps net.Dialer and blocks connections to private/internal IPs.
+type ssrfSafeDialer struct {
+	inner *net.Dialer
+}
+
+func (d *ssrfSafeDialer) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid address: %w", err)
+	}
+
+	ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil || len(ips) == 0 {
+		return nil, fmt.Errorf("DNS resolution failed for %s", host)
+	}
+
+	for _, ipAddr := range ips {
+		ip := ipAddr.IP
+		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+			return nil, fmt.Errorf("SSRF: connection to %s (%s) is blocked", host, ip)
+		}
+		for _, network_ := range utils.PrivateRanges() {
+			if network_.Contains(ip) {
+				return nil, fmt.Errorf("SSRF: connection to %s (%s) is blocked", host, ip)
+			}
+		}
+	}
+
+	// Use the first resolved IP directly to prevent DNS rebinding
+	resolvedAddr := net.JoinHostPort(ips[0].IP.String(), port)
+	return d.inner.DialContext(ctx, network, resolvedAddr)
 }
 
 func copyVideoFile(src, dst string) error {
@@ -235,6 +269,17 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	if urlStr != "" {
 		if strings.HasPrefix(urlStr, "http://") || strings.HasPrefix(urlStr, "https://") {
+			// SSRF check: validate the host before making the request
+			parsedURL, parseErr := url_.Parse(urlStr)
+			if parseErr != nil {
+				http.Error(w, "Invalid URL", http.StatusBadRequest)
+				return
+			}
+			if err := utils.ValidateRemoteURL(parsedURL.Hostname()); err != nil {
+				log.Printf("Security: blocked SSRF attempt to %s", parsedURL.Hostname())
+				http.Error(w, "URL not allowed", http.StatusForbidden)
+				return
+			}
 			img, ext, fileData, err = downloadImage(r.Context(), urlStr)
 		} else {
 			if !utils.IsValidLocalPath(urlStr) {
