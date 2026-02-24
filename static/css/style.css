@@ -54,14 +54,14 @@
     --font-mono:     'Disket-Mono', monospace;
     --font-mono-bold:'Disket-Mono-Bold', monospace;
 
-    /* Scale (3 steps is enough for a dense admin UI) */
-    --text-base: 0.8125rem; /* 13px — buttons, inputs, dropdowns, toasts       */
-    --text-sm:   0.75rem;   /* 12px — meta info, link-meta, footer, copy-btn   */
-    --text-xs:   0.625rem;  /* 10px — section labels (uppercase), image names  */
+    /* Scale */
+    --text-base: 0.8125rem;
+    --text-sm:   0.75rem;
+    --text-xs:   0.625rem;
 
-    --fw-normal:  400;
-    --fw-medium:  500;
-    --fw-semibold: 600;
+    /* Единый font-weight */
+    --fw-normal: 400;
+    --fw-ui:     400;
 }
 
 
@@ -198,7 +198,6 @@ body.dark .network-bg::after {
     margin: 0 auto;
 }
 
-/* Shared card surface */
 .section,
 .link-card,
 .create-card,
@@ -221,7 +220,7 @@ body.dark .network-bg::after {
 .section h2 {
     font-family: var(--font-ui);
     font-size: var(--text-sm);
-    font-weight: var(--fw-semibold);
+    font-weight: var(--fw-ui);
     margin-bottom: 12px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -369,7 +368,7 @@ body.dark .view-icon.light-theme-icon {
     border-radius: var(--radius-sm);
     font-family: var(--font-ui);
     font-size: var(--text-base);
-    font-weight: var(--fw-medium);
+    font-weight: var(--fw-ui);
     cursor: pointer;
     white-space: nowrap;
     text-decoration: none;
@@ -394,7 +393,7 @@ body.dark .view-icon.light-theme-icon {
 
 
 /* ============================================================
-   INPUTS (shared: .input-field & .search-input)
+   INPUTS
    ============================================================ */
 .input-field,
 .search-input {
@@ -527,7 +526,7 @@ body.dark .view-icon.light-theme-icon {
 .link-id {
     font-family: var(--font-mono-bold);
     font-size: 0.9375rem;
-    font-weight: var(--fw-semibold);
+    font-weight: 700;
     color: var(--text);
     white-space: nowrap;
     overflow: hidden;
@@ -553,7 +552,7 @@ body.dark .view-icon.light-theme-icon {
     color: var(--text-muted);
     font-family: var(--font-ui);
     font-size: var(--text-sm);
-    font-weight: var(--fw-medium);
+    font-weight: var(--fw-ui);
     cursor: pointer;
     white-space: nowrap;
     flex-shrink: 0;
@@ -584,10 +583,8 @@ body.dark .view-icon.light-theme-icon {
 
 
 /* ============================================================
-   DROPDOWNS — единый стиль для всех трёх меню
+   DROPDOWNS
    ============================================================ */
-
-/* Триггер-кнопки со стрелкой */
 .upload-toggle-btn,
 .custom-select-btn {
     display: inline-flex;
@@ -607,14 +604,12 @@ body.dark .view-icon.light-theme-icon {
     transform: rotate(180deg);
 }
 
-/* Обёртки */
 .upload-dropdown,
 .lang-switcher,
 .custom-select {
     position: relative;
 }
 
-/* Поверхность меню — единая для всех */
 .upload-menu,
 .lang-switcher ul.lang-list,
 .custom-select-menu {
@@ -631,14 +626,12 @@ body.dark .view-icon.light-theme-icon {
     overflow: hidden;
 }
 
-/* Upload — по центру кнопки */
 .upload-menu {
     left: 50%;
     transform: translateX(-50%);
     animation: dropdownOpenCenter .15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Lang — по центру кнопки */
 .lang-switcher ul.lang-list {
     left: 50%;
     transform: translateX(-50%);
@@ -646,7 +639,6 @@ body.dark .view-icon.light-theme-icon {
     animation: dropdownOpenCenter .15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Custom select — на всю ширину кнопки */
 .custom-select-menu {
     left: 0;
     right: 0;
@@ -654,14 +646,12 @@ body.dark .view-icon.light-theme-icon {
     animation: dropdownOpen .15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Открытие */
 .upload-dropdown.open .upload-menu,
 .lang-switcher ul.lang-list.open,
 .custom-select.open .custom-select-menu {
     display: block;
 }
 
-/* Пункты меню — единый стиль */
 .upload-menu-item,
 .lang-switcher ul.lang-list li,
 .custom-select-option {
@@ -676,7 +666,7 @@ body.dark .view-icon.light-theme-icon {
     color: var(--text);
     font-family: var(--font-ui);
     font-size: var(--text-base);
-    font-weight: var(--fw-medium);
+    font-weight: var(--fw-ui);
     cursor: pointer;
     white-space: nowrap;
     text-align: left;
@@ -688,10 +678,8 @@ body.dark .view-icon.light-theme-icon {
 .lang-switcher ul.lang-list li:hover,
 .custom-select-option:hover { background: var(--btn-secondary-hover); }
 
-/* Выбранный пункт */
-.custom-select-option.selected { color: var(--accent); font-weight: var(--fw-semibold); }
+.custom-select-option.selected { color: var(--accent); font-weight: 700; }
 
-/* Анимации */
 @keyframes dropdownOpen {
     from { opacity: 0; transform: translateY(-6px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -703,7 +691,7 @@ body.dark .view-icon.light-theme-icon {
 
 
 /* ============================================================
-   LANGUAGE SWITCHER — кнопка-триггер
+   LANGUAGE SWITCHER
    ============================================================ */
 .lang-switcher {
     font-family: var(--font-ui);
@@ -736,7 +724,7 @@ body.dark        #langIconDark { opacity: 1; }
     border-radius: var(--radius-sm);
     font-family: var(--font-ui);
     font-size: var(--text-base);
-    font-weight: var(--fw-medium);
+    font-weight: var(--fw-ui);
     cursor: pointer;
     user-select: none;
     transition: background .15s ease, border-color .15s ease;
@@ -745,7 +733,7 @@ body.dark        #langIconDark { opacity: 1; }
 
 
 /* ============================================================
-   CUSTOM SELECT — кнопка-триггер
+   CUSTOM SELECT
    ============================================================ */
 .custom-select { display: inline-flex; align-items: center; }
 
@@ -760,7 +748,7 @@ body.dark        #langIconDark { opacity: 1; }
     color: var(--text);
     font-family: var(--font-ui);
     font-size: var(--text-base);
-    font-weight: var(--fw-medium);
+    font-weight: var(--fw-ui);
     cursor: pointer;
     white-space: nowrap;
     user-select: none;
@@ -801,7 +789,7 @@ body.dark        #langIconDark { opacity: 1; }
     margin-bottom: 18px;
     font-family: var(--font-ui);
     font-size: 1rem;
-    font-weight: var(--fw-semibold);
+    font-weight: var(--fw-ui);
     color: var(--text);
 }
 .modal-body    { margin-bottom: 20px; max-height: 50vh; overflow-y: auto; }
@@ -856,7 +844,7 @@ body.dark        #langIconDark { opacity: 1; }
     background: #10b981;
     color: #fff;
     font-size: var(--text-sm);
-    font-weight: var(--fw-semibold);
+    font-weight: 700;
     box-shadow: 0 2px 4px rgba(0,0,0,.2);
 }
 
@@ -963,7 +951,6 @@ body.dark        #langIconDark { opacity: 1; }
 .links-list.grid-view .upload-toggle-btn { width: 100%; }
 .links-list.grid-view .upload-toggle-btn { justify-content: center; }
 
-/* FIX grid: upload menu по центру кнопки, но не выходит за карточку */
 .links-list.grid-view .upload-menu {
     left: 50%;
     right: auto;
@@ -995,7 +982,7 @@ body.dark        #langIconDark { opacity: 1; }
     color: var(--text-muted);
     font-family: var(--font-ui);
     font-size: var(--text-sm);
-    font-weight: var(--fw-medium);
+    font-weight: var(--fw-ui);
     transition: background .15s ease, color .15s ease;
 }
 .github-link:hover { background: var(--btn-secondary); color: var(--text); }
@@ -1026,7 +1013,7 @@ body.dark        #langIconDark { opacity: 1; }
     text-align: center;
     font-family: var(--font-ui);
     font-size: var(--text-base);
-    font-weight: var(--fw-medium);
+    font-weight: var(--fw-ui);
     line-height: 1.3;
     color: var(--text-secondary);
     background: var(--bg);
@@ -1077,7 +1064,6 @@ body.dark        #langIconDark { opacity: 1; }
     .custom-select,
     .custom-select-btn { width: 100%; }
 
-    /* На мобильных upload menu — на всю ширину кнопки */
     .upload-dropdown,
     .upload-toggle-btn { width: 100%; }
     .upload-toggle-btn { justify-content: center; }
