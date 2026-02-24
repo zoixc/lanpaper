@@ -690,27 +690,19 @@ body.dark .view-icon.light-theme-icon {
 .lang-controls {
     display: flex;
     align-items: center;
-    gap: 0;
-    transition: gap .3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.lang-switcher.open .lang-controls {
     gap: 8px;
 }
 
+/* Иконка всегда видна и сдвигается влево при открытии */
 .lang-switcher .lang-icon {
     width: 18px;
     height: 18px;
-    opacity: 0;
-    transform: translateX(20px) scale(0.5);
-    pointer-events: none;
-    transition: opacity .3s cubic-bezier(0.4, 0, 0.2, 1),
-                transform .3s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 1;
+    transition: transform .3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .lang-switcher.open .lang-icon {
-    opacity: 1;
-    transform: translateX(0) scale(1);
+    transform: translateX(-8px);
 }
 
 body:not(.dark) #langIconLight,
@@ -739,11 +731,13 @@ body.dark        #langIconLight { display: none; }
 }
 .lang-switcher button:hover { background: var(--btn-secondary-hover); border-color: var(--border-hover); }
 
+/* Список разворачивается с масштабированием от правого края */
 .lang-switcher ul.lang-list {
     position: absolute;
     top: 50%;
-    right: calc(100% + 8px);
-    transform: translateY(-50%);
+    right: calc(100% + 16px);
+    transform: translateY(-50%) scaleX(0);
+    transform-origin: right center;
     display: flex;
     flex-direction: row;
     gap: 4px;
@@ -755,13 +749,13 @@ body.dark        #langIconLight { display: none; }
     border-radius: var(--radius);
     box-shadow: var(--shadow-md);
     opacity: 0;
-    visibility: hidden;
-    transition: opacity .2s ease, visibility .2s ease;
+    transition: transform .3s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity .3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .lang-switcher.open ul.lang-list {
+    transform: translateY(-50%) scaleX(1);
     opacity: 1;
-    visibility: visible;
 }
 
 .lang-switcher ul.lang-list li {
@@ -1129,14 +1123,23 @@ body.dark        #langIconLight { display: none; }
     }
 
     /* На мобильных языковое меню вертикальное */
+    .lang-switcher.open .lang-icon {
+        transform: translateX(0);
+    }
+
     .lang-switcher ul.lang-list {
         position: absolute;
         top: calc(100% + 6px);
         right: auto;
         left: 50%;
-        transform: translateX(-50%);
+        transform: translateX(-50%) scaleY(0);
+        transform-origin: center top;
         flex-direction: column;
         gap: 0;
+    }
+
+    .lang-switcher.open ul.lang-list {
+        transform: translateX(-50%) scaleY(1);
     }
 
     .lang-switcher ul.lang-list li {
