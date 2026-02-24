@@ -191,13 +191,14 @@ async function initLanguage() {
 
     DOM.langBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        DOM.langList.classList.toggle('open');
-        DOM.langBtn.setAttribute('aria-expanded', DOM.langList.classList.contains('open'));
+        const isOpen = DOM.langSwitcher.classList.contains('open');
+        DOM.langSwitcher.classList.toggle('open', !isOpen);
+        DOM.langBtn.setAttribute('aria-expanded', String(!isOpen));
     });
 
     document.addEventListener('click', (e) => {
         if (!DOM.langSwitcher.contains(e.target)) {
-            DOM.langList.classList.remove('open');
+            DOM.langSwitcher.classList.remove('open');
             DOM.langBtn.setAttribute('aria-expanded', 'false');
         }
     });
@@ -208,7 +209,7 @@ async function setLanguage(lang) {
     STATE.lang = lang;
     localStorage.setItem('lang', lang);
     DOM.langLabel.textContent = lang.toUpperCase();
-    DOM.langList.classList.remove('open');
+    DOM.langSwitcher.classList.remove('open');
 
     try {
         const res = await fetch(`/static/i18n/${lang}.json`);
