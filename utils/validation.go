@@ -21,8 +21,25 @@ func IsValidLocalPath(path string) bool {
 	clean := filepath.Clean(path)
 	return !filepath.IsAbs(clean) &&
 		!strings.HasPrefix(clean, "..") &&
-		!strings.Contains(clean, "/\..") &&
+		!strings.Contains(clean, "/.." ) &&
 		!strings.HasPrefix(clean, "\\\\")
+}
+
+// allowedMIMETypes is the set of MIME types accepted for upload.
+var allowedMIMETypes = map[string]bool{
+	"image/jpeg": true,
+	"image/png":  true,
+	"image/gif":  true,
+	"image/webp": true,
+	"image/bmp":  true,
+	"image/tiff": true,
+	"video/mp4":  true,
+	"video/webm": true,
+}
+
+// IsAllowedMimeType reports whether mimeType is an accepted upload type.
+func IsAllowedMimeType(mimeType string) bool {
+	return allowedMIMETypes[strings.ToLower(mimeType)]
 }
 
 // magicBytes holds the expected file signatures for supported types.
