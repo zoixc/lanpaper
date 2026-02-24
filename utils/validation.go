@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"log"
-	"net/http"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -13,32 +12,28 @@ import (
 // windowsAbsPath matches Windows-style absolute paths like C:\ or D:/
 var windowsAbsPath = regexp.MustCompile(`(?i)^[a-z]:[/\\]`)
 
-// IsValidLocalPath validates that a path doesn't contain dangerous patterns
+// IsValidLocalPath validates that a path doesn't contain dangerous patterns.
 func IsValidLocalPath(path string) bool {
-	// Check for null bytes
 	if strings.Contains(path, "\x00") {
 		return false
 	}
 
-	// Reject Windows absolute paths (e.g. C:\Windows) — filepath.IsAbs
-	// returns false for these on Linux, so we check explicitly.
+	// filepath.IsAbs returns false for Windows paths on Linux, so check explicitly.
 	if windowsAbsPath.MatchString(path) {
 		return false
 	}
 
 	cleanPath := filepath.Clean(path)
 
-	// Reject absolute paths
 	if filepath.IsAbs(cleanPath) {
 		return false
 	}
 
-	// Reject paths trying to escape (..)
-	if strings.HasPrefix(cleanPath, "..") || strings.Contains(cleanPath, "/..") {
+	if strings.HasPrefix(cleanPath, "..") || strings.Contains(cleanPath, "/\..") {
 		return false
 	}
 
-	// Reject UNC paths on Windows
+	// Reject UNC paths on Windows.
 	if strings.HasPrefix(cleanPath, "\\\\") {
 		return false
 	}
@@ -46,21 +41,7 @@ func IsValidLocalPath(path string) bool {
 	return true
 }
 
-// GetRealIP extracts real IP from request considering proxy headers
-func GetRealIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if idx := strings.Index(xff, ","); idx >= 0 {
-			return strings.TrimSpace(xff[:idx])
-		}
-		return strings.TrimSpace(xff)
-	}
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
-	}
-	return r.RemoteAddr
-}
-
-// Magic bytes signatures for file type validation
+// Magic bytes signatures for file type validation.
 var magicBytes = map[string][]byte{
 	"jpg":  {0xFF, 0xD8, 0xFF},
 	"png":  {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A},
@@ -73,7 +54,7 @@ var magicBytes = map[string][]byte{
 	// mp4 is handled separately via ftyp box check
 }
 
-// ValidateFileType checks if file content matches expected type using magic bytes
+// ValidateFileType checks if file content matches expected type using magic bytes.
 func ValidateFileType(data []byte, expectedExt string) error {
 	if len(data) < 16 {
 		return fmt.Errorf("file too small to validate")
@@ -81,25 +62,22 @@ func ValidateFileType(data []byte, expectedExt string) error {
 
 	expectedExt = strings.ToLower(strings.TrimPrefix(expectedExt, "."))
 
-	// Normalize extensions
 	if expectedExt == "jpeg" {
 		expectedExt = "jpg"
 	}
 
-	// Special case for WebP (needs RIFF and WEBP check)
+	// WebP needs both RIFF header and WEBP marker at offset 8.
 	if expectedExt == "webp" {
-		riffMagic := magicBytes["webp"]
-		if !bytes.HasPrefix(data, riffMagic) {
+		if !bytes.HasPrefix(data, magicBytes["webp"]) {
 			return fmt.Errorf("file does not match WebP magic bytes")
 		}
-		// Check for WEBP signature at offset 8
 		if len(data) >= 12 && string(data[8:12]) != "WEBP" {
 			return fmt.Errorf("file has RIFF header but not WEBP format")
 		}
 		return nil
 	}
 
-	// Special case for MP4: validate ftyp box at offset 4
+	// MP4: validate ftyp box at offset 4.
 	if expectedExt == "mp4" {
 		if len(data) < 12 {
 			return fmt.Errorf("file too small for MP4 validation")
@@ -115,7 +93,6 @@ func ValidateFileType(data []byte, expectedExt string) error {
 		return fmt.Errorf("unsupported file type: %s", expectedExt)
 	}
 
-	// Standard magic bytes check
 	if !bytes.HasPrefix(data, magic) {
 		maxShow := len(magic)
 		if len(data) < maxShow {
@@ -129,37 +106,8 @@ func ValidateFileType(data []byte, expectedExt string) error {
 	return nil
 }
 
-// IsAllowedMimeType checks if MIME type is allowed
-func IsAllowedMimeType(mimeType string) bool {
-	allowed := []string{
-		"image/jpeg",
-		"image/png",
-		"image/gif",
-		"image/webp",
-		"image/bmp",
-		"image/tiff",
-		"video/mp4",
-		"video/webm",
-	}
-
-	for _, a := range allowed {
-		if mimeType == a {
-			return true
-		}
-	}
-	return false
-}
-
-// SanitizeFilename removes dangerous characters from filename
+// SanitizeFilename strips path separators from a filename and is used solely
+// for safe logging — the actual saved filename is always the link name.
 func SanitizeFilename(filename string) string {
-	// Remove path separators
-	filename = filepath.Base(filename)
-
-	// Remove dangerous characters
-	dangerous := []string{"..", "~", "$", "`", "|", ";", "&", "<", ">", "(", ")", "{", "}", "[", "]"}
-	for _, char := range dangerous {
-		filename = strings.ReplaceAll(filename, char, "")
-	}
-
-	return filename
+	return filepath.Base(filename)
 }

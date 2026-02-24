@@ -72,8 +72,8 @@ async function loadAppVersion() {
         if (data.version && DOM.appVersion) {
             DOM.appVersion.textContent = `v${data.version}`;
         }
-    } catch (e) {
-        // silently ignore — footer will show 'v...'
+    } catch (_) {
+        // silently ignore — footer will keep showing 'v...'
     }
 }
 
@@ -212,13 +212,8 @@ async function setLanguage(lang) {
 
     try {
         const res = await fetch(`/static/i18n/${lang}.json`);
-        if (res.ok) {
-            STATE.translations = await res.json();
-        } else {
-            STATE.translations = {};
-        }
-    } catch (e) {
-        console.warn('Translation load failed', e);
+        STATE.translations = res.ok ? await res.json() : {};
+    } catch (_) {
         STATE.translations = {};
     }
 
@@ -246,7 +241,7 @@ function t(key, defaultText) {
 }
 
 
-// Update dynamic aria-labels after language switch
+// Update dynamic aria-labels after language switch.
 function updateAriaLabels() {
     document.querySelectorAll('[data-i18n-aria]').forEach(el => {
         const key = el.dataset.i18nAria;
@@ -531,7 +526,7 @@ async function loadExternalImages() {
             };
             DOM.modalList.appendChild(div);
         });
-    } catch (e) {
+    } catch (_) {
         DOM.modalList.innerHTML = `<div style="color:red; text-align:center;">${t('server_error', 'Error loading images')}</div>`;
     }
 }
@@ -552,8 +547,8 @@ async function apiCall(url, method = 'GET', body = null, isFormData = false) {
             throw new Error(text || `HTTP ${res.status}`);
         }
 
-        const contentType = res.headers.get("content-type");
-        if (contentType && contentType.indexOf("application/json") !== -1) {
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
             return res.json();
         }
         return null;
@@ -571,8 +566,7 @@ async function loadLinks() {
         STATE.wallpapers = wallpapers || [];
         updateSearchStats();
         filterAndSort();
-    } catch (e) {
-        console.error('LoadLinks error:', e);
+    } catch (_) {
         showToast(t('load_error', 'Failed to load links'), 'error');
         STATE.wallpapers = [];
         renderLinks([]);
@@ -703,6 +697,20 @@ function setupCardEvents(card, link) {
     const dropdown = card.querySelector('.upload-dropdown');
     const toggleBtn = card.querySelector('.upload-toggle-btn');
 
+    // Use AbortController so this card's document listeners are cleaned up
+    // when renderLinks() replaces the DOM (calling renderLinks sets innerHTML = '',
+    // but the controller is scoped to the card's lifetime via the article itself).
+    const ac = new AbortController();
+    const { signal } = ac;
+
+    // Abort all card-scoped document listeners when the card is removed from DOM.
+    new MutationObserver((_, obs) => {
+        if (!document.contains(card)) {
+            ac.abort();
+            obs.disconnect();
+        }
+    }).observe(document.body, { childList: true, subtree: true });
+
     toggleBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const isOpen = dropdown.classList.contains('open');
@@ -716,7 +724,7 @@ function setupCardEvents(card, link) {
             dropdown.classList.remove('open');
             toggleBtn.setAttribute('aria-expanded', 'false');
         }
-    });
+    }, { signal });
 
     card.querySelector('.upload-file-btn').addEventListener('click', () => {
         dropdown.classList.remove('open');
@@ -754,6 +762,7 @@ function setupCardEvents(card, link) {
     card.querySelector('.delete-btn').onclick = async () => {
         if (confirm(t('confirm_delete', 'Delete link?'))) {
             await apiCall(`/api/link/${link.linkName}`, 'DELETE');
+            ac.abort();
             card.remove();
             STATE.wallpapers = STATE.wallpapers.filter(wp => wp.linkName !== link.linkName);
             updateSearchStats();
@@ -793,24 +802,16 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
         }
 
         updateCard(card, updatedLink);
-        reorderCard(card, updatedLink);
         filterAndSort();
         showToast(t('upload_success', 'Uploaded!'), 'success');
-    } catch (e) {
-        console.error(e);
-    }
-}
-
-
-function reorderCard(card, link) {
-    if (link.hasImage) {
-        DOM.linksList.prepend(card);
+    } catch (_) {
+        // Error toast is already shown by apiCall.
     }
 }
 
 
 function setupGlobalListeners() {
-    DOM.createForm.onsubmit = async (e) => {
+    DOM.createForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = DOM.createInput.value.trim();
         if (!id) {
@@ -839,28 +840,24 @@ function setupGlobalListeners() {
                 preview: '',
             };
 
-            const clone = DOM.template.content.cloneNode(true);
-            const article = clone.querySelector('article');
-            updateCard(article, newLinkObj);
-            setupCardEvents(article, newLinkObj);
-            applyTranslations(article);
-            updateAriaLabels();
-
-            DOM.emptyState.style.display = 'none';
-            DOM.linksList.appendChild(article);
             STATE.wallpapers.push(newLinkObj);
             filterAndSort();
 
-            article.animate([
-                { opacity: 0, transform: 'translateY(10px)' },
-                { opacity: 1, transform: 'translateY(0)' }
-            ], { duration: 300 });
+            // Find the freshly rendered card and animate it.
+            const newCard = DOM.linksList.querySelector(`[data-link-name="${CSS.escape(id)}"]`)
+                ?? DOM.linksList.lastElementChild;
+            if (newCard) {
+                newCard.animate([
+                    { opacity: 0, transform: 'translateY(10px)' },
+                    { opacity: 1, transform: 'translateY(0)' }
+                ], { duration: 300 });
+            }
 
             showToast(t('created_success', 'Link created'), 'success');
-        } catch (e) {
-            console.error(e);
+        } catch (_) {
+            // Error toast is already shown by apiCall.
         }
-    };
+    });
 
     DOM.modalOverlay.onclick = (e) => {
         if (e.target === DOM.modalOverlay) closeModal();
