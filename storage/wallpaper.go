@@ -7,10 +7,10 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"sync"
 )
 
+// Wallpaper represents a named wallpaper slot.
 type Wallpaper struct {
 	ID        string `json:"id"`
 	LinkName  string `json:"linkName"`
@@ -23,11 +23,12 @@ type Wallpaper struct {
 	ModTime   int64  `json:"modTime"`
 	CreatedAt int64  `json:"createdAt"`
 
-	// Runtime-only fields: not persisted to JSON, derived from MIMEType on Load()
+	// Runtime-only: not persisted, derived from MIMEType on Load().
 	ImagePath   string `json:"-"`
 	PreviewPath string `json:"-"`
 }
 
+// Store is a thread-safe in-memory store backed by a JSON file.
 type Store struct {
 	sync.RWMutex
 	wallpapers map[string]*Wallpaper
@@ -35,6 +36,7 @@ type Store struct {
 
 const dataFile = "data/wallpapers.json"
 
+// Global is the application-wide wallpaper store.
 var Global = &Store{wallpapers: make(map[string]*Wallpaper)}
 
 func (s *Store) Get(id string) (*Wallpaper, bool) {
@@ -56,11 +58,13 @@ func (s *Store) Delete(id string) {
 	delete(s.wallpapers, id)
 }
 
+// GetAll returns a snapshot of all wallpapers, sorted: images-with-files first
+// (newest ModTime), then empty slots (newest CreatedAt).
 func (s *Store) GetAll() []*Wallpaper {
 	s.RLock()
 	defer s.RUnlock()
 
-	var wallpapers []*Wallpaper
+	wallpapers := make([]*Wallpaper, 0, len(s.wallpapers))
 	for _, wp := range s.wallpapers {
 		if wp != nil {
 			clone := *wp
@@ -81,7 +85,8 @@ func (s *Store) GetAll() []*Wallpaper {
 	return wallpapers
 }
 
-// atomicWrite marshals data and writes it atomically via a temp file + rename.
+// atomicWrite marshals data and writes it atomically via a temp-file + rename
+// so that a crash mid-write never produces a truncated JSON file.
 func atomicWrite(path string, data map[string]*Wallpaper) error {
 	body, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
@@ -111,6 +116,7 @@ func atomicWrite(path string, data map[string]*Wallpaper) error {
 	return nil
 }
 
+// Save persists the current state to disk atomically.
 func (s *Store) Save() error {
 	s.RLock()
 	defer s.RUnlock()
@@ -130,6 +136,7 @@ func derivePaths(wp *Wallpaper) {
 	}
 }
 
+// Load reads wallpapers from disk. A missing file is not an error (first run).
 func (s *Store) Load() error {
 	data, err := os.ReadFile(dataFile)
 	if err != nil {
@@ -142,18 +149,17 @@ func (s *Store) Load() error {
 	if err := json.Unmarshal(data, &m); err != nil {
 		return err
 	}
-
 	for _, wp := range m {
 		derivePaths(wp)
 	}
-
 	s.Lock()
 	s.wallpapers = m
 	s.Unlock()
 	return nil
 }
 
-// PruneOldImages removes oldest images when exceeding max count.
+// PruneOldImages removes the oldest images when the total exceeds max,
+// keeping the newest max entries. The link slots are preserved (HasImage=false).
 func PruneOldImages(max int) {
 	Global.Lock()
 	defer Global.Unlock()
@@ -169,19 +175,18 @@ func PruneOldImages(max int) {
 		return
 	}
 
+	// Sort oldest-first so we delete from the front.
 	sort.Slice(candidates, func(i, j int) bool {
 		return candidates[i].ModTime < candidates[j].ModTime
 	})
 
-	toDelete := len(candidates) - max
-	for i := 0; i < toDelete; i++ {
-		wp := candidates[i]
+	for _, wp := range candidates[:len(candidates)-max] {
 		log.Printf("Pruning old image: %s", wp.ID)
 
 		if err := os.Remove(wp.ImagePath); err != nil && !os.IsNotExist(err) {
 			log.Printf("Error pruning image %s: %v", wp.ImagePath, err)
 		}
-		if wp.PreviewPath != "" && !strings.HasPrefix(wp.PreviewPath, "/static/") {
+		if wp.PreviewPath != "" {
 			if err := os.Remove(wp.PreviewPath); err != nil && !os.IsNotExist(err) {
 				log.Printf("Error pruning preview %s: %v", wp.PreviewPath, err)
 			}

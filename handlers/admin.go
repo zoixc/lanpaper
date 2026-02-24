@@ -94,11 +94,12 @@ func Wallpapers(w http.ResponseWriter, r *http.Request) {
 	for _, wp := range wallpapers {
 		category := wp.Category
 		if category == "" {
-			if wp.MIMEType == "mp4" || wp.MIMEType == "webm" {
+			switch {
+			case wp.MIMEType == "mp4" || wp.MIMEType == "webm":
 				category = "video"
-			} else if wp.HasImage {
+			case wp.HasImage:
 				category = "image"
-			} else {
+			default:
 				category = "other"
 			}
 		}
@@ -135,7 +136,18 @@ func isValidCategory(cat string) bool {
 	return validCategories[cat]
 }
 
-// Link handles POST /api/link and DELETE /api/link/{name}
+// linkNameFromPath extracts and validates the last path segment.
+// Returns ("", false) when the segment is invalid.
+func linkNameFromPath(r *http.Request) (string, bool) {
+	// filepath.Base handles trailing slashes and ".." entries uniformly.
+	name := filepath.Base(strings.TrimSuffix(r.URL.Path, "/"))
+	if !isValidLinkName(name) {
+		return "", false
+	}
+	return name, true
+}
+
+// Link handles POST /api/link, PATCH /api/link/{name}, DELETE /api/link/{name}
 func Link(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
@@ -178,8 +190,8 @@ func Link(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 
 	case http.MethodPatch:
-		linkName := filepath.Base(r.URL.Path)
-		if !isValidLinkName(linkName) {
+		linkName, ok := linkNameFromPath(r)
+		if !ok {
 			http.Error(w, "Invalid link", http.StatusBadRequest)
 			return
 		}
@@ -198,7 +210,7 @@ func Link(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if req.Category != nil {
-			// Empty string resets category to "other" instead of storing an invalid blank value.
+			// Empty string resets to "other" instead of storing a blank value.
 			if *req.Category == "" {
 				wp.Category = "other"
 			} else if !isValidCategory(*req.Category) {
@@ -220,14 +232,13 @@ func Link(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case http.MethodDelete:
-		linkName := filepath.Base(r.URL.Path)
-		if !isValidLinkName(linkName) {
+		linkName, ok := linkNameFromPath(r)
+		if !ok {
 			http.Error(w, "Invalid link", http.StatusBadRequest)
 			return
 		}
 		wp, exists := storage.Global.Get(linkName)
 		if !exists {
-			// Return 404 so the caller can distinguish "deleted" from "never existed".
 			http.Error(w, "Link not found", http.StatusNotFound)
 			return
 		}
@@ -272,7 +283,7 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 	}
 	realRoot, err := filepath.EvalSymlinks(absRoot)
 	if err != nil {
-		// Directory may not exist yet; return empty list gracefully.
+		// Directory may not exist yet — return empty list gracefully.
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode([]string{})
 		return
@@ -297,9 +308,8 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 			return nil
 		}
 
-		// Resolve symlinks for every file and verify the real path is still
-		// inside realRoot. This prevents a symlink in the gallery pointing
-		// to /etc/passwd or files belonging to other containers/services.
+		// Resolve symlinks and verify the real path stays inside realRoot.
+		// This prevents a symlink in the gallery pointing to /etc/passwd etc.
 		realPath, symlinkErr := filepath.EvalSymlinks(path)
 		if symlinkErr != nil {
 			// Broken symlink — skip silently.
@@ -316,8 +326,7 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 			ext == ".mp4" || ext == ".webm" {
 			relPath, relErr := filepath.Rel(absRoot, path)
 			if relErr == nil {
-				relPath = filepath.ToSlash(relPath)
-				files = append(files, relPath)
+				files = append(files, filepath.ToSlash(relPath))
 			}
 		}
 		return nil
@@ -377,7 +386,7 @@ func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resolve symlinks and verify the real target is still inside the gallery root.
+	// Resolve symlinks and verify the real target is still inside the gallery.
 	realPath, err := filepath.EvalSymlinks(absPath)
 	if err != nil {
 		http.NotFound(w, r)
