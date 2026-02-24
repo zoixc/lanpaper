@@ -521,18 +521,15 @@ func loadLocalImage(path string) (image.Image, string, []byte, error) {
 	n, _ := f.Read(head)
 	head = head[:n]
 
-	for _, seek := range []struct{ msg string }{{"rewind"}, {"post-dim rewind"}} {
-		if _, err := f.Seek(0, io.SeekStart); err != nil {
-			return nil, "", nil, fmt.Errorf("%s: %w", seek.msg, err)
-		}
-		if seek.msg == "rewind" {
-			if dimErr := checkImageDimensions(f); dimErr != nil {
-				log.Printf("Security: oversized local image %s: %v", path, dimErr)
-				return nil, "", nil, errors.New("image dimensions too large")
-			}
-		} else {
-			break
-		}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return nil, "", nil, fmt.Errorf("seek: %w", err)
+	}
+	if dimErr := checkImageDimensions(f); dimErr != nil {
+		log.Printf("Security: oversized local image %s: %v", path, dimErr)
+		return nil, "", nil, errors.New("image dimensions too large")
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return nil, "", nil, fmt.Errorf("seek: %w", err)
 	}
 
 	img, format, err := image.Decode(f)
