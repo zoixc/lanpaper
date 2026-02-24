@@ -605,13 +605,11 @@ body.dark .view-icon.light-theme-icon {
 }
 
 .upload-dropdown,
-.lang-switcher,
 .custom-select {
     position: relative;
 }
 
 .upload-menu,
-.lang-switcher ul.lang-list,
 .custom-select-menu {
     position: absolute;
     top: calc(100% + 6px);
@@ -632,13 +630,6 @@ body.dark .view-icon.light-theme-icon {
     animation: dropdownOpenCenter .15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.lang-switcher ul.lang-list {
-    left: 50%;
-    transform: translateX(-50%);
-    min-width: 100%;
-    animation: dropdownOpenCenter .15s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
 .custom-select-menu {
     left: 0;
     right: 0;
@@ -647,13 +638,11 @@ body.dark .view-icon.light-theme-icon {
 }
 
 .upload-dropdown.open .upload-menu,
-.lang-switcher ul.lang-list.open,
 .custom-select.open .custom-select-menu {
     display: block;
 }
 
 .upload-menu-item,
-.lang-switcher ul.lang-list li,
 .custom-select-option {
     display: flex;
     align-items: center;
@@ -675,7 +664,6 @@ body.dark .view-icon.light-theme-icon {
     transition: background .1s ease;
 }
 .upload-menu-item:hover,
-.lang-switcher ul.lang-list li:hover,
 .custom-select-option:hover { background: var(--btn-secondary-hover); }
 
 .custom-select-option.selected { color: var(--accent); font-weight: 700; }
@@ -691,25 +679,45 @@ body.dark .view-icon.light-theme-icon {
 
 
 /* ============================================================
-   LANGUAGE SWITCHER
+   LANGUAGE SWITCHER — горизонтальный выпадающий список
    ============================================================ */
 .lang-switcher {
+    position: relative;
     font-family: var(--font-ui);
     z-index: var(--z-dropdown);
 }
-.lang-switcher .lang-controls { display: flex; align-items: center; }
+
+.lang-controls {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    transition: gap .3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.lang-switcher.open .lang-controls {
+    gap: 8px;
+}
 
 .lang-switcher .lang-icon {
-    position: absolute;
-    left: -22px;
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     opacity: 0;
+    transform: translateX(20px) scale(0.5);
     pointer-events: none;
-    transition: opacity .2s;
+    transition: opacity .3s cubic-bezier(0.4, 0, 0.2, 1),
+                transform .3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+.lang-switcher.open .lang-icon {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+}
+
 body:not(.dark) #langIconLight,
-body.dark        #langIconDark { opacity: 1; }
+body.dark        #langIconDark { display: block; }
+
+body:not(.dark) #langIconDark,
+body.dark        #langIconLight { display: none; }
 
 .lang-switcher button {
     display: flex;
@@ -730,6 +738,51 @@ body.dark        #langIconDark { opacity: 1; }
     transition: background .15s ease, border-color .15s ease;
 }
 .lang-switcher button:hover { background: var(--btn-secondary-hover); border-color: var(--border-hover); }
+
+.lang-switcher ul.lang-list {
+    position: absolute;
+    top: 50%;
+    right: calc(100% + 8px);
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    padding: 4px;
+    margin: 0;
+    list-style: none;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .2s ease, visibility .2s ease;
+}
+
+.lang-switcher.open ul.lang-list {
+    opacity: 1;
+    visibility: visible;
+}
+
+.lang-switcher ul.lang-list li {
+    padding: 6px 10px;
+    min-width: 42px;
+    text-align: center;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: var(--text-base);
+    font-weight: var(--fw-ui);
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+    transition: background .1s ease;
+}
+
+.lang-switcher ul.lang-list li:hover {
+    background: var(--btn-secondary-hover);
+}
 
 
 /* ============================================================
@@ -1073,6 +1126,22 @@ body.dark        #langIconDark { opacity: 1; }
         transform: none;
         min-width: unset;
         animation: dropdownOpen .15s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* На мобильных языковое меню вертикальное */
+    .lang-switcher ul.lang-list {
+        position: absolute;
+        top: calc(100% + 6px);
+        right: auto;
+        left: 50%;
+        transform: translateX(-50%);
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .lang-switcher ul.lang-list li {
+        width: 100%;
+        text-align: center;
     }
 }
 
