@@ -5,7 +5,7 @@ import (
 	"net"
 )
 
-// privateRanges contains all IP ranges that must never be contacted via
+// privateRanges holds all IP networks that must never be contacted via
 // user-supplied URLs (SSRF prevention).
 var privateRanges_ []*net.IPNet
 
@@ -29,26 +29,23 @@ func init() {
 	}
 }
 
-// PrivateRanges returns the list of blocked IP networks (used by the dialer).
+// PrivateRanges returns the list of blocked IP networks (used by the SSRF-safe dialer).
 func PrivateRanges() []*net.IPNet {
 	return privateRanges_
 }
 
-// IsBlockedIP returns true when the given hostname/IP resolves to a private or
-// reserved address. Always returns true on DNS resolution failure to fail-safe.
+// IsBlockedIP reports whether host resolves to a private or reserved address.
+// Returns true on DNS failure to fail safe.
 func IsBlockedIP(host string) bool {
-	// Strip brackets around IPv6 literals
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		host = h
 	}
 
 	ips, err := net.LookupIP(host)
 	if err != nil || len(ips) == 0 {
-		// Fail safe: block unresolvable hosts
 		return true
 	}
 
-	// Every resolved IP must be public — block if any is private
 	for _, ip := range ips {
 		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
 			return true
@@ -62,8 +59,7 @@ func IsBlockedIP(host string) bool {
 	return false
 }
 
-// ValidateRemoteURL checks that the URL host is not a private/internal IP.
-// Returns an error if the URL should be blocked.
+// ValidateRemoteURL returns an error if host resolves to a private/internal address.
 func ValidateRemoteURL(host string) error {
 	if IsBlockedIP(host) {
 		return fmt.Errorf("access to internal or reserved addresses is not allowed")

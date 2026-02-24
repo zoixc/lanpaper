@@ -15,7 +15,7 @@ import (
 	"lanpaper/utils"
 )
 
-// maxWalkDepth limits how deep ExternalImages will recurse into subdirectories.
+// maxWalkDepth limits directory recursion depth in ExternalImages.
 const maxWalkDepth = 3
 
 func Admin(w http.ResponseWriter, r *http.Request) {
@@ -34,13 +34,8 @@ type WallpaperResponse struct {
 	CreatedAt int64  `json:"createdAt"`
 }
 
-// Wallpapers handles GET /api/wallpapers
-// Supports query params:
-//
-//	?category=tech        — filter by category
-//	?has_image=true|false — filter by image presence
-//	?sort=created|updated — sort field (default: server default)
-//	?order=asc|desc       — sort direction (default: desc)
+// Wallpapers handles GET /api/wallpapers.
+// Supported query params: ?category=, ?has_image=true|false, ?sort=created|updated, ?order=asc|desc
 func Wallpapers(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -49,7 +44,6 @@ func Wallpapers(w http.ResponseWriter, r *http.Request) {
 
 	wallpapers := storage.Global.GetAll()
 
-	// --- filtering ---
 	if cat := r.URL.Query().Get("category"); cat != "" {
 		filtered := wallpapers[:0]
 		for _, wp := range wallpapers {
@@ -70,7 +64,6 @@ func Wallpapers(w http.ResponseWriter, r *http.Request) {
 		wallpapers = filtered
 	}
 
-	// --- sorting ---
 	sortField := r.URL.Query().Get("sort")  // "created" | "updated"
 	sortOrder := r.URL.Query().Get("order") // "asc" | "desc"
 	if sortField != "" {
@@ -136,10 +129,8 @@ func isValidCategory(cat string) bool {
 	return validCategories[cat]
 }
 
-// linkNameFromPath extracts and validates the last path segment.
-// Returns ("", false) when the segment is invalid.
+// linkNameFromPath extracts and validates the last URL path segment.
 func linkNameFromPath(r *http.Request) (string, bool) {
-	// filepath.Base handles trailing slashes and ".." entries uniformly.
 	name := filepath.Base(strings.TrimSuffix(r.URL.Path, "/"))
 	if !isValidLinkName(name) {
 		return "", false
@@ -147,7 +138,7 @@ func linkNameFromPath(r *http.Request) (string, bool) {
 	return name, true
 }
 
-// Link handles POST /api/link, PATCH /api/link/{name}, DELETE /api/link/{name}
+// Link handles POST /api/link, PATCH /api/link/{name}, DELETE /api/link/{name}.
 func Link(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
@@ -274,7 +265,6 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 		root = "external/images"
 	}
 
-	// Resolve the root itself so we have a real path for symlink containment checks.
 	absRoot, err := filepath.Abs(root)
 	if err != nil {
 		log.Printf("Error resolving external image root: %v", err)
@@ -283,7 +273,7 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 	}
 	realRoot, err := filepath.EvalSymlinks(absRoot)
 	if err != nil {
-		// Directory may not exist yet — return empty list gracefully.
+		// Directory may not exist yet — return an empty list.
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode([]string{})
 		return
@@ -308,12 +298,10 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 			return nil
 		}
 
-		// Resolve symlinks and verify the real path stays inside realRoot.
-		// This prevents a symlink in the gallery pointing to /etc/passwd etc.
+		// Resolve symlinks to prevent gallery entries pointing outside the root.
 		realPath, symlinkErr := filepath.EvalSymlinks(path)
 		if symlinkErr != nil {
-			// Broken symlink — skip silently.
-			return nil
+			return nil // broken symlink — skip silently
 		}
 		if !strings.HasPrefix(realPath, realRoot+string(filepath.Separator)) && realPath != realRoot {
 			log.Printf("Security: skipping symlink escape in gallery: %s -> %s", path, realPath)
@@ -366,7 +354,6 @@ func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resolve gallery root symlinks once.
 	realRoot, err := filepath.EvalSymlinks(absRoot)
 	if err != nil {
 		http.NotFound(w, r)
@@ -386,7 +373,7 @@ func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resolve symlinks and verify the real target is still inside the gallery.
+	// Resolve symlinks and verify the real target stays inside the gallery.
 	realPath, err := filepath.EvalSymlinks(absPath)
 	if err != nil {
 		http.NotFound(w, r)

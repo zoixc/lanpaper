@@ -27,7 +27,7 @@ import (
 	"github.com/chai2010/webp"
 	xdraw "golang.org/x/image/draw"
 
-	// Register additional image decoders into image.Decode registry.
+	// Register additional image decoders into the image.Decode registry.
 	_ "golang.org/x/image/bmp"
 	_ "golang.org/x/image/tiff"
 
@@ -37,7 +37,7 @@ import (
 )
 
 func init() {
-	// Register WebP decoder so image.Decode can handle WebP input.
+	// Register the WebP decoder so image.Decode handles WebP input.
 	image.RegisterFormat("webp", "RIFF????WEBP", webp.Decode, webp.DecodeConfig)
 }
 
@@ -50,7 +50,6 @@ func InitUploadSemaphore(maxConcurrent int) {
 	uploadSem = make(chan struct{}, maxConcurrent)
 }
 
-// httpTransport is a shared transport so connections are pooled across downloads.
 var (
 	transportMu     sync.Mutex
 	cachedTransport *http.Transport
@@ -58,6 +57,8 @@ var (
 	cachedInsecure  bool
 )
 
+// getTransport returns a cached *http.Transport, rebuilding it when proxy or
+// TLS settings have changed.
 func getTransport() *http.Transport {
 	transportMu.Lock()
 	defer transportMu.Unlock()
@@ -71,7 +72,7 @@ func getTransport() *http.Transport {
 
 	t := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure}, //nolint:gosec
-		// DialContext uses an SSRF-aware dialer that resolves DNS and blocks private IPs.
+		// SSRF-safe dialer: resolves DNS and blocks private IPs.
 		DialContext: (&ssrfSafeDialer{inner: &net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
@@ -133,7 +134,7 @@ func (d *ssrfSafeDialer) DialContext(ctx context.Context, network, addr string) 
 	return d.inner.DialContext(ctx, network, resolvedAddr)
 }
 
-// copyVideoToFile copies from an io.Reader into a destination file path.
+// copyVideoToFile copies from r into a new file at dst.
 func copyVideoToFile(r io.Reader, dst string) error {
 	out, err := os.Create(dst)
 	if err != nil {
@@ -175,18 +176,18 @@ var mimeToExt = map[string]string{
 	"video/webm": "webm",
 }
 
-// normalizeFormat maps image.Decode format names to our internal extensions.
+// normalizeFormat maps image.Decode format names to internal extensions.
 func normalizeFormat(format string) string {
 	switch format {
 	case "jpeg":
 		return "jpg"
 	default:
-		return format // png, gif, webp, tiff, bmp — already correct
+		return format
 	}
 }
 
-// storedExt returns the extension that will actually be written to disk.
-// bmp and tiff are re-encoded as JPEG for storage, so the stored ext is "jpg".
+// storedExt returns the extension written to disk.
+// bmp and tiff are re-encoded as JPEG, so their stored extension is "jpg".
 func storedExt(ext string) string {
 	if ext == "bmp" || ext == "tiff" {
 		return "jpg"
@@ -194,18 +195,17 @@ func storedExt(ext string) string {
 	return ext
 }
 
-// maxImageDimension is the maximum allowed width or height of a decoded image.
-// Images exceeding this are rejected to prevent decompression bomb attacks.
-// 16384 px covers all practical wallpaper resolutions (8K = 7680 px wide).
+// maxImageDimension is the maximum allowed image width or height.
+// Larger images are rejected before decoding to prevent decompression bombs.
+// 16384 px covers all practical wallpaper sizes (8K = 7680 px wide).
 const maxImageDimension = 16384
 
-// checkImageDimensions peeks at the image config (width/height only, no full
-// decode) and returns an error if either dimension exceeds maxImageDimension.
+// checkImageDimensions peeks at the image config without a full decode and
+// returns an error if either dimension exceeds maxImageDimension.
 func checkImageDimensions(r io.ReadSeeker) error {
 	cfg, _, err := image.DecodeConfig(r)
 	if err != nil {
-		// If we can't read config, let the full decode fail later with its own error.
-		return nil
+		return nil // let the full decode fail with its own error
 	}
 	if cfg.Width > maxImageDimension || cfg.Height > maxImageDimension {
 		return fmt.Errorf("image dimensions %dx%d exceed maximum allowed %dx%d",
@@ -214,7 +214,7 @@ func checkImageDimensions(r io.ReadSeeker) error {
 	return nil
 }
 
-// thumbnail resizes src to fit within maxW x maxH using golang.org/x/image/draw.
+// thumbnail resizes src to fit within maxW×maxH using bilinear scaling.
 func thumbnail(src image.Image, maxW, maxH int) image.Image {
 	srcB := src.Bounds()
 	scaleX := float64(maxW) / float64(srcB.Dx())
@@ -326,7 +326,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// Resolve symlinks and re-check to prevent symlink escapes to /etc/passwd etc.
+			// Resolve symlinks to prevent escape to arbitrary paths.
 			realPath, realErr := filepath.EvalSymlinks(absPath)
 			if realErr != nil {
 				log.Printf("Security: cannot resolve symlink %s: %v", absPath, realErr)
@@ -371,7 +371,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// SanitizeFilename is used only for safe log output — actual storage uses linkName.
+		// SanitizeFilename is used only for safe log output; actual storage uses linkName.
 		safeFilename := utils.SanitizeFilename(header.Filename)
 
 		head := make([]byte, 512)
@@ -446,7 +446,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// For bmp/tiff the encoder re-encodes to JPEG, so the stored extension is "jpg".
+	// bmp/tiff are re-encoded as JPEG, so the on-disk extension is "jpg".
 	saveExt := storedExt(ext)
 	originalPath := filepath.Join("static", "images", linkName+"."+saveExt)
 	previewPath := filepath.Join("static", "images", "previews", linkName+".webp")
@@ -564,7 +564,6 @@ func saveImage(img image.Image, format, path string) error {
 	case "webp":
 		return webp.Encode(out, img, &webp.Options{Quality: 85})
 	default:
-		// Fallback: encode as JPEG.
 		return jpeg.Encode(out, img, &jpeg.Options{Quality: 85})
 	}
 }
@@ -610,8 +609,7 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 		return nil, "", nil, fmt.Errorf("invalid URL")
 	}
 
-	// One context timeout governs the entire download; client.Timeout is not set
-	// separately to avoid redundant timer allocation.
+	// One context timeout governs the entire download.
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 
@@ -650,8 +648,8 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 		return nil, "", nil, errors.New("image dimensions too large")
 	}
 
-	// Use the format reported by the decoder, not Content-Type — CDNs often
-	// serve images with application/octet-stream.
+	// Use the format reported by the decoder, not Content-Type —
+	// CDNs often serve images with application/octet-stream.
 	img, format, err := image.Decode(bytes.NewReader(buf))
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("invalid or unsupported image format")

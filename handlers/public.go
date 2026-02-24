@@ -39,9 +39,7 @@ func Public(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Open the file once — use the returned *os.File for both Stat and
-	// ServeContent, eliminating the extra syscall and the TOCTOU window
-	// between a separate Stat + Open pair.
+	// Open the file once for both Stat and ServeContent to avoid a TOCTOU race.
 	f, err := os.Open(wp.ImagePath)
 	if err != nil {
 		http.NotFound(w, r)

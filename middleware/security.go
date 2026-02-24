@@ -7,22 +7,21 @@ import (
 	"lanpaper/config"
 )
 
-// WithSecurity attaches security headers and applies public-endpoint rate
-// limiting. It must wrap every handler that is reachable without auth.
+// WithSecurity attaches security headers and applies public-endpoint rate limiting.
+// Must wrap every handler reachable without authentication.
 func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("X-Frame-Options", "DENY")
-		// X-XSS-Protection is deprecated and omitted: modern browsers ignore it
-		// and it can introduce XSS vulnerabilities in some edge cases.
+		// X-XSS-Protection is omitted: deprecated and can introduce XSS in some browsers.
 		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		h.Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
 		h.Set("X-Download-Options", "noopen")
 		h.Set("Cross-Origin-Resource-Policy", "same-origin")
 		h.Set("Cross-Origin-Opener-Policy", "same-origin")
-		// Note: Cross-Origin-Embedder-Policy: require-corp is intentionally
-		// omitted — it breaks loading of external images in the admin panel.
+		// Cross-Origin-Embedder-Policy: require-corp is intentionally omitted —
+		// it breaks loading of external images in the admin panel.
 		h.Set("Content-Security-Policy",
 			"default-src 'none'; "+
 				"script-src 'self'; "+
@@ -36,7 +35,6 @@ func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 				"base-uri 'self'; "+
 				"frame-ancestors 'none';")
 
-		// Rate-limit public (non-admin, non-API) endpoints only.
 		// /api/* and /admin are rate-limited separately (upload middleware).
 		if !strings.HasPrefix(r.URL.Path, "/admin") && !strings.HasPrefix(r.URL.Path, "/api/") {
 			ip := clientIP(r)

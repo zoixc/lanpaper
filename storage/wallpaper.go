@@ -23,7 +23,7 @@ type Wallpaper struct {
 	ModTime   int64  `json:"modTime"`
 	CreatedAt int64  `json:"createdAt"`
 
-	// Runtime-only: not persisted, derived from MIMEType on Load().
+	// Runtime-only fields: not persisted; derived from MIMEType on Load.
 	ImagePath   string `json:"-"`
 	PreviewPath string `json:"-"`
 }
@@ -58,8 +58,8 @@ func (s *Store) Delete(id string) {
 	delete(s.wallpapers, id)
 }
 
-// GetAll returns a snapshot of all wallpapers, sorted: images-with-files first
-// (newest ModTime), then empty slots (newest CreatedAt).
+// GetAll returns a snapshot of all wallpapers sorted: images first (newest
+// ModTime), then empty slots (newest CreatedAt).
 func (s *Store) GetAll() []*Wallpaper {
 	s.RLock()
 	defer s.RUnlock()
@@ -85,8 +85,8 @@ func (s *Store) GetAll() []*Wallpaper {
 	return wallpapers
 }
 
-// atomicWrite marshals data and writes it atomically via a temp-file + rename
-// so that a crash mid-write never produces a truncated JSON file.
+// atomicWrite marshals data and writes it via a temp-file + rename so that a
+// crash mid-write never produces a truncated JSON file.
 func atomicWrite(path string, data map[string]*Wallpaper) error {
 	body, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
@@ -136,7 +136,7 @@ func derivePaths(wp *Wallpaper) {
 	}
 }
 
-// Load reads wallpapers from disk. A missing file is not an error (first run).
+// Load reads wallpapers from disk. A missing file is treated as first run.
 func (s *Store) Load() error {
 	data, err := os.ReadFile(dataFile)
 	if err != nil {
@@ -158,8 +158,8 @@ func (s *Store) Load() error {
 	return nil
 }
 
-// PruneOldImages removes the oldest images when the total exceeds max,
-// keeping the newest max entries. The link slots are preserved (HasImage=false).
+// PruneOldImages removes the oldest images when the count exceeds max,
+// keeping the newest max entries. Link slots are preserved (HasImage=false).
 func PruneOldImages(max int) {
 	Global.Lock()
 	defer Global.Unlock()

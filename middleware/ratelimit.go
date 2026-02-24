@@ -22,13 +22,12 @@ var (
 	counts = map[string]*counter{}
 )
 
-// cleanerInterval is how often idle rate-limit entries are swept.
-// 2× the window (1 min) keeps memory low while ensuring entries expire
-// shortly after their window rolls over.
+// cleanerInterval is the sweep period for idle rate-limit entries.
+// 2× the 1-minute window ensures entries expire shortly after their window rolls over.
 const cleanerInterval = 2 * time.Minute
 
 // StartCleaner removes stale per-IP counters periodically.
-// Call once from main; it runs until the process exits.
+// Call once from main; runs until the process exits.
 func StartCleaner() {
 	ticker := time.NewTicker(cleanerInterval)
 	defer ticker.Stop()
@@ -44,7 +43,7 @@ func StartCleaner() {
 	}
 }
 
-// isOverLimitNS checks whether ip has exceeded perMin+burst requests in the
+// isOverLimitNS reports whether ip has exceeded perMin+burst requests in the
 // current one-minute window for the given namespace.
 func isOverLimitNS(ns, ip string, perMin, burst int) bool {
 	if perMin <= 0 {
@@ -71,19 +70,16 @@ func isOverLimit(ip string, perMin, burst int) bool {
 	return isOverLimitNS("public", ip, perMin, burst)
 }
 
-// clientIP returns the real client IP address.
-//
-// X-Real-IP and X-Forwarded-For are honoured ONLY when the TCP connection
-// originates from the configured TrustedProxy address/CIDR. Without a trusted
-// proxy the raw RemoteAddr is always used, preventing IP spoofing in direct /
-// LAN deployments.
+// clientIP returns the real client IP.
+// X-Real-IP and X-Forwarded-For are honoured only when the TCP connection
+// originates from the configured TrustedProxy, preventing IP spoofing.
 func clientIP(r *http.Request) string {
 	if config.IsTrustedProxy(r.RemoteAddr) {
 		if xr := r.Header.Get("X-Real-IP"); xr != "" {
 			return strings.TrimSpace(xr)
 		}
 		if xf := r.Header.Get("X-Forwarded-For"); xf != "" {
-			// XFF is a comma-separated list; the leftmost entry is the client.
+			// XFF is comma-separated; take the leftmost (client) entry.
 			if idx := strings.IndexByte(xf, ','); idx >= 0 {
 				return strings.TrimSpace(xf[:idx])
 			}
@@ -97,8 +93,8 @@ func clientIP(r *http.Request) string {
 	return host
 }
 
-// RateLimitFunc returns the current (perMin, burst) values on every call so
-// that the live config is always reflected without a server restart.
+// RateLimitFunc returns the current (perMin, burst) pair on every call so that
+// live config changes take effect without a server restart.
 type RateLimitFunc func() (perMin, burst int)
 
 // RateLimit returns middleware that enforces a per-IP rate limit in the

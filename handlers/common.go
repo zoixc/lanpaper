@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Reserved names that cannot be used as link names
+// reservedNames cannot be used as link names because they clash with URL routes.
 var reservedNames = map[string]bool{
 	"api":      true,
 	"admin":    true,
@@ -15,10 +15,10 @@ var reservedNames = map[string]bool{
 	"health":   true,
 }
 
-// linkNameRe is compiled once at startup to avoid per-call overhead
+// linkNameRe is compiled once at startup.
 var linkNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
 
-// isValidLinkName validates link name format and checks against reserved names
+// isValidLinkName checks format and reserved-name constraints.
 func isValidLinkName(name string) bool {
 	if len(name) < 1 || len(name) > 255 {
 		return false

@@ -19,10 +19,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// Version is injected at build time via:
-//
-//	go build -ldflags "-X main.Version=$(cat VERSION)"
-//
+// Version is injected at build time: go build -ldflags "-X main.Version=$(cat VERSION)"
 // Falls back to "dev" when building without ldflags.
 var (
 	Version   = "dev"
@@ -33,7 +30,6 @@ func main() {
 	_ = godotenv.Load()
 	config.Load()
 
-	// Startup warnings
 	if config.Current.DisableAuth {
 		if config.Current.AdminUser == "" && config.Current.AdminPass == "" {
 			log.Println("Warning: No credentials provided. Authentication is automatically disabled.")
@@ -94,11 +90,10 @@ func main() {
 	server := &http.Server{
 		Addr:    port,
 		Handler: mux,
-		// ReadTimeout covers reading the request headers + body.
-		// 30 s is enough for uploads since the semaphore limits concurrency.
+		// ReadTimeout covers reading the full request (headers + body).
 		ReadTimeout: 30 * time.Second,
-		// WriteTimeout must be longer than downloadImage's 90 s context so that
-		// URL-based uploads of large files don't get cut off mid-response.
+		// WriteTimeout must exceed downloadImage's 90 s context to avoid
+		// cutting off URL-based uploads mid-response.
 		WriteTimeout: 120 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}
@@ -124,9 +119,7 @@ func main() {
 	log.Println("Server stopped")
 }
 
-// healthCheckHandler returns a minimal liveness probe.
-// Version and uptime are intentionally omitted to avoid leaking build info
-// to unauthenticated callers. Use /health/ready for detailed diagnostics.
+// healthCheckHandler returns a liveness probe response.
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
