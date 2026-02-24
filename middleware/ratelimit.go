@@ -4,9 +4,10 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
+
+	"lanpaper/config"
 )
 
 type counter struct {
@@ -64,15 +65,57 @@ func isOverLimit(ip string, perMin, burst int) bool {
 	return isOverLimitNS("public", ip, perMin, burst)
 }
 
+// clientIP returns the real client IP.
+//
+// X-Real-IP and X-Forwarded-For are honoured ONLY when the TCP connection
+// originates from the configured TrustedProxy address/CIDR. Without a trusted
+// proxy configured the raw RemoteAddr is always used, preventing IP spoofing
+// in direct / LAN deployments.
 func clientIP(r *http.Request) string {
-	if xr := r.Header.Get("X-Real-IP"); xr != "" {
-		return xr
+	if config.IsTrustedProxy(r.RemoteAddr) {
+		if xr := r.Header.Get("X-Real-IP"); xr != "" {
+			return xr
+		}
+		if xf := r.Header.Get("X-Forwarded-For"); xf != "" {
+			// XFF may be a comma-separated list; take the leftmost (client) entry.
+			parts := splitAndTrim(xf)
+			if len(parts) > 0 {
+				return parts[0]
+			}
+		}
 	}
-	if xf := r.Header.Get("X-Forwarded-For"); xf != "" {
-		return strings.TrimSpace(strings.Split(xf, ",")[0])
+	// Default: use the real TCP remote address.
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
 	}
-	host, _, _ := net.SplitHostPort(r.RemoteAddr)
 	return host
+}
+
+// splitAndTrim splits a comma-separated header value and trims spaces.
+func splitAndTrim(s string) []string {
+	parts := make([]string, 0)
+	start := 0
+	for i := 0; i <= len(s); i++ {
+		if i == len(s) || s[i] == ',' {
+			v := trimSpace(s[start:i])
+			if v != "" {
+				parts = append(parts, v)
+			}
+			start = i + 1
+		}
+	}
+	return parts
+}
+
+func trimSpace(s string) string {
+	for len(s) > 0 && (s[0] == ' ' || s[0] == '\t') {
+		s = s[1:]
+	}
+	for len(s) > 0 && (s[len(s)-1] == ' ' || s[len(s)-1] == '\t') {
+		s = s[:len(s)-1]
+	}
+	return s
 }
 
 // RateLimitFunc is a function that returns the current (perMin, burst) values.

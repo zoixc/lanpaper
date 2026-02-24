@@ -21,10 +21,13 @@ func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 		// Note: Cross-Origin-Embedder-Policy: require-corp is intentionally omitted
 		// as it breaks loading of external images in the admin panel.
 
+		// 'unsafe-inline' removed from style-src — all styles are in external
+		// stylesheet (static/css/style.css). If inline styles are ever needed
+		// again, use a CSP nonce instead of re-adding 'unsafe-inline'.
 		w.Header().Set("Content-Security-Policy",
 			"default-src 'none'; "+
 				"script-src 'self'; "+
-				"style-src 'self' 'unsafe-inline'; "+
+				"style-src 'self'; "+
 				"img-src 'self' https: data: blob:; "+
 				"media-src 'self' https: data: blob:; "+
 				"connect-src 'self'; "+

@@ -124,15 +124,15 @@ func main() {
 	log.Println("Server stopped")
 }
 
+// healthCheckHandler returns a minimal liveness probe.
+// Version and uptime are intentionally omitted to avoid leaking build info
+// to unauthenticated callers. Use /health/ready for detailed diagnostics.
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-	response := map[string]interface{}{
+	response := map[string]string{
 		"status":  "ok",
 		"service": "lanpaper",
-		"version": Version,
-		"time":    time.Now().Unix(),
-		"uptime":  time.Since(startTime).String(),
 	}
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("Error encoding health check response: %v", err)

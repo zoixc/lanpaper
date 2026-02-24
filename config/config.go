@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"log"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -30,6 +31,11 @@ type Config struct {
 	ProxyUsername        string     `json:"proxyUsername,omitempty"`
 	ProxyPassword        string     `json:"proxyPassword,omitempty"`
 	Rate                 RateConfig `json:"rate"`
+	// TrustedProxy is the IP (or CIDR) of a reverse proxy sitting in front of
+	// Lanpaper. When set, X-Real-IP / X-Forwarded-For headers are trusted ONLY
+	// for requests that arrive from this address. Leave empty to use the
+	// direct TCP remote address (safe default for LAN / direct deployments).
+	TrustedProxy string `json:"trustedProxy,omitempty"`
 }
 
 var Current Config
@@ -50,6 +56,7 @@ func Load() {
 		ProxyType:            getEnv("PROXY_TYPE", "http"),
 		ProxyUsername:        getEnvAny("PROXY_USERNAME", "PROXY_USER", ""),
 		ProxyPassword:        getEnvAny("PROXY_PASSWORD", "PROXY_PASS", ""),
+		TrustedProxy:         getEnv("TRUSTED_PROXY", ""),
 		Rate: RateConfig{
 			PublicPerMin: getEnvInt("RATE_PUBLIC_PER_MIN", 120),
 			UploadPerMin: getEnvInt("RATE_UPLOAD_PER_MIN", 20),
@@ -64,6 +71,33 @@ func Load() {
 	}
 
 	validate()
+}
+
+// IsTrustedProxy reports whether the given remote address matches the
+// configured TrustedProxy IP or CIDR. Always returns false when TrustedProxy
+// is empty (safe default).
+func IsTrustedProxy(remoteAddr string) bool {
+	if Current.TrustedProxy == "" {
+		return false
+	}
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		host = remoteAddr
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	// Accept exact IP match
+	if proxyIP := net.ParseIP(Current.TrustedProxy); proxyIP != nil {
+		return proxyIP.Equal(ip)
+	}
+	// Accept CIDR match
+	_, cidr, err := net.ParseCIDR(Current.TrustedProxy)
+	if err != nil {
+		return false
+	}
+	return cidr.Contains(ip)
 }
 
 // validate sanitises Current in-place, resetting any out-of-range values to
@@ -106,6 +140,19 @@ func validate() {
 		default:
 			log.Printf("Warning: invalid proxy type %q, using http", Current.ProxyType)
 			Current.ProxyType = "http"
+		}
+	}
+
+	// Validate TrustedProxy format if set
+	if Current.TrustedProxy != "" {
+		valid := net.ParseIP(Current.TrustedProxy) != nil
+		if !valid {
+			_, _, err := net.ParseCIDR(Current.TrustedProxy)
+			valid = err == nil
+		}
+		if !valid {
+			log.Printf("Warning: invalid TRUSTED_PROXY %q — ignoring (must be IP or CIDR)", Current.TrustedProxy)
+			Current.TrustedProxy = ""
 		}
 	}
 
