@@ -7,7 +7,7 @@
     z-index: var(--z-dropdown);
 }
 
-/* Settings Button (Gear Icon) */
+/* Settings Button */
 #settingsBtn {
     cursor: pointer;
     width: 32px;
@@ -20,25 +20,31 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background .15s ease, border-color .15s ease, transform .2s ease;
+    /* Explicit color ensures SVG stroke inherits the correct theme color */
+    color: var(--text);
+    transition: background .15s ease, border-color .15s ease, color .15s ease;
 }
 
 #settingsBtn:hover {
     background: var(--btn-secondary);
     border-color: var(--border);
+    color: var(--text);
 }
 
 .settings-dropdown.open #settingsBtn {
     background: var(--btn-secondary-hover);
     border-color: var(--border-hover);
+    color: var(--text);
+}
+
+/* Rotate gear 30deg when open — subtle and fitting for a gear */
+#settingsBtn svg {
+    transition: transform .35s cubic-bezier(0.34, 1.56, .64, 1);
+    display: block;
 }
 
 .settings-dropdown.open #settingsBtn svg {
-    transform: rotate(45deg);
-}
-
-#settingsBtn svg {
-    transition: transform .3s cubic-bezier(0.34, 1.56, .64, 1);
+    transform: rotate(30deg);
 }
 
 /* Settings Menu Panel */
@@ -62,13 +68,13 @@
 }
 
 @keyframes settingsMenuOpen {
-    from { 
-        opacity: 0; 
-        transform: translateY(-8px) scale(0.96); 
+    from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.96);
     }
-    to { 
-        opacity: 1; 
-        transform: translateY(0) scale(1); 
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
     }
 }
 
@@ -177,7 +183,7 @@ body.dark .lang-option.active {
         right: -8px;
         min-width: 200px;
     }
-    
+
     .lang-options {
         grid-template-columns: repeat(2, 1fr);
     }
