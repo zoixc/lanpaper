@@ -20,31 +20,42 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    /* Explicit color ensures SVG stroke inherits the correct theme color */
-    color: var(--text);
-    transition: background .15s ease, border-color .15s ease, color .15s ease;
+    transition: background .15s ease, border-color .15s ease;
 }
 
 #settingsBtn:hover {
     background: var(--btn-secondary);
     border-color: var(--border);
-    color: var(--text);
 }
 
 .settings-dropdown.open #settingsBtn {
     background: var(--btn-secondary-hover);
     border-color: var(--border-hover);
-    color: var(--text);
 }
 
-/* Rotate gear 30deg when open — subtle and fitting for a gear */
-#settingsBtn svg {
-    transition: transform .35s cubic-bezier(0.34, 1.56, .64, 1);
-    display: block;
+/* Settings Icon (image-based) */
+.settings-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 18px;
+    height: 18px;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .3s ease, transform .35s cubic-bezier(0.34, 1.56, .64, 1);
 }
 
-.settings-dropdown.open #settingsBtn svg {
-    transform: rotate(30deg);
+/* Show correct icon per theme */
+body:not(.dark) .settings-icon.light-theme-icon,
+body.dark .settings-icon.dark-theme-icon {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Rotate gear 30deg when open */
+.settings-dropdown.open #settingsBtn .settings-icon {
+    transform: translate(-50%, -50%) rotate(30deg);
 }
 
 /* Settings Menu Panel */
