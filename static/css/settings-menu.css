@@ -142,6 +142,7 @@ body.dark .settings-icon.dark-theme-icon {
     border-color: var(--border-hover);
 }
 
+/* Light theme active state: dark button (#454542) with light text */
 .lang-option.active {
     background: var(--btn-primary);
     color: var(--bg);
@@ -149,10 +150,12 @@ body.dark .settings-icon.dark-theme-icon {
     font-weight: 700;
 }
 
+/* Dark theme active state: accent color (#6e7fcc) with white text for high contrast */
 body.dark .lang-option.active {
-    background: var(--btn-primary);
-    color: var(--text);
-    border-color: var(--btn-primary);
+    background: var(--accent);
+    color: #ffffff;
+    border-color: var(--accent);
+    font-weight: 700;
 }
 
 /* Settings Menu Items (Export/Import) */

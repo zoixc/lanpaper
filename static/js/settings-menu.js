@@ -94,8 +94,8 @@
                     location.reload();
                 }
                 
-                // Close dropdown after selection
-                setTimeout(closeSettingsDropdown, 200);
+                // Close dropdown immediately after selection (no delay)
+                closeSettingsDropdown();
             });
             
             langOptions.appendChild(btn);
