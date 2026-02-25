@@ -40,7 +40,6 @@ const DOM = {
     modalConfirm: document.getElementById('modalConfirmBtn'),
 
     // Creation
-    createBtn: document.getElementById('createLinkBtn'),
     createInput: document.getElementById('newLinkId'),
     createForm: document.getElementById('createForm'),
 

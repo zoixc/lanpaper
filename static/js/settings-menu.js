@@ -125,7 +125,4 @@
             select.classList.remove('open');
         });
     }
-
-    // Make closeSettingsDropdown available globally for other scripts
-    window.closeSettingsDropdown = closeSettingsDropdown;
 })();
