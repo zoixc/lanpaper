@@ -8,13 +8,17 @@ const RUNTIME_CACHE = 'lanpaper-runtime';
 
 // Static assets to cache on install
 const STATIC_ASSETS = [
-  '/',
   '/admin.html',
   '/static/css/style.css',
+  '/static/css/settings-menu.css',
   '/static/js/app.js',
+  '/static/js/export-import.js',
+  '/static/js/settings-menu.js',
+  '/static/js/compressor.js',
   '/static/logo.svg',
   '/static/logo-dark.svg',
   '/static/favicon.svg',
+  '/static/manifest.json'
 ];
 
 // Install event - cache static assets
@@ -24,9 +28,31 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('[SW] Caching static assets');
-        return cache.addAll(STATIC_ASSETS);
+        // Cache assets individually to avoid failure on missing files
+        return Promise.allSettled(
+          STATIC_ASSETS.map(url =>
+            fetch(url)
+              .then(response => {
+                if (response.ok) {
+                  return cache.put(url, response);
+                }
+                console.warn('[SW] Failed to cache:', url, response.status);
+                return null;
+              })
+              .catch(error => {
+                console.warn('[SW] Error caching:', url, error.message);
+                return null;
+              })
+          )
+        );
       })
-      .then(() => self.skipWaiting())
+      .then(() => {
+        console.log('[SW] Cache complete');
+        return self.skipWaiting();
+      })
+      .catch(error => {
+        console.error('[SW] Cache failed:', error);
+      })
   );
 });
 
@@ -45,7 +71,10 @@ self.addEventListener('activate', (event) => {
             })
         );
       })
-      .then(() => self.clients.claim())
+      .then(() => {
+        console.log('[SW] Activation complete');
+        return self.clients.claim();
+      })
   );
 });
 
@@ -61,22 +90,38 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/api/')) return;
 
   // For static assets: Cache first, then network
-  if (STATIC_ASSETS.some(asset => url.pathname === asset || url.pathname.startsWith('/static/'))) {
+  if (STATIC_ASSETS.some(asset => url.pathname === asset) || url.pathname.startsWith('/static/')) {
     event.respondWith(
       caches.match(request)
         .then(cached => {
-          if (cached) return cached;
+          if (cached) {
+            // Return cached, but update in background
+            fetch(request)
+              .then(response => {
+                if (response && response.status === 200) {
+                  caches.open(CACHE_NAME)
+                    .then(cache => cache.put(request, response.clone()));
+                }
+              })
+              .catch(() => {}); // Silent fail for background update
+            return cached;
+          }
+          // Not in cache, fetch from network
           return fetch(request)
             .then(response => {
-              if (response.status === 200) {
+              if (response && response.status === 200) {
                 const clone = response.clone();
                 caches.open(CACHE_NAME)
-                  .then(cache => cache.put(request, clone));
+                  .then(cache => cache.put(request, clone))
+                  .catch(() => {}); // Silent fail
               }
               return response;
             });
         })
-        .catch(() => caches.match('/admin.html')) // Fallback to offline page
+        .catch(() => {
+          // Fallback to offline page
+          return caches.match('/admin.html');
+        })
     );
     return;
   }
@@ -85,10 +130,11 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(request)
       .then(response => {
-        if (response.status === 200) {
+        if (response && response.status === 200) {
           const clone = response.clone();
           caches.open(RUNTIME_CACHE)
-            .then(cache => cache.put(request, clone));
+            .then(cache => cache.put(request, clone))
+            .catch(() => {}); // Silent fail
         }
         return response;
       })
@@ -98,12 +144,15 @@ self.addEventListener('fetch', (event) => {
 
 // Message event - for manual cache updates
 self.addEventListener('message', (event) => {
-  if (event.data.action === 'skipWaiting') {
+  if (event.data && event.data.action === 'skipWaiting') {
     self.skipWaiting();
   }
-  if (event.data.action === 'clearCache') {
+  if (event.data && event.data.action === 'clearCache') {
     event.waitUntil(
-      caches.keys().then(names => Promise.all(names.map(name => caches.delete(name))))
+      caches.keys().then(names => {
+        console.log('[SW] Clearing all caches');
+        return Promise.all(names.map(name => caches.delete(name)));
+      })
     );
   }
 });
