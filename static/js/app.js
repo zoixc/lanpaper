@@ -14,6 +14,8 @@ const STATE = {
     sortBy: 'date_desc',
     wallpapers: [],
     filteredWallpapers: [],
+    compressor: null,
+    lazyObserver: null,
 };
 
 
@@ -57,10 +59,115 @@ document.addEventListener('DOMContentLoaded', async () => {
     initLanguage();
     initView();
     initSearchSort();
+    initLazyLoading();
+    initKeyboardShortcuts();
+    initPWA();
+    initCompression();
     loadAppVersion();
     await loadLinks();
     setupGlobalListeners();
 });
+
+
+// PWA INITIALIZATION
+function initPWA() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/static/sw.js')
+            .then(reg => console.log('SW registered:', reg.scope))
+            .catch(err => console.warn('SW registration failed:', err));
+    }
+}
+
+
+// IMAGE COMPRESSION INITIALIZATION
+function initCompression() {
+    // Check if compression script is loaded
+    if (typeof ImageCompressor !== 'undefined') {
+        STATE.compressor = new ImageCompressor({
+            maxWidth: 1920,
+            maxHeight: 1080,
+            quality: 0.85
+        });
+    }
+}
+
+
+// LAZY LOADING INITIALIZATION
+function initLazyLoading() {
+    if (!('IntersectionObserver' in window)) return;
+
+    STATE.lazyObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const img = entry.target;
+                if (img.dataset.src) {
+                    img.src = img.dataset.src;
+                    img.removeAttribute('data-src');
+                    STATE.lazyObserver.unobserve(img);
+                }
+            }
+        });
+    }, {
+        rootMargin: '50px 0px',
+        threshold: 0.01
+    });
+}
+
+
+// KEYBOARD SHORTCUTS
+function initKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        // Ignore if typing in input/textarea
+        if (e.target.matches('input, textarea')) return;
+
+        // Ctrl/Cmd + N: Create new link
+        if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+            e.preventDefault();
+            DOM.createInput.focus();
+            return;
+        }
+
+        // Ctrl/Cmd + F: Focus search
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            DOM.searchInput.focus();
+            DOM.searchInput.select();
+            return;
+        }
+
+        // Ctrl/Cmd + G: Toggle grid/list view
+        if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
+            e.preventDefault();
+            DOM.viewBtn.click();
+            return;
+        }
+
+        // Esc: Close modal or clear search
+        if (e.key === 'Escape') {
+            if (!DOM.modalOverlay.classList.contains('hidden')) {
+                closeModal();
+            } else if (DOM.searchInput.value) {
+                DOM.searchInput.value = '';
+                DOM.searchInput.dispatchEvent(new Event('input'));
+            }
+            return;
+        }
+
+        // T: Toggle theme
+        if (e.key === 't' || e.key === 'T') {
+            DOM.themeBtn.click();
+            return;
+        }
+    });
+
+    // Show shortcuts hint on first visit
+    if (!localStorage.getItem('shortcuts-seen')) {
+        setTimeout(() => {
+            showToast('💡 Shortcuts: Ctrl+N (new), Ctrl+F (search), Ctrl+G (view), T (theme)', 'success');
+            localStorage.setItem('shortcuts-seen', 'true');
+        }, 2000);
+    }
+}
 
 
 // VERSION
@@ -517,9 +624,19 @@ async function loadExternalImages() {
 
             const previewUrl = `/api/external-image-preview?path=${encodeURIComponent(file)}`;
             div.innerHTML = `
-                <img src="${previewUrl}" loading="lazy" alt="${file}">
+                <img data-src="${previewUrl}" alt="${file}" style="opacity: 0; transition: opacity 0.3s;">
                 <div class="image-name">${file}</div>
             `;
+
+            // Lazy load modal images
+            const img = div.querySelector('img');
+            if (STATE.lazyObserver) {
+                STATE.lazyObserver.observe(img);
+                img.addEventListener('load', () => { img.style.opacity = '1'; });
+            } else {
+                img.src = img.dataset.src;
+                img.style.opacity = '1';
+            }
 
             div.onclick = () => {
                 DOM.modalList.querySelectorAll('.image-option').forEach(el => el.classList.remove('selected'));
@@ -617,6 +734,7 @@ function detectCategory(link) {
 function updateCard(card, link) {
     const linkName = link.linkName || link.id;
     card.querySelector('.link-id').textContent = linkName;
+    card.dataset.linkName = linkName;
 
     const fullUrl = `${window.location.origin}/${linkName}`;
 
@@ -653,18 +771,39 @@ function updateCard(card, link) {
 
     if (link.hasImage && resolvedPreview) {
         const img = document.createElement('img');
-        img.src = '/' + resolvedPreview.replace(/^\//, '') + `?t=${Date.now()}`;
+        const imgSrc = '/' + resolvedPreview.replace(/^\//, '') + `?t=${Date.now()}`;
+        
+        // Use lazy loading
+        if (STATE.lazyObserver) {
+            img.dataset.src = imgSrc;
+            img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"%3E%3C/svg%3E';
+            STATE.lazyObserver.observe(img);
+        } else {
+            img.src = imgSrc;
+        }
+        
         img.alt = 'Preview';
         img.className = 'preview';
+        img.loading = 'lazy';
         img.onerror = () => {
             previewWrapper.innerHTML = `<div class="no-image">${t('preview_unavailable', 'Preview unavailable')}</div>`;
         };
         previewWrapper.appendChild(img);
     } else if (link.hasImage) {
         const img = document.createElement('img');
-        img.src = '/' + (link.imageUrl || '').replace(/^\//, '') || fullUrl;
+        const imgSrc = '/' + (link.imageUrl || '').replace(/^\//, '') || fullUrl;
+        
+        if (STATE.lazyObserver) {
+            img.dataset.src = imgSrc;
+            img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"%3E%3C/svg%3E';
+            STATE.lazyObserver.observe(img);
+        } else {
+            img.src = imgSrc;
+        }
+        
         img.alt = 'Image';
         img.className = 'preview';
+        img.loading = 'lazy';
         img.onerror = () => {
             previewWrapper.innerHTML = `<div class="no-image">${t('image_unavailable', 'Image unavailable')}</div>`;
         };
@@ -698,13 +837,9 @@ function setupCardEvents(card, link) {
     const dropdown = card.querySelector('.upload-dropdown');
     const toggleBtn = card.querySelector('.upload-toggle-btn');
 
-    // Use AbortController so this card's document listeners are cleaned up
-    // when renderLinks() replaces the DOM (calling renderLinks sets innerHTML = '',
-    // but the controller is scoped to the card's lifetime via the article itself).
     const ac = new AbortController();
     const { signal } = ac;
 
-    // Abort all card-scoped document listeners when the card is removed from DOM.
     new MutationObserver((_, obs) => {
         if (!document.contains(card)) {
             ac.abort();
@@ -785,7 +920,20 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
             showToast(t('invalid_image', 'Invalid file format'), 'error');
             return;
         }
-        formData.append('file', fileOrUrl);
+
+        // Compress image if compressor is available
+        let fileToUpload = fileOrUrl;
+        if (STATE.compressor && fileOrUrl.type.startsWith('image/')) {
+            const originalSize = fileOrUrl.size;
+            fileToUpload = await STATE.compressor.compress(fileOrUrl);
+            
+            if (fileToUpload.size < originalSize) {
+                const info = ImageCompressor.getCompressionInfo(originalSize, fileToUpload.size);
+                showToast(`🗜️ Compressed: ${info.percent}% smaller (${formatKB(info.saved)} saved)`, 'success');
+            }
+        }
+
+        formData.append('file', fileToUpload);
     }
 
     try {
@@ -844,7 +992,6 @@ function setupGlobalListeners() {
             STATE.wallpapers.push(newLinkObj);
             filterAndSort();
 
-            // Find the freshly rendered card and animate it.
             const newCard = DOM.linksList.querySelector(`[data-link-name="${CSS.escape(id)}"]`)
                 ?? DOM.linksList.lastElementChild;
             if (newCard) {
