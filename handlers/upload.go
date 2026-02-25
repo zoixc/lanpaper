@@ -181,16 +181,14 @@ func storedExt(ext string) string {
 	return ext
 }
 
-// maxImageDimension is the maximum allowed image width or height (decompression bomb guard).
-const maxImageDimension = 16384
-
 func checkImageDimensions(r io.ReadSeeker) error {
 	cfg, _, err := image.DecodeConfig(r)
 	if err != nil {
 		return nil // let the full decode produce the real error
 	}
-	if cfg.Width > maxImageDimension || cfg.Height > maxImageDimension {
-		return fmt.Errorf("image %dx%d exceeds %dx%d limit", cfg.Width, cfg.Height, maxImageDimension, maxImageDimension)
+	if cfg.Width > config.MaxImageDimension || cfg.Height > config.MaxImageDimension {
+		return fmt.Errorf("image %dx%d exceeds %dx%d limit",
+			cfg.Width, cfg.Height, config.MaxImageDimension, config.MaxImageDimension)
 	}
 	return nil
 }
@@ -280,32 +278,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Invalid path", http.StatusBadRequest)
 				return
 			}
-			absBase, absErr := filepath.Abs(externalBase())
-			if absErr != nil {
-				log.Printf("Error resolving base dir: %v", absErr)
-				http.Error(w, "Server configuration error", http.StatusInternalServerError)
-				return
-			}
-			absPath, absErr := filepath.Abs(filepath.Join(absBase, filepath.Clean(urlStr)))
-			if absErr != nil {
-				log.Printf("Error resolving file path: %v", absErr)
-				http.Error(w, "Invalid path", http.StatusBadRequest)
-				return
-			}
-			if !strings.HasPrefix(absPath, absBase+string(filepath.Separator)) && absPath != absBase {
-				log.Printf("Security: path traversal: %s -> %s", urlStr, absPath)
-				http.Error(w, "Path outside allowed directory", http.StatusForbidden)
-				return
-			}
-			// Resolve symlinks to prevent escape to arbitrary paths.
-			realPath, realErr := filepath.EvalSymlinks(absPath)
-			if realErr != nil {
-				log.Printf("Security: cannot resolve symlink %s: %v", absPath, realErr)
-				http.Error(w, "Invalid path", http.StatusBadRequest)
-				return
-			}
-			if !strings.HasPrefix(realPath, absBase+string(filepath.Separator)) && realPath != absBase {
-				log.Printf("Security: symlink escape: %s -> %s", absPath, realPath)
+			// Use utils.ValidateAndResolvePath to prevent path traversal and symlink escapes.
+			absPath, _, pathErr := utils.ValidateAndResolvePath(externalBase(), urlStr)
+			if pathErr != nil {
+				log.Printf("Security: path validation failed for %s: %v", urlStr, pathErr)
 				http.Error(w, "Path outside allowed directory", http.StatusForbidden)
 				return
 			}
@@ -428,7 +404,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Save failed", http.StatusInternalServerError)
 			return
 		}
-		if err := saveImage(thumbnail(img, 200, 160), "webp", previewPath); err != nil {
+		// Use config constants for thumbnail dimensions instead of hardcoded values.
+		if err := saveImage(thumbnail(img, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight), "webp", previewPath); err != nil {
 			log.Printf("Error saving preview %s: %v", previewPath, err)
 			if removeErr := os.Remove(originalPath); removeErr != nil && !os.IsNotExist(removeErr) {
 				log.Printf("Error removing original after preview fail: %v", removeErr)
@@ -494,15 +471,15 @@ func saveImage(img image.Image, format, path string) error {
 	}()
 	switch format {
 	case "jpg", "jpeg":
-		return jpeg.Encode(out, img, &jpeg.Options{Quality: 85})
+		return jpeg.Encode(out, img, &jpeg.Options{Quality: config.JPEGQuality})
 	case "png":
 		return png.Encode(out, img)
 	case "gif":
-		return gif.Encode(out, img, &gif.Options{NumColors: 256})
+		return gif.Encode(out, img, &gif.Options{NumColors: config.GIFColors})
 	case "webp":
-		return webp.Encode(out, img, &webp.Options{Quality: 85})
+		return webp.Encode(out, img, &webp.Options{Quality: config.WebPQuality})
 	default:
-		return jpeg.Encode(out, img, &jpeg.Options{Quality: 85})
+		return jpeg.Encode(out, img, &jpeg.Options{Quality: config.JPEGQuality})
 	}
 }
 
@@ -547,7 +524,7 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 	}
 
 	// One timeout governs the entire download.
-	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(config.DownloadTimeout)*time.Second)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
