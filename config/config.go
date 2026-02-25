@@ -42,9 +42,9 @@ var Current Config
 func Load() {
 	Current = Config{
 		Port:                 getEnv("PORT", "8080"),
-		MaxUploadMB:          getEnvInt("MAX_UPLOAD_MB", 50),
+		MaxUploadMB:          getEnvInt("MAX_UPLOAD_MB", DefaultMaxUploadMB),
 		MaxImages:            getEnvInt("MAX_IMAGES", 0),
-		MaxConcurrentUploads: getEnvInt("MAX_CONCURRENT_UPLOADS", 2),
+		MaxConcurrentUploads: getEnvInt("MAX_CONCURRENT_UPLOADS", DefaultMaxConcurrentUploads),
 		ExternalImageDir:     getEnv("EXTERNAL_IMAGE_DIR", "external/images"),
 		AdminUser:            getEnv("ADMIN_USER", ""),
 		AdminPass:            getEnv("ADMIN_PASS", ""),
@@ -57,9 +57,9 @@ func Load() {
 		ProxyPassword:        getEnvAny("PROXY_PASSWORD", "PROXY_PASS", ""),
 		TrustedProxy:         getEnv("TRUSTED_PROXY", ""),
 		Rate: RateConfig{
-			PublicPerMin: getEnvInt("RATE_PUBLIC_PER_MIN", 120),
-			UploadPerMin: getEnvInt("RATE_UPLOAD_PER_MIN", 20),
-			Burst:        getEnvInt("RATE_BURST", 10),
+			PublicPerMin: getEnvInt("RATE_PUBLIC_PER_MIN", DefaultPublicRatePerMin),
+			UploadPerMin: getEnvInt("RATE_UPLOAD_PER_MIN", DefaultUploadRatePerMin),
+			Burst:        getEnvInt("RATE_BURST", DefaultRateBurst),
 		},
 	}
 
@@ -105,23 +105,23 @@ func validate() {
 		Current.Port = "8080"
 	}
 
-	if Current.MaxUploadMB <= 0 {
-		log.Printf("Warning: invalid MaxUploadMB %d, using 10", Current.MaxUploadMB)
-		Current.MaxUploadMB = 10
+	if Current.MaxUploadMB < MinUploadMB {
+		log.Printf("Warning: MaxUploadMB %d is below minimum %d, using %d", Current.MaxUploadMB, MinUploadMB, DefaultMaxUploadMB)
+		Current.MaxUploadMB = DefaultMaxUploadMB
 	}
 
 	if Current.MaxConcurrentUploads <= 0 {
-		Current.MaxConcurrentUploads = 2
+		Current.MaxConcurrentUploads = DefaultMaxConcurrentUploads
 	}
 
 	if Current.Rate.PublicPerMin < 0 {
-		Current.Rate.PublicPerMin = 120
+		Current.Rate.PublicPerMin = DefaultPublicRatePerMin
 	}
 	if Current.Rate.UploadPerMin < 0 {
-		Current.Rate.UploadPerMin = 20
+		Current.Rate.UploadPerMin = DefaultUploadRatePerMin
 	}
 	if Current.Rate.Burst <= 0 {
-		Current.Rate.Burst = 10
+		Current.Rate.Burst = DefaultRateBurst
 	}
 
 	if Current.ProxyHost != "" {
