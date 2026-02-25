@@ -9,6 +9,20 @@ import (
 	"lanpaper/config"
 )
 
+// staticSecurityHeaders are headers that don't change per-request.
+// Pre-built once to reduce allocation overhead.
+var staticSecurityHeaders = map[string]string{
+	"X-Content-Type-Options":           "nosniff",
+	"X-Frame-Options":                  "DENY",
+	"Referrer-Policy":                  "strict-origin-when-cross-origin",
+	"Permissions-Policy":               "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()",
+	"X-Download-Options":               "noopen",
+	"Cross-Origin-Resource-Policy":     "same-origin",
+	"Cross-Origin-Opener-Policy":       "same-origin",
+	"Cross-Origin-Embedder-Policy":     "require-corp",
+	"Strict-Transport-Security":        "max-age=63072000; includeSubDomains; preload",
+}
+
 // generateNonce creates a cryptographically secure nonce (128 bits of entropy)
 func generateNonce() (string, error) {
 	b := make([]byte, 16) // 128 bits
@@ -50,27 +64,21 @@ func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 			nonce = ""
 		}
 
-		// Store nonce in request context for use in templates
-		// Note: In production, inject nonce into HTML templates
-		if nonce != "" {
-			w.Header().Set("X-Nonce", nonce) // Custom header for JS to read
+		h := w.Header()
+		
+		// Apply static security headers (cached)
+		for key, value := range staticSecurityHeaders {
+			// Skip HSTS if not using TLS
+			if key == "Strict-Transport-Security" && r.TLS == nil {
+				continue
+			}
+			h.Set(key, value)
 		}
 
-		// Security headers following OWASP recommendations
-		h := w.Header()
-		h.Set("Content-Security-Policy", buildCSP(nonce))
-		h.Set("X-Content-Type-Options", "nosniff") // Prevent MIME sniffing
-		h.Set("X-Frame-Options", "DENY") // Prevent clickjacking (legacy)
-		h.Set("Referrer-Policy", "strict-origin-when-cross-origin") // Limit referrer info
-		h.Set("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()") // Disable unnecessary features
-		h.Set("X-Download-Options", "noopen") // IE: prevent opening downloads in browser context
-		h.Set("Cross-Origin-Resource-Policy", "same-origin") // CORP: isolate resources
-		h.Set("Cross-Origin-Opener-Policy", "same-origin") // COOP: isolate browsing context
-		h.Set("Cross-Origin-Embedder-Policy", "require-corp") // COEP: require CORP for cross-origin resources
-
-		// Strict-Transport-Security (HSTS) - only if using HTTPS
-		if r.TLS != nil {
-			h.Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload") // 2 years
+		// Dynamic headers that depend on nonce
+		if nonce != "" {
+			h.Set("Content-Security-Policy", buildCSP(nonce))
+			h.Set("X-Nonce", nonce) // Custom header for JS to read
 		}
 
 		// Rate limiting for public endpoints
