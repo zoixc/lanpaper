@@ -60,7 +60,33 @@ func (s *Store) Delete(id string) {
 
 // GetAll returns a snapshot of all wallpapers sorted: images first (newest
 // ModTime), then empty slots (newest CreatedAt).
+// Returns pointers to the original wallpapers - callers must not modify.
+// For mutable copies, use GetAllCopy.
 func (s *Store) GetAll() []*Wallpaper {
+	s.RLock()
+	snap := make([]*Wallpaper, 0, len(s.wallpapers))
+	for _, wp := range s.wallpapers {
+		if wp != nil {
+			snap = append(snap, wp)
+		}
+	}
+	s.RUnlock()
+
+	sort.Slice(snap, func(i, j int) bool {
+		if snap[i].HasImage != snap[j].HasImage {
+			return snap[i].HasImage
+		}
+		if snap[i].HasImage {
+			return snap[i].ModTime > snap[j].ModTime
+		}
+		return snap[i].CreatedAt > snap[j].CreatedAt
+	})
+	return snap
+}
+
+// GetAllCopy returns a deep copy of all wallpapers for cases where
+// mutation is needed without affecting the original data.
+func (s *Store) GetAllCopy() []*Wallpaper {
 	s.RLock()
 	snap := make([]*Wallpaper, 0, len(s.wallpapers))
 	for _, wp := range s.wallpapers {
