@@ -113,6 +113,9 @@ async function importData(file) {
             return;
         }
 
+        // Show loading toast
+        showToast('⏳ Syncing data with server...', 'info');
+
         // Restore settings if available
         if (data.settings) {
             if (data.settings.lang) {
@@ -135,14 +138,57 @@ async function importData(file) {
             }
         }
 
-        // Restore wallpapers data
-        STATE.wallpapers = data.wallpapers;
-        filterAndSort();
+        // Sync imported links with server
+        await syncImportedLinksWithServer(data.wallpapers);
+        
+        // Reload from server to ensure consistency
+        await loadLinks();
         
         showToast(`✅ ${t('import_success', 'Data imported successfully')}`, 'success');
     } catch (error) {
         console.error('Import error:', error);
         showToast(`❌ ${t('import_error', 'Import failed: Invalid file')}`, 'error');
+    }
+}
+
+
+/**
+ * Sync imported wallpapers with server
+ * Creates missing links on server (without images)
+ */
+async function syncImportedLinksWithServer(importedWallpapers) {
+    // Get current server links
+    const serverLinks = await apiCall('/api/wallpapers');
+    const serverLinkNames = new Set(serverLinks.map(link => link.linkName));
+    
+    // Find links that exist in import but not on server
+    const missingLinks = importedWallpapers.filter(
+        wp => !serverLinkNames.has(wp.linkName)
+    );
+    
+    if (missingLinks.length === 0) {
+        return; // Nothing to sync
+    }
+    
+    // Create missing links on server
+    const createPromises = missingLinks.map(async (link) => {
+        try {
+            await apiCall('/api/link', 'POST', { linkName: link.linkName });
+            return { success: true, linkName: link.linkName };
+        } catch (error) {
+            console.warn(`Failed to create link ${link.linkName}:`, error);
+            return { success: false, linkName: link.linkName, error };
+        }
+    });
+    
+    const results = await Promise.allSettled(createPromises);
+    
+    // Log results
+    const successCount = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+    const failCount = results.length - successCount;
+    
+    if (failCount > 0) {
+        console.warn(`Import: ${successCount} links created, ${failCount} failed`);
     }
 }
 
