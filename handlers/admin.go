@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -16,6 +17,14 @@ import (
 
 // maxWalkDepth limits directory recursion depth in ExternalImages.
 const maxWalkDepth = 3
+
+// SortField represents valid sort field options for type safety.
+type SortField string
+
+const (
+	SortFieldCreated SortField = "created"
+	SortFieldUpdated SortField = "updated"
+)
 
 func Admin(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "admin.html")
@@ -79,22 +88,20 @@ func Wallpapers(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// sortWallpapers sorts wallpapers using efficient O(n log n) algorithm.
 func sortWallpapers(wps []*storage.Wallpaper, field string, desc bool) {
-	for i := 1; i < len(wps); i++ {
-		for j := i; j > 0; j-- {
-			var vi, vj int64
-			if field == "updated" {
-				vi, vj = wps[j].ModTime, wps[j-1].ModTime
-			} else {
-				vi, vj = wps[j].CreatedAt, wps[j-1].CreatedAt
-			}
-			if (desc && vi > vj) || (!desc && vi < vj) {
-				wps[j], wps[j-1] = wps[j-1], wps[j]
-			} else {
-				break
-			}
+	sort.Slice(wps, func(i, j int) bool {
+		var vi, vj int64
+		if field == string(SortFieldUpdated) {
+			vi, vj = wps[i].ModTime, wps[j].ModTime
+		} else {
+			vi, vj = wps[i].CreatedAt, wps[j].CreatedAt
 		}
-	}
+		if desc {
+			return vi > vj
+		}
+		return vi < vj
+	})
 }
 
 func toResponse(wp *storage.Wallpaper) WallpaperResponse {
