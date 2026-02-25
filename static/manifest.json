@@ -1,33 +1,38 @@
 {
   "name": "Lanpaper",
   "short_name": "Lanpaper",
-  "description": "Share images and videos with short links",
-  "start_url": "/",
+  "description": "Simple image sharing and URL shortening service",
+  "start_url": "/admin.html",
   "display": "standalone",
   "background_color": "#f4f2ed",
-  "theme_color": "#f26d39",
+  "theme_color": "#ffffff",
   "orientation": "any",
+  "scope": "/",
   "icons": [
     {
-      "src": "/static/logo.svg",
+      "src": "/static/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/static/logo.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
     }
   ],
-  "categories": ["productivity", "utilities"],
+  "categories": ["utilities", "productivity"],
+  "screenshots": [],
   "shortcuts": [
     {
       "name": "Create new link",
       "short_name": "New",
       "description": "Create a new short link",
-      "url": "/?action=create",
-      "icons": [
-        {
-          "src": "/static/logo.svg",
-          "sizes": "96x96"
-        }
-      ]
+      "url": "/admin.html?action=create",
+      "icons": [{
+        "src": "/static/favicon.svg",
+        "sizes": "96x96"
+      }]
     }
   ]
 }

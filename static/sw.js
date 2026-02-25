@@ -1,149 +1,109 @@
 /**
- * Service Worker for Lanpaper PWA
- * Provides offline support and caching strategies
+ * Lanpaper Service Worker
+ * Provides offline caching and PWA functionality
  */
 
-const CACHE_VERSION = 'lanpaper-v1.2';
-const STATIC_CACHE = `${CACHE_VERSION}-static`;
-const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
-const IMAGE_CACHE = `${CACHE_VERSION}-images`;
+const CACHE_NAME = 'lanpaper-v1.0.0';
+const RUNTIME_CACHE = 'lanpaper-runtime';
 
-// Assets to cache on install
+// Static assets to cache on install
 const STATIC_ASSETS = [
-    '/',
-    '/static/css/style.css',
-    '/static/js/app.js',
-    '/static/js/image-compressor.js',
-    '/static/logo.svg',
-    '/static/logo-dark.svg',
-    '/static/i18n/en.json',
-    '/static/i18n/ru.json',
-    '/static/i18n/de.json',
-    '/static/i18n/fr.json',
-    '/static/i18n/it.json',
-    '/static/i18n/es.json',
+  '/',
+  '/admin.html',
+  '/static/css/style.css',
+  '/static/js/app.js',
+  '/static/logo.svg',
+  '/static/logo-dark.svg',
+  '/static/favicon.svg',
 ];
 
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
-    console.log('[SW] Installing...');
-    event.waitUntil(
-        caches.open(STATIC_CACHE)
-            .then(cache => {
-                console.log('[SW] Caching static assets');
-                return cache.addAll(STATIC_ASSETS);
-            })
-            .then(() => self.skipWaiting())
-            .catch(err => console.error('[SW] Install error:', err))
-    );
+  console.log('[SW] Installing service worker...');
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        console.log('[SW] Caching static assets');
+        return cache.addAll(STATIC_ASSETS);
+      })
+      .then(() => self.skipWaiting())
+  );
 });
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-    console.log('[SW] Activating...');
-    event.waitUntil(
-        caches.keys()
-            .then(cacheNames => {
-                return Promise.all(
-                    cacheNames
-                        .filter(name => name.startsWith('lanpaper-') && name !== STATIC_CACHE && name !== DYNAMIC_CACHE && name !== IMAGE_CACHE)
-                        .map(name => {
-                            console.log('[SW] Deleting old cache:', name);
-                            return caches.delete(name);
-                        })
-                );
+  console.log('[SW] Activating service worker...');
+  event.waitUntil(
+    caches.keys()
+      .then(cacheNames => {
+        return Promise.all(
+          cacheNames
+            .filter(name => name !== CACHE_NAME && name !== RUNTIME_CACHE)
+            .map(name => {
+              console.log('[SW] Deleting old cache:', name);
+              return caches.delete(name);
             })
-            .then(() => self.clients.claim())
-    );
+        );
+      })
+      .then(() => self.clients.claim())
+  );
 });
 
-// Fetch event - serve from cache, fallback to network
+// Fetch event - network first, then cache
 self.addEventListener('fetch', (event) => {
-    const { request } = event;
-    const url = new URL(request.url);
+  const { request } = event;
+  const url = new URL(request.url);
 
-    // Skip non-GET requests
-    if (request.method !== 'GET') return;
+  // Skip non-GET requests
+  if (request.method !== 'GET') return;
 
-    // Skip external requests
-    if (url.origin !== location.origin) return;
+  // Skip API calls (always fetch fresh)
+  if (url.pathname.startsWith('/api/')) return;
 
-    // API requests - Network first, cache fallback
-    if (url.pathname.startsWith('/api/')) {
-        event.respondWith(
-            fetch(request)
-                .then(response => {
-                    // Clone and cache successful responses
-                    if (response.ok && url.pathname === '/api/wallpapers') {
-                        const clone = response.clone();
-                        caches.open(DYNAMIC_CACHE).then(cache => cache.put(request, clone));
-                    }
-                    return response;
-                })
-                .catch(() => {
-                    // Fallback to cache on network error
-                    return caches.match(request).then(cached => {
-                        if (cached) return cached;
-                        // Return offline response
-                        return new Response(JSON.stringify({ error: 'Offline' }), {
-                            status: 503,
-                            headers: { 'Content-Type': 'application/json' }
-                        });
-                    });
-                })
-        );
-        return;
-    }
-
-    // Images and media - Cache first, network fallback
-    if (url.pathname.match(/\.(jpg|jpeg|png|gif|webp|svg|mp4|webm)$/i)) {
-        event.respondWith(
-            caches.match(request)
-                .then(cached => {
-                    if (cached) return cached;
-
-                    return fetch(request)
-                        .then(response => {
-                            if (response.ok) {
-                                const clone = response.clone();
-                                caches.open(IMAGE_CACHE).then(cache => cache.put(request, clone));
-                            }
-                            return response;
-                        });
-                })
-        );
-        return;
-    }
-
-    // Static assets - Cache first, network fallback
+  // For static assets: Cache first, then network
+  if (STATIC_ASSETS.some(asset => url.pathname === asset || url.pathname.startsWith('/static/'))) {
     event.respondWith(
-        caches.match(request)
-            .then(cached => {
-                if (cached) return cached;
-
-                return fetch(request)
-                    .then(response => {
-                        if (response.ok && !url.pathname.includes('?')) {
-                            const clone = response.clone();
-                            caches.open(STATIC_CACHE).then(cache => cache.put(request, clone));
-                        }
-                        return response;
-                    });
-            })
+      caches.match(request)
+        .then(cached => {
+          if (cached) return cached;
+          return fetch(request)
+            .then(response => {
+              if (response.status === 200) {
+                const clone = response.clone();
+                caches.open(CACHE_NAME)
+                  .then(cache => cache.put(request, clone));
+              }
+              return response;
+            });
+        })
+        .catch(() => caches.match('/admin.html')) // Fallback to offline page
     );
+    return;
+  }
+
+  // For images and dynamic content: Network first, cache fallback
+  event.respondWith(
+    fetch(request)
+      .then(response => {
+        if (response.status === 200) {
+          const clone = response.clone();
+          caches.open(RUNTIME_CACHE)
+            .then(cache => cache.put(request, clone));
+        }
+        return response;
+      })
+      .catch(() => caches.match(request))
+  );
 });
 
-// Message event - handle cache clearing
+// Message event - for manual cache updates
 self.addEventListener('message', (event) => {
-    if (event.data && event.data.type === 'CLEAR_CACHE') {
-        event.waitUntil(
-            caches.keys().then(cacheNames => {
-                return Promise.all(
-                    cacheNames
-                        .filter(name => name.startsWith('lanpaper-'))
-                        .map(name => caches.delete(name))
-                );
-            })
-        );
-    }
+  if (event.data.action === 'skipWaiting') {
+    self.skipWaiting();
+  }
+  if (event.data.action === 'clearCache') {
+    event.waitUntil(
+      caches.keys().then(names => Promise.all(names.map(name => caches.delete(name))))
+    );
+  }
 });
