@@ -58,9 +58,24 @@ func (s *Store) Delete(id string) {
 	delete(s.wallpapers, id)
 }
 
+// sortSnap sorts a wallpaper slice in-place: images first (newest ModTime),
+// then empty slots (newest CreatedAt). Extracted to avoid duplication between
+// GetAll and GetAllCopy.
+func sortSnap(snap []*Wallpaper) {
+	sort.Slice(snap, func(i, j int) bool {
+		if snap[i].HasImage != snap[j].HasImage {
+			return snap[i].HasImage
+		}
+		if snap[i].HasImage {
+			return snap[i].ModTime > snap[j].ModTime
+		}
+		return snap[i].CreatedAt > snap[j].CreatedAt
+	})
+}
+
 // GetAll returns a snapshot of all wallpapers sorted: images first (newest
 // ModTime), then empty slots (newest CreatedAt).
-// Returns pointers to the original wallpapers - callers must not modify.
+// Returns pointers to the original wallpapers — callers must not modify.
 // For mutable copies, use GetAllCopy.
 func (s *Store) GetAll() []*Wallpaper {
 	s.RLock()
@@ -71,16 +86,7 @@ func (s *Store) GetAll() []*Wallpaper {
 		}
 	}
 	s.RUnlock()
-
-	sort.Slice(snap, func(i, j int) bool {
-		if snap[i].HasImage != snap[j].HasImage {
-			return snap[i].HasImage
-		}
-		if snap[i].HasImage {
-			return snap[i].ModTime > snap[j].ModTime
-		}
-		return snap[i].CreatedAt > snap[j].CreatedAt
-	})
+	sortSnap(snap)
 	return snap
 }
 
@@ -96,16 +102,7 @@ func (s *Store) GetAllCopy() []*Wallpaper {
 		}
 	}
 	s.RUnlock()
-
-	sort.Slice(snap, func(i, j int) bool {
-		if snap[i].HasImage != snap[j].HasImage {
-			return snap[i].HasImage
-		}
-		if snap[i].HasImage {
-			return snap[i].ModTime > snap[j].ModTime
-		}
-		return snap[i].CreatedAt > snap[j].CreatedAt
-	})
+	sortSnap(snap)
 	return snap
 }
 

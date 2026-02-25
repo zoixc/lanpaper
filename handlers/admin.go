@@ -260,26 +260,31 @@ func Link(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func externalRoot() string {
+	if d := config.Current.ExternalImageDir; d != "" {
+		return d
+	}
+	return "external/images"
+}
+
 func ExternalImages(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	root := config.Current.ExternalImageDir
-	if root == "" {
-		root = "external/images"
-	}
+	root := externalRoot()
 
-	absRoot, err := filepath.Abs(root)
-	if err != nil {
-		log.Printf("Error resolving external image root: %v", err)
-		http.Error(w, "Server configuration error", http.StatusInternalServerError)
-		return
-	}
-	realRoot, err := filepath.EvalSymlinks(absRoot)
+	// Resolve the gallery root; a missing directory returns an empty list.
+	absRoot, _, err := utils.ValidateAndResolvePath(root, ".")
 	if err != nil {
 		// Directory may not exist yet — return an empty list.
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode([]string{})
+		return
+	}
+	realRoot, realErr := filepath.EvalSymlinks(absRoot)
+	if realErr != nil {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode([]string{})
 		return
@@ -347,42 +352,10 @@ func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	root := config.Current.ExternalImageDir
-	if root == "" {
-		root = "external/images"
-	}
-	absRoot, err := filepath.Abs(root)
+	// Use utils.ValidateAndResolvePath to prevent path traversal and symlink escapes.
+	absPath, _, err := utils.ValidateAndResolvePath(externalRoot(), pathParam)
 	if err != nil {
-		log.Printf("Error resolving root directory: %v", err)
-		http.Error(w, "Server configuration error", http.StatusInternalServerError)
-		return
-	}
-	realRoot, err := filepath.EvalSymlinks(absRoot)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-
-	absPath, err := filepath.Abs(filepath.Join(absRoot, filepath.Clean(pathParam)))
-	if err != nil {
-		log.Printf("Error resolving preview path: %v", err)
-		http.NotFound(w, r)
-		return
-	}
-	if !strings.HasPrefix(absPath, absRoot+string(filepath.Separator)) && absPath != absRoot {
-		log.Printf("Security: blocked path traversal in preview: %s -> %s", pathParam, absPath)
-		http.Error(w, "Path outside allowed directory", http.StatusForbidden)
-		return
-	}
-
-	// Resolve symlinks and verify the real target stays inside the gallery.
-	realPath, err := filepath.EvalSymlinks(absPath)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	if !strings.HasPrefix(realPath, realRoot+string(filepath.Separator)) && realPath != realRoot {
-		log.Printf("Security: blocked symlink escape in preview: %s -> %s", absPath, realPath)
+		log.Printf("Security: path validation failed for preview %s: %v", pathParam, err)
 		http.Error(w, "Path outside allowed directory", http.StatusForbidden)
 		return
 	}
