@@ -22,13 +22,10 @@ var (
 	counts = map[string]*counter{}
 )
 
-// cleanerInterval is the sweep period for idle rate-limit entries.
-// 2× the 1-minute window ensures entries expire shortly after their window rolls over.
-const cleanerInterval = 2 * time.Minute
-
 // StartCleaner removes stale per-IP counters periodically.
 // Call once from main; runs until the process exits.
 func StartCleaner() {
+	cleanerInterval := time.Duration(config.RateLimitCleanerInterval) * time.Second
 	ticker := time.NewTicker(cleanerInterval)
 	defer ticker.Stop()
 	for range ticker.C {
