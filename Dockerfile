@@ -23,10 +23,11 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     -o lanpaper .
 
 # --- Stage 2: Runner ---
-FROM alpine:latest
+FROM alpine:3.21
 
-# Use curl instead of wget (lighter)
-RUN apk --no-cache add ca-certificates curl
+# ca-certificates for HTTPS; wget is provided by busybox (already in Alpine)
+# and is used only for the HEALTHCHECK — no extra packages needed.
+RUN apk --no-cache add ca-certificates
 
 # Run as non-root user for security
 RUN addgroup -S lanpaper && adduser -S lanpaper -G lanpaper
@@ -45,6 +46,6 @@ USER lanpaper
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8080/health || exit 1
+  CMD wget -qO- http://localhost:8080/health || exit 1
 
 CMD ["./lanpaper"]

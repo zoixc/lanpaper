@@ -390,8 +390,14 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		} else if !strings.HasPrefix(urlStr, "http") {
-			absBase, _ := filepath.Abs(externalBase())
-			if err := copyVideoFile(filepath.Join(absBase, filepath.Clean(urlStr)), originalPath); err != nil {
+			// Use ValidateAndResolvePath — absPath already validated earlier in this branch.
+			absPath, _, pathErr := utils.ValidateAndResolvePath(externalBase(), urlStr)
+			if pathErr != nil {
+				log.Printf("Security: path validation failed for video %s: %v", urlStr, pathErr)
+				http.Error(w, "Path outside allowed directory", http.StatusForbidden)
+				return
+			}
+			if err := copyVideoFile(absPath, originalPath); err != nil {
 				log.Printf("Error copying external video to %s: %v", originalPath, err)
 				http.Error(w, "Failed to copy video", http.StatusInternalServerError)
 				return

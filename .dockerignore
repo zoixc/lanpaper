@@ -1,0 +1,45 @@
+# Version control
+.git
+.gitignore
+.github
+
+# Documentation
+*.md
+docs/
+
+# Go test artifacts
+*_test.go
+*.test
+*.out
+go.work
+
+# Local config and secrets
+config.json
+.env
+
+# Application runtime data (mounted via volumes in production)
+data/
+static/images/*
+!static/images/.gitkeep
+static/images/previews/*
+!static/images/previews/.gitkeep
+external/
+
+# IDE and OS artifacts
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Docker compose files (not needed inside image)
+docker-compose*.yml
+
+# Build artifacts
+lanpaper
+lanpaper.exe
+
+# Local dev dirs
+lanpaper/
+homepage/

@@ -29,9 +29,13 @@ type Wallpaper struct {
 }
 
 // Store is a thread-safe in-memory store backed by a JSON file.
+// sortedSnap caches the sorted wallpaper slice and is invalidated whenever
+// the map is mutated (Set, Delete, Load, PruneOldImages). This avoids
+// running O(n log n) sort on every GET /api/wallpapers request.
 type Store struct {
 	sync.RWMutex
 	wallpapers map[string]*Wallpaper
+	sortedSnap []*Wallpaper // nil means cache is invalid
 }
 
 const dataFile = "data/wallpapers.json"
@@ -46,21 +50,24 @@ func (s *Store) Get(id string) (*Wallpaper, bool) {
 	return wp, ok
 }
 
+// Set stores a wallpaper and invalidates the sorted cache.
 func (s *Store) Set(id string, wp *Wallpaper) {
 	s.Lock()
 	defer s.Unlock()
 	s.wallpapers[id] = wp
+	s.sortedSnap = nil
 }
 
+// Delete removes a wallpaper and invalidates the sorted cache.
 func (s *Store) Delete(id string) {
 	s.Lock()
 	defer s.Unlock()
 	delete(s.wallpapers, id)
+	s.sortedSnap = nil
 }
 
 // sortSnap sorts a wallpaper slice in-place: images first (newest ModTime),
-// then empty slots (newest CreatedAt). Extracted to avoid duplication between
-// GetAll and GetAllCopy.
+// then empty slots (newest CreatedAt).
 func sortSnap(snap []*Wallpaper) {
 	sort.Slice(snap, func(i, j int) bool {
 		if snap[i].HasImage != snap[j].HasImage {
@@ -73,36 +80,47 @@ func sortSnap(snap []*Wallpaper) {
 	})
 }
 
-// GetAll returns a snapshot of all wallpapers sorted: images first (newest
+// GetAll returns a sorted snapshot of all wallpapers: images first (newest
 // ModTime), then empty slots (newest CreatedAt).
 // Returns pointers to the original wallpapers — callers must not modify.
 // For mutable copies, use GetAllCopy.
+// The sorted result is cached and reused until the store is mutated.
 func (s *Store) GetAll() []*Wallpaper {
 	s.RLock()
+	if s.sortedSnap != nil {
+		snap := s.sortedSnap
+		s.RUnlock()
+		return snap
+	}
+	s.RUnlock()
+
+	// Cache miss: build and sort under write lock to prevent duplicate work.
+	s.Lock()
+	defer s.Unlock()
+	// Double-check after acquiring write lock.
+	if s.sortedSnap != nil {
+		return s.sortedSnap
+	}
 	snap := make([]*Wallpaper, 0, len(s.wallpapers))
 	for _, wp := range s.wallpapers {
 		if wp != nil {
 			snap = append(snap, wp)
 		}
 	}
-	s.RUnlock()
 	sortSnap(snap)
+	s.sortedSnap = snap
 	return snap
 }
 
 // GetAllCopy returns a deep copy of all wallpapers for cases where
 // mutation is needed without affecting the original data.
 func (s *Store) GetAllCopy() []*Wallpaper {
-	s.RLock()
-	snap := make([]*Wallpaper, 0, len(s.wallpapers))
-	for _, wp := range s.wallpapers {
-		if wp != nil {
-			clone := *wp
-			snap = append(snap, &clone)
-		}
+	original := s.GetAll()
+	snap := make([]*Wallpaper, len(original))
+	for i, wp := range original {
+		clone := *wp
+		snap[i] = &clone
 	}
-	s.RUnlock()
-	sortSnap(snap)
 	return snap
 }
 
@@ -152,7 +170,8 @@ func derivePaths(wp *Wallpaper) {
 	}
 }
 
-// Load reads wallpapers from disk. A missing file is treated as first run.
+// Load reads wallpapers from disk and invalidates the sorted cache.
+// A missing file is treated as first run.
 func (s *Store) Load() error {
 	data, err := os.ReadFile(dataFile)
 	if err != nil {
@@ -170,6 +189,7 @@ func (s *Store) Load() error {
 	}
 	s.Lock()
 	s.wallpapers = m
+	s.sortedSnap = nil
 	s.Unlock()
 	return nil
 }
@@ -207,6 +227,7 @@ func PruneOldImages(max int) {
 		*wp = Wallpaper{ID: wp.ID, LinkName: wp.LinkName, Category: wp.Category, CreatedAt: wp.CreatedAt}
 	}
 
+	Global.sortedSnap = nil
 	if err := atomicWrite(dataFile, Global.wallpapers); err != nil {
 		log.Printf("Error saving after pruning: %v", err)
 	}
