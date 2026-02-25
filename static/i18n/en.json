@@ -11,6 +11,8 @@
   "select_server": "From gallery",
   "remove": "Remove",
 
+  "settings_language": "Language",
+  "settings_data": "Data",
   "export_json": "Export",
   "import_json": "Import",
   "export_success": "Data exported successfully",

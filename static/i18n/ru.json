@@ -11,6 +11,8 @@
   "select_server": "Из галереи",
   "remove": "Удалить",
 
+  "settings_language": "Язык",
+  "settings_data": "Данные",
   "export_json": "Экспорт",
   "import_json": "Импорт",
   "export_success": "Данные успешно экспортированы",
