@@ -40,9 +40,10 @@ function exportData() {
         
         URL.revokeObjectURL(url);
         
+        console.log('[Export] Successfully exported', exportData.wallpapers.length, 'wallpapers');
         showToast(`✅ ${t('export_success', 'Data exported successfully')}`, 'success');
     } catch (error) {
-        console.error('Export error:', error);
+        console.error('[Export] Error:', error);
         showToast(`❌ ${t('export_error', 'Export failed')}`, 'error');
     }
 }
@@ -85,7 +86,7 @@ async function triggerImport() {
     } catch (error) {
         // User cancelled or other error
         if (error.name !== 'AbortError') {
-            console.error('Import trigger error:', error);
+            console.error('[Import] Trigger error:', error);
         }
     }
 }
@@ -95,13 +96,21 @@ async function triggerImport() {
  * Process imported data from file
  */
 async function importData(file) {
+    console.log('[Import] Starting import from file:', file.name);
+    
     try {
         const text = await file.text();
         const data = JSON.parse(text);
         
+        console.log('[Import] Parsed data:', {
+            version: data.version,
+            wallpapers: data.wallpapers?.length,
+            settings: Object.keys(data.settings || {})
+        });
+        
         // Validate data structure
         if (!data.wallpapers || !Array.isArray(data.wallpapers)) {
-            throw new Error('Invalid data format');
+            throw new Error('Invalid data format: missing wallpapers array');
         }
 
         // Confirm import
@@ -110,6 +119,7 @@ async function importData(file) {
             .replace('{{count}}', count);
         
         if (!confirm(confirmMsg)) {
+            console.log('[Import] User cancelled');
             return;
         }
 
@@ -118,6 +128,8 @@ async function importData(file) {
 
         // Restore settings if available
         if (data.settings) {
+            console.log('[Import] Restoring settings:', data.settings);
+            
             if (data.settings.lang) {
                 await setLanguage(data.settings.lang);
             }
@@ -139,14 +151,18 @@ async function importData(file) {
         }
 
         // Sync imported links with server
-        await syncImportedLinksWithServer(data.wallpapers);
+        console.log('[Import] Starting server sync...');
+        const syncResult = await syncImportedLinksWithServer(data.wallpapers);
+        console.log('[Import] Sync result:', syncResult);
         
         // Reload from server to ensure consistency
+        console.log('[Import] Reloading from server...');
         await loadLinks();
+        console.log('[Import] Reload complete. Current wallpapers:', STATE.wallpapers.length);
         
         showToast(`✅ ${t('import_success', 'Data imported successfully')}`, 'success');
     } catch (error) {
-        console.error('Import error:', error);
+        console.error('[Import] Error:', error);
         showToast(`❌ ${t('import_error', 'Import failed: Invalid file')}`, 'error');
     }
 }
@@ -157,38 +173,64 @@ async function importData(file) {
  * Creates missing links on server (without images)
  */
 async function syncImportedLinksWithServer(importedWallpapers) {
-    // Get current server links
-    const serverLinks = await apiCall('/api/wallpapers');
-    const serverLinkNames = new Set(serverLinks.map(link => link.linkName));
+    console.log('[Sync] Syncing', importedWallpapers.length, 'wallpapers with server');
     
-    // Find links that exist in import but not on server
-    const missingLinks = importedWallpapers.filter(
-        wp => !serverLinkNames.has(wp.linkName)
-    );
-    
-    if (missingLinks.length === 0) {
-        return; // Nothing to sync
-    }
-    
-    // Create missing links on server
-    const createPromises = missingLinks.map(async (link) => {
-        try {
-            await apiCall('/api/link', 'POST', { linkName: link.linkName });
-            return { success: true, linkName: link.linkName };
-        } catch (error) {
-            console.warn(`Failed to create link ${link.linkName}:`, error);
-            return { success: false, linkName: link.linkName, error };
+    try {
+        // Get current server links
+        console.log('[Sync] Fetching current server links...');
+        const serverLinks = await apiCall('/api/wallpapers');
+        console.log('[Sync] Server has', serverLinks.length, 'links');
+        
+        const serverLinkNames = new Set(serverLinks.map(link => link.linkName || link.id));
+        console.log('[Sync] Server link names:', Array.from(serverLinkNames));
+        
+        // Find links that exist in import but not on server
+        const missingLinks = importedWallpapers.filter(
+            wp => !serverLinkNames.has(wp.linkName || wp.id)
+        );
+        
+        console.log('[Sync] Missing links to create:', missingLinks.map(l => l.linkName || l.id));
+        
+        if (missingLinks.length === 0) {
+            console.log('[Sync] No missing links, skipping sync');
+            return { total: 0, success: 0, failed: 0 };
         }
-    });
-    
-    const results = await Promise.allSettled(createPromises);
-    
-    // Log results
-    const successCount = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
-    const failCount = results.length - successCount;
-    
-    if (failCount > 0) {
-        console.warn(`Import: ${successCount} links created, ${failCount} failed`);
+        
+        // Create missing links on server sequentially
+        const results = [];
+        for (const link of missingLinks) {
+            const linkName = link.linkName || link.id;
+            console.log('[Sync] Creating link:', linkName);
+            
+            try {
+                await apiCall('/api/link', 'POST', { linkName });
+                console.log('[Sync] Created:', linkName);
+                results.push({ success: true, linkName });
+            } catch (error) {
+                console.error('[Sync] Failed to create:', linkName, error);
+                results.push({ success: false, linkName, error: error.message });
+            }
+        }
+        
+        const successCount = results.filter(r => r.success).length;
+        const failCount = results.filter(r => !r.success).length;
+        
+        console.log('[Sync] Complete:', successCount, 'created,', failCount, 'failed');
+        
+        if (failCount > 0) {
+            const failed = results.filter(r => !r.success);
+            console.warn('[Sync] Failed links:', failed);
+        }
+        
+        return {
+            total: missingLinks.length,
+            success: successCount,
+            failed: failCount,
+            results
+        };
+    } catch (error) {
+        console.error('[Sync] Fatal error during sync:', error);
+        throw error;
     }
 }
 
@@ -207,3 +249,5 @@ if (DOM.importBtn) {
         triggerImport();
     });
 }
+
+console.log('[Export/Import] Module loaded');
