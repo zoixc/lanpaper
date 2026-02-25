@@ -25,8 +25,11 @@
         <div id="settingsDropdown" class="settings-dropdown">
           <button id="settingsBtn" class="theme-switcher" aria-label="Settings" aria-expanded="false" aria-haspopup="true">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M12 1v6m0 6v6m9-9h-6m-6 0H3m15.364 6.364l-4.243-4.243m0 0l-4.242-4.242m4.242 4.242l-4.242 4.243m4.242-4.243l4.243 4.243"/>
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M12 1v6m0 6v6"></path>
+              <path d="M17 12h6M1 12h6"></path>
+              <path d="m4.2 19.8 4.2-4.2m7.6-7.6 4.2-4.2"></path>
+              <path d="m19.8 19.8-4.2-4.2M7.8 7.8 3.6 3.6"></path>
             </svg>
           </button>
           
@@ -40,23 +43,23 @@
             <!-- Export/Import Section -->
             <div class="settings-section">
               <div class="settings-section-title" data-i18n="settings_data">Data</div>
-              <button class="settings-menu-item" id="exportBtn">
+              <button class="settings-menu-item" id="exportBtn" type="button">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="15" x2="12" y2="3"/>
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
                 </svg>
                 <span data-i18n="export_json">Export</span>
               </button>
-              <button class="settings-menu-item" id="importBtn">
+              <button class="settings-menu-item" id="importBtn" type="button">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="17 8 12 3 7 8"/>
-                  <line x1="12" y1="3" x2="12" y2="15"/>
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
                 </svg>
                 <span data-i18n="import_json">Import</span>
               </button>
-              <input id="importFile" type="file" accept="application/json,.json" style="display:none" aria-hidden="true">
+              <input id="importFile" type="file" accept="application/json,.json" style="display:none;" aria-hidden="true">
             </div>
           </div>
         </div>
@@ -225,8 +228,8 @@
     </article>
   </template>
 
-  <script src="/static/js/compressor.js"></script>
   <script src="/static/js/settings-menu.js"></script>
+  <script src="/static/js/compressor.js"></script>
   <script src="/static/js/app.js" defer></script>
   <script src="/static/js/export-import.js" defer></script>
 </body>

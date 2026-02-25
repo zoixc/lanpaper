@@ -21,10 +21,6 @@ const STATE = {
 
 // DOM ELEMENTS
 const DOM = {
-    langSwitcher: document.getElementById('langSwitcher'),
-    langBtn: document.getElementById('langBtn'),
-    langList: document.getElementById('langList'),
-    langLabel: document.getElementById('langLabel'),
     themeBtn: document.getElementById('themeToggle'),
     viewBtn: document.getElementById('viewToggle'),
     linksList: document.getElementById('linksList'),
@@ -56,7 +52,7 @@ const DOM = {
 // INITIALIZATION
 document.addEventListener('DOMContentLoaded', async () => {
     initTheme();
-    initLanguage();
+    await initLanguage();
     initView();
     initSearchSort();
     initLazyLoading();
@@ -280,43 +276,16 @@ function updateClasses(mode) {
 
 // LANGUAGE MANAGER
 async function initLanguage() {
-    const langs = ['en', 'ru', 'de', 'fr', 'it', 'es'];
-
-    langs.forEach(lang => {
-        const li = document.createElement('li');
-        li.textContent = lang.toUpperCase();
-        li.dataset.lang = lang;
-        li.tabIndex = 0;
-        li.addEventListener('click', () => setLanguage(lang));
-        li.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') setLanguage(lang);
-        });
-        DOM.langList.appendChild(li);
-    });
-
     await setLanguage(STATE.lang);
-
-    DOM.langBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const isOpen = DOM.langSwitcher.classList.contains('open');
-        DOM.langSwitcher.classList.toggle('open', !isOpen);
-        DOM.langBtn.setAttribute('aria-expanded', String(!isOpen));
-    });
-
-    document.addEventListener('click', (e) => {
-        if (!DOM.langSwitcher.contains(e.target)) {
-            DOM.langSwitcher.classList.remove('open');
-            DOM.langBtn.setAttribute('aria-expanded', 'false');
-        }
-    });
 }
 
+
+// Export setLanguage to window for settings-menu.js
+window.setLanguage = setLanguage;
 
 async function setLanguage(lang) {
     STATE.lang = lang;
     localStorage.setItem('lang', lang);
-    DOM.langLabel.textContent = lang.toUpperCase();
-    DOM.langSwitcher.classList.remove('open');
 
     try {
         const res = await fetch(`/static/i18n/${lang}.json`);
@@ -329,6 +298,11 @@ async function setLanguage(lang) {
     syncCustomSelectLabels();
     updateSearchStats();
     updateAriaLabels();
+    
+    // Update active language button in settings menu
+    document.querySelectorAll('.lang-option').forEach(opt => {
+        opt.classList.toggle('active', opt.dataset.lang === lang);
+    });
 }
 
 
