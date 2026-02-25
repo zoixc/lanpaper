@@ -1,12 +1,12 @@
 /**
  * Export/Import functionality for Lanpaper
  * Allows backing up and restoring all data
+ * No hidden input elements - uses modern File System Access API with fallback
  */
 
 // DOM Elements for export/import
 DOM.exportBtn = document.getElementById('exportBtn');
 DOM.importBtn = document.getElementById('importBtn');
-DOM.importFile = document.getElementById('importFile');
 
 
 /**
@@ -50,6 +50,49 @@ function exportData() {
 
 /**
  * Import data from JSON file
+ * Uses File System Access API with fallback to classic input method
+ */
+async function triggerImport() {
+    try {
+        // Try modern File System Access API first (Chrome 86+, Edge 86+)
+        if ('showOpenFilePicker' in window) {
+            const [fileHandle] = await window.showOpenFilePicker({
+                types: [{
+                    description: 'JSON Files',
+                    accept: { 'application/json': ['.json'] }
+                }],
+                multiple: false
+            });
+            
+            const file = await fileHandle.getFile();
+            await importData(file);
+        } else {
+            // Fallback: Create temporary input element
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'application/json,.json';
+            
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    await importData(file);
+                }
+                input.remove();
+            };
+            
+            input.click();
+        }
+    } catch (error) {
+        // User cancelled or other error
+        if (error.name !== 'AbortError') {
+            console.error('Import trigger error:', error);
+        }
+    }
+}
+
+
+/**
+ * Process imported data from file
  */
 async function importData(file) {
     try {
@@ -106,20 +149,15 @@ async function importData(file) {
 
 // Event listeners
 if (DOM.exportBtn) {
-    DOM.exportBtn.addEventListener('click', exportData);
+    DOM.exportBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        exportData();
+    });
 }
 
-if (DOM.importBtn && DOM.importFile) {
-    DOM.importBtn.addEventListener('click', () => {
-        DOM.importFile.click();
-    });
-    
-    DOM.importFile.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            importData(file);
-        }
-        // Reset input so same file can be selected again
-        e.target.value = '';
+if (DOM.importBtn) {
+    DOM.importBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        triggerImport();
     });
 }
