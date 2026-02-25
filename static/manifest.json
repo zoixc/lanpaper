@@ -1,31 +1,33 @@
 {
-  "name": "Lanpaper - Image Manager",
+  "name": "Lanpaper",
   "short_name": "Lanpaper",
-  "description": "Professional image and wallpaper management system",
-  "start_url": "/admin",
+  "description": "Share images and videos with short links",
+  "start_url": "/",
   "display": "standalone",
+  "background_color": "#f4f2ed",
+  "theme_color": "#f26d39",
   "orientation": "any",
-  "background_color": "#fafbfc",
-  "theme_color": "#ffffff",
-  "categories": ["productivity", "utilities"],
   "icons": [
     {
-      "src": "/static/icons/icon-192.svg",
-      "sizes": "192x192",
+      "src": "/static/logo.svg",
+      "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any"
-    },
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "shortcuts": [
     {
-      "src": "/static/icons/icon-512.svg",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "/static/icons/favicon.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
+      "name": "Create new link",
+      "short_name": "New",
+      "description": "Create a new short link",
+      "url": "/?action=create",
+      "icons": [
+        {
+          "src": "/static/logo.svg",
+          "sizes": "96x96"
+        }
+      ]
     }
   ]
 }
