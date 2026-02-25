@@ -75,10 +75,10 @@ func main() {
 	srv := &http.Server{
 		Addr:    port,
 		Handler: mux,
-		// ReadTimeout covers headers + body; WriteTimeout must exceed the 90 s download context.
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 120 * time.Second,
-		IdleTimeout:  120 * time.Second,
+		// ReadTimeout covers headers + body; WriteTimeout must exceed the download context timeout.
+		ReadTimeout:  time.Duration(config.HTTPReadTimeout) * time.Second,
+		WriteTimeout: time.Duration(config.HTTPWriteTimeout) * time.Second,
+		IdleTimeout:  time.Duration(config.HTTPIdleTimeout) * time.Second,
 	}
 
 	go func() {
@@ -86,7 +86,7 @@ func main() {
 		signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
 		<-ch
 		log.Println("Shutting down...")
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.ShutdownTimeout)*time.Second)
 		defer cancel()
 		if err := srv.Shutdown(ctx); err != nil {
 			log.Printf("Shutdown error: %v", err)
