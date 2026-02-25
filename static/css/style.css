@@ -326,8 +326,9 @@ h1::before {
     transform: translate(-50%, -50%);
     opacity: 0;
     pointer-events: none;
-    transition: opacity .3s ease,
-                transform .4s cubic-bezier(0.34, 1.56, .64, 1);
+    /* Faster transitions for snappier feel */
+    transition: opacity .2s ease,
+                transform .2s cubic-bezier(0.34, 1.56, .64, 1);
 }
 
 .theme-icon.active,

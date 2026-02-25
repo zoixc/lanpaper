@@ -245,30 +245,40 @@ function initView() {
 
 
 function applyViewMode(mode, animate = false) {
+    // Update icon classes IMMEDIATELY so the button feels responsive
+    updateIconClasses(mode);
+
     if (animate) {
         DOM.linksList.classList.add('switching');
         setTimeout(() => {
-            updateClasses(mode);
+            updateLayoutClasses(mode);
             void DOM.linksList.offsetHeight;
             requestAnimationFrame(() => {
                 DOM.linksList.classList.remove('switching');
             });
-        }, 200);
+        }, 100); // Reduced from 200ms to 100ms
     } else {
-        updateClasses(mode);
+        updateLayoutClasses(mode);
     }
 }
 
 
-function updateClasses(mode) {
+function updateIconClasses(mode) {
     if (mode === 'grid') {
-        DOM.linksList.classList.add('grid-view');
         DOM.viewBtn.querySelectorAll('.list-icon').forEach(el => el.classList.add('active'));
         DOM.viewBtn.querySelectorAll('.grid-icon').forEach(el => el.classList.remove('active'));
     } else {
-        DOM.linksList.classList.remove('grid-view');
         DOM.viewBtn.querySelectorAll('.list-icon').forEach(el => el.classList.remove('active'));
         DOM.viewBtn.querySelectorAll('.grid-icon').forEach(el => el.classList.add('active'));
+    }
+}
+
+
+function updateLayoutClasses(mode) {
+    if (mode === 'grid') {
+        DOM.linksList.classList.add('grid-view');
+    } else {
+        DOM.linksList.classList.remove('grid-view');
     }
 }
 
