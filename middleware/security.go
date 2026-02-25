@@ -7,14 +7,16 @@ import (
 	"lanpaper/config"
 )
 
+// CSP allows service workers and relaxed inline scripts for dev console
 const csp = "default-src 'none'; " +
-	"script-src 'self'; " +
-	"style-src 'self'; " +
+	"script-src 'self' 'unsafe-eval'; " +
+	"style-src 'self' 'unsafe-inline'; " +
 	"img-src 'self' https: data: blob:; " +
 	"media-src 'self' https: data: blob:; " +
 	"connect-src 'self'; " +
 	"font-src 'self'; " +
 	"manifest-src 'self'; " +
+	"worker-src 'self'; " +
 	"form-action 'self'; " +
 	"base-uri 'self'; " +
 	"frame-ancestors 'none';"
