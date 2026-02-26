@@ -25,6 +25,7 @@ type Config struct {
 	MaxUploadMB          int               `json:"maxUploadMB"`
 	MaxImages            int               `json:"maxImages"`
 	MaxConcurrentUploads int               `json:"maxConcurrentUploads"`
+	MaxWalkDepth         int               `json:"maxWalkDepth"`
 	ExternalImageDir     string            `json:"externalImageDir"`
 	AdminUser            string            `json:"adminUser"`
 	AdminPass            string            `json:"adminPass"`
@@ -51,6 +52,7 @@ func Load() {
 		MaxUploadMB:          getEnvInt("MAX_UPLOAD_MB", DefaultMaxUploadMB),
 		MaxImages:            getEnvInt("MAX_IMAGES", 0),
 		MaxConcurrentUploads: getEnvInt("MAX_CONCURRENT_UPLOADS", DefaultMaxConcurrentUploads),
+		MaxWalkDepth:         getEnvInt("MAX_WALK_DEPTH", DefaultMaxWalkDepth),
 		ExternalImageDir:     getEnv("EXTERNAL_IMAGE_DIR", "external/images"),
 		AdminUser:            getEnv("ADMIN_USER", ""),
 		AdminPass:            getEnv("ADMIN_PASS", ""),
@@ -122,6 +124,11 @@ func validate() {
 
 	if Current.MaxConcurrentUploads <= 0 {
 		Current.MaxConcurrentUploads = DefaultMaxConcurrentUploads
+	}
+
+	if Current.MaxWalkDepth <= 0 || Current.MaxWalkDepth > 10 {
+		log.Printf("Warning: MaxWalkDepth %d out of range (1-10), using %d", Current.MaxWalkDepth, DefaultMaxWalkDepth)
+		Current.MaxWalkDepth = DefaultMaxWalkDepth
 	}
 
 	if Current.Rate.PublicPerMin < 0 {
