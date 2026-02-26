@@ -40,8 +40,8 @@ func TestValidateMaxUploadMB(t *testing.T) {
 	}{
 		{"valid 10MB", 10, 10},
 		{"valid 100MB", 100, 100},
-		{"invalid - zero", 0, 10},
-		{"invalid - negative", -5, 10},
+		{"invalid - zero", 0, DefaultMaxUploadMB},
+		{"invalid - negative", -5, DefaultMaxUploadMB},
 	}
 
 	for _, tt := range tests {

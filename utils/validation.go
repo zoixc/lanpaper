@@ -101,12 +101,13 @@ func ValidateFileType(data []byte, expectedExt string) error {
 	return nil
 }
 
-// SanitizeFilename returns the base name of filename, used only for safe logging.
+// SanitizeFilename returns a safe filename by extracting just the base name
+// (stripping any path components) and removing dangerous shell characters.
 func SanitizeFilename(name string) string {
-	// Remove path separators
-	name = strings.ReplaceAll(name, "/", "")
-	name = strings.ReplaceAll(name, "\\", "")
-	name = strings.ReplaceAll(name, "..", "")
+	// Extract only the base filename, discarding any path components.
+	// This handles both "../../../etc/passwd" → "passwd" and
+	// "/home/user/../file.jpg" → "file.jpg" correctly.
+	name = filepath.Base(name)
 
 	// Remove dangerous shell characters
 	dangerousChars := []string{"$", "`", "|", ";", "[", "]", "(", ")", "&", "<", ">", "\"", "'"}
@@ -114,7 +115,7 @@ func SanitizeFilename(name string) string {
 		name = strings.ReplaceAll(name, char, "")
 	}
 
-	// Replace spaces with underscores (or remove them)
+	// Replace spaces with underscores
 	name = strings.ReplaceAll(name, " ", "_")
 
 	return name
