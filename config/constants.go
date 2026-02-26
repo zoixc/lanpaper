@@ -76,3 +76,14 @@ const (
 	// RateLimitCleanerInterval is the sweep period for idle rate-limit entries.
 	RateLimitCleanerInterval = 120 // seconds (2 minutes)
 )
+
+// File system constants
+const (
+	// DefaultMaxWalkDepth is the default maximum directory recursion depth for external images.
+	// Can be overridden via MAX_WALK_DEPTH environment variable.
+	DefaultMaxWalkDepth = 3
+
+	// FileCopyBufferSize is the buffer size for copying files (1MB).
+	// Larger buffer improves performance for large video files.
+	FileCopyBufferSize = 1024 * 1024
+)
