@@ -54,6 +54,7 @@ func main() {
 	mux.HandleFunc("/health/ready", readyHandler)
 	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Admin)))
 	mux.HandleFunc("/api/wallpapers", middleware.WithSecurity(handlers.Wallpapers))
+	mux.HandleFunc("/api/compression-config", middleware.WithSecurity(handlers.GetCompressionConfig))
 	mux.HandleFunc("/api/link/", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Link)))
 	mux.HandleFunc("/api/link", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Link)))
 	mux.HandleFunc("/api/upload",
@@ -93,7 +94,7 @@ func main() {
 		}
 	}()
 
-	log.Printf("Lanpaper %s on %s (max upload %d MB)", Version, port, config.Current.MaxUploadMB)
+	log.Printf("Lanpaper %s on %s (max upload %d MB, compression: %d%% quality, %d%% scale)", Version, port, config.Current.MaxUploadMB, config.Current.Compression.Quality, config.Current.Compression.Scale)
 	log.Printf("Admin: http://localhost%s/admin", port)
 
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
