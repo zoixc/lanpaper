@@ -158,7 +158,7 @@ function initKeyboardShortcuts() {
     // Show shortcuts hint on first visit
     if (!localStorage.getItem('shortcuts-seen')) {
         setTimeout(() => {
-            showToast('💡 Shortcuts: Ctrl+N (new), Ctrl+F (search), Ctrl+G (view), T (theme)', 'success');
+            showToast(`💡 ${t('shortcuts_hint', 'Shortcuts: Ctrl+N (new), Ctrl+F (search), Ctrl+G (view), T (theme)')}`, 'success');
             localStorage.setItem('shortcuts-seen', 'true');
         }, 2000);
     }
