@@ -24,6 +24,7 @@
     --accent:           #f26d39;
     --accent-light:     #f0a070;
     --accent-dark:      #c94410;
+    --accent-subtle:    rgba(242, 109, 57, 0.08);
 
     --btn-primary:         #454542;
     --btn-primary-hover:   #2c2c2a;
@@ -33,12 +34,12 @@
     --btn-danger-hover:    #ec561a;
     --lang-button:         #f4f2ed;
 
-    /* Enhanced shadows with more depth */
-    --shadow-sm:    0 2px 8px rgba(42, 42, 40, 0.08);
-    --shadow-md:    0 4px 16px rgba(42, 42, 40, 0.12);
-    --shadow-lg:    0 8px 32px rgba(42, 42, 40, 0.16);
-    --shadow-focus: 0 0 0 3px rgba(242, 109, 57, 0.15);
-    --shadow-card-hover: 0 8px 24px rgba(42, 42, 40, 0.14);
+    /* Optimized shadows - reduced blur radius */
+    --shadow-sm:    0 1px 3px rgba(42, 42, 40, 0.08);
+    --shadow-md:    0 2px 8px rgba(42, 42, 40, 0.1);
+    --shadow-lg:    0 4px 16px rgba(42, 42, 40, 0.12);
+    --shadow-focus: 0 0 0 3px rgba(242, 109, 57, 0.12);
+    --shadow-card-hover: 0 3px 12px rgba(42, 42, 40, 0.1);
 
     --radius:    8px;
     --radius-sm: 6px;
@@ -53,13 +54,13 @@
 
     /* Status colors */
     --success: #10b981;
-    --success-light: rgba(16, 185, 129, 0.1);
+    --success-light: rgba(16, 185, 129, 0.08);
     --warning: #f59e0b;
-    --warning-light: rgba(245, 158, 11, 0.1);
+    --warning-light: rgba(245, 158, 11, 0.08);
     --error: #ef4444;
-    --error-light: rgba(239, 68, 68, 0.1);
+    --error-light: rgba(239, 68, 68, 0.08);
     --info: #3b82f6;
-    --info-light: rgba(59, 130, 246, 0.1);
+    --info-light: rgba(59, 130, 246, 0.08);
 
     --z-toast:    9999;
     --z-modal:    5000;
@@ -98,6 +99,7 @@ body.dark {
     --accent:           #6e7fcc;
     --accent-light:     #7b8fd4;
     --accent-dark:      #5c6fbb;
+    --accent-subtle:    rgba(110, 127, 204, 0.12);
 
     --btn-primary:         #dde1e8;
     --btn-primary-hover:   #ffffff;
@@ -107,21 +109,21 @@ body.dark {
     --btn-danger-hover:    #cc3333;
     --lang-button:         #26262c;
 
-    --shadow-sm:    0 2px 12px rgba(0, 0, 0, 0.3);
-    --shadow-md:    0 4px 20px rgba(0, 0, 0, 0.4);
-    --shadow-lg:    0 8px 40px rgba(0, 0, 0, 0.5);
-    --shadow-focus: 0 0 0 3px rgba(110, 127, 204, 0.25);
-    --shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.45);
+    --shadow-sm:    0 1px 4px rgba(0, 0, 0, 0.2);
+    --shadow-md:    0 2px 10px rgba(0, 0, 0, 0.25);
+    --shadow-lg:    0 4px 20px rgba(0, 0, 0, 0.3);
+    --shadow-focus: 0 0 0 3px rgba(110, 127, 204, 0.2);
+    --shadow-card-hover: 0 3px 14px rgba(0, 0, 0, 0.28);
 
     --accent-gradient: linear-gradient(135deg, #7b8fd4 0%, #5c6fbb 40%, #e05252 100%);
     --card-bg:    #26262c;
     --card-hover: #2e2f38;
     --logo-color: #dde1e8;
 
-    --success-light: rgba(16, 185, 129, 0.15);
-    --warning-light: rgba(245, 158, 11, 0.15);
-    --error-light: rgba(239, 68, 68, 0.15);
-    --info-light: rgba(59, 130, 246, 0.15);
+    --success-light: rgba(16, 185, 129, 0.12);
+    --warning-light: rgba(245, 158, 11, 0.12);
+    --error-light: rgba(239, 68, 68, 0.12);
+    --info-light: rgba(59, 130, 246, 0.12);
 }
 
 
@@ -159,12 +161,12 @@ body {
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 
 /* ============================================================
-   SCROLLBAR STYLING
+   OPTIMIZED SCROLLBAR STYLING
    ============================================================ */
 ::-webkit-scrollbar {
     width: 10px;
@@ -198,7 +200,7 @@ body {
     pointer-events: none;
     background-color: var(--bg);
     overflow: hidden;
-    transition: background-color 0.3s ease;
+    transition: background-color 0.25s ease;
 }
 
 .network-bg::before {
@@ -261,9 +263,9 @@ body.dark .network-bg::after {
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    transition: border-color .2s cubic-bezier(0.4, 0, 0.2, 1),
-                background   .2s cubic-bezier(0.4, 0, 0.2, 1),
-                box-shadow   .25s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: border-color .18s cubic-bezier(0.4, 0, 0.2, 1),
+                background   .18s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow   .2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .section {
@@ -364,7 +366,7 @@ h1::before {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background .15s ease, border-color .15s ease, transform .15s ease;
+    transition: background .15s ease, border-color .15s ease, transform .12s ease;
 }
 
 #themeToggle:hover,
@@ -417,7 +419,7 @@ body.dark .view-icon.light-theme-icon {
 
 
 /* ============================================================
-   BUTTONS WITH RIPPLE EFFECT
+   OPTIMIZED BUTTONS WITH SUBTLE RIPPLE
    ============================================================ */
 .btn {
     display: inline-flex;
@@ -441,23 +443,19 @@ body.dark .view-icon.light-theme-icon {
     transition: background .15s cubic-bezier(0.4,0,.2,1),
                 border-color .15s cubic-bezier(0.4,0,.2,1),
                 color .15s cubic-bezier(0.4,0,.2,1),
-                transform .15s cubic-bezier(0.4,0,.2,1),
-                box-shadow .15s cubic-bezier(0.4,0,.2,1);
+                transform .12s cubic-bezier(0.4,0,.2,1);
 }
 
 .btn:hover  { 
     background: var(--btn-secondary-hover); 
     border-color: var(--border-hover);
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-sm);
 }
 
 .btn:active { 
-    transform: translateY(0) scale(0.98); 
-    box-shadow: none;
+    transform: scale(0.98); 
 }
 
-/* Ripple effect */
+/* Subtle ripple effect - только для кликов */
 .btn::after {
     content: '';
     position: absolute;
@@ -466,18 +464,20 @@ body.dark .view-icon.light-theme-icon {
     width: 0;
     height: 0;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.3);
     transform: translate(-50%, -50%);
-    transition: width 0.6s, height 0.6s;
+    transition: width 0.4s ease, height 0.4s ease, opacity 0.4s ease;
+    opacity: 0;
 }
 
 body.dark .btn::after {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .btn:active::after {
-    width: 200px;
-    height: 200px;
+    width: 150px;
+    height: 150px;
+    opacity: 1;
 }
 
 .btn--primary       { 
@@ -488,7 +488,6 @@ body.dark .btn::after {
 .btn--primary:hover { 
     background: var(--btn-primary-hover); 
     border-color: var(--btn-primary-hover);
-    box-shadow: var(--shadow-md);
 }
 
 .btn--secondary       { background: var(--btn-secondary); color: var(--text-secondary); }
@@ -502,7 +501,6 @@ body.dark .btn::after {
 .btn--danger:hover { 
     background: var(--btn-danger-hover); 
     border-color: var(--btn-danger-hover);
-    box-shadow: 0 4px 12px rgba(242, 109, 57, 0.3);
 }
 
 
@@ -521,7 +519,7 @@ body.dark .btn::after {
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     outline: none;
-    transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+    transition: border-color .18s ease, box-shadow .18s ease;
 }
 
 .input-field:hover, .search-input:hover { 
@@ -531,7 +529,6 @@ body.dark .btn::after {
 .input-field:focus, .search-input:focus { 
     border-color: var(--accent); 
     box-shadow: var(--shadow-focus);
-    transform: translateY(-1px);
 }
 
 .input-field::placeholder, .search-input::placeholder { 
@@ -543,7 +540,7 @@ body.dark .btn::after {
 
 
 /* ============================================================
-   LINK CARDS — LIST VIEW WITH ANIMATIONS
+   LINK CARDS — SUBTLE HOVER WITHOUT JUMP
    ============================================================ */
 .links-list {
     display: flex;
@@ -558,13 +555,13 @@ body.dark .btn::after {
     display: grid;
     gap: 16px;
     padding: 16px;
-    animation: cardEnter 0.3s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+    animation: cardEnter 0.25s cubic-bezier(0.4, 0, 0.2, 1) backwards;
 }
 
 @keyframes cardEnter {
     from {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(8px);
     }
     to {
         opacity: 1;
@@ -578,11 +575,12 @@ body.dark .btn::after {
     min-height: 112px;
 }
 
+/* FIXED: Subtle hover without translateY jump */
 .link-card:hover {
     background: var(--card-hover);
     border-color: var(--border-hover);
     box-shadow: var(--shadow-card-hover);
-    transform: translateY(-2px);
+    /* Removed translateY */
 }
 
 .create-card {
@@ -592,7 +590,7 @@ body.dark .btn::after {
 
 
 /* ============================================================
-   PREVIEW WITH ZOOM EFFECT
+   PREVIEW WITH SUBTLE ZOOM
    ============================================================ */
 .preview-link {
     display: block;
@@ -601,7 +599,7 @@ body.dark .btn::after {
     align-self: center;
     transition: transform .2s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.preview-link:hover { transform: scale(1.05); }
+.preview-link:hover { transform: scale(1.03); }
 
 .preview-wrapper {
     position: relative;
@@ -612,7 +610,7 @@ body.dark .btn::after {
     overflow: hidden;
     border: 1px solid var(--border);
     background: var(--bg-secondary);
-    transition: border-color .2s ease, box-shadow .2s ease;
+    transition: border-color .18s ease, box-shadow .18s ease;
 }
 
 .preview-link:hover .preview-wrapper {
@@ -633,7 +631,7 @@ body.dark .btn::after {
 
 .preview-link:hover .preview-wrapper img,
 .preview-link:hover .preview-wrapper video {
-    transform: scale(1.1);
+    transform: scale(1.08);
 }
 
 .preview-wrapper .no-image {
@@ -702,25 +700,24 @@ body.dark .btn::after {
     cursor: pointer;
     white-space: nowrap;
     flex-shrink: 0;
-    transition: background .15s ease, border-color .15s ease, color .15s ease, transform .15s ease;
+    transition: background .15s ease, border-color .15s ease, color .15s ease;
 }
 
 .copy-url-btn:hover  { 
     background: var(--btn-secondary-hover); 
     border-color: var(--border-hover); 
     color: var(--text);
-    transform: translateY(-1px);
 }
 
 .copy-url-btn:active {
-    transform: translateY(0) scale(0.95);
+    transform: scale(0.95);
 }
 
 .copy-url-btn.copied { 
     border-color: var(--success); 
     color: var(--success); 
     background: var(--success-light);
-    animation: copyPulse 0.4s ease;
+    animation: copyPulse 0.3s ease;
 }
 
 @keyframes copyPulse {
@@ -746,7 +743,7 @@ body.dark .btn::after {
     padding: 64px 20px;
     color: var(--text-muted);
     font-size: var(--text-base);
-    animation: fadeIn 0.5s ease;
+    animation: fadeIn 0.4s ease;
 }
 
 @keyframes fadeIn {
@@ -756,7 +753,7 @@ body.dark .btn::after {
 
 
 /* ============================================================
-   DROPDOWNS WITH SMOOTH ANIMATIONS
+   DROPDOWNS WITH OPTIMIZED ANIMATIONS
    ============================================================ */
 .upload-toggle-btn,
 .custom-select-btn {
@@ -769,7 +766,7 @@ body.dark .btn::after {
 .custom-select-btn svg {
     flex-shrink: 0;
     opacity: 0.5;
-    transition: transform .25s cubic-bezier(0.4, 0, 0.2, 1), opacity .2s ease;
+    transition: transform .2s cubic-bezier(0.4, 0, 0.2, 1), opacity .18s ease;
 }
 
 .upload-dropdown.open .upload-toggle-btn svg,
@@ -795,25 +792,32 @@ body.dark .btn::after {
     box-shadow: var(--shadow-lg);
     z-index: calc(var(--z-dropdown) + 1);
     overflow: hidden;
-    backdrop-filter: blur(8px);
     visibility: hidden;
     opacity: 0;
     pointer-events: none;
-    transition: opacity .2s cubic-bezier(0.4, 0, 0.2, 1),
-                transform .2s cubic-bezier(0.4, 0, 0.2, 1),
-                visibility 0s linear .2s;
+    transition: opacity .18s cubic-bezier(0.4, 0, 0.2, 1),
+                transform .18s cubic-bezier(0.4, 0, 0.2, 1),
+                visibility 0s linear .18s;
+}
+
+/* Conditional backdrop-filter for performance */
+@media (min-width: 769px) {
+    .upload-menu,
+    .custom-select-menu {
+        backdrop-filter: blur(4px);
+    }
 }
 
 .upload-menu {
     left: 50%;
-    transform: translateX(-50%) translateY(-8px) scale(0.95);
+    transform: translateX(-50%) translateY(-6px) scale(0.96);
 }
 
 .custom-select-menu {
     left: 0;
     right: 0;
     min-width: unset;
-    transform: translateY(-8px) scale(0.95);
+    transform: translateY(-6px) scale(0.96);
 }
 
 .upload-dropdown.open .upload-menu,
@@ -821,8 +825,8 @@ body.dark .btn::after {
     visibility: visible;
     opacity: 1;
     pointer-events: auto;
-    transition: opacity .2s cubic-bezier(0.4, 0, 0.2, 1),
-                transform .2s cubic-bezier(0.4, 0, 0.2, 1),
+    transition: opacity .18s cubic-bezier(0.4, 0, 0.2, 1),
+                transform .18s cubic-bezier(0.4, 0, 0.2, 1),
                 visibility 0s linear 0s;
 }
 
@@ -853,24 +857,24 @@ body.dark .btn::after {
     text-align: left;
     list-style: none;
     user-select: none;
-    transition: background .15s ease, transform .1s ease;
+    transition: background .12s ease;
 }
 
 .upload-menu-item:hover,
 .custom-select-option:hover { 
     background: var(--btn-secondary-hover);
-    transform: translateX(2px);
 }
 
 .upload-menu-item:active,
 .custom-select-option:active {
-    transform: translateX(0) scale(0.98);
+    transform: scale(0.98);
 }
 
+/* FIXED: Subtle accent color for selected option */
 .custom-select-option.selected { 
-    color: var(--accent); 
-    font-weight: 700;
-    background: var(--success-light);
+    color: var(--text); 
+    font-weight: 600;
+    background: var(--accent-subtle);
 }
 
 
@@ -894,31 +898,36 @@ body.dark .btn::after {
     cursor: pointer;
     white-space: nowrap;
     user-select: none;
-    transition: background .15s ease, border-color .15s ease, box-shadow .15s ease;
+    transition: background .15s ease, border-color .15s ease;
 }
 
 .custom-select-btn:hover { 
     background: var(--btn-secondary); 
     border-color: var(--border-hover);
-    box-shadow: var(--shadow-sm);
 }
 
 
 /* ============================================================
-   MODAL WITH BLUR BACKDROP
+   MODAL WITH OPTIMIZED BLUR
    ============================================================ */
 .modal-overlay {
     position: fixed;
     inset: 0;
     background: rgba(15, 15, 15, 0.6);
-    backdrop-filter: blur(8px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: var(--z-modal);
     opacity: 0;
     visibility: hidden;
-    transition: opacity .3s ease, visibility .3s ease, backdrop-filter .3s ease;
+    transition: opacity .25s ease, visibility .25s ease;
+}
+
+/* Conditional backdrop-filter */
+@media (min-width: 769px) {
+    .modal-overlay {
+        backdrop-filter: blur(6px);
+    }
 }
 
 .modal-overlay:not(.hidden) { 
@@ -930,9 +939,9 @@ body.dark .btn::after {
     padding: 24px;
     width: 90%;
     max-width: 540px;
-    transform: scale(0.9) translateY(20px);
+    transform: scale(0.94) translateY(15px);
     box-shadow: var(--shadow-lg);
-    transition: transform .3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform .25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .modal-overlay:not(.hidden) .modal { 
@@ -965,11 +974,11 @@ body.dark .btn::after {
     overflow: hidden;
     cursor: pointer;
     background: var(--bg-secondary);
-    transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+    transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
 }
 
 .image-option:hover { 
-    transform: scale(1.05); 
+    transform: scale(1.04); 
     border-color: var(--border-hover);
     box-shadow: var(--shadow-md);
 }
@@ -979,11 +988,11 @@ body.dark .btn::after {
     height: 100%; 
     object-fit: cover; 
     display: block;
-    transition: transform 0.3s ease;
+    transition: transform 0.25s ease;
 }
 
 .image-option:hover img {
-    transform: scale(1.1);
+    transform: scale(1.08);
 }
 
 .image-option .image-name {
@@ -1000,12 +1009,11 @@ body.dark .btn::after {
     overflow: hidden;
     text-overflow: ellipsis;
     text-align: center;
-    backdrop-filter: blur(4px);
 }
 
 .image-option.selected { 
     border-color: var(--success);
-    box-shadow: 0 0 0 3px var(--success-light);
+    box-shadow: 0 0 0 2px var(--success-light);
 }
 
 .image-option.selected::after {
@@ -1021,19 +1029,19 @@ body.dark .btn::after {
     color: #fff;
     font-size: var(--text-sm);
     font-weight: 700;
-    box-shadow: 0 2px 8px rgba(0,0,0,.3);
-    animation: checkmarkPop 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 6px rgba(0,0,0,.25);
+    animation: checkmarkPop 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @keyframes checkmarkPop {
     0% { transform: scale(0) rotate(-180deg); }
-    50% { transform: scale(1.2) rotate(10deg); }
+    50% { transform: scale(1.15) rotate(10deg); }
     100% { transform: scale(1) rotate(0deg); }
 }
 
 
 /* ============================================================
-   TOASTS WITH BETTER ANIMATIONS
+   OPTIMIZED TOASTS
    ============================================================ */
 .toast-container {
     position: fixed;
@@ -1056,8 +1064,7 @@ body.dark .btn::after {
     font-weight: var(--fw-normal);
     pointer-events: auto;
     box-shadow: var(--shadow-lg);
-    backdrop-filter: blur(8px);
-    animation: toastSlideIn .4s cubic-bezier(0.4,0,.2,1) forwards;
+    animation: toastSlideIn .3s cubic-bezier(0.4,0,.2,1) forwards;
 }
 
 .toast.success { 
@@ -1077,14 +1084,14 @@ body.dark .btn::after {
 
 .toast.hiding  { 
     opacity: 0; 
-    transform: translateX(120%) scale(0.8); 
-    transition: opacity .3s ease, transform .3s cubic-bezier(0.4, 0, 0.8, 0.4); 
+    transform: translateX(110%) scale(0.9); 
+    transition: opacity .25s ease, transform .25s cubic-bezier(0.4, 0, 0.8, 0.4); 
 }
 
 @keyframes toastSlideIn {
     from { 
         opacity: 0; 
-        transform: translateX(120%) scale(0.8);
+        transform: translateX(110%) scale(0.9);
     }
     to   { 
         opacity: 1; 
@@ -1162,7 +1169,7 @@ body.dark .btn::after {
 .links-list.grid-view .upload-menu {
     left: 50%;
     right: auto;
-    transform: translateX(-50%) translateY(-8px) scale(0.95);
+    transform: translateX(-50%) translateY(-6px) scale(0.96);
     min-width: 100%;
 }
 
@@ -1195,13 +1202,12 @@ body.dark .btn::after {
     font-family: var(--font-ui);
     font-size: var(--text-sm);
     font-weight: var(--fw-ui);
-    transition: background .15s ease, color .15s ease, transform .15s ease;
+    transition: background .15s ease, color .15s ease;
 }
 
 .github-link:hover { 
     background: var(--btn-secondary); 
     color: var(--text);
-    transform: translateY(-1px);
 }
 
 
@@ -1238,7 +1244,7 @@ body.dark .btn::after {
     border-radius: var(--radius-sm);
     white-space: normal;
     word-break: keep-all;
-    transition: border-color .2s ease, color .2s ease;
+    transition: border-color .18s ease, color .18s ease;
 }
 
 .search-stats:hover {
@@ -1257,7 +1263,7 @@ body.dark .btn::after {
 
 
 /* ============================================================
-   SHAKE ANIMATION FOR ERRORS
+   UTILITY ANIMATIONS
    ============================================================ */
 @keyframes shake {
     0%, 100% { transform: translateX(0); }
@@ -1266,39 +1272,7 @@ body.dark .btn::after {
 }
 
 .shake {
-    animation: shake 0.4s ease;
-}
-
-
-/* ============================================================
-   LOADING SKELETON
-   ============================================================ */
-@keyframes skeleton-loading {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-}
-
-.skeleton {
-    background: linear-gradient(
-        90deg,
-        var(--bg-secondary) 0%,
-        var(--border) 50%,
-        var(--bg-secondary) 100%
-    );
-    background-size: 200% 100%;
-    animation: skeleton-loading 1.5s ease-in-out infinite;
-    border-radius: var(--radius-sm);
-}
-
-
-/* ============================================================
-   DRAG & DROP VISUAL FEEDBACK
-   ============================================================ */
-.link-card.drag-over {
-    border: 2px dashed var(--accent);
-    background: var(--accent-light);
-    opacity: 0.8;
-    transform: scale(1.02);
+    animation: shake 0.35s ease;
 }
 
 
@@ -1340,7 +1314,7 @@ body.dark .btn::after {
     .upload-menu {
         left: 0;
         right: 0;
-        transform: translateY(-8px) scale(0.95);
+        transform: translateY(-6px) scale(0.96);
         min-width: unset;
     }
     .upload-dropdown.open .upload-menu {
@@ -1350,7 +1324,7 @@ body.dark .btn::after {
 
 
 /* ============================================================
-   REDUCED MOTION
+   REDUCED MOTION & ACCESSIBILITY
    ============================================================ */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
