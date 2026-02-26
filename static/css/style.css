@@ -822,7 +822,7 @@ body.dark .btn::after {
     display: flex;
     align-items: center;
     width: 100%;
-    padding: 6px 12px;
+    padding: 8px 12px;
     gap: 8px;
     border: none;
     border-radius: var(--radius-sm);
