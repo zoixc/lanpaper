@@ -16,6 +16,7 @@ const STATE = {
     filteredWallpapers: [],
     compressor: null,
     lazyObserver: null,
+    compressionConfig: null, // Loaded from server
 };
 
 
@@ -57,6 +58,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initLazyLoading();
     initKeyboardShortcuts();
     initPWA();
+    await loadCompressionConfig();
     initCompression();
     loadAppVersion();
     await loadLinks();
@@ -74,15 +76,42 @@ function initPWA() {
 }
 
 
+// LOAD COMPRESSION CONFIG FROM SERVER
+async function loadCompressionConfig() {
+    try {
+        const res = await fetch('/api/compression-config');
+        if (res.ok) {
+            STATE.compressionConfig = await res.json();
+            console.log('[Compression] Server config:', STATE.compressionConfig);
+        } else {
+            console.warn('[Compression] Failed to load config, using defaults');
+        }
+    } catch (err) {
+        console.warn('[Compression] Error loading config:', err);
+    }
+}
+
+
 // IMAGE COMPRESSION INITIALIZATION
 function initCompression() {
     // Check if compression script is loaded
     if (typeof ImageCompressor !== 'undefined') {
+        const quality = STATE.compressionConfig?.quality || 85;
+        const scale = STATE.compressionConfig?.scale || 100;
+        
+        // Calculate max dimensions based on scale percentage
+        const baseWidth = 1920;
+        const baseHeight = 1080;
+        const maxWidth = Math.floor((baseWidth * scale) / 100);
+        const maxHeight = Math.floor((baseHeight * scale) / 100);
+        
         STATE.compressor = new ImageCompressor({
-            maxWidth: 1920,
-            maxHeight: 1080,
-            quality: 0.85
+            maxWidth: maxWidth,
+            maxHeight: maxHeight,
+            quality: quality / 100 // Convert 1-100 to 0.01-1.0
         });
+        
+        console.log(`[Compression] Initialized: ${quality}% quality, ${scale}% scale (${maxWidth}x${maxHeight})`);
     }
 }
 
