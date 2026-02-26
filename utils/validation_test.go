@@ -128,7 +128,7 @@ func TestSanitizeFilename(t *testing.T) {
 		want     string
 	}{
 		{"simple filename", "photo.jpg", "photo.jpg"},
-		{"filename with spaces", "my photo.jpg", "my photo.jpg"},
+		{"filename with spaces", "my photo.jpg", "my_photo.jpg"},
 		{"path traversal removed", "../../../etc/passwd", "passwd"},
 		{"dangerous chars removed", "file$name`test.jpg", "filenametest.jpg"},
 		{"pipes removed", "file|name.jpg", "filename.jpg"},
