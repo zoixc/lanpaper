@@ -9,7 +9,7 @@
 
 
 /* ============================================================
-   VARIABLES — LIGHT (Enhanced Lofree palette)
+   CSS VARIABLES
    ============================================================ */
 :root {
     --bg:               #f4f2ed;
@@ -34,7 +34,6 @@
     --btn-danger-hover:    #ec561a;
     --lang-button:         #f4f2ed;
 
-    /* Optimized shadows - reduced blur radius */
     --shadow-sm:    0 1px 3px rgba(42, 42, 40, 0.08);
     --shadow-md:    0 2px 8px rgba(42, 42, 40, 0.1);
     --shadow-lg:    0 4px 16px rgba(42, 42, 40, 0.12);
@@ -52,11 +51,8 @@
     --card-hover: #f2f0ea;
     --logo-color: #2a2a28;
 
-    /* Status colors */
     --success: #10b981;
     --success-light: rgba(16, 185, 129, 0.08);
-    --warning: #f59e0b;
-    --warning-light: rgba(245, 158, 11, 0.08);
     --error: #ef4444;
     --error-light: rgba(239, 68, 68, 0.08);
     --info: #3b82f6;
@@ -67,7 +63,6 @@
     --z-dropdown: 1000;
     --z-header:   100;
 
-    /* Typography */
     --font-ui:       'Google', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --font-mono:     'Disket-Mono', monospace;
     --font-mono-bold:'Disket-Mono-Bold', monospace;
@@ -82,10 +77,6 @@
     --fw-bold:   700;
 }
 
-
-/* ============================================================
-   VARIABLES — DARK (Enhanced Keychron V1 palette)
-   ============================================================ */
 body.dark {
     --bg:               #1c1c20;
     --bg-secondary:     #26262c;
@@ -121,7 +112,6 @@ body.dark {
     --logo-color: #dde1e8;
 
     --success-light: rgba(16, 185, 129, 0.12);
-    --warning-light: rgba(245, 158, 11, 0.12);
     --error-light: rgba(239, 68, 68, 0.12);
     --info-light: rgba(59, 130, 246, 0.12);
 }
@@ -166,7 +156,7 @@ body {
 
 
 /* ============================================================
-   OPTIMIZED SCROLLBAR STYLING
+   SCROLLBAR
    ============================================================ */
 ::-webkit-scrollbar {
     width: 10px;
@@ -345,7 +335,7 @@ h1::before {
 
 
 /* ============================================================
-   CONTROLS (THEME & VIEW TOGGLES)
+   CONTROLS
    ============================================================ */
 .controls {
     display: flex;
@@ -419,7 +409,7 @@ body.dark .view-icon.light-theme-icon {
 
 
 /* ============================================================
-   OPTIMIZED BUTTONS WITH SUBTLE RIPPLE
+   BUTTONS
    ============================================================ */
 .btn {
     display: inline-flex;
@@ -455,7 +445,6 @@ body.dark .view-icon.light-theme-icon {
     transform: scale(0.98); 
 }
 
-/* Subtle ripple effect - только для кликов */
 .btn::after {
     content: '';
     position: absolute;
@@ -505,7 +494,7 @@ body.dark .btn::after {
 
 
 /* ============================================================
-   INPUTS WITH ENHANCED FOCUS
+   INPUTS
    ============================================================ */
 .input-field,
 .search-input {
@@ -540,7 +529,7 @@ body.dark .btn::after {
 
 
 /* ============================================================
-   LINK CARDS — SUBTLE HOVER WITHOUT JUMP
+   LINK CARDS
    ============================================================ */
 .links-list {
     display: flex;
@@ -575,12 +564,10 @@ body.dark .btn::after {
     min-height: 112px;
 }
 
-/* FIXED: Subtle hover without translateY jump */
 .link-card:hover {
     background: var(--card-hover);
     border-color: var(--border-hover);
     box-shadow: var(--shadow-card-hover);
-    /* Removed translateY */
 }
 
 .create-card {
@@ -590,7 +577,7 @@ body.dark .btn::after {
 
 
 /* ============================================================
-   PREVIEW WITH SUBTLE ZOOM
+   PREVIEW
    ============================================================ */
 .preview-link {
     display: block;
@@ -753,7 +740,7 @@ body.dark .btn::after {
 
 
 /* ============================================================
-   DROPDOWNS WITH OPTIMIZED ANIMATIONS
+   DROPDOWNS
    ============================================================ */
 .upload-toggle-btn,
 .custom-select-btn {
@@ -798,14 +785,6 @@ body.dark .btn::after {
     transition: opacity .18s cubic-bezier(0.4, 0, 0.2, 1),
                 transform .18s cubic-bezier(0.4, 0, 0.2, 1),
                 visibility 0s linear .18s;
-}
-
-/* Conditional backdrop-filter for performance */
-@media (min-width: 769px) {
-    .upload-menu,
-    .custom-select-menu {
-        backdrop-filter: blur(4px);
-    }
 }
 
 .upload-menu {
@@ -870,7 +849,6 @@ body.dark .btn::after {
     transform: scale(0.98);
 }
 
-/* Selected option - same style as language buttons */
 .custom-select-option.selected { 
     background: var(--btn-primary);
     color: var(--bg);
@@ -916,7 +894,7 @@ body.dark .custom-select-option.selected {
 
 
 /* ============================================================
-   MODAL WITH OPTIMIZED BLUR
+   MODAL
    ============================================================ */
 .modal-overlay {
     position: fixed;
@@ -929,13 +907,6 @@ body.dark .custom-select-option.selected {
     opacity: 0;
     visibility: hidden;
     transition: opacity .25s ease, visibility .25s ease;
-}
-
-/* Conditional backdrop-filter */
-@media (min-width: 769px) {
-    .modal-overlay {
-        backdrop-filter: blur(6px);
-    }
 }
 
 .modal-overlay:not(.hidden) { 
@@ -1049,7 +1020,7 @@ body.dark .custom-select-option.selected {
 
 
 /* ============================================================
-   ENHANCED TOAST NOTIFICATIONS
+   TOAST NOTIFICATIONS
    ============================================================ */
 .toast-container {
     position: fixed;
@@ -1085,7 +1056,6 @@ body.dark .toast {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 12px rgba(0, 0, 0, 0.3);
 }
 
-/* Status-specific styles with colored accent bar and icon background */
 .toast::before {
     content: '';
     position: absolute;
@@ -1099,9 +1069,7 @@ body.dark .toast {
 .toast.success::before { background: var(--success); }
 .toast.error::before { background: var(--error); }
 .toast.info::before { background: var(--info); }
-.toast.warning::before { background: var(--warning); }
 
-/* Optional: Icon styling if you add icons */
 .toast-icon {
     flex-shrink: 0;
     width: 20px;
@@ -1126,17 +1094,12 @@ body.dark .toast {
     background: var(--info-light); 
     color: var(--info);
 }
-.toast.warning .toast-icon { 
-    background: var(--warning-light); 
-    color: var(--warning);
-}
 
 .toast-content {
     flex: 1;
     min-width: 0;
 }
 
-/* Enhanced slide-in animation with bounce */
 @keyframes toastSlideIn {
     0% { 
         opacity: 0; 
@@ -1152,7 +1115,6 @@ body.dark .toast {
     }
 }
 
-/* Enhanced slide-out animation */
 .toast.hiding {
     animation: toastSlideOut 0.35s cubic-bezier(0.5, 0, 0.75, 0) forwards;
 }
@@ -1168,7 +1130,6 @@ body.dark .toast {
     }
 }
 
-/* Hover effect - pause auto-dismiss */
 .toast:hover {
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2), 0 4px 12px rgba(0, 0, 0, 0.12);
     transform: translateY(-2px);
@@ -1179,7 +1140,6 @@ body.dark .toast:hover {
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
-/* Progress bar (optional - for auto-dismiss timer) */
 .toast::after {
     content: '';
     position: absolute;
@@ -1315,7 +1275,7 @@ body.dark .toast:hover {
 
 
 /* ============================================================
-   SEARCH & SORT BAR
+   SEARCH & SORT
    ============================================================ */
 .search-sort-bar {
     display: flex;
@@ -1355,7 +1315,6 @@ body.dark .toast:hover {
     color: var(--text);
 }
 
-.sort-select { display: none; }
 .sort-label  {
     font-family: var(--font-ui);
     font-size: var(--text-base);
@@ -1380,7 +1339,22 @@ body.dark .toast:hover {
 
 
 /* ============================================================
-   RESPONSIVE ≤ 768px
+   BACKDROP FILTERS - DESKTOP ONLY
+   ============================================================ */
+@media (min-width: 769px) {
+    .upload-menu,
+    .custom-select-menu {
+        backdrop-filter: blur(4px);
+    }
+    
+    .modal-overlay {
+        backdrop-filter: blur(6px);
+    }
+}
+
+
+/* ============================================================
+   RESPONSIVE
    ============================================================ */
 @media (max-width: 768px) {
     .container  { padding: 20px 16px; }
@@ -1434,7 +1408,7 @@ body.dark .toast:hover {
 
 
 /* ============================================================
-   REDUCED MOTION & ACCESSIBILITY
+   ACCESSIBILITY
    ============================================================ */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
