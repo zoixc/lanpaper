@@ -124,7 +124,7 @@ async function importData(file) {
         }
 
         // Show loading toast
-        showToast('⏳ Syncing data with server...', 'info');
+        showToast(`⏳ ${t('sync_in_progress', 'Syncing data with server...')}`, 'info');
 
         // Restore settings if available
         if (data.settings) {
