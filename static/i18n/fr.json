@@ -20,6 +20,7 @@
   "import_success": "Données importées avec succès",
   "import_error": "Échec de l'import : Fichier invalide",
   "import_confirm": "Importer {{count}} liens ? Cela remplacera les données actuelles.",
+  "sync_in_progress": "Synchronisation des données avec le serveur...",
 
   "enter_image_url_title": "Coller depuis URL",
   "select_server_title": "Sélectionner dans la galerie",
@@ -60,5 +61,12 @@
 
   "aria_open_image": "Ouvrir l'image",
   "aria_link_id": "ID du lien",
-  "aria_file_info": "Informations sur le fichier"
+  "aria_file_info": "Informations sur le fichier",
+  "aria_settings": "Paramètres",
+  "aria_toggle_view": "Basculer la vue",
+  "aria_toggle_theme": "Basculer le mode sombre",
+  "aria_search": "Rechercher des fonds d'écran",
+  "aria_link_input": "ID du lien",
+
+  "shortcuts_hint": "Raccourcis : Ctrl+N (nouveau), Ctrl+F (rechercher), Ctrl+G (vue), T (thème)"
 }
