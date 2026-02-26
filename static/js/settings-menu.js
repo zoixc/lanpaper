@@ -20,22 +20,27 @@
 
         if (!settingsDropdown || !settingsBtn || !langOptions) return;
 
-        // Toggle dropdown
+        // Toggle dropdown with proper open/close behavior
         settingsBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             const isOpen = settingsDropdown.classList.contains('open');
             
+            // Close ALL dropdowns first
             closeAllDropdowns();
             
+            // If it was closed, open it now
             if (!isOpen) {
                 settingsDropdown.classList.add('open');
                 settingsBtn.setAttribute('aria-expanded', 'true');
+            } else {
+                // If it was open, keep it closed (already closed by closeAllDropdowns)
+                settingsBtn.setAttribute('aria-expanded', 'false');
             }
         });
 
         // Close dropdown when clicking outside
         document.addEventListener('click', (e) => {
-            if (!settingsDropdown.contains(e.target)) {
+            if (!settingsDropdown.contains(e.target) && e.target !== settingsBtn) {
                 closeSettingsDropdown();
             }
         });
@@ -96,8 +101,21 @@
     }
 
     function closeAllDropdowns() {
-        document.querySelectorAll('.upload-dropdown.open, .custom-select.open').forEach(el => {
-            el.classList.remove('open');
+        // Close settings dropdown
+        closeSettingsDropdown();
+        
+        // Close upload dropdowns
+        document.querySelectorAll('.upload-dropdown.open').forEach(dropdown => {
+            dropdown.classList.remove('open');
+            const btn = dropdown.previousElementSibling;
+            if (btn) btn.setAttribute('aria-expanded', 'false');
+        });
+        
+        // Close custom selects
+        document.querySelectorAll('.custom-select.open').forEach(select => {
+            select.classList.remove('open');
+            const btn = select.querySelector('.custom-select-btn');
+            if (btn) btn.setAttribute('aria-expanded', 'false');
         });
     }
 })();
