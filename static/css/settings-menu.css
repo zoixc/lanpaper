@@ -62,7 +62,7 @@ body.dark .settings-icon.dark-theme-icon {
 
 /* Subtle rotation when open */
 .settings-dropdown.open #settingsBtn .settings-icon {
-    transform: translate(-50%, -50%) rotate(45deg);
+    transform: translate(-50%, -50%) rotate(90deg);
 }
 
 /* Settings Menu Panel - Optimized */
