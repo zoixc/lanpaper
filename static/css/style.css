@@ -1049,62 +1049,157 @@ body.dark .custom-select-option.selected {
 
 
 /* ============================================================
-   OPTIMIZED TOASTS
+   ENHANCED TOAST NOTIFICATIONS
    ============================================================ */
 .toast-container {
     position: fixed;
-    bottom: 20px; right: 20px;
+    bottom: 24px;
+    right: 24px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
     z-index: var(--z-toast);
     pointer-events: none;
 }
 
 .toast {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 14px 18px;
-    max-width: 380px;
+    gap: 12px;
+    min-width: 320px;
+    max-width: 420px;
+    padding: 16px 20px;
     font-family: var(--font-ui);
     font-size: var(--text-base);
     font-weight: var(--fw-normal);
+    line-height: 1.5;
+    color: var(--text);
     pointer-events: auto;
-    box-shadow: var(--shadow-lg);
-    animation: toastSlideIn .3s cubic-bezier(0.4,0,.2,1) forwards;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.08);
+    animation: toastSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.toast.success { 
-    border-left: 4px solid var(--success);
-    background: var(--card-bg);
+body.dark .toast {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 12px rgba(0, 0, 0, 0.3);
 }
 
-.toast.error   { 
-    border-left: 4px solid var(--error);
-    background: var(--card-bg);
+/* Status-specific styles with colored accent bar and icon background */
+.toast::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    transition: width 0.3s ease;
 }
 
-.toast.info   { 
-    border-left: 4px solid var(--info);
-    background: var(--card-bg);
+.toast.success::before { background: var(--success); }
+.toast.error::before { background: var(--error); }
+.toast.info::before { background: var(--info); }
+.toast.warning::before { background: var(--warning); }
+
+/* Optional: Icon styling if you add icons */
+.toast-icon {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: var(--text-sm);
+    font-weight: 700;
 }
 
-.toast.hiding  { 
-    opacity: 0; 
-    transform: translateX(110%) scale(0.9); 
-    transition: opacity .25s ease, transform .25s cubic-bezier(0.4, 0, 0.8, 0.4); 
+.toast.success .toast-icon { 
+    background: var(--success-light); 
+    color: var(--success);
+}
+.toast.error .toast-icon { 
+    background: var(--error-light); 
+    color: var(--error);
+}
+.toast.info .toast-icon { 
+    background: var(--info-light); 
+    color: var(--info);
+}
+.toast.warning .toast-icon { 
+    background: var(--warning-light); 
+    color: var(--warning);
 }
 
+.toast-content {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Enhanced slide-in animation with bounce */
 @keyframes toastSlideIn {
-    from { 
+    0% { 
         opacity: 0; 
-        transform: translateX(110%) scale(0.9);
+        transform: translateX(100%) translateY(0) scale(0.9);
     }
-    to   { 
+    60% {
+        opacity: 1;
+        transform: translateX(-8px) translateY(0) scale(1);
+    }
+    100% { 
         opacity: 1; 
+        transform: translateX(0) translateY(0) scale(1);
+    }
+}
+
+/* Enhanced slide-out animation */
+.toast.hiding {
+    animation: toastSlideOut 0.35s cubic-bezier(0.5, 0, 0.75, 0) forwards;
+}
+
+@keyframes toastSlideOut {
+    0% {
+        opacity: 1;
         transform: translateX(0) scale(1);
     }
+    100% {
+        opacity: 0;
+        transform: translateX(120%) scale(0.92);
+    }
+}
+
+/* Hover effect - pause auto-dismiss */
+.toast:hover {
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2), 0 4px 12px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+body.dark .toast:hover {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* Progress bar (optional - for auto-dismiss timer) */
+.toast::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: currentColor;
+    opacity: 0.15;
+    transform-origin: left;
+    animation: toastProgress 3s linear forwards;
+}
+
+.toast:hover::after {
+    animation-play-state: paused;
+}
+
+@keyframes toastProgress {
+    from { transform: scaleX(1); }
+    to { transform: scaleX(0); }
 }
 
 
@@ -1300,8 +1395,15 @@ body.dark .custom-select-option.selected {
     .btn             { width: 100%; }
     .link-info       { align-items: center; }
 
-    .toast-container { left: 16px; right: 16px; }
-    .toast { max-width: 100%; }
+    .toast-container { 
+        left: 16px; 
+        right: 16px; 
+        bottom: 16px;
+    }
+    .toast { 
+        min-width: unset;
+        max-width: 100%; 
+    }
 
     .links-list.grid-view {
         grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
