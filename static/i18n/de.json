@@ -20,6 +20,7 @@
   "import_success": "Daten erfolgreich importiert",
   "import_error": "Import fehlgeschlagen: Ungültige Datei",
   "import_confirm": "{{count}} Links importieren? Dies ersetzt die aktuellen Daten.",
+  "sync_in_progress": "Daten werden mit Server synchronisiert...",
 
   "enter_image_url_title": "Aus URL einfügen",
   "select_server_title": "Aus Galerie wählen",
@@ -60,5 +61,12 @@
 
   "aria_open_image": "Bild öffnen",
   "aria_link_id": "Link-ID",
-  "aria_file_info": "Dateiinfo"
+  "aria_file_info": "Dateiinfo",
+  "aria_settings": "Einstellungen",
+  "aria_toggle_view": "Ansicht wechseln",
+  "aria_toggle_theme": "Dunkelmodus umschalten",
+  "aria_search": "Hintergrundbilder suchen",
+  "aria_link_input": "Link-ID",
+
+  "shortcuts_hint": "Tastenkürzel: Strg+N (neu), Strg+F (suchen), Strg+G (Ansicht), T (Design)"
 }
