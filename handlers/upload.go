@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -56,7 +57,7 @@ var (
 )
 
 // getTransport returns a cached *http.Transport, rebuilding it when proxy or
-// TLS settings have changed.
+// TLS settings have changed. Properly closes old transport to prevent leaks.
 func getTransport() *http.Transport {
 	transportMu.Lock()
 	defer transportMu.Unlock()
@@ -65,6 +66,11 @@ func getTransport() *http.Transport {
 	insecure := config.Current.InsecureSkipVerify
 	if cachedTransport != nil && cachedProxyHost == proxyHost && cachedInsecure == insecure {
 		return cachedTransport
+	}
+
+	// Close old transport to prevent connection leaks
+	if cachedTransport != nil {
+		cachedTransport.CloseIdleConnections()
 	}
 
 	t := &http.Transport{
@@ -123,7 +129,7 @@ func (d *ssrfSafeDialer) DialContext(ctx context.Context, network, addr string) 
 	return d.inner.DialContext(ctx, network, net.JoinHostPort(ips[0].IP.String(), port))
 }
 
-// copyVideoToFile streams r into a new file at dst.
+// copyVideoToFile streams r into a new file at dst with buffering for better performance.
 func copyVideoToFile(r io.Reader, dst string) error {
 	out, err := os.Create(dst)
 	if err != nil {
@@ -134,13 +140,19 @@ func copyVideoToFile(r io.Reader, dst string) error {
 			log.Printf("Error closing %s: %v", dst, cerr)
 		}
 	}()
-	if _, err := io.Copy(out, r); err != nil {
+
+	// Use buffered writer for better performance
+	bw := bufio.NewWriterSize(out, config.FileCopyBufferSize)
+	if _, err := io.Copy(bw, r); err != nil {
 		return fmt.Errorf("copy: %w", err)
+	}
+	if err := bw.Flush(); err != nil {
+		return fmt.Errorf("flush: %w", err)
 	}
 	return nil
 }
 
-// copyVideoFile copies a video from src to dst.
+// copyVideoFile copies a video from src to dst with buffering.
 func copyVideoFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
@@ -173,7 +185,8 @@ func normalizeFormat(format string) string {
 }
 
 // storedExt returns the on-disk extension.
-// bmp and tiff are re-encoded as JPEG, so their stored extension is "jpg".
+// Note: BMP and TIFF images are automatically re-encoded as JPEG for storage efficiency.
+// This conversion reduces file size while maintaining reasonable quality.
 func storedExt(ext string) string {
 	if ext == "bmp" || ext == "tiff" {
 		return "jpg"
@@ -206,13 +219,6 @@ func thumbnail(src image.Image, maxW, maxH int) image.Image {
 }
 
 func isVideo(ext string) bool { return ext == "mp4" || ext == "webm" }
-
-func externalBase() string {
-	if d := config.Current.ExternalImageDir; d != "" {
-		return d
-	}
-	return "external/images"
-}
 
 func Upload(w http.ResponseWriter, r *http.Request) {
 	select {
@@ -279,7 +285,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			// Use utils.ValidateAndResolvePath to prevent path traversal and symlink escapes.
-			absPath, _, pathErr := utils.ValidateAndResolvePath(externalBase(), urlStr)
+			absPath, _, pathErr := utils.ValidateAndResolvePath(utils.ExternalBaseDir(), urlStr)
 			if pathErr != nil {
 				log.Printf("Security: path validation failed for %s: %v", urlStr, pathErr)
 				http.Error(w, "Path outside allowed directory", http.StatusForbidden)
@@ -289,7 +295,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			if isVideo(ext) {
 				video = true
 			} else {
-				img, ext, fileData, err = loadLocalImage(absPath)
+				img, ext, fileData, err = loadLocalImage(r.Context(), absPath)
 			}
 		}
 		if err != nil {
@@ -391,7 +397,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 		} else if !strings.HasPrefix(urlStr, "http") {
 			// Use ValidateAndResolvePath — absPath already validated earlier in this branch.
-			absPath, _, pathErr := utils.ValidateAndResolvePath(externalBase(), urlStr)
+			absPath, _, pathErr := utils.ValidateAndResolvePath(utils.ExternalBaseDir(), urlStr)
 			if pathErr != nil {
 				log.Printf("Security: path validation failed for video %s: %v", urlStr, pathErr)
 				http.Error(w, "Path outside allowed directory", http.StatusForbidden)
@@ -489,7 +495,13 @@ func saveImage(img image.Image, format, path string) error {
 	}
 }
 
-func loadLocalImage(path string) (image.Image, string, []byte, error) {
+// loadLocalImage loads an image from local filesystem with context support for cancellation.
+func loadLocalImage(ctx context.Context, path string) (image.Image, string, []byte, error) {
+	// Check context before starting
+	if err := ctx.Err(); err != nil {
+		return nil, "", nil, err
+	}
+
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, "", nil, errors.New("file not found")
@@ -513,6 +525,11 @@ func loadLocalImage(path string) (image.Image, string, []byte, error) {
 	}
 	if _, err := f.Seek(0, io.SeekStart); err != nil {
 		return nil, "", nil, fmt.Errorf("seek: %w", err)
+	}
+
+	// Check context again before decoding
+	if err := ctx.Err(); err != nil {
+		return nil, "", nil, err
 	}
 
 	img, format, err := image.Decode(f)
