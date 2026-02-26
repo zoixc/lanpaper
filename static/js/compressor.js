@@ -27,25 +27,23 @@ class ImageCompressor {
       return file;
     }
 
+    const img = await this._loadImage(file);
+    return this._compressImage(img, file.name);
+  }
+
+  /**
+   * Load image from file
+   * @private
+   */
+  _loadImage(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
+      const img = new Image();
       
-      reader.onload = (e) => {
-        const img = new Image();
-        
-        img.onload = () => {
-          try {
-            const compressed = this._compressImage(img, file.name, file.type);
-            resolve(compressed);
-          } catch (error) {
-            reject(error);
-          }
-        };
-        
-        img.onerror = () => reject(new Error('Failed to load image'));
-        img.src = e.target.result;
-      };
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Failed to load image'));
       
+      reader.onload = (e) => img.src = e.target.result;
       reader.onerror = () => reject(new Error('Failed to read file'));
       reader.readAsDataURL(file);
     });
@@ -55,20 +53,19 @@ class ImageCompressor {
    * Internal compression logic
    * @private
    */
-  _compressImage(img, fileName, originalType) {
+  async _compressImage(img, fileName) {
     const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: false });
 
     // Calculate new dimensions
-    let { width, height } = img;
     const ratio = Math.min(
-      this.maxWidth / width,
-      this.maxHeight / height,
+      this.maxWidth / img.width,
+      this.maxHeight / img.height,
       1 // Don't upscale
     );
 
-    canvas.width = Math.floor(width * ratio);
-    canvas.height = Math.floor(height * ratio);
+    canvas.width = Math.floor(img.width * ratio);
+    canvas.height = Math.floor(img.height * ratio);
 
     // Enable image smoothing for better quality
     ctx.imageSmoothingEnabled = true;
@@ -78,26 +75,19 @@ class ImageCompressor {
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
     // Convert to blob
-    return new Promise((resolve, reject) => {
+    const blob = await new Promise((resolve, reject) => {
       canvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            reject(new Error('Canvas to Blob conversion failed'));
-            return;
-          }
-
-          // Create new file with compressed data
-          const newFileName = fileName.replace(/\.[^.]+$/, '.jpg');
-          const compressedFile = new File([blob], newFileName, {
-            type: this.mimeType,
-            lastModified: Date.now()
-          });
-
-          resolve(compressedFile);
-        },
+        (blob) => blob ? resolve(blob) : reject(new Error('Canvas to Blob conversion failed')),
         this.mimeType,
         this.quality
       );
+    });
+
+    // Create new file with compressed data
+    const newFileName = fileName.replace(/\.[^.]+$/, '.jpg');
+    return new File([blob], newFileName, {
+      type: this.mimeType,
+      lastModified: Date.now()
     });
   }
 
@@ -114,8 +104,8 @@ class ImageCompressor {
     return {
       original: originalSize,
       compressed: compressedSize,
-      saved: saved,
-      percent: percent
+      saved,
+      percent
     };
   }
 }
