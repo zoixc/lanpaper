@@ -52,6 +52,35 @@ const DOM = {
 // Helper for conditional logging
 const log = (...args) => STATE.isDebug && console.log(...args);
 
+// Global function to close all dropdowns (used by settings-menu.js too)
+window.closeAllDropdowns = function(exceptElement) {
+    // Close settings dropdown
+    const settingsDropdown = document.getElementById('settingsDropdown');
+    const settingsBtn = document.getElementById('settingsBtn');
+    if (settingsDropdown && settingsDropdown !== exceptElement) {
+        settingsDropdown.classList.remove('open');
+        if (settingsBtn) settingsBtn.setAttribute('aria-expanded', 'false');
+    }
+    
+    // Close upload dropdowns
+    document.querySelectorAll('.upload-dropdown.open').forEach(dropdown => {
+        if (dropdown !== exceptElement) {
+            dropdown.classList.remove('open');
+            const btn = dropdown.previousElementSibling;
+            if (btn) btn.setAttribute('aria-expanded', 'false');
+        }
+    });
+    
+    // Close custom selects
+    document.querySelectorAll('.custom-select.open').forEach(select => {
+        if (select !== exceptElement) {
+            select.classList.remove('open');
+            const btn = select.querySelector('.custom-select-btn');
+            if (btn) btn.setAttribute('aria-expanded', 'false');
+        }
+    });
+};
+
 
 // INITIALIZATION
 document.addEventListener('DOMContentLoaded', async () => {
@@ -373,6 +402,12 @@ function initCustomSelect() {
     btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const isOpen = customSelect.classList.contains('open');
+        
+        // Close all other dropdowns first
+        if (!isOpen) {
+            closeAllDropdowns(customSelect);
+        }
+        
         customSelect.classList.toggle('open', !isOpen);
         btn.setAttribute('aria-expanded', String(!isOpen));
     });
@@ -805,8 +840,13 @@ function setupCardEvents(card, link) {
     toggleBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const isOpen = dropdown.classList.contains('open');
-        document.querySelectorAll('.upload-dropdown.open').forEach(d => d.classList.remove('open'));
-        if (!isOpen) dropdown.classList.add('open');
+        
+        // Close all other dropdowns before opening this one
+        if (!isOpen) {
+            closeAllDropdowns(dropdown);
+        }
+        
+        dropdown.classList.toggle('open', !isOpen);
         toggleBtn.setAttribute('aria-expanded', String(!isOpen));
     });
 
