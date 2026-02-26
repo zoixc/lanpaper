@@ -20,6 +20,7 @@
   "import_success": "Данные успешно импортированы",
   "import_error": "Ошибка импорта: неверный файл",
   "import_confirm": "Импортировать {{count}} ссылок? Текущие данные будут заменены.",
+  "sync_in_progress": "Синхронизация данных с сервером...",
 
   "enter_image_url_title": "Вставить из URL",
   "select_server_title": "Выбрать из галереи",
@@ -60,5 +61,12 @@
 
   "aria_open_image": "Открыть изображение",
   "aria_link_id": "ID ссылки",
-  "aria_file_info": "Информация о файле"
+  "aria_file_info": "Информация о файле",
+  "aria_settings": "Настройки",
+  "aria_toggle_view": "Переключить вид",
+  "aria_toggle_theme": "Переключить тёмную тему",
+  "aria_search": "Поиск обоев",
+  "aria_link_input": "ID ссылки",
+
+  "shortcuts_hint": "Горячие клавиши: Ctrl+N (создать), Ctrl+F (поиск), Ctrl+G (вид), T (тема)"
 }
