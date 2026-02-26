@@ -105,7 +105,11 @@ func main() {
 func healthHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "service": "lanpaper"})
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"status":  "ok",
+		"service": "lanpaper",
+		"version": Version,
+	})
 }
 
 func readyHandler(w http.ResponseWriter, _ *http.Request) {
