@@ -20,6 +20,18 @@ services:
       - MAX_IMAGES=100
       - MAX_CONCURRENT_UPLOADS=2
 
+      # Client-side image compression settings
+      # COMPRESSION_QUALITY: 1-100 (default: 85)
+      #   - 100 = maximum quality, minimal compression
+      #   - 85 = balanced quality/size (recommended)
+      #   - 70 = smaller files, some quality loss
+      - COMPRESSION_QUALITY=85
+      
+      # COMPRESSION_SCALE: 1-100 (default: 100)
+      #   - 100 = full resolution (1920x1080 max)
+      #   - 50 = half resolution (960x540 max)
+      - COMPRESSION_SCALE=100
+
       # Rate limiting
       - RATE_PUBLIC_PER_MIN=120
       - RATE_UPLOAD_PER_MIN=20
