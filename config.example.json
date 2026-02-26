@@ -12,6 +12,10 @@
     "uploadPerMin": 20,
     "burst": 10
   },
+  "compression": {
+    "quality": 85,
+    "scale": 100
+  },
   "proxyType": "http",
   "proxyHost": "",
   "proxyPort": "",

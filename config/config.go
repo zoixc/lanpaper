@@ -15,22 +15,28 @@ type RateConfig struct {
 	Burst        int `json:"burst"`
 }
 
+type CompressionConfig struct {
+	Quality int `json:"quality"` // 1-100, JPEG quality
+	Scale   int `json:"scale"`   // 1-100, percentage of max dimensions (1920x1080)
+}
+
 type Config struct {
-	Port                 string     `json:"port"`
-	MaxUploadMB          int        `json:"maxUploadMB"`
-	MaxImages            int        `json:"maxImages"`
-	MaxConcurrentUploads int        `json:"maxConcurrentUploads"`
-	ExternalImageDir     string     `json:"externalImageDir"`
-	AdminUser            string     `json:"adminUser"`
-	AdminPass            string     `json:"adminPass"`
-	DisableAuth          bool       `json:"disableAuth,omitempty"`
-	InsecureSkipVerify   bool       `json:"insecureSkipVerify,omitempty"`
-	ProxyHost            string     `json:"proxyHost,omitempty"`
-	ProxyPort            string     `json:"proxyPort,omitempty"`
-	ProxyType            string     `json:"proxyType,omitempty"`
-	ProxyUsername        string     `json:"proxyUsername,omitempty"`
-	ProxyPassword        string     `json:"proxyPassword,omitempty"`
-	Rate                 RateConfig `json:"rate"`
+	Port                 string            `json:"port"`
+	MaxUploadMB          int               `json:"maxUploadMB"`
+	MaxImages            int               `json:"maxImages"`
+	MaxConcurrentUploads int               `json:"maxConcurrentUploads"`
+	ExternalImageDir     string            `json:"externalImageDir"`
+	AdminUser            string            `json:"adminUser"`
+	AdminPass            string            `json:"adminPass"`
+	DisableAuth          bool              `json:"disableAuth,omitempty"`
+	InsecureSkipVerify   bool              `json:"insecureSkipVerify,omitempty"`
+	ProxyHost            string            `json:"proxyHost,omitempty"`
+	ProxyPort            string            `json:"proxyPort,omitempty"`
+	ProxyType            string            `json:"proxyType,omitempty"`
+	ProxyUsername        string            `json:"proxyUsername,omitempty"`
+	ProxyPassword        string            `json:"proxyPassword,omitempty"`
+	Rate                 RateConfig        `json:"rate"`
+	Compression          CompressionConfig `json:"compression"`
 	// TrustedProxy is the IP or CIDR of a reverse proxy in front of Lanpaper.
 	// X-Real-IP / X-Forwarded-For are trusted only for requests from this address.
 	// Leave empty to always use the raw TCP remote address (safe default).
@@ -60,6 +66,10 @@ func Load() {
 			PublicPerMin: getEnvInt("RATE_PUBLIC_PER_MIN", DefaultPublicRatePerMin),
 			UploadPerMin: getEnvInt("RATE_UPLOAD_PER_MIN", DefaultUploadRatePerMin),
 			Burst:        getEnvInt("RATE_BURST", DefaultRateBurst),
+		},
+		Compression: CompressionConfig{
+			Quality: getEnvInt("COMPRESSION_QUALITY", DefaultCompressionQuality),
+			Scale:   getEnvInt("COMPRESSION_SCALE", DefaultCompressionScale),
 		},
 	}
 
@@ -122,6 +132,16 @@ func validate() {
 	}
 	if Current.Rate.Burst <= 0 {
 		Current.Rate.Burst = DefaultRateBurst
+	}
+
+	// Validate compression settings
+	if Current.Compression.Quality < 1 || Current.Compression.Quality > 100 {
+		log.Printf("Warning: COMPRESSION_QUALITY %d out of range (1-100), using %d", Current.Compression.Quality, DefaultCompressionQuality)
+		Current.Compression.Quality = DefaultCompressionQuality
+	}
+	if Current.Compression.Scale < 1 || Current.Compression.Scale > 100 {
+		log.Printf("Warning: COMPRESSION_SCALE %d out of range (1-100), using %d", Current.Compression.Scale, DefaultCompressionScale)
+		Current.Compression.Scale = DefaultCompressionScale
 	}
 
 	if Current.ProxyHost != "" {

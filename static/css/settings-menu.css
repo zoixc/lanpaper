@@ -1,5 +1,5 @@
 /* ============================================================
-   SETTINGS DROPDOWN MENU
+   SETTINGS DROPDOWN MENU - PERFORMANCE OPTIMIZED
    ============================================================ */
 
 .settings-dropdown {
@@ -20,7 +20,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background .15s ease, border-color .15s ease;
+    transition: background .15s ease, 
+                border-color .15s ease, 
+                transform .12s ease;
 }
 
 #settingsBtn:hover {
@@ -28,12 +30,16 @@
     border-color: var(--border);
 }
 
+#settingsBtn:active {
+    transform: scale(0.95);
+}
+
 .settings-dropdown.open #settingsBtn {
     background: var(--btn-secondary-hover);
     border-color: var(--border-hover);
 }
 
-/* Settings Icon (image-based) */
+/* Settings Icon with optimized rotation */
 .settings-icon {
     position: absolute;
     top: 50%;
@@ -43,7 +49,8 @@
     transform: translate(-50%, -50%);
     opacity: 0;
     pointer-events: none;
-    transition: opacity .3s ease, transform .35s cubic-bezier(0.34, 1.56, .64, 1);
+    transition: opacity .2s ease, 
+                transform .3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Show correct icon per theme */
@@ -53,12 +60,12 @@ body.dark .settings-icon.dark-theme-icon {
     pointer-events: auto;
 }
 
-/* Rotate gear 30deg when open */
+/* Subtle rotation when open */
 .settings-dropdown.open #settingsBtn .settings-icon {
-    transform: translate(-50%, -50%) rotate(30deg);
+    transform: translate(-50%, -50%) rotate(90deg);
 }
 
-/* Settings Menu Panel */
+/* Settings Menu Panel - Optimized */
 .settings-menu {
     position: absolute;
     top: calc(100% + 8px);
@@ -68,8 +75,10 @@ body.dark .settings-icon.dark-theme-icon {
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-lg);
     z-index: calc(var(--z-dropdown) + 1);
+    overflow: hidden;
+    
     /* Closed state */
     visibility: hidden;
     opacity: 0;
@@ -78,6 +87,13 @@ body.dark .settings-icon.dark-theme-icon {
     transition: opacity .2s cubic-bezier(0.4, 0, 0.2, 1),
                 transform .2s cubic-bezier(0.4, 0, 0.2, 1),
                 visibility 0s linear .2s;
+}
+
+/* Conditional backdrop-filter only on desktop */
+@media (min-width: 769px) {
+    .settings-menu {
+        backdrop-filter: blur(6px);
+    }
 }
 
 /* Open state */
@@ -113,7 +129,7 @@ body.dark .settings-icon.dark-theme-icon {
     margin: 0;
 }
 
-/* Language Options */
+/* Language Options Grid */
 .lang-options {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -121,6 +137,7 @@ body.dark .settings-icon.dark-theme-icon {
     padding: 0 4px;
 }
 
+/* Language Option Buttons - Simplified */
 .lang-option {
     display: flex;
     align-items: center;
@@ -136,7 +153,12 @@ body.dark .settings-icon.dark-theme-icon {
     font-weight: var(--fw-ui);
     cursor: pointer;
     user-select: none;
-    transition: background .15s ease, border-color .15s ease, color .15s ease;
+    position: relative;
+    overflow: hidden;
+    transition: background .15s ease, 
+                border-color .15s ease, 
+                color .15s ease,
+                transform .12s ease;
 }
 
 .lang-option:hover {
@@ -144,23 +166,51 @@ body.dark .settings-icon.dark-theme-icon {
     border-color: var(--border-hover);
 }
 
-/* Light theme active state: dark button (#454542) with light text */
+.lang-option:active {
+    transform: scale(0.95);
+}
+
+/* Subtle ripple effect */
+.lang-option::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.25);
+    transform: translate(-50%, -50%);
+    transition: width 0.3s ease, height 0.3s ease, opacity 0.3s ease;
+    opacity: 0;
+}
+
+body.dark .lang-option::after {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.lang-option:active::after {
+    width: 100px;
+    height: 100px;
+    opacity: 1;
+}
+
+/* Active state - subtle highlight */
 .lang-option.active {
     background: var(--btn-primary);
     color: var(--bg);
     border-color: var(--btn-primary);
-    font-weight: 700;
+    font-weight: 600;
 }
 
-/* Dark theme active state: accent color (#6e7fcc) with white text for high contrast */
 body.dark .lang-option.active {
     background: var(--accent);
     color: #ffffff;
     border-color: var(--accent);
-    font-weight: 700;
+    font-weight: 600;
 }
 
-/* Settings Menu Items (Export/Import) */
+/* Settings Menu Items - Simplified */
 .settings-menu-item {
     display: flex;
     align-items: center;
@@ -177,23 +227,90 @@ body.dark .lang-option.active {
     cursor: pointer;
     white-space: nowrap;
     text-align: left;
-    transition: background .15s ease, color .15s ease;
+    position: relative;
+    overflow: hidden;
+    transition: background .15s ease, 
+                color .15s ease,
+                transform .12s ease;
 }
 
 .settings-menu-item:hover {
     background: var(--btn-secondary-hover);
 }
 
+.settings-menu-item:active {
+    transform: scale(0.98);
+}
+
 .settings-menu-item svg {
     flex-shrink: 0;
     opacity: 0.7;
+    transition: opacity .18s ease, transform .18s ease;
 }
 
 .settings-menu-item:hover svg {
     opacity: 1;
+    transform: scale(1.08);
 }
 
-/* Responsive */
+/* Simplified stagger animation - only on open */
+.settings-dropdown.open .settings-menu-item {
+    animation: slideIn 0.2s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+}
+
+.settings-dropdown.open .settings-menu-item:nth-child(1) {
+    animation-delay: 0.03s;
+}
+
+.settings-dropdown.open .settings-menu-item:nth-child(2) {
+    animation-delay: 0.06s;
+}
+
+.settings-dropdown.open .settings-menu-item:nth-child(3) {
+    animation-delay: 0.09s;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Simplified scale animation for language options */
+.settings-dropdown.open .lang-option {
+    animation: scaleIn 0.2s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+}
+
+.settings-dropdown.open .lang-option:nth-child(1) { animation-delay: 0.03s; }
+.settings-dropdown.open .lang-option:nth-child(2) { animation-delay: 0.05s; }
+.settings-dropdown.open .lang-option:nth-child(3) { animation-delay: 0.07s; }
+.settings-dropdown.open .lang-option:nth-child(4) { animation-delay: 0.09s; }
+.settings-dropdown.open .lang-option:nth-child(5) { animation-delay: 0.11s; }
+.settings-dropdown.open .lang-option:nth-child(6) { animation-delay: 0.13s; }
+
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Loading state */
+.settings-menu-item.loading {
+    pointer-events: none;
+    opacity: 0.5;
+}
+
+/* Responsive adjustments */
 @media (max-width: 768px) {
     .settings-menu {
         right: -8px;
@@ -202,5 +319,37 @@ body.dark .lang-option.active {
 
     .lang-options {
         grid-template-columns: repeat(2, 1fr);
+    }
+    
+    /* Remove hover elevation on mobile */
+    #settingsBtn:hover {
+        transform: none;
+    }
+    
+    .lang-option:hover,
+    .settings-menu-item:hover {
+        transform: none;
+    }
+}
+
+/* Accessibility */
+@media (prefers-contrast: high) {
+    .lang-option.active {
+        border-width: 2px;
+    }
+    
+    .settings-menu {
+        border-width: 2px;
+    }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .settings-icon,
+    .settings-menu,
+    .lang-option,
+    .settings-menu-item {
+        transition-duration: 0.01ms !important;
+        animation: none !important;
     }
 }

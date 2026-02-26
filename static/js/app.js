@@ -16,6 +16,8 @@ const STATE = {
     filteredWallpapers: [],
     compressor: null,
     lazyObserver: null,
+    compressionConfig: null,
+    isDebug: false, // Set to true for console logs
 };
 
 
@@ -47,6 +49,38 @@ const DOM = {
     template: document.getElementById('linkCardTemplate'),
 };
 
+// Helper for conditional logging
+const log = (...args) => STATE.isDebug && console.log(...args);
+
+// Global function to close all dropdowns (used by settings-menu.js too)
+window.closeAllDropdowns = function(exceptElement) {
+    // Close settings dropdown
+    const settingsDropdown = document.getElementById('settingsDropdown');
+    const settingsBtn = document.getElementById('settingsBtn');
+    if (settingsDropdown && settingsDropdown !== exceptElement) {
+        settingsDropdown.classList.remove('open');
+        if (settingsBtn) settingsBtn.setAttribute('aria-expanded', 'false');
+    }
+    
+    // Close upload dropdowns
+    document.querySelectorAll('.upload-dropdown.open').forEach(dropdown => {
+        if (dropdown !== exceptElement) {
+            dropdown.classList.remove('open');
+            const btn = dropdown.previousElementSibling;
+            if (btn) btn.setAttribute('aria-expanded', 'false');
+        }
+    });
+    
+    // Close custom selects
+    document.querySelectorAll('.custom-select.open').forEach(select => {
+        if (select !== exceptElement) {
+            select.classList.remove('open');
+            const btn = select.querySelector('.custom-select-btn');
+            if (btn) btn.setAttribute('aria-expanded', 'false');
+        }
+    });
+};
+
 
 // INITIALIZATION
 document.addEventListener('DOMContentLoaded', async () => {
@@ -57,6 +91,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initLazyLoading();
     initKeyboardShortcuts();
     initPWA();
+    await loadCompressionConfig();
     initCompression();
     loadAppVersion();
     await loadLinks();
@@ -68,22 +103,37 @@ document.addEventListener('DOMContentLoaded', async () => {
 function initPWA() {
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/static/sw.js')
-            .then(reg => console.log('SW registered:', reg.scope))
-            .catch(err => console.warn('SW registration failed:', err));
+            .catch(() => {}); // Silent fail
     }
+}
+
+
+// LOAD COMPRESSION CONFIG FROM SERVER
+async function loadCompressionConfig() {
+    try {
+        const res = await fetch('/api/compression-config');
+        if (res.ok) STATE.compressionConfig = await res.json();
+    } catch (_) {}
 }
 
 
 // IMAGE COMPRESSION INITIALIZATION
 function initCompression() {
-    // Check if compression script is loaded
-    if (typeof ImageCompressor !== 'undefined') {
-        STATE.compressor = new ImageCompressor({
-            maxWidth: 1920,
-            maxHeight: 1080,
-            quality: 0.85
-        });
-    }
+    if (typeof ImageCompressor === 'undefined') return;
+    
+    const quality = STATE.compressionConfig?.quality || 85;
+    const scale = STATE.compressionConfig?.scale || 100;
+    
+    const maxWidth = Math.floor((1920 * scale) / 100);
+    const maxHeight = Math.floor((1080 * scale) / 100);
+    
+    STATE.compressor = new ImageCompressor({
+        maxWidth,
+        maxHeight,
+        quality: quality / 100
+    });
+    
+    log(`[Compression] ${quality}% quality, ${scale}% scale (${maxWidth}x${maxHeight})`);
 }
 
 
@@ -112,53 +162,40 @@ function initLazyLoading() {
 // KEYBOARD SHORTCUTS
 function initKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
-        // Ignore if typing in input/textarea
         if (e.target.matches('input, textarea')) return;
 
-        // Ctrl/Cmd + N: Create new link
-        if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        const keyMap = {
+            'n': () => (e.ctrlKey || e.metaKey) && DOM.createInput.focus(),
+            'f': () => {
+                if (e.ctrlKey || e.metaKey) {
+                    DOM.searchInput.focus();
+                    DOM.searchInput.select();
+                }
+            },
+            'g': () => (e.ctrlKey || e.metaKey) && DOM.viewBtn.click(),
+            'Escape': () => {
+                if (!DOM.modalOverlay.classList.contains('hidden')) {
+                    closeModal();
+                } else if (DOM.searchInput.value) {
+                    DOM.searchInput.value = '';
+                    DOM.searchInput.dispatchEvent(new Event('input'));
+                }
+            },
+            't': () => DOM.themeBtn.click(),
+            'T': () => DOM.themeBtn.click(),
+        };
+
+        const handler = keyMap[e.key];
+        if (handler) {
             e.preventDefault();
-            DOM.createInput.focus();
-            return;
-        }
-
-        // Ctrl/Cmd + F: Focus search
-        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-            e.preventDefault();
-            DOM.searchInput.focus();
-            DOM.searchInput.select();
-            return;
-        }
-
-        // Ctrl/Cmd + G: Toggle grid/list view
-        if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
-            e.preventDefault();
-            DOM.viewBtn.click();
-            return;
-        }
-
-        // Esc: Close modal or clear search
-        if (e.key === 'Escape') {
-            if (!DOM.modalOverlay.classList.contains('hidden')) {
-                closeModal();
-            } else if (DOM.searchInput.value) {
-                DOM.searchInput.value = '';
-                DOM.searchInput.dispatchEvent(new Event('input'));
-            }
-            return;
-        }
-
-        // T: Toggle theme
-        if (e.key === 't' || e.key === 'T') {
-            DOM.themeBtn.click();
-            return;
+            handler();
         }
     });
 
     // Show shortcuts hint on first visit
     if (!localStorage.getItem('shortcuts-seen')) {
         setTimeout(() => {
-            showToast('💡 Shortcuts: Ctrl+N (new), Ctrl+F (search), Ctrl+G (view), T (theme)', 'success');
+            showToast(`💡 ${t('shortcuts_hint', 'Shortcuts: Ctrl+N (new), Ctrl+F (search), Ctrl+G (view), T (theme)')}`, 'success');
             localStorage.setItem('shortcuts-seen', 'true');
         }, 2000);
     }
@@ -174,20 +211,14 @@ async function loadAppVersion() {
         if (data.version && DOM.appVersion) {
             DOM.appVersion.textContent = `v${data.version}`;
         }
-    } catch (_) {
-        // silently ignore — footer will keep showing 'v...'
-    }
+    } catch (_) {}
 }
 
 
 // THEME MANAGER
 function initTheme() {
     const saved = localStorage.getItem('theme');
-    if (saved) {
-        STATE.isDark = saved === 'dark';
-    } else {
-        STATE.isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
+    STATE.isDark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
     applyTheme();
 
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
@@ -221,13 +252,10 @@ function applyTheme() {
     const icons = DOM.themeBtn.querySelectorAll('.theme-icon');
     icons.forEach(icon => icon.classList.remove('active'));
 
-    if (STATE.isDark) {
-        const sun = DOM.themeBtn.querySelector('img[alt="Light"]');
-        if (sun) sun.classList.add('active');
-    } else {
-        const moon = DOM.themeBtn.querySelector('img[alt="Dark"]');
-        if (moon) moon.classList.add('active');
-    }
+    const activeIcon = STATE.isDark 
+        ? DOM.themeBtn.querySelector('img[alt="Light"]')
+        : DOM.themeBtn.querySelector('img[alt="Dark"]');
+    if (activeIcon) activeIcon.classList.add('active');
 }
 
 
@@ -245,7 +273,6 @@ function initView() {
 
 
 function applyViewMode(mode, animate = false) {
-    // Update icon classes IMMEDIATELY so the button feels responsive
     updateIconClasses(mode);
 
     if (animate) {
@@ -256,7 +283,7 @@ function applyViewMode(mode, animate = false) {
             requestAnimationFrame(() => {
                 DOM.linksList.classList.remove('switching');
             });
-        }, 100); // Reduced from 200ms to 100ms
+        }, 100);
     } else {
         updateLayoutClasses(mode);
     }
@@ -264,22 +291,14 @@ function applyViewMode(mode, animate = false) {
 
 
 function updateIconClasses(mode) {
-    if (mode === 'grid') {
-        DOM.viewBtn.querySelectorAll('.list-icon').forEach(el => el.classList.add('active'));
-        DOM.viewBtn.querySelectorAll('.grid-icon').forEach(el => el.classList.remove('active'));
-    } else {
-        DOM.viewBtn.querySelectorAll('.list-icon').forEach(el => el.classList.remove('active'));
-        DOM.viewBtn.querySelectorAll('.grid-icon').forEach(el => el.classList.add('active'));
-    }
+    const isGrid = mode === 'grid';
+    DOM.viewBtn.querySelectorAll('.list-icon').forEach(el => el.classList.toggle('active', isGrid));
+    DOM.viewBtn.querySelectorAll('.grid-icon').forEach(el => el.classList.toggle('active', !isGrid));
 }
 
 
 function updateLayoutClasses(mode) {
-    if (mode === 'grid') {
-        DOM.linksList.classList.add('grid-view');
-    } else {
-        DOM.linksList.classList.remove('grid-view');
-    }
+    DOM.linksList.classList.toggle('grid-view', mode === 'grid');
 }
 
 
@@ -289,7 +308,6 @@ async function initLanguage() {
 }
 
 
-// Export setLanguage to window for settings-menu.js
 window.setLanguage = setLanguage;
 
 async function setLanguage(lang) {
@@ -308,7 +326,6 @@ async function setLanguage(lang) {
     updateSearchStats();
     updateAriaLabels();
     
-    // Update active language button in settings menu
     document.querySelectorAll('.lang-option').forEach(opt => {
         opt.classList.toggle('active', opt.dataset.lang === lang);
     });
@@ -332,7 +349,6 @@ function t(key, defaultText) {
 }
 
 
-// Update dynamic aria-labels after language switch.
 function updateAriaLabels() {
     document.querySelectorAll('[data-i18n-aria]').forEach(el => {
         const key = el.dataset.i18nAria;
@@ -343,17 +359,15 @@ function updateAriaLabels() {
 
 // SEARCH & SORT
 function initSearchSort() {
-    const searchInput = DOM.searchInput;
-    const sortSelect = DOM.sortSelect;
-    if (!searchInput) return;
+    if (!DOM.searchInput) return;
 
     STATE.searchQuery = localStorage.getItem('searchQuery') || '';
     STATE.sortBy = localStorage.getItem('sortBy') || 'date_desc';
-    searchInput.value = STATE.searchQuery;
-    if (sortSelect) sortSelect.value = STATE.sortBy;
+    DOM.searchInput.value = STATE.searchQuery;
+    if (DOM.sortSelect) DOM.sortSelect.value = STATE.sortBy;
 
     let timer;
-    searchInput.addEventListener('input', (e) => {
+    DOM.searchInput.addEventListener('input', (e) => {
         clearTimeout(timer);
         timer = setTimeout(() => {
             STATE.searchQuery = e.target.value.toLowerCase().trim();
@@ -362,8 +376,8 @@ function initSearchSort() {
         }, 250);
     });
 
-    if (sortSelect) {
-        sortSelect.addEventListener('change', (e) => {
+    if (DOM.sortSelect) {
+        DOM.sortSelect.addEventListener('change', (e) => {
             STATE.sortBy = e.target.value;
             localStorage.setItem('sortBy', STATE.sortBy);
             filterAndSort();
@@ -388,6 +402,12 @@ function initCustomSelect() {
     btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const isOpen = customSelect.classList.contains('open');
+        
+        // Close all other dropdowns first
+        if (!isOpen) {
+            closeAllDropdowns(customSelect);
+        }
+        
         customSelect.classList.toggle('open', !isOpen);
         btn.setAttribute('aria-expanded', String(!isOpen));
     });
@@ -447,31 +467,33 @@ function syncCustomSelectLabels() {
 }
 
 
+// Enhanced filter to search by name AND file type
 function filterWallpapers() {
-    const query = STATE.searchQuery;
-    if (!query) {
+    if (!STATE.searchQuery) {
         STATE.filteredWallpapers = [...STATE.wallpapers];
-    } else {
-        STATE.filteredWallpapers = STATE.wallpapers.filter(wp => {
-            const name = (wp.linkName || wp.id || '').toLowerCase();
-            return name.includes(query);
-        });
+        return;
     }
+    
+    STATE.filteredWallpapers = STATE.wallpapers.filter(wp => {
+        const name = (wp.linkName || wp.id || '').toLowerCase();
+        const fileName = (wp.imagePath || wp.imageUrl || '').toLowerCase();
+        const query = STATE.searchQuery;
+        return name.includes(query) || fileName.includes(query);
+    });
 }
 
 
 function sortWallpapers(list) {
     const sorted = [...list];
-    switch (STATE.sortBy) {
-        case 'name_asc':
-            sorted.sort((a, b) => a.linkName.localeCompare(b.linkName)); break;
-        case 'name_desc':
-            sorted.sort((a, b) => b.linkName.localeCompare(a.linkName)); break;
-        case 'date_desc':
-            sorted.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); break;
-        case 'date_asc':
-            sorted.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); break;
-    }
+    const sortFns = {
+        name_asc: (a, b) => a.linkName.localeCompare(b.linkName),
+        name_desc: (a, b) => b.linkName.localeCompare(a.linkName),
+        date_desc: (a, b) => (b.createdAt || 0) - (a.createdAt || 0),
+        date_asc: (a, b) => (a.createdAt || 0) - (b.createdAt || 0),
+    };
+    
+    const sortFn = sortFns[STATE.sortBy];
+    if (sortFn) sorted.sort(sortFn);
     return sorted;
 }
 
@@ -485,20 +507,19 @@ function filterAndSort() {
 
 
 function updateSearchStats() {
-    const statsEl = DOM.searchStats;
-    if (!statsEl) return;
+    if (!DOM.searchStats) return;
 
     const total = STATE.wallpapers.length;
     const shown = STATE.filteredWallpapers.length;
 
     if (STATE.searchQuery) {
         const tpl = t('search_found', 'Found {{shown}} of {{total}}');
-        statsEl.textContent = tpl
+        DOM.searchStats.textContent = tpl
             .replace('{{shown}}', shown)
             .replace('{{total}}', total);
     } else {
         const tpl = t('search_total', 'Total: {{total}}');
-        statsEl.textContent = tpl.replace('{{total}}', total);
+        DOM.searchStats.textContent = tpl.replace('{{total}}', total);
     }
 }
 
@@ -513,9 +534,7 @@ function showToast(message, type = 'success') {
 
     setTimeout(() => {
         toast.classList.add('hiding');
-        setTimeout(() => {
-            if (toast.parentNode) toast.remove();
-        }, 400);
+        setTimeout(() => toast.remove(), 400);
     }, 3000);
 }
 
@@ -565,14 +584,9 @@ function closeModal() {
 
 
 function confirmModal() {
-    let result = null;
-
-    if (DOM.modalInput.style.display !== 'none') {
-        result = DOM.modalInput.value.trim();
-    } else {
-        const selected = DOM.modalList.querySelector('.selected');
-        if (selected) result = selected.dataset.value;
-    }
+    let result = DOM.modalInput.style.display !== 'none'
+        ? DOM.modalInput.value.trim()
+        : DOM.modalList.querySelector('.selected')?.dataset.value;
 
     if (result) {
         DOM.modalOverlay.classList.add('hidden');
@@ -593,12 +607,12 @@ async function loadExternalImages() {
         if (!res.ok) throw new Error('Failed');
         const files = await res.json();
 
-        DOM.modalList.innerHTML = '';
-
-        if (!files || files.length === 0) {
+        if (!files?.length) {
             DOM.modalList.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">${t('server_empty', 'No images found')}</div>`;
             return;
         }
+
+        DOM.modalList.innerHTML = '';
 
         files.forEach(file => {
             const div = document.createElement('div');
@@ -611,11 +625,10 @@ async function loadExternalImages() {
                 <div class="image-name">${file}</div>
             `;
 
-            // Lazy load modal images
             const img = div.querySelector('img');
             if (STATE.lazyObserver) {
                 STATE.lazyObserver.observe(img);
-                img.addEventListener('load', () => { img.style.opacity = '1'; });
+                img.addEventListener('load', () => img.style.opacity = '1');
             } else {
                 img.src = img.dataset.src;
                 img.style.opacity = '1';
@@ -649,10 +662,7 @@ async function apiCall(url, method = 'GET', body = null, isFormData = false) {
         }
 
         const contentType = res.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-            return res.json();
-        }
-        return null;
+        return contentType?.includes('application/json') ? res.json() : null;
     } catch (e) {
         showToast(e.message, 'error');
         throw e;
@@ -663,9 +673,7 @@ async function apiCall(url, method = 'GET', body = null, isFormData = false) {
 // APP LOGIC
 async function loadLinks() {
     try {
-        const wallpapers = await apiCall('/api/wallpapers');
-        STATE.wallpapers = wallpapers || [];
-        updateSearchStats();
+        STATE.wallpapers = await apiCall('/api/wallpapers') || [];
         filterAndSort();
     } catch (_) {
         showToast(t('load_error', 'Failed to load links'), 'error');
@@ -678,7 +686,7 @@ async function loadLinks() {
 function renderLinks(wallpapers) {
     DOM.linksList.innerHTML = '';
 
-    if (!wallpapers || wallpapers.length === 0) {
+    if (!wallpapers?.length) {
         DOM.emptyState.style.display = 'block';
         return;
     }
@@ -706,11 +714,38 @@ function detectCategory(link) {
     const mime = link.mimeType || '';
     if (mime.startsWith('video/')) return 'video';
     if (mime.startsWith('image/')) return 'image';
+    
     const path = link.imagePath || link.imageUrl || '';
     const ext = path.split('.').pop().toLowerCase();
     if (['mp4', 'webm'].includes(ext)) return 'video';
     if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) return 'image';
     return 'other';
+}
+
+
+// Helper to create lazy-loaded image element
+function createLazyImage(src, alt = 'Image', className = 'preview', errorMsg) {
+    const img = document.createElement('img');
+    
+    if (STATE.lazyObserver) {
+        img.dataset.src = src;
+        img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"%3E%3C/svg%3E';
+        STATE.lazyObserver.observe(img);
+    } else {
+        img.src = src;
+    }
+    
+    img.alt = alt;
+    img.className = className;
+    img.loading = 'lazy';
+    
+    if (errorMsg) {
+        img.onerror = () => {
+            img.parentElement.innerHTML = `<div class="no-image">${errorMsg}</div>`;
+        };
+    }
+    
+    return img;
 }
 
 
@@ -725,8 +760,7 @@ function updateCard(card, link) {
     previewLink.href = fullUrl;
     previewLink.setAttribute('aria-label', t('aria_open_image', 'Open image'));
 
-    const linkIdEl = card.querySelector('.link-id');
-    linkIdEl.setAttribute('aria-label', t('aria_link_id', 'Link ID'));
+    card.querySelector('.link-id').setAttribute('aria-label', t('aria_link_id', 'Link ID'));
 
     const category = link.hasImage ? detectCategory(link) : 'other';
 
@@ -740,56 +774,29 @@ function updateCard(card, link) {
         fileType = t('no_image', 'No image');
     }
 
-    const dateStr = link.createdAt ? formatDate(link.createdAt) : '\u2014';
-    const sizeStr = link.sizeBytes ? ` \u00b7 ${formatKB(link.sizeBytes)}` : '';
+    const dateStr = link.createdAt ? formatDate(link.createdAt) : '—';
+    const sizeStr = link.sizeBytes ? ` · ${formatKB(link.sizeBytes)}` : '';
 
     const linkMeta = card.querySelector('.link-meta');
-    linkMeta.textContent = `${category} \u00b7 ${fileType}${sizeStr} \u00b7 ${dateStr}`;
+    linkMeta.textContent = `${category} · ${fileType}${sizeStr} · ${dateStr}`;
     linkMeta.setAttribute('aria-label', t('aria_file_info', 'File info'));
 
     const previewWrapper = card.querySelector('.preview-wrapper');
     previewWrapper.innerHTML = '';
 
-    const resolvedPreview = link.previewPath || link.preview || '';
-
-    if (link.hasImage && resolvedPreview) {
-        const img = document.createElement('img');
-        const imgSrc = '/' + resolvedPreview.replace(/^\//, '') + `?t=${Date.now()}`;
+    // Unified image loading logic
+    if (link.hasImage) {
+        const resolvedPreview = link.previewPath || link.preview || '';
+        const imgSrc = resolvedPreview 
+            ? '/' + resolvedPreview.replace(/^\//, '') + `?t=${Date.now()}`
+            : '/' + (link.imageUrl || '').replace(/^\//, '') || fullUrl;
         
-        // Use lazy loading
-        if (STATE.lazyObserver) {
-            img.dataset.src = imgSrc;
-            img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"%3E%3C/svg%3E';
-            STATE.lazyObserver.observe(img);
-        } else {
-            img.src = imgSrc;
-        }
-        
-        img.alt = 'Preview';
-        img.className = 'preview';
-        img.loading = 'lazy';
-        img.onerror = () => {
-            previewWrapper.innerHTML = `<div class="no-image">${t('preview_unavailable', 'Preview unavailable')}</div>`;
-        };
-        previewWrapper.appendChild(img);
-    } else if (link.hasImage) {
-        const img = document.createElement('img');
-        const imgSrc = '/' + (link.imageUrl || '').replace(/^\//, '') || fullUrl;
-        
-        if (STATE.lazyObserver) {
-            img.dataset.src = imgSrc;
-            img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"%3E%3C/svg%3E';
-            STATE.lazyObserver.observe(img);
-        } else {
-            img.src = imgSrc;
-        }
-        
-        img.alt = 'Image';
-        img.className = 'preview';
-        img.loading = 'lazy';
-        img.onerror = () => {
-            previewWrapper.innerHTML = `<div class="no-image">${t('image_unavailable', 'Image unavailable')}</div>`;
-        };
+        const img = createLazyImage(
+            imgSrc,
+            resolvedPreview ? 'Preview' : 'Image',
+            'preview',
+            t(resolvedPreview ? 'preview_unavailable' : 'image_unavailable', 'Image unavailable')
+        );
         previewWrapper.appendChild(img);
     } else {
         const noImg = document.createElement('div');
@@ -833,8 +840,13 @@ function setupCardEvents(card, link) {
     toggleBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const isOpen = dropdown.classList.contains('open');
-        document.querySelectorAll('.upload-dropdown.open').forEach(d => d.classList.remove('open'));
-        if (!isOpen) dropdown.classList.add('open');
+        
+        // Close all other dropdowns before opening this one
+        if (!isOpen) {
+            closeAllDropdowns(dropdown);
+        }
+        
+        dropdown.classList.toggle('open', !isOpen);
         toggleBtn.setAttribute('aria-expanded', String(!isOpen));
     });
 
@@ -869,7 +881,7 @@ function setupCardEvents(card, link) {
     });
 
     card.ondragover = e => { e.preventDefault(); card.style.borderColor = 'var(--border-focus)'; };
-    card.ondragleave = () => { card.style.borderColor = 'var(--border)'; };
+    card.ondragleave = () => card.style.borderColor = 'var(--border)';
     card.ondrop = async e => {
         e.preventDefault();
         card.style.borderColor = 'var(--border)';
@@ -904,7 +916,6 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
             return;
         }
 
-        // Compress image if compressor is available
         let fileToUpload = fileOrUrl;
         if (STATE.compressor && fileOrUrl.type.startsWith('image/')) {
             const originalSize = fileOrUrl.size;
@@ -936,9 +947,7 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
         updateCard(card, updatedLink);
         filterAndSort();
         showToast(t('upload_success', 'Uploaded!'), 'success');
-    } catch (_) {
-        // Error toast is already shown by apiCall.
-    }
+    } catch (_) {}
 }
 
 
@@ -951,15 +960,13 @@ function setupGlobalListeners() {
             return;
         }
 
-        const idRe = /^[a-zA-Z0-9_-]{1,64}$/;
-        if (!idRe.test(id)) {
+        if (!/^[a-zA-Z0-9_-]{1,64}$/.test(id)) {
             showToast(t('invalid_id_chars', 'Invalid ID format'), 'error');
             return;
         }
 
         try {
             await apiCall('/api/link', 'POST', { linkName: id });
-
             DOM.createInput.value = '';
 
             const newLinkObj = {
@@ -985,9 +992,7 @@ function setupGlobalListeners() {
             }
 
             showToast(t('created_success', 'Link created'), 'success');
-        } catch (_) {
-            // Error toast is already shown by apiCall.
-        }
+        } catch (_) {}
     });
 
     DOM.modalOverlay.onclick = (e) => {
@@ -1005,6 +1010,5 @@ function formatKB(bytes) {
 
 
 function formatDate(ts) {
-    if (!ts) return '\u2014';
-    return new Date(ts * 1000).toLocaleDateString();
+    return ts ? new Date(ts * 1000).toLocaleDateString() : '—';
 }

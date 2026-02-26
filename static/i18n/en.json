@@ -20,6 +20,7 @@
   "import_success": "Data imported successfully",
   "import_error": "Import failed: Invalid file",
   "import_confirm": "Import {{count}} links? This will replace current data.",
+  "sync_in_progress": "Syncing data with server...",
 
   "enter_image_url_title": "Paste from URL",
   "select_server_title": "Select from gallery",
@@ -60,5 +61,12 @@
 
   "aria_open_image": "Open image",
   "aria_link_id": "Link ID",
-  "aria_file_info": "File info"
+  "aria_file_info": "File info",
+  "aria_settings": "Settings",
+  "aria_toggle_view": "Toggle view",
+  "aria_toggle_theme": "Toggle dark mode",
+  "aria_search": "Search wallpapers",
+  "aria_link_input": "Link ID",
+
+  "shortcuts_hint": "Shortcuts: Ctrl+N (new), Ctrl+F (search), Ctrl+G (view), T (theme)"
 }
