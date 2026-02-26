@@ -25,8 +25,10 @@
             e.stopPropagation();
             const isOpen = settingsDropdown.classList.contains('open');
             
-            // Close ALL dropdowns first
-            closeAllDropdowns();
+            // Close ALL dropdowns first (using global function from app.js)
+            if (typeof window.closeAllDropdowns === 'function') {
+                window.closeAllDropdowns(isOpen ? null : settingsDropdown);
+            }
             
             // If it was closed, open it now
             if (!isOpen) {
@@ -98,24 +100,5 @@
         
         settingsDropdown?.classList.remove('open');
         settingsBtn?.setAttribute('aria-expanded', 'false');
-    }
-
-    function closeAllDropdowns() {
-        // Close settings dropdown
-        closeSettingsDropdown();
-        
-        // Close upload dropdowns
-        document.querySelectorAll('.upload-dropdown.open').forEach(dropdown => {
-            dropdown.classList.remove('open');
-            const btn = dropdown.previousElementSibling;
-            if (btn) btn.setAttribute('aria-expanded', 'false');
-        });
-        
-        // Close custom selects
-        document.querySelectorAll('.custom-select.open').forEach(select => {
-            select.classList.remove('open');
-            const btn = select.querySelector('.custom-select-btn');
-            if (btn) btn.setAttribute('aria-expanded', 'false');
-        });
     }
 })();
