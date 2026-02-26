@@ -21,7 +21,7 @@ func IsValidLocalPath(path string) bool {
 	clean := filepath.Clean(path)
 	return !filepath.IsAbs(clean) &&
 		!strings.HasPrefix(clean, "..") &&
-		!strings.Contains(clean, "/.." ) &&
+		!strings.Contains(clean, "/..") &&
 		!strings.HasPrefix(clean, "\\\\")
 }
 
@@ -102,4 +102,20 @@ func ValidateFileType(data []byte, expectedExt string) error {
 }
 
 // SanitizeFilename returns the base name of filename, used only for safe logging.
-func SanitizeFilename(filename string) string { return filepath.Base(filename) }
+func SanitizeFilename(name string) string {
+	// Remove path separators
+	name = strings.ReplaceAll(name, "/", "")
+	name = strings.ReplaceAll(name, "\\", "")
+	name = strings.ReplaceAll(name, "..", "")
+
+	// Remove dangerous shell characters
+	dangerousChars := []string{"$", "`", "|", ";", "[", "]", "(", ")", "&", "<", ">", "\"", "'"}
+	for _, char := range dangerousChars {
+		name = strings.ReplaceAll(name, char, "")
+	}
+
+	// Replace spaces with underscores (or remove them)
+	name = strings.ReplaceAll(name, " ", "_")
+
+	return name
+}
