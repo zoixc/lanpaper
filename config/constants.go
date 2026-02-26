@@ -20,6 +20,15 @@ const (
 
 	// GIFColors is the number of colors in GIF palette.
 	GIFColors = 256
+
+	// DefaultCompressionQuality is the default client-side compression quality (1-100).
+	// 85 = good balance between quality and file size.
+	// 100 = maximum quality, no compression.
+	DefaultCompressionQuality = 85
+
+	// DefaultCompressionScale is the default client-side scale percentage (1-100).
+	// 100 = full size (1920x1080 max), 50 = half size (960x540 max).
+	DefaultCompressionScale = 100
 )
 
 // Validation constants
