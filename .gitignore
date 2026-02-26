@@ -47,6 +47,7 @@ docker-compose.yml
 # Local dev dirs
 lanpaper/
 homepage/
+docs/
 
 # Misc
 style-old.css

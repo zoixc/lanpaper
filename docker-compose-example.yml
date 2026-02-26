@@ -25,6 +25,15 @@ services:
       - RATE_UPLOAD_PER_MIN=20
       - RATE_BURST=10
 
+      # Trusted reverse proxy IP or CIDR.
+      # Set this ONLY when Lanpaper is behind nginx/Caddy/Traefik so that
+      # X-Real-IP / X-Forwarded-For headers are used for rate limiting.
+      # Leave unset for direct / LAN deployments (safe default).
+      # Examples:
+      #   - TRUSTED_PROXY=172.18.0.1        # specific Docker gateway IP
+      #   - TRUSTED_PROXY=172.18.0.0/16     # entire Docker bridge subnet
+      # - TRUSTED_PROXY=
+
       # Path inside the container where your external images will be mounted
       - EXTERNAL_IMAGE_DIR=/app/gallery
 

@@ -14,15 +14,13 @@ const STATE = {
     sortBy: 'date_desc',
     wallpapers: [],
     filteredWallpapers: [],
+    compressor: null,
+    lazyObserver: null,
 };
 
 
 // DOM ELEMENTS
 const DOM = {
-    langSwitcher: document.getElementById('langSwitcher'),
-    langBtn: document.getElementById('langBtn'),
-    langList: document.getElementById('langList'),
-    langLabel: document.getElementById('langLabel'),
     themeBtn: document.getElementById('themeToggle'),
     viewBtn: document.getElementById('viewToggle'),
     linksList: document.getElementById('linksList'),
@@ -42,7 +40,6 @@ const DOM = {
     modalConfirm: document.getElementById('modalConfirmBtn'),
 
     // Creation
-    createBtn: document.getElementById('createLinkBtn'),
     createInput: document.getElementById('newLinkId'),
     createForm: document.getElementById('createForm'),
 
@@ -54,13 +51,118 @@ const DOM = {
 // INITIALIZATION
 document.addEventListener('DOMContentLoaded', async () => {
     initTheme();
-    initLanguage();
+    await initLanguage();
     initView();
     initSearchSort();
+    initLazyLoading();
+    initKeyboardShortcuts();
+    initPWA();
+    initCompression();
     loadAppVersion();
     await loadLinks();
     setupGlobalListeners();
 });
+
+
+// PWA INITIALIZATION
+function initPWA() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/static/sw.js')
+            .then(reg => console.log('SW registered:', reg.scope))
+            .catch(err => console.warn('SW registration failed:', err));
+    }
+}
+
+
+// IMAGE COMPRESSION INITIALIZATION
+function initCompression() {
+    // Check if compression script is loaded
+    if (typeof ImageCompressor !== 'undefined') {
+        STATE.compressor = new ImageCompressor({
+            maxWidth: 1920,
+            maxHeight: 1080,
+            quality: 0.85
+        });
+    }
+}
+
+
+// LAZY LOADING INITIALIZATION
+function initLazyLoading() {
+    if (!('IntersectionObserver' in window)) return;
+
+    STATE.lazyObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const img = entry.target;
+                if (img.dataset.src) {
+                    img.src = img.dataset.src;
+                    img.removeAttribute('data-src');
+                    STATE.lazyObserver.unobserve(img);
+                }
+            }
+        });
+    }, {
+        rootMargin: '50px 0px',
+        threshold: 0.01
+    });
+}
+
+
+// KEYBOARD SHORTCUTS
+function initKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        // Ignore if typing in input/textarea
+        if (e.target.matches('input, textarea')) return;
+
+        // Ctrl/Cmd + N: Create new link
+        if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+            e.preventDefault();
+            DOM.createInput.focus();
+            return;
+        }
+
+        // Ctrl/Cmd + F: Focus search
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            DOM.searchInput.focus();
+            DOM.searchInput.select();
+            return;
+        }
+
+        // Ctrl/Cmd + G: Toggle grid/list view
+        if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
+            e.preventDefault();
+            DOM.viewBtn.click();
+            return;
+        }
+
+        // Esc: Close modal or clear search
+        if (e.key === 'Escape') {
+            if (!DOM.modalOverlay.classList.contains('hidden')) {
+                closeModal();
+            } else if (DOM.searchInput.value) {
+                DOM.searchInput.value = '';
+                DOM.searchInput.dispatchEvent(new Event('input'));
+            }
+            return;
+        }
+
+        // T: Toggle theme
+        if (e.key === 't' || e.key === 'T') {
+            DOM.themeBtn.click();
+            return;
+        }
+    });
+
+    // Show shortcuts hint on first visit
+    if (!localStorage.getItem('shortcuts-seen')) {
+        setTimeout(() => {
+            showToast('💡 Shortcuts: Ctrl+N (new), Ctrl+F (search), Ctrl+G (view), T (theme)', 'success');
+            localStorage.setItem('shortcuts-seen', 'true');
+        }, 2000);
+    }
+}
 
 
 // VERSION
@@ -72,8 +174,8 @@ async function loadAppVersion() {
         if (data.version && DOM.appVersion) {
             DOM.appVersion.textContent = `v${data.version}`;
         }
-    } catch (e) {
-        // silently ignore — footer will show 'v...'
+    } catch (_) {
+        // silently ignore — footer will keep showing 'v...'
     }
 }
 
@@ -143,82 +245,61 @@ function initView() {
 
 
 function applyViewMode(mode, animate = false) {
+    // Update icon classes IMMEDIATELY so the button feels responsive
+    updateIconClasses(mode);
+
     if (animate) {
         DOM.linksList.classList.add('switching');
         setTimeout(() => {
-            updateClasses(mode);
+            updateLayoutClasses(mode);
             void DOM.linksList.offsetHeight;
             requestAnimationFrame(() => {
                 DOM.linksList.classList.remove('switching');
             });
-        }, 200);
+        }, 100); // Reduced from 200ms to 100ms
     } else {
-        updateClasses(mode);
+        updateLayoutClasses(mode);
     }
 }
 
 
-function updateClasses(mode) {
+function updateIconClasses(mode) {
     if (mode === 'grid') {
-        DOM.linksList.classList.add('grid-view');
         DOM.viewBtn.querySelectorAll('.list-icon').forEach(el => el.classList.add('active'));
         DOM.viewBtn.querySelectorAll('.grid-icon').forEach(el => el.classList.remove('active'));
     } else {
-        DOM.linksList.classList.remove('grid-view');
         DOM.viewBtn.querySelectorAll('.list-icon').forEach(el => el.classList.remove('active'));
         DOM.viewBtn.querySelectorAll('.grid-icon').forEach(el => el.classList.add('active'));
     }
 }
 
 
-// LANGUAGE MANAGER
-async function initLanguage() {
-    const langs = ['en', 'ru', 'de', 'fr', 'it', 'es'];
-
-    langs.forEach(lang => {
-        const li = document.createElement('li');
-        li.textContent = lang.toUpperCase();
-        li.dataset.lang = lang;
-        li.tabIndex = 0;
-        li.addEventListener('click', () => setLanguage(lang));
-        li.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') setLanguage(lang);
-        });
-        DOM.langList.appendChild(li);
-    });
-
-    await setLanguage(STATE.lang);
-
-    DOM.langBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        DOM.langList.classList.toggle('open');
-        DOM.langBtn.setAttribute('aria-expanded', DOM.langList.classList.contains('open'));
-    });
-
-    document.addEventListener('click', (e) => {
-        if (!DOM.langSwitcher.contains(e.target)) {
-            DOM.langList.classList.remove('open');
-            DOM.langBtn.setAttribute('aria-expanded', 'false');
-        }
-    });
+function updateLayoutClasses(mode) {
+    if (mode === 'grid') {
+        DOM.linksList.classList.add('grid-view');
+    } else {
+        DOM.linksList.classList.remove('grid-view');
+    }
 }
 
+
+// LANGUAGE MANAGER
+async function initLanguage() {
+    await setLanguage(STATE.lang);
+}
+
+
+// Export setLanguage to window for settings-menu.js
+window.setLanguage = setLanguage;
 
 async function setLanguage(lang) {
     STATE.lang = lang;
     localStorage.setItem('lang', lang);
-    DOM.langLabel.textContent = lang.toUpperCase();
-    DOM.langList.classList.remove('open');
 
     try {
         const res = await fetch(`/static/i18n/${lang}.json`);
-        if (res.ok) {
-            STATE.translations = await res.json();
-        } else {
-            STATE.translations = {};
-        }
-    } catch (e) {
-        console.warn('Translation load failed', e);
+        STATE.translations = res.ok ? await res.json() : {};
+    } catch (_) {
         STATE.translations = {};
     }
 
@@ -226,6 +307,11 @@ async function setLanguage(lang) {
     syncCustomSelectLabels();
     updateSearchStats();
     updateAriaLabels();
+    
+    // Update active language button in settings menu
+    document.querySelectorAll('.lang-option').forEach(opt => {
+        opt.classList.toggle('active', opt.dataset.lang === lang);
+    });
 }
 
 
@@ -246,7 +332,7 @@ function t(key, defaultText) {
 }
 
 
-// Update dynamic aria-labels after language switch
+// Update dynamic aria-labels after language switch.
 function updateAriaLabels() {
     document.querySelectorAll('[data-i18n-aria]').forEach(el => {
         const key = el.dataset.i18nAria;
@@ -521,9 +607,19 @@ async function loadExternalImages() {
 
             const previewUrl = `/api/external-image-preview?path=${encodeURIComponent(file)}`;
             div.innerHTML = `
-                <img src="${previewUrl}" loading="lazy" alt="${file}">
+                <img data-src="${previewUrl}" alt="${file}" style="opacity: 0; transition: opacity 0.3s;">
                 <div class="image-name">${file}</div>
             `;
+
+            // Lazy load modal images
+            const img = div.querySelector('img');
+            if (STATE.lazyObserver) {
+                STATE.lazyObserver.observe(img);
+                img.addEventListener('load', () => { img.style.opacity = '1'; });
+            } else {
+                img.src = img.dataset.src;
+                img.style.opacity = '1';
+            }
 
             div.onclick = () => {
                 DOM.modalList.querySelectorAll('.image-option').forEach(el => el.classList.remove('selected'));
@@ -531,7 +627,7 @@ async function loadExternalImages() {
             };
             DOM.modalList.appendChild(div);
         });
-    } catch (e) {
+    } catch (_) {
         DOM.modalList.innerHTML = `<div style="color:red; text-align:center;">${t('server_error', 'Error loading images')}</div>`;
     }
 }
@@ -552,8 +648,8 @@ async function apiCall(url, method = 'GET', body = null, isFormData = false) {
             throw new Error(text || `HTTP ${res.status}`);
         }
 
-        const contentType = res.headers.get("content-type");
-        if (contentType && contentType.indexOf("application/json") !== -1) {
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
             return res.json();
         }
         return null;
@@ -571,8 +667,7 @@ async function loadLinks() {
         STATE.wallpapers = wallpapers || [];
         updateSearchStats();
         filterAndSort();
-    } catch (e) {
-        console.error('LoadLinks error:', e);
+    } catch (_) {
         showToast(t('load_error', 'Failed to load links'), 'error');
         STATE.wallpapers = [];
         renderLinks([]);
@@ -622,6 +717,7 @@ function detectCategory(link) {
 function updateCard(card, link) {
     const linkName = link.linkName || link.id;
     card.querySelector('.link-id').textContent = linkName;
+    card.dataset.linkName = linkName;
 
     const fullUrl = `${window.location.origin}/${linkName}`;
 
@@ -658,18 +754,39 @@ function updateCard(card, link) {
 
     if (link.hasImage && resolvedPreview) {
         const img = document.createElement('img');
-        img.src = '/' + resolvedPreview.replace(/^\//, '') + `?t=${Date.now()}`;
+        const imgSrc = '/' + resolvedPreview.replace(/^\//, '') + `?t=${Date.now()}`;
+        
+        // Use lazy loading
+        if (STATE.lazyObserver) {
+            img.dataset.src = imgSrc;
+            img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"%3E%3C/svg%3E';
+            STATE.lazyObserver.observe(img);
+        } else {
+            img.src = imgSrc;
+        }
+        
         img.alt = 'Preview';
         img.className = 'preview';
+        img.loading = 'lazy';
         img.onerror = () => {
             previewWrapper.innerHTML = `<div class="no-image">${t('preview_unavailable', 'Preview unavailable')}</div>`;
         };
         previewWrapper.appendChild(img);
     } else if (link.hasImage) {
         const img = document.createElement('img');
-        img.src = '/' + (link.imageUrl || '').replace(/^\//, '') || fullUrl;
+        const imgSrc = '/' + (link.imageUrl || '').replace(/^\//, '') || fullUrl;
+        
+        if (STATE.lazyObserver) {
+            img.dataset.src = imgSrc;
+            img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"%3E%3C/svg%3E';
+            STATE.lazyObserver.observe(img);
+        } else {
+            img.src = imgSrc;
+        }
+        
         img.alt = 'Image';
         img.className = 'preview';
+        img.loading = 'lazy';
         img.onerror = () => {
             previewWrapper.innerHTML = `<div class="no-image">${t('image_unavailable', 'Image unavailable')}</div>`;
         };
@@ -703,6 +820,16 @@ function setupCardEvents(card, link) {
     const dropdown = card.querySelector('.upload-dropdown');
     const toggleBtn = card.querySelector('.upload-toggle-btn');
 
+    const ac = new AbortController();
+    const { signal } = ac;
+
+    new MutationObserver((_, obs) => {
+        if (!document.contains(card)) {
+            ac.abort();
+            obs.disconnect();
+        }
+    }).observe(document.body, { childList: true, subtree: true });
+
     toggleBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const isOpen = dropdown.classList.contains('open');
@@ -716,7 +843,7 @@ function setupCardEvents(card, link) {
             dropdown.classList.remove('open');
             toggleBtn.setAttribute('aria-expanded', 'false');
         }
-    });
+    }, { signal });
 
     card.querySelector('.upload-file-btn').addEventListener('click', () => {
         dropdown.classList.remove('open');
@@ -754,6 +881,7 @@ function setupCardEvents(card, link) {
     card.querySelector('.delete-btn').onclick = async () => {
         if (confirm(t('confirm_delete', 'Delete link?'))) {
             await apiCall(`/api/link/${link.linkName}`, 'DELETE');
+            ac.abort();
             card.remove();
             STATE.wallpapers = STATE.wallpapers.filter(wp => wp.linkName !== link.linkName);
             updateSearchStats();
@@ -775,7 +903,20 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
             showToast(t('invalid_image', 'Invalid file format'), 'error');
             return;
         }
-        formData.append('file', fileOrUrl);
+
+        // Compress image if compressor is available
+        let fileToUpload = fileOrUrl;
+        if (STATE.compressor && fileOrUrl.type.startsWith('image/')) {
+            const originalSize = fileOrUrl.size;
+            fileToUpload = await STATE.compressor.compress(fileOrUrl);
+            
+            if (fileToUpload.size < originalSize) {
+                const info = ImageCompressor.getCompressionInfo(originalSize, fileToUpload.size);
+                showToast(`🗜️ Compressed: ${info.percent}% smaller (${formatKB(info.saved)} saved)`, 'success');
+            }
+        }
+
+        formData.append('file', fileToUpload);
     }
 
     try {
@@ -793,24 +934,16 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
         }
 
         updateCard(card, updatedLink);
-        reorderCard(card, updatedLink);
         filterAndSort();
         showToast(t('upload_success', 'Uploaded!'), 'success');
-    } catch (e) {
-        console.error(e);
-    }
-}
-
-
-function reorderCard(card, link) {
-    if (link.hasImage) {
-        DOM.linksList.prepend(card);
+    } catch (_) {
+        // Error toast is already shown by apiCall.
     }
 }
 
 
 function setupGlobalListeners() {
-    DOM.createForm.onsubmit = async (e) => {
+    DOM.createForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = DOM.createInput.value.trim();
         if (!id) {
@@ -839,28 +972,23 @@ function setupGlobalListeners() {
                 preview: '',
             };
 
-            const clone = DOM.template.content.cloneNode(true);
-            const article = clone.querySelector('article');
-            updateCard(article, newLinkObj);
-            setupCardEvents(article, newLinkObj);
-            applyTranslations(article);
-            updateAriaLabels();
-
-            DOM.emptyState.style.display = 'none';
-            DOM.linksList.appendChild(article);
             STATE.wallpapers.push(newLinkObj);
             filterAndSort();
 
-            article.animate([
-                { opacity: 0, transform: 'translateY(10px)' },
-                { opacity: 1, transform: 'translateY(0)' }
-            ], { duration: 300 });
+            const newCard = DOM.linksList.querySelector(`[data-link-name="${CSS.escape(id)}"]`)
+                ?? DOM.linksList.lastElementChild;
+            if (newCard) {
+                newCard.animate([
+                    { opacity: 0, transform: 'translateY(10px)' },
+                    { opacity: 1, transform: 'translateY(0)' }
+                ], { duration: 300 });
+            }
 
             showToast(t('created_success', 'Link created'), 'success');
-        } catch (e) {
-            console.error(e);
+        } catch (_) {
+            // Error toast is already shown by apiCall.
         }
-    };
+    });
 
     DOM.modalOverlay.onclick = (e) => {
         if (e.target === DOM.modalOverlay) closeModal();

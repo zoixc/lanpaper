@@ -1,0 +1,69 @@
+package config
+
+// Image processing constants
+const (
+	// MaxImageDimension is the maximum allowed image width or height.
+	// Images exceeding this size are rejected to prevent decompression bombs.
+	MaxImageDimension = 16384 // 16K pixels
+
+	// ThumbnailMaxWidth is the maximum width for generated thumbnails.
+	ThumbnailMaxWidth = 200
+
+	// ThumbnailMaxHeight is the maximum height for generated thumbnails.
+	ThumbnailMaxHeight = 160
+
+	// JPEGQuality is the quality setting for JPEG encoding (1-100).
+	JPEGQuality = 85
+
+	// WebPQuality is the quality setting for WebP encoding (1-100).
+	WebPQuality = 85
+
+	// GIFColors is the number of colors in GIF palette.
+	GIFColors = 256
+)
+
+// Validation constants
+const (
+	// MinUploadMB is the minimum allowed MaxUploadMB value.
+	MinUploadMB = 1
+
+	// DefaultMaxUploadMB is the default upload size limit in megabytes.
+	DefaultMaxUploadMB = 50
+
+	// DefaultMaxConcurrentUploads is the default number of concurrent uploads.
+	DefaultMaxConcurrentUploads = 2
+)
+
+// Network constants
+const (
+	// DownloadTimeout is the maximum time allowed for downloading remote images.
+	// Set to 90 seconds to accommodate slow connections and large files.
+	DownloadTimeout = 90 // seconds
+
+	// HTTPReadTimeout covers request headers and body reading.
+	HTTPReadTimeout = 30 // seconds
+
+	// HTTPWriteTimeout must exceed DownloadTimeout to allow large file responses.
+	HTTPWriteTimeout = 120 // seconds
+
+	// HTTPIdleTimeout is the maximum time to wait for the next request.
+	HTTPIdleTimeout = 120 // seconds
+
+	// ShutdownTimeout is the graceful shutdown timeout.
+	ShutdownTimeout = 30 // seconds
+)
+
+// Rate limiting constants
+const (
+	// DefaultPublicRatePerMin is the default rate limit for public endpoints.
+	DefaultPublicRatePerMin = 120
+
+	// DefaultUploadRatePerMin is the default rate limit for upload endpoint.
+	DefaultUploadRatePerMin = 20
+
+	// DefaultRateBurst is the default burst allowance for rate limiting.
+	DefaultRateBurst = 10
+
+	// RateLimitCleanerInterval is the sweep period for idle rate-limit entries.
+	RateLimitCleanerInterval = 120 // seconds (2 minutes)
+)

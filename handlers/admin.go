@@ -15,8 +15,16 @@ import (
 	"lanpaper/utils"
 )
 
-// maxWalkDepth limits how deep ExternalImages will recurse into subdirectories.
+// maxWalkDepth limits directory recursion depth in ExternalImages.
 const maxWalkDepth = 3
+
+// SortField represents valid sort field options for type safety.
+type SortField string
+
+const (
+	SortFieldCreated SortField = "created"
+	SortFieldUpdated SortField = "updated"
+)
 
 func Admin(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "admin.html")
@@ -34,13 +42,8 @@ type WallpaperResponse struct {
 	CreatedAt int64  `json:"createdAt"`
 }
 
-// Wallpapers handles GET /api/wallpapers
-// Supports query params:
-//
-//	?category=tech        — filter by category
-//	?has_image=true|false — filter by image presence
-//	?sort=created|updated — sort field (default: server default)
-//	?order=asc|desc       — sort direction (default: desc)
+// Wallpapers handles GET /api/wallpapers.
+// Supported query params: ?category=, ?has_image=true|false, ?sort=created|updated, ?order=asc|desc
 func Wallpapers(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -49,73 +52,34 @@ func Wallpapers(w http.ResponseWriter, r *http.Request) {
 
 	wallpapers := storage.Global.GetAll()
 
-	// --- filtering ---
 	if cat := r.URL.Query().Get("category"); cat != "" {
-		filtered := wallpapers[:0]
+		out := wallpapers[:0]
 		for _, wp := range wallpapers {
 			if strings.EqualFold(wp.Category, cat) {
-				filtered = append(filtered, wp)
+				out = append(out, wp)
 			}
 		}
-		wallpapers = filtered
+		wallpapers = out
 	}
 	if hasImg := r.URL.Query().Get("has_image"); hasImg != "" {
 		want := hasImg == "true"
-		filtered := wallpapers[:0]
+		out := wallpapers[:0]
 		for _, wp := range wallpapers {
 			if wp.HasImage == want {
-				filtered = append(filtered, wp)
+				out = append(out, wp)
 			}
 		}
-		wallpapers = filtered
+		wallpapers = out
 	}
 
-	// --- sorting ---
-	sortField := r.URL.Query().Get("sort")  // "created" | "updated"
-	sortOrder := r.URL.Query().Get("order") // "asc" | "desc"
-	if sortField != "" {
-		desc := sortOrder != "asc"
-		sort.Slice(wallpapers, func(i, j int) bool {
-			var vi, vj int64
-			switch sortField {
-			case "updated":
-				vi, vj = wallpapers[i].ModTime, wallpapers[j].ModTime
-			default: // "created"
-				vi, vj = wallpapers[i].CreatedAt, wallpapers[j].CreatedAt
-			}
-			if desc {
-				return vi > vj
-			}
-			return vi < vj
-		})
+	if sf := r.URL.Query().Get("sort"); sf != "" {
+		desc := r.URL.Query().Get("order") != "asc"
+		sortWallpapers(wallpapers, sf, desc)
 	}
 
-	var resp []WallpaperResponse
+	resp := make([]WallpaperResponse, 0, len(wallpapers))
 	for _, wp := range wallpapers {
-		category := wp.Category
-		if category == "" {
-			if wp.MIMEType == "mp4" || wp.MIMEType == "webm" {
-				category = "video"
-			} else if wp.HasImage {
-				category = "image"
-			} else {
-				category = "other"
-			}
-		}
-		resp = append(resp, WallpaperResponse{
-			ID:        wp.ID,
-			LinkName:  wp.LinkName,
-			Category:  category,
-			HasImage:  wp.HasImage,
-			ImageURL:  wp.ImageURL,
-			Preview:   wp.Preview,
-			MIMEType:  wp.MIMEType,
-			SizeBytes: wp.SizeBytes,
-			CreatedAt: wp.CreatedAt,
-		})
-	}
-	if resp == nil {
-		resp = []WallpaperResponse{}
+		resp = append(resp, toResponse(wp))
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -124,18 +88,75 @@ func Wallpapers(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// sortWallpapers sorts wallpapers using efficient O(n log n) algorithm.
+func sortWallpapers(wps []*storage.Wallpaper, field string, desc bool) {
+	sort.Slice(wps, func(i, j int) bool {
+		var vi, vj int64
+		if field == string(SortFieldUpdated) {
+			vi, vj = wps[i].ModTime, wps[j].ModTime
+		} else {
+			vi, vj = wps[i].CreatedAt, wps[j].CreatedAt
+		}
+		if desc {
+			return vi > vj
+		}
+		return vi < vj
+	})
+}
+
+func toResponse(wp *storage.Wallpaper) WallpaperResponse {
+	cat := wp.Category
+	if cat == "" {
+		switch {
+		case wp.MIMEType == "mp4" || wp.MIMEType == "webm":
+			cat = "video"
+		case wp.HasImage:
+			cat = "image"
+		default:
+			cat = "other"
+		}
+	}
+	return WallpaperResponse{
+		ID:        wp.ID,
+		LinkName:  wp.LinkName,
+		Category:  cat,
+		HasImage:  wp.HasImage,
+		ImageURL:  wp.ImageURL,
+		Preview:   wp.Preview,
+		MIMEType:  wp.MIMEType,
+		SizeBytes: wp.SizeBytes,
+		CreatedAt: wp.CreatedAt,
+	}
+}
+
 var validCategories = map[string]bool{
-	"tech":  true,
-	"life":  true,
-	"work":  true,
-	"other": true,
+	"tech": true, "life": true, "work": true, "other": true,
 }
 
-func isValidCategory(cat string) bool {
-	return validCategories[cat]
+func isValidCategory(cat string) bool { return validCategories[cat] }
+
+// linkNameFromPath extracts and validates the last URL path segment.
+func linkNameFromPath(r *http.Request) (string, bool) {
+	name := filepath.Base(strings.TrimSuffix(r.URL.Path, "/"))
+	if !isValidLinkName(name) {
+		return "", false
+	}
+	return name, true
 }
 
-// Link handles POST /api/link and DELETE /api/link/{name}
+// removeFiles deletes image and optional preview files, ignoring not-found errors.
+func removeFiles(imagePath, previewPath string) {
+	if err := os.Remove(imagePath); err != nil && !os.IsNotExist(err) {
+		log.Printf("Error removing image %s: %v", imagePath, err)
+	}
+	if previewPath != "" {
+		if err := os.Remove(previewPath); err != nil && !os.IsNotExist(err) {
+			log.Printf("Error removing preview %s: %v", previewPath, err)
+		}
+	}
+}
+
+// Link handles POST /api/link, PATCH /api/link/{name}, DELETE /api/link/{name}.
 func Link(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
@@ -159,27 +180,25 @@ func Link(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Link exists", http.StatusConflict)
 			return
 		}
-		category := req.Category
-		if category == "" {
-			category = "other"
+		cat := req.Category
+		if cat == "" {
+			cat = "other"
 		}
-		newWp := &storage.Wallpaper{
+		storage.Global.Set(req.LinkName, &storage.Wallpaper{
 			ID:        req.LinkName,
 			LinkName:  req.LinkName,
-			Category:  category,
-			HasImage:  false,
+			Category:  cat,
 			CreatedAt: time.Now().Unix(),
-		}
-		storage.Global.Set(req.LinkName, newWp)
+		})
 		if err := storage.Global.Save(); err != nil {
-			log.Printf("Error saving wallpapers after link creation: %v", err)
+			log.Printf("Error saving after link creation: %v", err)
 		}
-		log.Printf("Created link: %s (category: %s)", req.LinkName, category)
+		log.Printf("Created link: %s (category: %s)", req.LinkName, cat)
 		w.WriteHeader(http.StatusCreated)
 
 	case http.MethodPatch:
-		linkName := filepath.Base(r.URL.Path)
-		if !isValidLinkName(linkName) {
+		linkName, ok := linkNameFromPath(r)
+		if !ok {
 			http.Error(w, "Invalid link", http.StatusBadRequest)
 			return
 		}
@@ -188,7 +207,6 @@ func Link(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Link not found", http.StatusNotFound)
 			return
 		}
-
 		var req struct {
 			Category *string `json:"category"`
 		}
@@ -196,9 +214,8 @@ func Link(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
 			return
 		}
-
 		if req.Category != nil {
-			// Empty string resets category to "other" instead of storing an invalid blank value.
+			// Empty string resets to "other" instead of storing a blank value.
 			if *req.Category == "" {
 				wp.Category = "other"
 			} else if !isValidCategory(*req.Category) {
@@ -208,10 +225,9 @@ func Link(w http.ResponseWriter, r *http.Request) {
 				wp.Category = *req.Category
 			}
 		}
-
 		storage.Global.Set(linkName, wp)
 		if err := storage.Global.Save(); err != nil {
-			log.Printf("Error saving wallpapers after link patch: %v", err)
+			log.Printf("Error saving after link patch: %v", err)
 		}
 		log.Printf("Patched link: %s (category: %s)", linkName, wp.Category)
 		w.Header().Set("Content-Type", "application/json")
@@ -220,30 +236,22 @@ func Link(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case http.MethodDelete:
-		linkName := filepath.Base(r.URL.Path)
-		if !isValidLinkName(linkName) {
+		linkName, ok := linkNameFromPath(r)
+		if !ok {
 			http.Error(w, "Invalid link", http.StatusBadRequest)
 			return
 		}
 		wp, exists := storage.Global.Get(linkName)
 		if !exists {
-			// Return 404 so the caller can distinguish "deleted" from "never existed".
 			http.Error(w, "Link not found", http.StatusNotFound)
 			return
 		}
 		if wp.HasImage {
-			if err := os.Remove(wp.ImagePath); err != nil && !os.IsNotExist(err) {
-				log.Printf("Error removing image %s: %v", wp.ImagePath, err)
-			}
-			if wp.PreviewPath != "" {
-				if err := os.Remove(wp.PreviewPath); err != nil && !os.IsNotExist(err) {
-					log.Printf("Error removing preview %s: %v", wp.PreviewPath, err)
-				}
-			}
+			removeFiles(wp.ImagePath, wp.PreviewPath)
 		}
 		storage.Global.Delete(linkName)
 		if err := storage.Global.Save(); err != nil {
-			log.Printf("Error saving wallpapers after link deletion: %v", err)
+			log.Printf("Error saving after link deletion: %v", err)
 		}
 		w.WriteHeader(http.StatusOK)
 
@@ -252,19 +260,38 @@ func Link(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func externalRoot() string {
+	if d := config.Current.ExternalImageDir; d != "" {
+		return d
+	}
+	return "external/images"
+}
+
 func ExternalImages(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	root := config.Current.ExternalImageDir
-	if root == "" {
-		root = "external/images"
+	root := externalRoot()
+
+	// Resolve the gallery root; a missing directory returns an empty list.
+	absRoot, _, err := utils.ValidateAndResolvePath(root, ".")
+	if err != nil {
+		// Directory may not exist yet — return an empty list.
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode([]string{})
+		return
+	}
+	realRoot, realErr := filepath.EvalSymlinks(absRoot)
+	if realErr != nil {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode([]string{})
+		return
 	}
 
 	var files []string
-	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+	_ = filepath.WalkDir(absRoot, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -272,31 +299,29 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 			if strings.HasPrefix(d.Name(), ".") && d.Name() != "." {
 				return filepath.SkipDir
 			}
-			rel, relErr := filepath.Rel(root, path)
-			if relErr == nil {
-				depth := len(strings.Split(rel, string(filepath.Separator)))
-				if rel != "." && depth > maxWalkDepth {
+			if rel, relErr := filepath.Rel(absRoot, path); relErr == nil && rel != "." {
+				if depth := len(strings.Split(rel, string(filepath.Separator))); depth > maxWalkDepth {
 					return filepath.SkipDir
 				}
 			}
 			return nil
 		}
-
-		ext := strings.ToLower(filepath.Ext(d.Name()))
-		if ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".gif" ||
-			ext == ".webp" || ext == ".bmp" || ext == ".tiff" || ext == ".tif" ||
-			ext == ".mp4" || ext == ".webm" {
-			relPath, err := filepath.Rel(root, path)
-			if err == nil {
-				relPath = filepath.ToSlash(relPath)
-				files = append(files, relPath)
+		realPath, symlinkErr := filepath.EvalSymlinks(path)
+		if symlinkErr != nil {
+			return nil
+		}
+		if !strings.HasPrefix(realPath, realRoot+string(filepath.Separator)) && realPath != realRoot {
+			log.Printf("Security: skipping symlink escape: %s -> %s", path, realPath)
+			return nil
+		}
+		if isAllowedExt(filepath.Ext(d.Name())) {
+			if relPath, relErr := filepath.Rel(absRoot, path); relErr == nil {
+				files = append(files, filepath.ToSlash(relPath))
 			}
 		}
 		return nil
 	})
-	if err != nil {
-		log.Printf("Error walking external images directory: %v", err)
-	}
+
 	if files == nil {
 		files = []string{}
 	}
@@ -305,6 +330,15 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error encoding external images response: %v", err)
 	}
 }
+
+// allowedExts is the set of file extensions served from the external gallery.
+var allowedExts = map[string]bool{
+	".jpg": true, ".jpeg": true, ".png": true, ".gif": true,
+	".webp": true, ".bmp": true, ".tiff": true, ".tif": true,
+	".mp4": true, ".webm": true,
+}
+
+func isAllowedExt(ext string) bool { return allowedExts[strings.ToLower(ext)] }
 
 func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
 	pathParam := r.URL.Query().Get("path")
@@ -318,32 +352,14 @@ func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	root := config.Current.ExternalImageDir
-	if root == "" {
-		root = "external/images"
-	}
-	absRoot, err := filepath.Abs(root)
+	// Use utils.ValidateAndResolvePath to prevent path traversal and symlink escapes.
+	absPath, _, err := utils.ValidateAndResolvePath(externalRoot(), pathParam)
 	if err != nil {
-		log.Printf("Error resolving root directory: %v", err)
-		http.Error(w, "Server configuration error", http.StatusInternalServerError)
-		return
-	}
-	fullPath := filepath.Join(absRoot, filepath.Clean(pathParam))
-	absPath, err := filepath.Abs(fullPath)
-	if err != nil {
-		log.Printf("Error resolving preview path: %v", err)
-		http.NotFound(w, r)
-		return
-	}
-	if !strings.HasPrefix(absPath, absRoot+string(filepath.Separator)) && absPath != absRoot {
-		log.Printf("Security: blocked path traversal in preview: %s -> %s", pathParam, absPath)
+		log.Printf("Security: path validation failed for preview %s: %v", pathParam, err)
 		http.Error(w, "Path outside allowed directory", http.StatusForbidden)
 		return
 	}
-	if _, err := os.Stat(absPath); os.IsNotExist(err) {
-		http.NotFound(w, r)
-		return
-	}
+
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	http.ServeFile(w, r, absPath)
 }

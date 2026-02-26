@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"log"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -30,6 +31,10 @@ type Config struct {
 	ProxyUsername        string     `json:"proxyUsername,omitempty"`
 	ProxyPassword        string     `json:"proxyPassword,omitempty"`
 	Rate                 RateConfig `json:"rate"`
+	// TrustedProxy is the IP or CIDR of a reverse proxy in front of Lanpaper.
+	// X-Real-IP / X-Forwarded-For are trusted only for requests from this address.
+	// Leave empty to always use the raw TCP remote address (safe default).
+	TrustedProxy string `json:"trustedProxy,omitempty"`
 }
 
 var Current Config
@@ -37,9 +42,9 @@ var Current Config
 func Load() {
 	Current = Config{
 		Port:                 getEnv("PORT", "8080"),
-		MaxUploadMB:          getEnvInt("MAX_UPLOAD_MB", 50),
+		MaxUploadMB:          getEnvInt("MAX_UPLOAD_MB", DefaultMaxUploadMB),
 		MaxImages:            getEnvInt("MAX_IMAGES", 0),
-		MaxConcurrentUploads: getEnvInt("MAX_CONCURRENT_UPLOADS", 2),
+		MaxConcurrentUploads: getEnvInt("MAX_CONCURRENT_UPLOADS", DefaultMaxConcurrentUploads),
 		ExternalImageDir:     getEnv("EXTERNAL_IMAGE_DIR", "external/images"),
 		AdminUser:            getEnv("ADMIN_USER", ""),
 		AdminPass:            getEnv("ADMIN_PASS", ""),
@@ -50,10 +55,11 @@ func Load() {
 		ProxyType:            getEnv("PROXY_TYPE", "http"),
 		ProxyUsername:        getEnvAny("PROXY_USERNAME", "PROXY_USER", ""),
 		ProxyPassword:        getEnvAny("PROXY_PASSWORD", "PROXY_PASS", ""),
+		TrustedProxy:         getEnv("TRUSTED_PROXY", ""),
 		Rate: RateConfig{
-			PublicPerMin: getEnvInt("RATE_PUBLIC_PER_MIN", 120),
-			UploadPerMin: getEnvInt("RATE_UPLOAD_PER_MIN", 20),
-			Burst:        getEnvInt("RATE_BURST", 10),
+			PublicPerMin: getEnvInt("RATE_PUBLIC_PER_MIN", DefaultPublicRatePerMin),
+			UploadPerMin: getEnvInt("RATE_UPLOAD_PER_MIN", DefaultUploadRatePerMin),
+			Burst:        getEnvInt("RATE_BURST", DefaultRateBurst),
 		},
 	}
 
@@ -66,51 +72,80 @@ func Load() {
 	validate()
 }
 
-// validate sanitises Current in-place, resetting any out-of-range values to
-// safe defaults. It is called by Load() and is also available to tests.
+// IsTrustedProxy reports whether remoteAddr matches the configured TrustedProxy
+// IP or CIDR. Returns false when TrustedProxy is empty.
+func IsTrustedProxy(remoteAddr string) bool {
+	if Current.TrustedProxy == "" {
+		return false
+	}
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		host = remoteAddr
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	if proxyIP := net.ParseIP(Current.TrustedProxy); proxyIP != nil {
+		return proxyIP.Equal(ip)
+	}
+	_, cidr, err := net.ParseCIDR(Current.TrustedProxy)
+	if err != nil {
+		return false
+	}
+	return cidr.Contains(ip)
+}
+
+// validate sanitises Current in-place, resetting out-of-range values to safe
+// defaults. Called by Load and available to tests.
 func validate() {
-	// Port
 	portStr := strings.TrimPrefix(Current.Port, ":")
 	if n, err := strconv.Atoi(portStr); err != nil || n < 1 || n > 65535 {
 		log.Printf("Warning: invalid port %q, using 8080", Current.Port)
 		Current.Port = "8080"
 	}
 
-	// MaxUploadMB
-	if Current.MaxUploadMB <= 0 {
-		log.Printf("Warning: invalid MaxUploadMB %d, using 10", Current.MaxUploadMB)
-		Current.MaxUploadMB = 10
+	if Current.MaxUploadMB < MinUploadMB {
+		log.Printf("Warning: MaxUploadMB %d is below minimum %d, using %d", Current.MaxUploadMB, MinUploadMB, DefaultMaxUploadMB)
+		Current.MaxUploadMB = DefaultMaxUploadMB
 	}
 
-	// MaxConcurrentUploads
 	if Current.MaxConcurrentUploads <= 0 {
-		Current.MaxConcurrentUploads = 2
+		Current.MaxConcurrentUploads = DefaultMaxConcurrentUploads
 	}
 
-	// Rate limits
 	if Current.Rate.PublicPerMin < 0 {
-		Current.Rate.PublicPerMin = 120
+		Current.Rate.PublicPerMin = DefaultPublicRatePerMin
 	}
 	if Current.Rate.UploadPerMin < 0 {
-		Current.Rate.UploadPerMin = 20
+		Current.Rate.UploadPerMin = DefaultUploadRatePerMin
 	}
 	if Current.Rate.Burst <= 0 {
-		Current.Rate.Burst = 10
+		Current.Rate.Burst = DefaultRateBurst
 	}
 
-	// Proxy type
 	if Current.ProxyHost != "" {
 		switch Current.ProxyType {
 		case "http", "https", "socks5":
-			// valid
 		default:
 			log.Printf("Warning: invalid proxy type %q, using http", Current.ProxyType)
 			Current.ProxyType = "http"
 		}
 	}
 
-	// Auto-disable auth when either credential is missing.
-	// Both username AND password must be provided for auth to work.
+	if Current.TrustedProxy != "" {
+		valid := net.ParseIP(Current.TrustedProxy) != nil
+		if !valid {
+			_, _, err := net.ParseCIDR(Current.TrustedProxy)
+			valid = err == nil
+		}
+		if !valid {
+			log.Printf("Warning: invalid TRUSTED_PROXY %q — ignoring (must be IP or CIDR)", Current.TrustedProxy)
+			Current.TrustedProxy = ""
+		}
+	}
+
+	// Both username and password are required; missing either disables auth.
 	if !Current.DisableAuth && (Current.AdminUser == "" || Current.AdminPass == "") {
 		Current.DisableAuth = true
 	}
@@ -124,15 +159,14 @@ func getEnv(key, fallback string) string {
 }
 
 // getEnvAny returns the first non-empty value among the given env keys.
-// The last argument is the fallback value.
+// The last argument is the fallback.
 func getEnvAny(keys ...string) string {
-	fallback := keys[len(keys)-1]
 	for _, key := range keys[:len(keys)-1] {
 		if v := os.Getenv(key); v != "" {
 			return v
 		}
 	}
-	return fallback
+	return keys[len(keys)-1]
 }
 
 func getEnvInt(key string, fallback int) int {

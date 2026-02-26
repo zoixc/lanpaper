@@ -3,27 +3,37 @@
   "input_placeholder": "ID ссылки (буквы, цифры, - или _)",
   "create_btn": "Создать",
   "existing_links": "Ссылки",
-  "no_links": "Список пуст",
-  "no_image": "Нет картинки",
-  "copy_url": "Копировать",
+  "no_links": "Нет ссылок",
+  "no_image": "Нет изображения",
+  "copy_url": "Копировать URL",
   "set_image": "Загрузить",
-  "paste_url": "По ссылке",
+  "paste_url": "Из URL",
   "select_server": "Из галереи",
   "remove": "Удалить",
 
-  "enter_image_url_title": "Вставить по ссылке",
-  "select_server_title": "Выбор из галереи",
-  "enter_image_url": "URL картинки:",
+  "settings_language": "Язык",
+  "settings_data": "Данные",
+  "export_json": "Экспорт",
+  "import_json": "Импорт",
+  "export_success": "Данные успешно экспортированы",
+  "export_error": "Ошибка экспорта",
+  "import_success": "Данные успешно импортированы",
+  "import_error": "Ошибка импорта: неверный файл",
+  "import_confirm": "Импортировать {{count}} ссылок? Текущие данные будут заменены.",
+
+  "enter_image_url_title": "Вставить из URL",
+  "select_server_title": "Выбрать из галереи",
+  "enter_image_url": "URL изображения:",
   "url_placeholder": "https://...",
 
-  "invalid_id": "Введите ID",
-  "invalid_id_chars": "Только a-z, 0-9, -, _",
-  "invalid_image": "Неверный формат",
+  "invalid_id": "ID обязателен",
+  "invalid_id_chars": "Используйте a-z, 0-9, - или _",
+  "invalid_image": "Неверный формат файла",
 
   "upload_success": "Загружено!",
-  "created_success": "Создано",
-  "deleted_success": "Удалено",
-  "confirm_delete": "Удалить ссылку?",
+  "created_success": "Ссылка создана",
+  "deleted_success": "Ссылка удалена",
+  "confirm_delete": "Удалить эту ссылку?",
 
   "loading": "Загрузка...",
   "server_empty": "Папка пуста",
@@ -31,16 +41,16 @@
   "copied": "Скопировано!",
 
   "modal_cancel": "Отмена",
-  "modal_ok": "ОК",
+  "modal_ok": "OK",
   "modal_default_title": "Ввод",
 
-  "search_placeholder": "Поиск по названию ссылки или файлу...",
+  "search_placeholder": "Поиск по имени или файлу...",
   "search_total": "Всего: {{total}}",
   "search_found": "Найдено {{shown}} из {{total}}",
 
   "sort_by": "Сортировка:",
-  "name_asc": "Название (А–Я)",
-  "name_desc": "Название (Я–А)",
+  "name_asc": "Имя (А–Я)",
+  "name_desc": "Имя (Я–А)",
   "date_new": "Сначала новые",
   "date_old": "Сначала старые",
 
@@ -50,5 +60,5 @@
 
   "aria_open_image": "Открыть изображение",
   "aria_link_id": "ID ссылки",
-  "aria_file_info": "Инфо о файле"
+  "aria_file_info": "Информация о файле"
 }

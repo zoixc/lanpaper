@@ -11,6 +11,16 @@
   "select_server": "From gallery",
   "remove": "Remove",
 
+  "settings_language": "Language",
+  "settings_data": "Data",
+  "export_json": "Export",
+  "import_json": "Import",
+  "export_success": "Data exported successfully",
+  "export_error": "Export failed",
+  "import_success": "Data imported successfully",
+  "import_error": "Import failed: Invalid file",
+  "import_confirm": "Import {{count}} links? This will replace current data.",
+
   "enter_image_url_title": "Paste from URL",
   "select_server_title": "Select from gallery",
   "enter_image_url": "Image URL:",

@@ -1,0 +1,204 @@
+/* ============================================================
+   SETTINGS DROPDOWN MENU
+   ============================================================ */
+
+.settings-dropdown {
+    position: relative;
+    z-index: var(--z-dropdown);
+}
+
+/* Settings Button */
+#settingsBtn {
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    position: relative;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .15s ease, border-color .15s ease;
+}
+
+#settingsBtn:hover {
+    background: var(--btn-secondary);
+    border-color: var(--border);
+}
+
+.settings-dropdown.open #settingsBtn {
+    background: var(--btn-secondary-hover);
+    border-color: var(--border-hover);
+}
+
+/* Settings Icon (image-based) */
+.settings-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 18px;
+    height: 18px;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .3s ease, transform .35s cubic-bezier(0.34, 1.56, .64, 1);
+}
+
+/* Show correct icon per theme */
+body:not(.dark) .settings-icon.light-theme-icon,
+body.dark .settings-icon.dark-theme-icon {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Rotate gear 30deg when open */
+.settings-dropdown.open #settingsBtn .settings-icon {
+    transform: translate(-50%, -50%) rotate(30deg);
+}
+
+/* Settings Menu Panel */
+.settings-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 240px;
+    padding: 8px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+    z-index: calc(var(--z-dropdown) + 1);
+    display: none;
+    animation: settingsMenuOpen .2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.settings-dropdown.open .settings-menu {
+    display: block;
+}
+
+@keyframes settingsMenuOpen {
+    from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Settings Section */
+.settings-section {
+    padding: 8px 0;
+}
+
+.settings-section:not(:last-child) {
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+    padding-bottom: 12px;
+}
+
+.settings-section-title {
+    font-family: var(--font-ui);
+    font-size: var(--text-xs);
+    font-weight: var(--fw-ui);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0 8px 8px 8px;
+    margin: 0;
+}
+
+/* Language Options */
+.lang-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    padding: 0 4px;
+}
+
+.lang-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: var(--text-base);
+    font-weight: var(--fw-ui);
+    cursor: pointer;
+    user-select: none;
+    transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+
+.lang-option:hover {
+    background: var(--btn-secondary-hover);
+    border-color: var(--border-hover);
+}
+
+/* Light theme active state: dark button (#454542) with light text */
+.lang-option.active {
+    background: var(--btn-primary);
+    color: var(--bg);
+    border-color: var(--btn-primary);
+    font-weight: 700;
+}
+
+/* Dark theme active state: accent color (#6e7fcc) with white text for high contrast */
+body.dark .lang-option.active {
+    background: var(--accent);
+    color: #ffffff;
+    border-color: var(--accent);
+    font-weight: 700;
+}
+
+/* Settings Menu Items (Export/Import) */
+.settings-menu-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 10px 12px;
+    gap: 10px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: var(--text-base);
+    font-weight: var(--fw-ui);
+    cursor: pointer;
+    white-space: nowrap;
+    text-align: left;
+    transition: background .15s ease, color .15s ease;
+}
+
+.settings-menu-item:hover {
+    background: var(--btn-secondary-hover);
+}
+
+.settings-menu-item svg {
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.settings-menu-item:hover svg {
+    opacity: 1;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .settings-menu {
+        right: -8px;
+        min-width: 200px;
+    }
+
+    .lang-options {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
