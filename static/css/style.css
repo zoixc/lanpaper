@@ -621,26 +621,45 @@ body.dark .view-icon.light-theme-icon {
     border-radius: var(--radius);
     box-shadow: var(--shadow-md);
     z-index: calc(var(--z-dropdown) + 1);
-    display: none;
     overflow: hidden;
+    /* Closed state */
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s cubic-bezier(0.4, 0, 0.2, 1),
+                transform .15s cubic-bezier(0.4, 0, 0.2, 1),
+                visibility 0s linear .15s;
 }
 
 .upload-menu {
     left: 50%;
-    transform: translateX(-50%);
-    animation: dropdownOpenCenter .15s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateX(-50%) translateY(-6px);
 }
 
 .custom-select-menu {
     left: 0;
     right: 0;
     min-width: unset;
-    animation: dropdownOpen .15s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateY(-6px);
 }
 
+/* Open state */
 .upload-dropdown.open .upload-menu,
 .custom-select.open .custom-select-menu {
-    display: block;
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    transition: opacity .15s cubic-bezier(0.4, 0, 0.2, 1),
+                transform .15s cubic-bezier(0.4, 0, 0.2, 1),
+                visibility 0s linear 0s;
+}
+
+.upload-dropdown.open .upload-menu {
+    transform: translateX(-50%) translateY(0);
+}
+
+.custom-select.open .custom-select-menu {
+    transform: translateY(0);
 }
 
 .upload-menu-item,
@@ -668,15 +687,6 @@ body.dark .view-icon.light-theme-icon {
 .custom-select-option:hover { background: var(--btn-secondary-hover); }
 
 .custom-select-option.selected { color: var(--accent); font-weight: 700; }
-
-@keyframes dropdownOpen {
-    from { opacity: 0; transform: translateY(-6px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes dropdownOpenCenter {
-    from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
-    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
 
 
 /* ============================================================
@@ -997,8 +1007,12 @@ body.dark        #langIconLight { display: none; }
 .links-list.grid-view .upload-menu {
     left: 50%;
     right: auto;
-    transform: translateX(-50%);
+    transform: translateX(-50%) translateY(-6px);
     min-width: 100%;
+}
+
+.links-list.grid-view .upload-dropdown.open .upload-menu {
+    transform: translateX(-50%) translateY(0);
 }
 
 
@@ -1113,9 +1127,11 @@ body.dark        #langIconLight { display: none; }
     .upload-menu {
         left: 0;
         right: 0;
-        transform: none;
+        transform: translateY(-6px);
         min-width: unset;
-        animation: dropdownOpen .15s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .upload-dropdown.open .upload-menu {
+        transform: translateY(0);
     }
 
     /* На мобильных языковое меню вертикальное */
