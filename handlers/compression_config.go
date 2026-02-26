@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/zoixc/lanpaper/config"
+	"lanpaper/config"
 )
 
 // CompressionConfigResponse represents the client-side compression settings
