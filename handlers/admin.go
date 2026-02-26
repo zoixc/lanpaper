@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,15 +16,19 @@ import (
 	"lanpaper/utils"
 )
 
-// maxWalkDepth limits directory recursion depth in ExternalImages.
-const maxWalkDepth = 3
-
 // SortField represents valid sort field options for type safety.
 type SortField string
 
 const (
 	SortFieldCreated SortField = "created"
 	SortFieldUpdated SortField = "updated"
+)
+
+const (
+	// DefaultPageSize is the default number of items per page when pagination is used.
+	DefaultPageSize = 50
+	// MaxPageSize is the maximum allowed page size to prevent excessive memory usage.
+	MaxPageSize = 200
 )
 
 func Admin(w http.ResponseWriter, r *http.Request) {
@@ -42,8 +47,25 @@ type WallpaperResponse struct {
 	CreatedAt int64  `json:"createdAt"`
 }
 
-// Wallpapers handles GET /api/wallpapers.
-// Supported query params: ?category=, ?has_image=true|false, ?sort=created|updated, ?order=asc|desc
+type PaginatedResponse struct {
+	Data       []WallpaperResponse `json:"data"`
+	Total      int                 `json:"total"`
+	Page       int                 `json:"page"`
+	PageSize   int                 `json:"pageSize"`
+	TotalPages int                 `json:"totalPages"`
+}
+
+// Wallpapers handles GET /api/wallpapers with optional pagination.
+// Supported query params:
+//   - category=<name>: Filter by category
+//   - has_image=true|false: Filter by image presence
+//   - sort=created|updated: Sort field (default: created)
+//   - order=asc|desc: Sort order (default: desc)
+//   - page=<number>: Page number for pagination (1-indexed, optional)
+//   - page_size=<number>: Items per page (default: 50, max: 200, optional)
+//
+// Without page parameter, returns all results (backward compatible).
+// With page parameter, returns paginated results with metadata.
 func Wallpapers(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -52,39 +74,95 @@ func Wallpapers(w http.ResponseWriter, r *http.Request) {
 
 	wallpapers := storage.Global.GetAll()
 
+	// Apply filters efficiently
 	if cat := r.URL.Query().Get("category"); cat != "" {
-		out := wallpapers[:0]
+		filtered := make([]*storage.Wallpaper, 0, len(wallpapers)/2)
 		for _, wp := range wallpapers {
 			if strings.EqualFold(wp.Category, cat) {
-				out = append(out, wp)
+				filtered = append(filtered, wp)
 			}
 		}
-		wallpapers = out
+		wallpapers = filtered
 	}
 	if hasImg := r.URL.Query().Get("has_image"); hasImg != "" {
 		want := hasImg == "true"
-		out := wallpapers[:0]
+		filtered := make([]*storage.Wallpaper, 0, len(wallpapers))
 		for _, wp := range wallpapers {
 			if wp.HasImage == want {
-				out = append(out, wp)
+				filtered = append(filtered, wp)
 			}
 		}
-		wallpapers = out
+		wallpapers = filtered
 	}
 
+	// Apply sorting
 	if sf := r.URL.Query().Get("sort"); sf != "" {
 		desc := r.URL.Query().Get("order") != "asc"
 		sortWallpapers(wallpapers, sf, desc)
 	}
 
-	resp := make([]WallpaperResponse, 0, len(wallpapers))
-	for _, wp := range wallpapers {
-		resp = append(resp, toResponse(wp))
-	}
+	// Check if pagination is requested
+	pageStr := r.URL.Query().Get("page")
+	if pageStr != "" {
+		// Paginated response
+		page, err := strconv.Atoi(pageStr)
+		if err != nil || page < 1 {
+			http.Error(w, "Invalid page number", http.StatusBadRequest)
+			return
+		}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		log.Printf("Error encoding wallpapers response: %v", err)
+		pageSize := DefaultPageSize
+		if pageSizeStr := r.URL.Query().Get("page_size"); pageSizeStr != "" {
+			if ps, err := strconv.Atoi(pageSizeStr); err == nil && ps > 0 {
+				pageSize = ps
+				if pageSize > MaxPageSize {
+					pageSize = MaxPageSize
+				}
+			}
+		}
+
+		total := len(wallpapers)
+		totalPages := (total + pageSize - 1) / pageSize
+		if totalPages == 0 {
+			totalPages = 1
+		}
+
+		start := (page - 1) * pageSize
+		end := start + pageSize
+		if start >= total {
+			start = total
+			end = total
+		} else if end > total {
+			end = total
+		}
+
+		pageData := wallpapers[start:end]
+		resp := make([]WallpaperResponse, 0, len(pageData))
+		for _, wp := range pageData {
+			resp = append(resp, toResponse(wp))
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(PaginatedResponse{
+			Data:       resp,
+			Total:      total,
+			Page:       page,
+			PageSize:   pageSize,
+			TotalPages: totalPages,
+		}); err != nil {
+			log.Printf("Error encoding paginated wallpapers response: %v", err)
+		}
+	} else {
+		// Non-paginated response (backward compatible)
+		resp := make([]WallpaperResponse, 0, len(wallpapers))
+		for _, wp := range wallpapers {
+			resp = append(resp, toResponse(wp))
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			log.Printf("Error encoding wallpapers response: %v", err)
+		}
 	}
 }
 
@@ -260,20 +338,13 @@ func Link(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func externalRoot() string {
-	if d := config.Current.ExternalImageDir; d != "" {
-		return d
-	}
-	return "external/images"
-}
-
 func ExternalImages(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	root := externalRoot()
+	root := utils.ExternalBaseDir()
 
 	// Resolve the gallery root; a missing directory returns an empty list.
 	absRoot, _, err := utils.ValidateAndResolvePath(root, ".")
@@ -290,6 +361,9 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Use configurable MaxWalkDepth from config instead of hardcoded value
+	maxDepth := config.Current.MaxWalkDepth
+
 	var files []string
 	_ = filepath.WalkDir(absRoot, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -300,7 +374,7 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 				return filepath.SkipDir
 			}
 			if rel, relErr := filepath.Rel(absRoot, path); relErr == nil && rel != "." {
-				if depth := len(strings.Split(rel, string(filepath.Separator))); depth > maxWalkDepth {
+				if depth := len(strings.Split(rel, string(filepath.Separator))); depth > maxDepth {
 					return filepath.SkipDir
 				}
 			}
@@ -353,7 +427,7 @@ func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Use utils.ValidateAndResolvePath to prevent path traversal and symlink escapes.
-	absPath, _, err := utils.ValidateAndResolvePath(externalRoot(), pathParam)
+	absPath, _, err := utils.ValidateAndResolvePath(utils.ExternalBaseDir(), pathParam)
 	if err != nil {
 		log.Printf("Security: path validation failed for preview %s: %v", pathParam, err)
 		http.Error(w, "Path outside allowed directory", http.StatusForbidden)
