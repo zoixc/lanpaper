@@ -470,7 +470,7 @@ body.dark .view-icon.light-theme-icon {
     border-radius: var(--radius-sm);
     outline: none;
     transition: border-color .18s ease, box-shadow .18s ease;
-    /* Prevent iOS zoom on focus (font-size must be >= 16px visually — handled by meta viewport) */
+    /* Prevent iOS zoom on focus */
     font-size: max(var(--text-base), 16px);
 }
 
@@ -1329,22 +1329,42 @@ body.dark .toast {
     .header-row { padding: 14px 18px; }
     h1          { font-size: 1.5rem; }
 
-    /* List view on mobile: single column, actions stretch full width */
+    /* List view on mobile: vertical card — preview on top, info + actions below */
     .link-card {
-        grid-template-columns: auto 1fr;
-        grid-template-rows: auto auto;
-        text-align: left;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 0;
+        min-height: unset;
     }
+
+    /* Preview stretches full width with a nice fixed height */
     .link-card .preview-link {
-        grid-row: 1 / 3;
-        align-self: center;
+        width: 100%;
+        align-self: unset;
+        border-radius: var(--radius) var(--radius) 0 0;
+        overflow: hidden;
     }
+    .link-card .preview-wrapper {
+        width: 100%;
+        height: 160px;
+        border-radius: var(--radius) var(--radius) 0 0;
+        border-left: none;
+        border-right: none;
+        border-top: none;
+    }
+
+    /* Info and actions inside a padded content area */
     .link-card .link-info {
-        align-self: center;
+        padding: 0 14px;
+        align-items: flex-start;
+        align-self: unset;
     }
     .link-card .actions-row {
-        grid-column: 2 / 3;
+        padding: 0 14px 14px;
+        align-self: unset;
         justify-content: flex-start;
+        width: 100%;
     }
     .link-card .upload-dropdown {
         flex: 1;
@@ -1355,9 +1375,6 @@ body.dark .toast {
     }
 
     .create-card { grid-template-columns: 1fr; text-align: center; }
-
-    .preview-wrapper { width: 80px; height: 60px; }
-    .link-info       { align-items: flex-start; }
 
     .btn--danger { width: 34px; padding: 0; }
 
@@ -1371,6 +1388,23 @@ body.dark .toast {
     .links-list.grid-view {
         grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     }
+
+    /* Grid view on mobile: restore flex-direction column (already set in grid-view rules) */
+    .links-list.grid-view .link-card {
+        padding: 14px;
+        flex-direction: column;
+    }
+    .links-list.grid-view .link-card .preview-link {
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+    }
+    .links-list.grid-view .link-card .preview-wrapper {
+        height: 100%;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border);
+    }
+    .links-list.grid-view .link-card .link-info { padding: 0; }
+    .links-list.grid-view .link-card .actions-row { padding: 0; }
 
     .search-sort-bar  { flex-direction: column; align-items: stretch; }
     .search-container,
