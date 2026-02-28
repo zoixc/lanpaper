@@ -23,19 +23,17 @@ type Wallpaper struct {
 	ModTime   int64  `json:"modTime"`
 	CreatedAt int64  `json:"createdAt"`
 
-	// Runtime-only fields: not persisted; derived from MIMEType on Load.
+	// Not persisted; derived from MIMEType on Load.
 	ImagePath   string `json:"-"`
 	PreviewPath string `json:"-"`
 }
 
 // Store is a thread-safe in-memory store backed by a JSON file.
-// sortedSnap caches the sorted wallpaper slice and is invalidated whenever
-// the map is mutated (Set, Delete, Load, PruneOldImages). This avoids
-// running O(n log n) sort on every GET /api/wallpapers request.
+// sortedSnap caches the sorted slice and is invalidated on any mutation.
 type Store struct {
 	sync.RWMutex
 	wallpapers map[string]*Wallpaper
-	sortedSnap []*Wallpaper // nil means cache is invalid
+	sortedSnap []*Wallpaper
 }
 
 const dataFile = "data/wallpapers.json"
@@ -50,7 +48,6 @@ func (s *Store) Get(id string) (*Wallpaper, bool) {
 	return wp, ok
 }
 
-// Set stores a wallpaper and invalidates the sorted cache.
 func (s *Store) Set(id string, wp *Wallpaper) {
 	s.Lock()
 	defer s.Unlock()
@@ -58,7 +55,6 @@ func (s *Store) Set(id string, wp *Wallpaper) {
 	s.sortedSnap = nil
 }
 
-// Delete removes a wallpaper and invalidates the sorted cache.
 func (s *Store) Delete(id string) {
 	s.Lock()
 	defer s.Unlock()
@@ -66,8 +62,6 @@ func (s *Store) Delete(id string) {
 	s.sortedSnap = nil
 }
 
-// sortSnap sorts a wallpaper slice in-place: images first (newest ModTime),
-// then empty slots (newest CreatedAt).
 func sortSnap(snap []*Wallpaper) {
 	sort.Slice(snap, func(i, j int) bool {
 		if snap[i].HasImage != snap[j].HasImage {
@@ -80,11 +74,9 @@ func sortSnap(snap []*Wallpaper) {
 	})
 }
 
-// GetAll returns a sorted snapshot of all wallpapers: images first (newest
-// ModTime), then empty slots (newest CreatedAt).
-// Returns pointers to the original wallpapers — callers must not modify.
-// For mutable copies, use GetAllCopy.
-// The sorted result is cached and reused until the store is mutated.
+// GetAll returns a sorted snapshot: images first (newest ModTime), then empty
+// slots (newest CreatedAt). Callers must not modify the returned pointers.
+// The result is cached until the store is mutated.
 func (s *Store) GetAll() []*Wallpaper {
 	s.RLock()
 	if s.sortedSnap != nil {
@@ -94,10 +86,9 @@ func (s *Store) GetAll() []*Wallpaper {
 	}
 	s.RUnlock()
 
-	// Cache miss: build and sort under write lock to prevent duplicate work.
+	// Cache miss: build under write lock to prevent duplicate work.
 	s.Lock()
 	defer s.Unlock()
-	// Double-check after acquiring write lock.
 	if s.sortedSnap != nil {
 		return s.sortedSnap
 	}
@@ -112,8 +103,7 @@ func (s *Store) GetAll() []*Wallpaper {
 	return snap
 }
 
-// GetAllCopy returns a deep copy of all wallpapers for cases where
-// mutation is needed without affecting the original data.
+// GetAllCopy returns a deep copy for cases where mutation is needed.
 func (s *Store) GetAllCopy() []*Wallpaper {
 	original := s.GetAll()
 	snap := make([]*Wallpaper, len(original))
@@ -124,8 +114,8 @@ func (s *Store) GetAllCopy() []*Wallpaper {
 	return snap
 }
 
-// atomicWrite marshals data and writes it via a temp-file + rename so that a
-// crash mid-write never produces a truncated JSON file.
+// atomicWrite marshals data to a temp file and renames it atomically,
+// so a crash mid-write never produces a truncated JSON file.
 func atomicWrite(path string, data map[string]*Wallpaper) error {
 	body, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
@@ -170,8 +160,7 @@ func derivePaths(wp *Wallpaper) {
 	}
 }
 
-// Load reads wallpapers from disk and invalidates the sorted cache.
-// A missing file is treated as first run.
+// Load reads wallpapers from disk. A missing file is treated as first run.
 func (s *Store) Load() error {
 	data, err := os.ReadFile(dataFile)
 	if err != nil {
@@ -184,7 +173,20 @@ func (s *Store) Load() error {
 	if err := json.Unmarshal(data, &m); err != nil {
 		return err
 	}
-	for _, wp := range m {
+	for key, wp := range m {
+		if wp == nil {
+			// Corrupt or manually edited JSON — skip null entries to avoid panics.
+			log.Printf("Warning: skipping nil wallpaper entry for key %q in storage", key)
+			delete(m, key)
+			continue
+		}
+		// Ensure required fields are consistent; self-heal if LinkName was not persisted.
+		if wp.LinkName == "" {
+			wp.LinkName = key
+		}
+		if wp.ID == "" {
+			wp.ID = key
+		}
 		derivePaths(wp)
 	}
 	s.Lock()
@@ -194,18 +196,20 @@ func (s *Store) Load() error {
 	return nil
 }
 
-// PruneOldImages removes the oldest images when the count exceeds max,
-// keeping the newest max entries. Link slots are preserved (HasImage=false).
+// PruneOldImages removes the oldest images when count exceeds max,
+// preserving empty slots. File I/O is performed outside the lock
+// to avoid blocking Get/Set during disk operations.
 func PruneOldImages(max int) {
 	Global.Lock()
-	defer Global.Unlock()
-
 	var candidates []*Wallpaper
 	for _, wp := range Global.wallpapers {
-		if wp.HasImage {
-			candidates = append(candidates, wp)
+		if wp != nil && wp.HasImage {
+			clone := *wp
+			candidates = append(candidates, &clone)
 		}
 	}
+	Global.Unlock()
+
 	if len(candidates) <= max {
 		return
 	}
@@ -224,11 +228,16 @@ func PruneOldImages(max int) {
 				log.Printf("Error pruning preview %s: %v", wp.PreviewPath, err)
 			}
 		}
-		*wp = Wallpaper{ID: wp.ID, LinkName: wp.LinkName, Category: wp.Category, CreatedAt: wp.CreatedAt}
+		// Reset the store entry: clear image fields, keep slot metadata.
+		Global.Set(wp.ID, &Wallpaper{
+			ID:        wp.ID,
+			LinkName:  wp.LinkName,
+			Category:  wp.Category,
+			CreatedAt: wp.CreatedAt,
+		})
 	}
 
-	Global.sortedSnap = nil
-	if err := atomicWrite(dataFile, Global.wallpapers); err != nil {
+	if err := Global.Save(); err != nil {
 		log.Printf("Error saving after pruning: %v", err)
 	}
 }

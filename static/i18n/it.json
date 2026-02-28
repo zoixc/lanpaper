@@ -13,6 +13,7 @@
 
   "settings_language": "Lingua",
   "settings_data": "Dati",
+  "settings_maintenance": "Manutenzione",
   "export_json": "Esporta",
   "import_json": "Importa",
   "export_success": "Dati esportati con successo",
@@ -21,6 +22,10 @@
   "import_error": "Importazione fallita: File non valido",
   "import_confirm": "Importare {{count}} link? Questo sostituirà i dati attuali.",
   "sync_in_progress": "Sincronizzazione dati con il server...",
+
+  "regen_previews": "Rigenera anteprime",
+  "regen_previews_running": "Rigenerazione...",
+  "regen_previews_done": "Fatto: {{ok}} ok, {{errors}} errori, {{skipped}} saltati",
 
   "enter_image_url_title": "Incolla da URL",
   "select_server_title": "Seleziona dalla galleria",
@@ -35,6 +40,9 @@
   "created_success": "Link creato",
   "deleted_success": "Link rimosso",
   "confirm_delete": "Eliminare questo link?",
+  "confirm_delete_title": "Eliminare il link?",
+  "confirm_delete_msg": "Eliminare \"{{name}}\"? Questa azione è irreversibile.",
+  "delete_btn": "Elimina",
 
   "loading": "Caricamento...",
   "server_empty": "La cartella è vuota",

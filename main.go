@@ -48,8 +48,16 @@ func main() {
 
 	go middleware.StartCleaner()
 
+	// Serve static files with long-lived cache for versioned assets.
+	// The app uses ?t=<timestamp> cache-busting on dynamic resources.
+	staticFS := http.FileServer(http.Dir("static"))
 	mux := http.NewServeMux()
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	mux.Handle("/static/", http.StripPrefix("/static/",
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", "public, max-age=86400")
+			staticFS.ServeHTTP(w, r)
+		}),
+	))
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/health/ready", readyHandler)
 	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Admin)))
@@ -66,6 +74,9 @@ func main() {
 	)
 	mux.HandleFunc("/api/external-images", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImages)))
 	mux.HandleFunc("/api/external-image-preview", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImagePreview)))
+	mux.HandleFunc("/api/regenerate-previews",
+		middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.RegeneratePreviews)),
+	)
 	mux.HandleFunc("/", handlers.Public)
 
 	port := config.Current.Port
@@ -94,7 +105,8 @@ func main() {
 		}
 	}()
 
-	log.Printf("Lanpaper %s on %s (max upload %d MB, compression: %d%% quality, %d%% scale)", Version, port, config.Current.MaxUploadMB, config.Current.Compression.Quality, config.Current.Compression.Scale)
+	log.Printf("Lanpaper %s on %s (max upload %d MB, compression: %d%% quality, %d%% scale)",
+		Version, port, config.Current.MaxUploadMB, config.Current.Compression.Quality, config.Current.Compression.Scale)
 	log.Printf("Admin: http://localhost%s/admin", port)
 
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {

@@ -13,6 +13,7 @@
 
   "settings_language": "Язык",
   "settings_data": "Данные",
+  "settings_maintenance": "Обслуживание",
   "export_json": "Экспорт",
   "import_json": "Импорт",
   "export_success": "Данные успешно экспортированы",
@@ -21,6 +22,10 @@
   "import_error": "Ошибка импорта: неверный файл",
   "import_confirm": "Импортировать {{count}} ссылок? Текущие данные будут заменены.",
   "sync_in_progress": "Синхронизация данных с сервером...",
+
+  "regen_previews": "Пересоздать превью",
+  "regen_previews_running": "Пересоздаём...",
+  "regen_previews_done": "Готово: {{ok}} ок, {{errors}} ошибок, {{skipped}} пропущено",
 
   "enter_image_url_title": "Вставить из URL",
   "select_server_title": "Выбрать из галереи",
@@ -35,6 +40,9 @@
   "created_success": "Ссылка создана",
   "deleted_success": "Ссылка удалена",
   "confirm_delete": "Удалить эту ссылку?",
+  "confirm_delete_title": "Удалить ссылку?",
+  "confirm_delete_msg": "Удалить \"{{name}}\"? Это действие нельзя отменить.",
+  "delete_btn": "Удалить",
 
   "loading": "Загрузка...",
   "server_empty": "Папка пуста",

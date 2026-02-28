@@ -18,7 +18,7 @@ type counter struct {
 
 var (
 	muCounts sync.Mutex
-	// key format: "<namespace>:<ip>" — isolates limits per endpoint group.
+	// key format: "<namespace>:<ip>" — isolates limits per endpoint group
 	counts = map[string]*counter{}
 )
 
@@ -32,7 +32,8 @@ func StartCleaner() {
 		now := time.Now()
 		muCounts.Lock()
 		for key, c := range counts {
-			if now.Sub(c.windowFrom) > cleanerInterval {
+			// Rate window is 1 minute; keep entries only within that window.
+			if now.Sub(c.windowFrom) > time.Minute {
 				delete(counts, key)
 			}
 		}
@@ -40,8 +41,6 @@ func StartCleaner() {
 	}
 }
 
-// isOverLimitNS reports whether ip has exceeded perMin+burst requests in the
-// current one-minute window for the given namespace.
 func isOverLimitNS(ns, ip string, perMin, burst int) bool {
 	if perMin <= 0 {
 		return false
@@ -67,8 +66,8 @@ func isOverLimit(ip string, perMin, burst int) bool {
 }
 
 // clientIP returns the real client IP.
-// X-Real-IP and X-Forwarded-For are honoured only when the TCP connection
-// originates from the configured TrustedProxy, preventing IP spoofing.
+// X-Real-IP and X-Forwarded-For are honoured only when the request originates
+// from the configured TrustedProxy, preventing IP spoofing.
 func clientIP(r *http.Request) string {
 	if config.IsTrustedProxy(r.RemoteAddr) {
 		if xr := r.Header.Get("X-Real-IP"); xr != "" {

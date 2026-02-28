@@ -25,48 +25,29 @@ func IsValidLocalPath(path string) bool {
 		!strings.HasPrefix(clean, "\\\\")
 }
 
-// allowedMIMETypes is the set of MIME types accepted for upload.
-var allowedMIMETypes = map[string]bool{
-	"image/jpeg": true,
-	"image/png":  true,
-	"image/gif":  true,
-	"image/webp": true,
-	"image/bmp":  true,
-	"image/tiff": true,
-	"video/mp4":  true,
-	"video/webm": true,
-}
-
-// IsAllowedMimeType reports whether mimeType is an accepted upload type.
-func IsAllowedMimeType(mimeType string) bool {
-	return allowedMIMETypes[strings.ToLower(mimeType)]
-}
-
-// magicBytes holds the expected file signatures for supported types.
+// magicBytes holds expected file signatures for supported types.
 var magicBytes = map[string][]byte{
-	"jpg":  {0xFF, 0xD8, 0xFF},
-	"png":  {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A},
-	"gif":  {0x47, 0x49, 0x46, 0x38},
-	"webp": {0x52, 0x49, 0x46, 0x46}, // RIFF prefix; WEBP marker at offset 8 checked separately
-	"bmp":  {0x42, 0x4D},
-	"tif":  {0x49, 0x49, 0x2A, 0x00}, // little-endian TIFF
-	"tiff": {0x4D, 0x4D, 0x00, 0x2A}, // big-endian TIFF
-	"webm": {0x1A, 0x45, 0xDF, 0xA3}, // EBML header
-	// mp4 validated via ftyp box check below
+	"jpg":     {0xFF, 0xD8, 0xFF},
+	"png":     {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A},
+	"gif":     {0x47, 0x49, 0x46, 0x38},
+	"webp":    {0x52, 0x49, 0x46, 0x46}, // RIFF prefix; WEBP marker at offset 8 checked below
+	"bmp":     {0x42, 0x4D},
+	"tiff_le": {0x49, 0x49, 0x2A, 0x00}, // little-endian TIFF
+	"tiff_be": {0x4D, 0x4D, 0x00, 0x2A}, // big-endian TIFF
+	"webm":    {0x1A, 0x45, 0xDF, 0xA3}, // EBML header
+	// mp4 validated via ftyp box check in ValidateFileType
 }
 
-// ValidateFileType verifies that the first bytes of data match the expected
-// file signature for expectedExt.
+// ValidateFileType verifies that data starts with the expected magic bytes
+// for expectedExt.
 func ValidateFileType(data []byte, expectedExt string) error {
 	if len(data) < 16 {
 		return fmt.Errorf("file too small to validate")
 	}
-
 	ext := strings.ToLower(strings.TrimPrefix(expectedExt, "."))
 	if ext == "jpeg" {
 		ext = "jpg"
 	}
-
 	switch ext {
 	case "webp":
 		if !bytes.HasPrefix(data, magicBytes["webp"]) {
@@ -84,8 +65,13 @@ func ValidateFileType(data []byte, expectedExt string) error {
 			return fmt.Errorf("file does not match MP4 structure")
 		}
 		return nil
+	case "tiff":
+		if bytes.HasPrefix(data, magicBytes["tiff_le"]) || bytes.HasPrefix(data, magicBytes["tiff_be"]) {
+			return nil
+		}
+		log.Printf("Security: magic bytes mismatch for TIFF: got %v", data[:4])
+		return fmt.Errorf("file content does not match extension tiff")
 	}
-
 	magic, ok := magicBytes[ext]
 	if !ok {
 		return fmt.Errorf("unsupported file type: %s", ext)
@@ -101,22 +87,18 @@ func ValidateFileType(data []byte, expectedExt string) error {
 	return nil
 }
 
-// SanitizeFilename returns a safe filename by extracting just the base name
-// (stripping any path components) and removing dangerous shell characters.
-func SanitizeFilename(name string) string {
-	// Extract only the base filename, discarding any path components.
-	// This handles both "../../../etc/passwd" → "passwd" and
-	// "/home/user/../file.jpg" → "file.jpg" correctly.
-	name = filepath.Base(name)
-
-	// Remove dangerous shell characters
-	dangerousChars := []string{"$", "`", "|", ";", "[", "]", "(", ")", "&", "<", ">", "\"", "'"}
-	for _, char := range dangerousChars {
-		name = strings.ReplaceAll(name, char, "")
+// dangerousRune drops shell-special characters and replaces spaces with '_'.
+func dangerousRune(r rune) rune {
+	switch r {
+	case '$', '`', '|', ';', '[', ']', '(', ')', '&', '<', '>', '"', '\'':
+		return -1
+	case ' ':
+		return '_'
 	}
+	return r
+}
 
-	// Replace spaces with underscores
-	name = strings.ReplaceAll(name, " ", "_")
-
-	return name
+// SanitizeFilename strips path components and removes dangerous characters.
+func SanitizeFilename(name string) string {
+	return strings.Map(dangerousRune, filepath.Base(name))
 }

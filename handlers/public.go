@@ -63,7 +63,8 @@ func Public(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
 	h.Set("Content-Type", mime)
 	h.Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s.%s"`, wp.LinkName, wp.MIMEType))
-	h.Set("Cache-Control", "public, max-age=31536000, immutable")
+	// Not immutable: the same URL path can be reassigned to a different image.
+	h.Set("Cache-Control", "public, max-age=60, must-revalidate")
 	h.Set("X-Content-Type-Options", "nosniff")
 
 	http.ServeContent(w, r, wp.LinkName+"."+wp.MIMEType, fi.ModTime(), f)

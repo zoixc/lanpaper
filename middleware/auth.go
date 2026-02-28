@@ -9,7 +9,7 @@ import (
 )
 
 // MaybeBasicAuth applies Basic Auth only when auth is enabled.
-// The check runs per-request so runtime config changes take effect immediately.
+// Checked per-request so runtime config changes take effect immediately.
 func MaybeBasicAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if config.Current.DisableAuth {

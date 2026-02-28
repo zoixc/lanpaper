@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"net/http"
@@ -10,7 +11,6 @@ import (
 )
 
 // staticSecurityHeaders are headers that don't change per-request.
-// Pre-built once to reduce allocation overhead on every request.
 var staticSecurityHeaders = map[string]string{
 	"X-Content-Type-Options":       "nosniff",
 	"X-Frame-Options":              "DENY",
@@ -19,22 +19,29 @@ var staticSecurityHeaders = map[string]string{
 	"X-Download-Options":           "noopen",
 	"Cross-Origin-Resource-Policy": "same-origin",
 	"Cross-Origin-Opener-Policy":   "same-origin",
-	"Cross-Origin-Embedder-Policy": "require-corp",
+	// require-corp breaks loading of static assets (images/JS/CSS) from 'self'
+	// unless every response carries CORP: same-origin, which http.FileServer
+	// does not set. Use credentialless to allow same-origin assets without
+	// requiring CORP on every sub-resource.
+	"Cross-Origin-Embedder-Policy": "credentialless",
 }
 
-// generateNonce creates a cryptographically secure nonce (128 bits of entropy).
-func generateNonce() (string, error) {
-	b := make([]byte, 16) // 128 bits
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return base64.StdEncoding.EncodeToString(b), nil
-}
-
-// buildCSP constructs a strict Content Security Policy with nonce.
 func buildCSP(nonce string) string {
-	// Strict CSP following OWASP and W3C recommendations.
-	// Reference: https://cheatsheetseries.owasp.org/cheatsheets/Content_Security_Policy_Cheat_Sheet.html
+	if nonce == "" {
+		return "default-src 'none'; " +
+			"script-src 'self'; " +
+			"style-src 'self'; " +
+			"img-src 'self' https: data: blob:; " +
+			"media-src 'self' https: data: blob:; " +
+			"connect-src 'self'; " +
+			"font-src 'self'; " +
+			"manifest-src 'self'; " +
+			"worker-src 'self' blob:; " +
+			"object-src 'none'; " +
+			"base-uri 'self'; " +
+			"form-action 'self'; " +
+			"frame-ancestors 'none';"
+	}
 	return "default-src 'none'; " +
 		"script-src 'self' 'nonce-" + nonce + "'; " +
 		"style-src 'self' 'nonce-" + nonce + "'; " +
@@ -43,44 +50,56 @@ func buildCSP(nonce string) string {
 		"connect-src 'self'; " +
 		"font-src 'self'; " +
 		"manifest-src 'self'; " +
-		"worker-src 'self'; " +
+		"worker-src 'self' blob:; " +
 		"object-src 'none'; " +
 		"base-uri 'self'; " +
 		"form-action 'self'; " +
-		"frame-ancestors 'none'; " +
-		"upgrade-insecure-requests; " +
-		"block-all-mixed-content;"
+		"frame-ancestors 'none';"
 }
 
-// WithSecurity attaches security headers and applies public-endpoint rate limiting.
-// Must wrap every handler reachable without authentication.
+func generateNonce() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(b), nil
+}
+
+type nonceKeyType struct{}
+
+var nonceKey nonceKeyType
+
+// NonceFromRequest retrieves the CSP nonce stored in the request context.
+// Returns an empty string if no nonce is present.
+func NonceFromRequest(r *http.Request) string {
+	if v := r.Context().Value(nonceKey); v != nil {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+// WithSecurity attaches security headers and applies public-endpoint rate
+// limiting. The CSP nonce is stored in the request context for templates.
 func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		nonce, err := generateNonce()
-		if err != nil {
-			// Fallback to strict CSP without nonce if generation fails.
-			nonce = ""
-		}
+		nonce, _ := generateNonce() // If err != nil, nonce is ""
 
 		h := w.Header()
-
-		// Apply pre-built static security headers.
 		for key, value := range staticSecurityHeaders {
 			h.Set(key, value)
 		}
-
-		// HSTS only over TLS — sending it over HTTP is meaningless and confusing.
 		if r.TLS != nil {
 			h.Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
 		}
 
-		// CSP is always set; nonce is embedded server-side into HTML templates,
-		// never exposed via a response header (that would defeat the purpose).
+		h.Set("Content-Security-Policy", buildCSP(nonce))
 		if nonce != "" {
-			h.Set("Content-Security-Policy", buildCSP(nonce))
+			r = r.WithContext(context.WithValue(r.Context(), nonceKey, nonce))
 		}
 
-		// Rate limiting for public endpoints.
+		// Apply public rate-limit only to routes that aren't admin or API.
 		if !strings.HasPrefix(r.URL.Path, "/admin") && !strings.HasPrefix(r.URL.Path, "/api/") {
 			if isOverLimit(clientIP(r), config.Current.Rate.PublicPerMin, config.Current.Rate.Burst) {
 				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)

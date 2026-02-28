@@ -4,11 +4,16 @@
   <meta charset="utf-8">
   <title>Lanpaper</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/skeleton.css">
   <link rel="stylesheet" href="/static/css/settings-menu.css">
   <link rel="manifest" href="/static/manifest.json">
-  <meta name="theme-color" content="#ffffff">
+  <!-- theme-color: respects system preference before JS loads -->
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1c1c20" media="(prefers-color-scheme: dark)">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
 </head>
 <body>
   <div class="network-bg"></div>
@@ -21,23 +26,16 @@
         <img src="/static/logo.svg" alt="Lanpaper" class="logo" width="120" height="40">
       </div>
       <div class="controls">
-        <!-- Settings Dropdown -->
         <div id="settingsDropdown" class="settings-dropdown">
           <button id="settingsBtn" class="theme-switcher" aria-label="Settings" data-i18n-aria="aria_settings" aria-expanded="false" aria-haspopup="true">
-            <!-- Light icon for dark theme -->
             <img src="/static/icons/settings.webp" class="settings-icon dark-theme-icon" alt="Settings" width="18" height="18">
-            <!-- Dark icon for light theme -->
             <img src="/static/icons/settings-dark.webp" class="settings-icon light-theme-icon" alt="Settings" width="18" height="18">
           </button>
-          
           <div class="settings-menu">
-            <!-- Language Section -->
             <div class="settings-section">
               <div class="settings-section-title" data-i18n="settings_language">Language</div>
               <div class="lang-options" id="langOptions"></div>
             </div>
-            
-            <!-- Export/Import Section -->
             <div class="settings-section">
               <div class="settings-section-title" data-i18n="settings_data">Data</div>
               <button class="settings-menu-item" id="exportBtn" type="button">
@@ -57,6 +55,16 @@
                 <span data-i18n="import_json">Import</span>
               </button>
             </div>
+            <div class="settings-section">
+              <div class="settings-section-title" data-i18n="settings_maintenance">Maintenance</div>
+              <button class="settings-menu-item" id="regenPreviewsBtn" type="button">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="23 4 23 10 17 10"/>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+                <span data-i18n="regen_previews">Regenerate Previews</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -74,25 +82,22 @@
       </div>
     </header>
 
-    <!-- Create new link -->
-    <section class="section">
-      <h2 data-i18n="create_new_link">Create new link</h2>
-      <form class="create-card" id="createForm">
-        <div class="create-row">
-          <input type="text" id="newLinkId" class="input-field"
-                 data-i18n-placeholder="input_placeholder"
-                 placeholder="Link ID (letters, numbers, - or _)"
-                 autocomplete="off"
-                 pattern="[a-zA-Z0-9_-]+"
-                 aria-label="Link ID"
-                 data-i18n-aria="aria_link_input">
-        </div>
+    <!-- Create + Search/Sort merged toolbar -->
+    <div class="toolbar-section">
+      <form class="create-row" id="createForm">
+        <input type="text" id="newLinkId" class="input-field"
+               data-i18n-placeholder="input_placeholder"
+               placeholder="Link ID (letters, numbers, - or _)"
+               autocomplete="off"
+               pattern="[a-zA-Z0-9_\-]+"
+               maxlength="255"
+               aria-label="Link ID"
+               data-i18n-aria="aria_link_input">
         <button type="submit" id="createLinkBtn" class="btn btn--primary" data-i18n="create_btn">Create</button>
       </form>
-    </section>
 
-    <!-- Search + Sort -->
-    <section class="section">
+      <div class="toolbar-divider"></div>
+
       <div class="search-sort-bar">
         <div class="search-container">
           <input
@@ -130,13 +135,13 @@
           </select>
         </div>
       </div>
-    </section>
+    </div>
 
     <!-- Links -->
     <section class="section">
       <h2 data-i18n="existing_links">Existing links</h2>
       <div class="links-list" id="linksList"></div>
-      <div class="empty-state" id="emptyState" data-i18n="no_links">No links yet</div>
+      <div class="empty-state d-none" id="emptyState" data-i18n="no_links">No links yet</div>
     </section>
 
     <footer class="footer">
@@ -153,16 +158,30 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Modal -->
-  <div id="modalOverlay" class="modal-overlay hidden">
+  <div id="modalOverlay" class="modal-overlay hidden" aria-modal="true" role="dialog">
     <div class="modal">
       <h3 id="modalTitle" data-i18n="modal_default_title">Input</h3>
       <div class="modal-body" id="modalBody">
-        <input type="text" id="modalInput" class="input-field" placeholder="https://..." data-i18n-placeholder="url_placeholder">
+        <input type="text" id="modalInput" class="input-field d-none" placeholder="https://..." data-i18n-placeholder="url_placeholder">
         <div id="modalList" class="modal-list hidden"></div>
       </div>
       <div class="modal-actions">
         <button id="modalCancelBtn" class="btn" data-i18n="modal_cancel">Cancel</button>
         <button id="modalConfirmBtn" class="btn btn--primary" data-i18n="modal_ok">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Delete Modal -->
+  <div id="confirmOverlay" class="modal-overlay hidden" aria-modal="true" role="alertdialog">
+    <div class="modal">
+      <h3 id="confirmTitle" data-i18n="confirm_delete_title">Delete link?</h3>
+      <div class="modal-body">
+        <p id="confirmMessage"></p>
+      </div>
+      <div class="modal-actions">
+        <button id="confirmCancelBtn" class="btn" data-i18n="modal_cancel">Cancel</button>
+        <button id="confirmDeleteBtn" class="btn btn--danger" data-i18n="delete_btn">Delete</button>
       </div>
     </div>
   </div>
@@ -178,7 +197,15 @@
       <div class="link-info">
         <div class="link-id-row">
           <div class="link-id" aria-label="Link ID"></div>
-          <button class="copy-url-btn" data-i18n="copy_url" aria-label="Copy URL">Copy URL</button>
+          <button class="copy-url-btn" aria-label="Copy URL" title="Copy URL">
+            <span class="copy-icon">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+            </span>
+            <span class="copy-text" data-i18n="copy_url">Copy URL</span>
+          </button>
         </div>
         <div class="link-meta" aria-label="File info"></div>
       </div>
@@ -200,7 +227,7 @@
               </svg>
               <span data-i18n="set_image">File</span>
             </button>
-            <input type="file" class="file-input" accept="image/*,video/mp4,video/webm" style="display:none;">
+            <input type="file" class="file-input d-none" accept="image/*,video/mp4,video/webm">
             <button class="upload-menu-item paste-url-btn">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
@@ -220,7 +247,15 @@
           </div>
         </div>
 
-        <button class="btn btn--danger delete-btn" data-i18n="remove">Remove</button>
+        <button class="btn btn--danger delete-btn" aria-label="Delete" title="Delete">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            <path d="M10 11v6"/>
+            <path d="M14 11v6"/>
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          </svg>
+        </button>
       </div>
 
     </article>

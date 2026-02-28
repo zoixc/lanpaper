@@ -13,6 +13,7 @@
 
   "settings_language": "Language",
   "settings_data": "Data",
+  "settings_maintenance": "Maintenance",
   "export_json": "Export",
   "import_json": "Import",
   "export_success": "Data exported successfully",
@@ -21,6 +22,10 @@
   "import_error": "Import failed: Invalid file",
   "import_confirm": "Import {{count}} links? This will replace current data.",
   "sync_in_progress": "Syncing data with server...",
+
+  "regen_previews": "Regenerate Previews",
+  "regen_previews_running": "Regenerating...",
+  "regen_previews_done": "Done: {{ok}} ok, {{errors}} errors, {{skipped}} skipped",
 
   "enter_image_url_title": "Paste from URL",
   "select_server_title": "Select from gallery",
@@ -35,6 +40,9 @@
   "created_success": "Link created",
   "deleted_success": "Link deleted",
   "confirm_delete": "Delete this link?",
+  "confirm_delete_title": "Delete link?",
+  "confirm_delete_msg": "Delete \"{{name}}\"? This cannot be undone.",
+  "delete_btn": "Delete",
 
   "loading": "Loading...",
   "server_empty": "Folder is empty",

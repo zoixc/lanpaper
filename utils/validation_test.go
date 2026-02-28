@@ -1,15 +1,14 @@
 package utils
 
 import (
-	"strings"
 	"testing"
 )
 
 func TestIsValidLocalPath(t *testing.T) {
 	tests := []struct {
-		name     string
-		path     string
-		want     bool
+		name string
+		path string
+		want bool
 	}{
 		{"valid relative path", "images/photo.jpg", true},
 		{"valid nested path", "folder/subfolder/image.png", true},
@@ -92,35 +91,6 @@ func TestValidateFileType(t *testing.T) {
 	}
 }
 
-func TestIsAllowedMimeType(t *testing.T) {
-	tests := []struct {
-		name     string
-		mimeType string
-		want     bool
-	}{
-		{"JPEG allowed", "image/jpeg", true},
-		{"PNG allowed", "image/png", true},
-		{"GIF allowed", "image/gif", true},
-		{"WebP allowed", "image/webp", true},
-		{"BMP allowed", "image/bmp", true},
-		{"TIFF allowed", "image/tiff", true},
-		{"MP4 allowed", "video/mp4", true},
-		{"WebM allowed", "video/webm", true},
-		{"SVG not allowed", "image/svg+xml", false},
-		{"executable not allowed", "application/x-executable", false},
-		{"text not allowed", "text/plain", false},
-		{"pdf not allowed", "application/pdf", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := IsAllowedMimeType(tt.mimeType); got != tt.want {
-				t.Errorf("IsAllowedMimeType(%q) = %v, want %v", tt.mimeType, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestSanitizeFilename(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -141,55 +111,6 @@ func TestSanitizeFilename(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := SanitizeFilename(tt.filename); got != tt.want {
 				t.Errorf("SanitizeFilename(%q) = %q, want %q", tt.filename, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestGetRealIP(t *testing.T) {
-	// This is a basic test - more complex scenarios would need mocked http.Request
-	tests := []struct {
-		name          string
-		xForwardedFor string
-		xRealIP       string
-		remoteAddr    string
-		want          string
-	}{
-		{
-			name:          "X-Forwarded-For single IP",
-			xForwardedFor: "192.168.1.1",
-			remoteAddr:    "10.0.0.1:1234",
-			want:          "192.168.1.1",
-		},
-		{
-			name:          "X-Forwarded-For multiple IPs",
-			xForwardedFor: "192.168.1.1, 10.0.0.2, 172.16.0.1",
-			remoteAddr:    "10.0.0.1:1234",
-			want:          "192.168.1.1",
-		},
-		{
-			name:       "X-Real-IP fallback",
-			xRealIP:    "192.168.1.100",
-			remoteAddr: "10.0.0.1:1234",
-			want:       "192.168.1.100",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Basic validation that function handles strings correctly
-			if tt.xForwardedFor != "" {
-				if idx := strings.Index(tt.xForwardedFor, ","); idx >= 0 {
-					got := strings.TrimSpace(tt.xForwardedFor[:idx])
-					if got != tt.want {
-						t.Errorf("Expected first IP = %q, got %q", tt.want, got)
-					}
-				} else {
-					got := strings.TrimSpace(tt.xForwardedFor)
-					if got != tt.want {
-						t.Errorf("Expected IP = %q, got %q", tt.want, got)
-					}
-				}
 			}
 		})
 	}

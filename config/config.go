@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
 )
 
 type RateConfig struct {
@@ -17,7 +18,7 @@ type RateConfig struct {
 
 type CompressionConfig struct {
 	Quality int `json:"quality"` // 1-100, JPEG quality
-	Scale   int `json:"scale"`   // 1-100, percentage of max dimensions (1920x1080)
+	Scale   int `json:"scale"`   // 1-100, percentage of max dimensions
 }
 
 type Config struct {
@@ -25,6 +26,7 @@ type Config struct {
 	MaxUploadMB          int               `json:"maxUploadMB"`
 	MaxImages            int               `json:"maxImages"`
 	MaxConcurrentUploads int               `json:"maxConcurrentUploads"`
+	MaxWalkDepth         int               `json:"maxWalkDepth"`
 	ExternalImageDir     string            `json:"externalImageDir"`
 	AdminUser            string            `json:"adminUser"`
 	AdminPass            string            `json:"adminPass"`
@@ -39,11 +41,19 @@ type Config struct {
 	Compression          CompressionConfig `json:"compression"`
 	// TrustedProxy is the IP or CIDR of a reverse proxy in front of Lanpaper.
 	// X-Real-IP / X-Forwarded-For are trusted only for requests from this address.
-	// Leave empty to always use the raw TCP remote address (safe default).
 	TrustedProxy string `json:"trustedProxy,omitempty"`
 }
 
 var Current Config
+
+// cachedProxy caches the parsed TrustedProxy value set during Load/validate.
+// Stored as *parsedProxy via atomic pointer to avoid any lock on the hot path.
+type parsedProxy struct {
+	ip   *net.IP
+	cidr *net.IPNet
+}
+
+var cachedProxyPtr atomic.Pointer[parsedProxy]
 
 func Load() {
 	Current = Config{
@@ -51,6 +61,7 @@ func Load() {
 		MaxUploadMB:          getEnvInt("MAX_UPLOAD_MB", DefaultMaxUploadMB),
 		MaxImages:            getEnvInt("MAX_IMAGES", 0),
 		MaxConcurrentUploads: getEnvInt("MAX_CONCURRENT_UPLOADS", DefaultMaxConcurrentUploads),
+		MaxWalkDepth:         getEnvInt("MAX_WALK_DEPTH", DefaultMaxWalkDepth),
 		ExternalImageDir:     getEnv("EXTERNAL_IMAGE_DIR", "external/images"),
 		AdminUser:            getEnv("ADMIN_USER", ""),
 		AdminPass:            getEnv("ADMIN_PASS", ""),
@@ -82,32 +93,43 @@ func Load() {
 	validate()
 }
 
-// IsTrustedProxy reports whether remoteAddr matches the configured TrustedProxy
-// IP or CIDR. Returns false when TrustedProxy is empty.
-func IsTrustedProxy(remoteAddr string) bool {
-	if Current.TrustedProxy == "" {
-		return false
+// parseTrustedProxyValue parses a single TrustedProxy string.
+// Returns (nil, nil, nil) when empty, and (nil, nil, err) on bad input.
+func parseTrustedProxyValue(s string) (*net.IP, *net.IPNet, error) {
+	if s == "" {
+		return nil, nil, nil
 	}
-	host, _, err := net.SplitHostPort(remoteAddr)
+	if ip := net.ParseIP(s); ip != nil {
+		return &ip, nil, nil
+	}
+	_, cidr, err := net.ParseCIDR(s)
 	if err != nil {
-		host = remoteAddr
+		return nil, nil, err
 	}
-	ip := net.ParseIP(host)
-	if ip == nil {
-		return false
-	}
-	if proxyIP := net.ParseIP(Current.TrustedProxy); proxyIP != nil {
-		return proxyIP.Equal(ip)
-	}
-	_, cidr, err := net.ParseCIDR(Current.TrustedProxy)
-	if err != nil {
-		return false
-	}
-	return cidr.Contains(ip)
+	return nil, cidr, nil
 }
 
-// validate sanitises Current in-place, resetting out-of-range values to safe
-// defaults. Called by Load and available to tests.
+// IsTrustedProxy reports whether remoteAddr matches the configured TrustedProxy.
+// Uses a cached parsed value so no allocation occurs on the hot path.
+func IsTrustedProxy(remoteAddr string) bool {
+	p := cachedProxyPtr.Load()
+	if p == nil || (p.ip == nil && p.cidr == nil) {
+		return false
+	}
+	host, _, splitErr := net.SplitHostPort(remoteAddr)
+	if splitErr != nil {
+		host = remoteAddr
+	}
+	remote := net.ParseIP(host)
+	if remote == nil {
+		return false
+	}
+	if p.ip != nil {
+		return p.ip.Equal(remote)
+	}
+	return p.cidr.Contains(remote)
+}
+
 func validate() {
 	portStr := strings.TrimPrefix(Current.Port, ":")
 	if n, err := strconv.Atoi(portStr); err != nil || n < 1 || n > 65535 {
@@ -119,9 +141,12 @@ func validate() {
 		log.Printf("Warning: MaxUploadMB %d is below minimum %d, using %d", Current.MaxUploadMB, MinUploadMB, DefaultMaxUploadMB)
 		Current.MaxUploadMB = DefaultMaxUploadMB
 	}
-
 	if Current.MaxConcurrentUploads <= 0 {
 		Current.MaxConcurrentUploads = DefaultMaxConcurrentUploads
+	}
+	if Current.MaxWalkDepth <= 0 || Current.MaxWalkDepth > 10 {
+		log.Printf("Warning: MaxWalkDepth %d out of range (1-10), using %d", Current.MaxWalkDepth, DefaultMaxWalkDepth)
+		Current.MaxWalkDepth = DefaultMaxWalkDepth
 	}
 
 	if Current.Rate.PublicPerMin < 0 {
@@ -134,7 +159,6 @@ func validate() {
 		Current.Rate.Burst = DefaultRateBurst
 	}
 
-	// Validate compression settings
 	if Current.Compression.Quality < 1 || Current.Compression.Quality > 100 {
 		log.Printf("Warning: COMPRESSION_QUALITY %d out of range (1-100), using %d", Current.Compression.Quality, DefaultCompressionQuality)
 		Current.Compression.Quality = DefaultCompressionQuality
@@ -153,19 +177,16 @@ func validate() {
 		}
 	}
 
-	if Current.TrustedProxy != "" {
-		valid := net.ParseIP(Current.TrustedProxy) != nil
-		if !valid {
-			_, _, err := net.ParseCIDR(Current.TrustedProxy)
-			valid = err == nil
-		}
-		if !valid {
-			log.Printf("Warning: invalid TRUSTED_PROXY %q — ignoring (must be IP or CIDR)", Current.TrustedProxy)
-			Current.TrustedProxy = ""
-		}
+	// Parse and cache TrustedProxy once so IsTrustedProxy is allocation-free per request.
+	ip, cidr, err := parseTrustedProxyValue(Current.TrustedProxy)
+	if err != nil {
+		log.Printf("Warning: invalid TRUSTED_PROXY %q — ignoring (must be IP or CIDR)", Current.TrustedProxy)
+		Current.TrustedProxy = ""
+		cachedProxyPtr.Store(&parsedProxy{})
+	} else {
+		cachedProxyPtr.Store(&parsedProxy{ip: ip, cidr: cidr})
 	}
 
-	// Both username and password are required; missing either disables auth.
 	if !Current.DisableAuth && (Current.AdminUser == "" || Current.AdminPass == "") {
 		Current.DisableAuth = true
 	}
@@ -178,8 +199,8 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-// getEnvAny returns the first non-empty value among the given env keys.
-// The last argument is the fallback.
+// getEnvAny returns the first non-empty value among the given env keys;
+// the last argument is the fallback.
 func getEnvAny(keys ...string) string {
 	for _, key := range keys[:len(keys)-1] {
 		if v := os.Getenv(key); v != "" {
