@@ -65,7 +65,7 @@ window.closeAllDropdowns = function(exceptElement) {
     document.querySelectorAll('.upload-dropdown.open').forEach(dropdown => {
         if (dropdown !== exceptElement) {
             dropdown.classList.remove('open');
-            const btn = dropdown.previousElementSibling;
+            const btn = dropdown.querySelector('.upload-toggle-btn');
             if (btn) btn.setAttribute('aria-expanded', 'false');
         }
     });
@@ -115,8 +115,8 @@ async function loadCompressionConfig() {
 function initCompression() {
     if (typeof ImageCompressor === 'undefined') return;
 
-    const quality = STATE.compressionConfig?.quality || 85;
-    const scale = STATE.compressionConfig?.scale || 100;
+    const quality = STATE.compressionConfig?.quality ?? 85;
+    const scale = STATE.compressionConfig?.scale ?? 100;
 
     const maxWidth = Math.floor((1920 * scale) / 100);
     const maxHeight = Math.floor((1080 * scale) / 100);
@@ -477,11 +477,12 @@ function filterWallpapers() {
         STATE.filteredWallpapers = [...STATE.wallpapers];
         return;
     }
+    const query = STATE.searchQuery;
     STATE.filteredWallpapers = STATE.wallpapers.filter(wp => {
         const name = (wp.linkName || wp.id || '').toLowerCase();
-        const fileName = (wp.imagePath || wp.imageUrl || '').toLowerCase();
-        const query = STATE.searchQuery;
-        return name.includes(query) || fileName.includes(query);
+        // Search by link name only — imageUrl is an internal server path,
+        // not something the user typed or knows.
+        return name.includes(query);
     });
 }
 
@@ -489,8 +490,8 @@ function filterWallpapers() {
 function sortWallpapers(list) {
     const sorted = [...list];
     const sortFns = {
-        name_asc:  (a, b) => a.linkName.localeCompare(b.linkName),
-        name_desc: (a, b) => b.linkName.localeCompare(a.linkName),
+        name_asc:  (a, b) => (a.linkName || '').localeCompare(b.linkName || ''),
+        name_desc: (a, b) => (b.linkName || '').localeCompare(a.linkName || ''),
         date_desc: (a, b) => (b.createdAt || 0) - (a.createdAt || 0),
         date_asc:  (a, b) => (a.createdAt || 0) - (b.createdAt || 0),
     };
@@ -634,29 +635,37 @@ async function loadExternalImages() {
         }
 
         DOM.modalList.innerHTML = '';
+        const frag = document.createDocumentFragment();
         files.forEach(file => {
             const div = document.createElement('div');
             div.className = 'image-option';
             div.dataset.value = file;
             const previewUrl = `/api/external-image-preview?path=${encodeURIComponent(file)}`;
-            div.innerHTML = `
-                <img data-src="${previewUrl}" alt="${file}" class="lazy-image-fade">
-                <div class="image-name">${file}</div>
-            `;
-            const img = div.querySelector('img');
+            // Sanitise file name before inserting as text to avoid XSS via crafted filenames
+            const nameEl = document.createElement('div');
+            nameEl.className = 'image-name';
+            nameEl.textContent = file;
+            const img = document.createElement('img');
+            img.alt = file;
+            img.className = 'lazy-image-fade';
             if (STATE.lazyObserver) {
+                img.dataset.src = previewUrl;
+                img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"%3E%3C/svg%3E';
                 STATE.lazyObserver.observe(img);
                 img.addEventListener('load', () => img.classList.add('loaded'));
             } else {
-                img.src = img.dataset.src;
+                img.src = previewUrl;
                 img.classList.add('loaded');
             }
+            div.appendChild(img);
+            div.appendChild(nameEl);
             div.onclick = () => {
                 DOM.modalList.querySelectorAll('.image-option').forEach(el => el.classList.remove('selected'));
                 div.classList.add('selected');
             };
-            DOM.modalList.appendChild(div);
+            frag.appendChild(div);
         });
+        DOM.modalList.appendChild(frag);
     } catch (_) {
         DOM.modalList.innerHTML = `<div class="modal-list-msg error">${t('server_error', 'Error loading images')}</div>`;
     }
@@ -721,12 +730,12 @@ function renderLinks(wallpapers) {
 
 function detectCategory(link) {
     const mime = link.mimeType || '';
-    if (mime.startsWith('video/')) return 'video';
-    if (mime.startsWith('image/')) return 'image';
-    const path = link.imagePath || link.imageUrl || '';
-    const ext = path.split('.').pop().toLowerCase();
-    if (['mp4', 'webm'].includes(ext)) return 'video';
-    if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) return 'image';
+    if (mime === 'mp4' || mime === 'webm') return 'video';
+    if (mime) return 'image';
+    // Fallback: infer from stored extension in URL.
+    const ext = (link.imageUrl || '').split('.').pop().toLowerCase();
+    if (ext === 'mp4' || ext === 'webm') return 'video';
+    if (ext) return 'image';
     return 'other';
 }
 
@@ -766,10 +775,11 @@ function updateCard(card, link) {
 
     let fileType;
     if (link.mimeType) {
-        fileType = (link.mimeType.split('/')[1] || link.mimeType).toUpperCase();
+        // mimeType from server is already the stored extension (e.g. "jpg", "mp4")
+        fileType = link.mimeType.toUpperCase();
     } else if (link.hasImage) {
-        const path = link.imagePath || link.imageUrl || '';
-        fileType = path.split('.').pop().toUpperCase() || 'IMAGE';
+        const ext = (link.imageUrl || '').split('.').pop();
+        fileType = ext ? ext.toUpperCase() : 'IMAGE';
     } else {
         fileType = t('no_image', 'No image');
     }
@@ -787,8 +797,9 @@ function updateCard(card, link) {
     if (link.hasImage) {
         const isVid = category === 'video';
         if (isVid) {
-            // Video: use <video> element for inline preview
-            const videoSrc = '/' + (link.imageUrl || '').replace(/^\//, '') + `?t=${Date.now()}`;
+            // Video: use <video> element for inline preview.
+            // Append a cache-busting timestamp so re-uploads are reflected immediately.
+            const videoSrc = '/' + (link.imageUrl || '').replace(/^\//, '') + `?t=${link.modTime || Date.now()}`;
             const video = document.createElement('video');
             video.src = videoSrc;
             video.className = 'preview';
@@ -803,17 +814,16 @@ function updateCard(card, link) {
             };
             previewWrapper.appendChild(video);
         } else {
-            const resolvedPreview = link.previewPath || link.preview || '';
+            const resolvedPreview = link.preview || '';
             const imgSrc = resolvedPreview
-                ? '/' + resolvedPreview.replace(/^\//, '') + `?t=${Date.now()}`
-                : '/' + (link.imageUrl || '').replace(/^\//, '') || fullUrl;
+                ? '/' + resolvedPreview.replace(/^\//, '') + `?t=${link.modTime || Date.now()}`
+                : '/' + (link.imageUrl || '').replace(/^\//, '');
             const img = createLazyImage(
                 imgSrc,
                 resolvedPreview ? 'Preview' : 'Image',
                 'preview',
                 t(resolvedPreview ? 'preview_unavailable' : 'image_unavailable', 'Image unavailable')
             );
-            // object-position: top for portrait images (common for wallpapers)
             img.classList.add('preview-top-center');
             previewWrapper.appendChild(img);
         }
@@ -847,9 +857,12 @@ function updateCard(card, link) {
                 newCopyBtn.classList.add('fading-out');
                 copyResetTimer = setTimeout(() => {
                     newCopyBtn.classList.remove('copied', 'fading-out');
+                    if (copyText) copyText.textContent = t('copy_url', 'Copy URL');
                     newCopyBtn.setAttribute('aria-label', t('copy_url', 'Copy URL'));
                 }, 300);
             }, 1500);
+        }).catch(() => {
+            showToast(t('copy_error', 'Failed to copy URL'), 'error');
         });
     };
 }
@@ -884,6 +897,7 @@ function setupCardEvents(card, link) {
 
     card.querySelector('.upload-file-btn').addEventListener('click', () => {
         dropdown.classList.remove('open');
+        toggleBtn.setAttribute('aria-expanded', 'false');
         fileInput.click();
     });
 
@@ -895,12 +909,14 @@ function setupCardEvents(card, link) {
 
     card.querySelector('.paste-url-btn').addEventListener('click', async () => {
         dropdown.classList.remove('open');
+        toggleBtn.setAttribute('aria-expanded', 'false');
         const url = await showModal('input', 'enter_image_url_title', 'url_placeholder');
         if (url) await handleUpload(link, url, card, true);
     });
 
     card.querySelector('.select-server-btn').addEventListener('click', async () => {
         dropdown.classList.remove('open');
+        toggleBtn.setAttribute('aria-expanded', 'false');
         const filename = await showModal('grid', 'select_server_title');
         if (filename) await handleUpload(link, filename, card, true);
     });
@@ -914,17 +930,19 @@ function setupCardEvents(card, link) {
     };
 
     card.querySelector('.delete-btn').onclick = async () => {
-        const confirmed = await showConfirm(
-            t('confirm_delete_msg', `Delete "${link.linkName}"? This cannot be undone.`)
-                .replace('{{name}}', link.linkName)
-        );
+        const msg = t('confirm_delete_msg', 'Delete "{{name}}"? This cannot be undone.')
+            .replace('{{name}}', link.linkName);
+        const confirmed = await showConfirm(msg);
         if (!confirmed) return;
-        await apiCall(`/api/link/${link.linkName}`, 'DELETE');
+        try {
+            await apiCall(`/api/link/${encodeURIComponent(link.linkName)}`, 'DELETE');
+        } catch (_) {
+            return; // apiCall already showed a toast
+        }
         ac.abort();
         card.remove();
         STATE.wallpapers = STATE.wallpapers.filter(wp => wp.linkName !== link.linkName);
-        updateSearchStats();
-        if (DOM.linksList.children.length === 0) DOM.emptyState.classList.remove('d-none');
+        filterAndSort();
         showToast(t('deleted_success', 'Link deleted'), 'success');
     };
 }
@@ -944,10 +962,15 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
         let fileToUpload = fileOrUrl;
         if (STATE.compressor && fileOrUrl.type.startsWith('image/')) {
             const originalSize = fileOrUrl.size;
-            fileToUpload = await STATE.compressor.compress(fileOrUrl);
-            if (fileToUpload.size < originalSize) {
-                const info = ImageCompressor.getCompressionInfo(originalSize, fileToUpload.size);
-                showToast(`🗜️ Compressed: ${info.percent}% smaller (${formatKB(info.saved)} saved)`, 'success');
+            try {
+                fileToUpload = await STATE.compressor.compress(fileOrUrl);
+                if (fileToUpload.size < originalSize) {
+                    const info = ImageCompressor.getCompressionInfo(originalSize, fileToUpload.size);
+                    showToast(`🗜️ Compressed: ${info.percent}% smaller (${formatKB(info.saved)} saved)`, 'success');
+                }
+            } catch (_) {
+                // Compression failed — fall back to original file
+                fileToUpload = fileOrUrl;
             }
         }
         formData.append('file', fileToUpload);
@@ -955,6 +978,8 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
 
     try {
         const updatedLink = await apiCall('/api/upload', 'POST', formData, true);
+        if (!updatedLink) return;
+        // Preserve createdAt if the server didn't return it (shouldn't happen, but defensive)
         if (!updatedLink.createdAt && link.createdAt) updatedLink.createdAt = link.createdAt;
         const idx = STATE.wallpapers.findIndex(wp => wp.linkName === updatedLink.linkName);
         if (idx !== -1) STATE.wallpapers[idx] = updatedLink;
@@ -969,11 +994,11 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
 function setupGlobalListeners() {
     DOM.createForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        // Debounce: prevent double-submit
         if (STATE.createPending) return;
         const id = DOM.createInput.value.trim();
         if (!id) { showToast(t('invalid_id', 'ID is required'), 'error'); return; }
-        if (!/^[a-zA-Z0-9_\-]{1,64}$/.test(id)) {
+        // Keep in sync with server-side isValidLinkName: 1-64 chars, alphanumeric + _ -
+        if (!/^[a-zA-Z0-9][a-zA-Z0-9_\-]{0,63}$/.test(id)) {
             showToast(t('invalid_id_chars', 'Invalid ID format'), 'error');
             return;
         }
@@ -1014,35 +1039,34 @@ function setupGlobalListeners() {
         if (e.target === DOM.modalOverlay) closeModal();
     };
 
-    // Confirm modal buttons
     DOM.confirmCancel.onclick = () => closeConfirm(false);
     DOM.confirmDelete.onclick = () => closeConfirm(true);
     DOM.confirmOverlay.onclick = (e) => {
         if (e.target === DOM.confirmOverlay) closeConfirm(false);
     };
 
-    // Regenerate previews button
     const regenBtn = document.getElementById('regenPreviewsBtn');
     if (regenBtn) {
         regenBtn.addEventListener('click', async () => {
             regenBtn.disabled = true;
-            const origText = regenBtn.querySelector('span')?.textContent;
-            if (regenBtn.querySelector('span')) regenBtn.querySelector('span').textContent = t('regen_previews_running', 'Regenerating...');
+            const spanEl = regenBtn.querySelector('span');
+            const origText = spanEl?.textContent;
+            if (spanEl) spanEl.textContent = t('regen_previews_running', 'Regenerating...');
             try {
                 const result = await apiCall('/api/regenerate-previews', 'POST');
+                if (!result) return;
                 showToast(
-                    t('regen_previews_done', `Done: ${result.ok} ok, ${result.errors} errors, ${result.skipped} skipped`)
+                    t('regen_previews_done', 'Done: {{ok}} ok, {{errors}} errors, {{skipped}} skipped')
                         .replace('{{ok}}', result.ok)
                         .replace('{{errors}}', result.errors)
                         .replace('{{skipped}}', result.skipped),
                     result.errors > 0 ? 'info' : 'success'
                 );
-                // Reload cards so new previews appear
                 await loadLinks();
             } catch (_) {}
             finally {
                 regenBtn.disabled = false;
-                if (regenBtn.querySelector('span') && origText) regenBtn.querySelector('span').textContent = origText;
+                if (spanEl && origText) spanEl.textContent = origText;
             }
         });
     }

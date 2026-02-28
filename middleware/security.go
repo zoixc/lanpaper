@@ -18,7 +18,11 @@ var staticSecurityHeaders = map[string]string{
 	"X-Download-Options":           "noopen",
 	"Cross-Origin-Resource-Policy": "same-origin",
 	"Cross-Origin-Opener-Policy":   "same-origin",
-	"Cross-Origin-Embedder-Policy": "require-corp",
+	// require-corp breaks loading of static assets (images/JS/CSS) from 'self'
+	// unless every response carries CORP: same-origin, which http.FileServer
+	// does not set. Use credentialless to allow same-origin assets without
+	// requiring CORP on every sub-resource.
+	"Cross-Origin-Embedder-Policy": "credentialless",
 }
 
 func buildCSP(nonce string) string {
@@ -31,13 +35,11 @@ func buildCSP(nonce string) string {
 			"connect-src 'self'; " +
 			"font-src 'self'; " +
 			"manifest-src 'self'; " +
-			"worker-src 'self'; " +
+			"worker-src 'self' blob:; " +
 			"object-src 'none'; " +
 			"base-uri 'self'; " +
 			"form-action 'self'; " +
-			"frame-ancestors 'none'; " +
-			"upgrade-insecure-requests; " +
-			"block-all-mixed-content;"
+			"frame-ancestors 'none';"
 	}
 	return "default-src 'none'; " +
 		"script-src 'self' 'nonce-" + nonce + "'; " +
@@ -47,13 +49,11 @@ func buildCSP(nonce string) string {
 		"connect-src 'self'; " +
 		"font-src 'self'; " +
 		"manifest-src 'self'; " +
-		"worker-src 'self'; " +
+		"worker-src 'self' blob:; " +
 		"object-src 'none'; " +
 		"base-uri 'self'; " +
 		"form-action 'self'; " +
-		"frame-ancestors 'none'; " +
-		"upgrade-insecure-requests; " +
-		"block-all-mixed-content;"
+		"frame-ancestors 'none';"
 }
 
 func generateNonce() (string, error) {
@@ -92,12 +92,13 @@ func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 		if r.TLS != nil {
 			h.Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
 		}
-		
+
 		h.Set("Content-Security-Policy", buildCSP(nonce))
 		if nonce != "" {
 			r = r.WithContext(contextWithNonce(r.Context(), nonce))
 		}
 
+		// Apply public rate-limit only to routes that aren't admin or API.
 		if !strings.HasPrefix(r.URL.Path, "/admin") && !strings.HasPrefix(r.URL.Path, "/api/") {
 			if isOverLimit(clientIP(r), config.Current.Rate.PublicPerMin, config.Current.Rate.Burst) {
 				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)

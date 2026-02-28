@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"sync/atomic"
 
@@ -24,7 +25,7 @@ type RegeneratePreviewsResult struct {
 }
 
 // RegeneratePreviews re-generates WebP thumbnails for every stored image entry.
-// Only POST is accepted. Runs up to 4 workers concurrently.
+// Only POST is accepted. Worker count scales with available CPUs (capped at 8).
 func RegeneratePreviews(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -57,13 +58,25 @@ func RegeneratePreviews(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	const workers = 4
+	// Scale workers with CPU count; at least 1, at most 8.
+	workers := runtime.NumCPU()
+	if workers < 1 {
+		workers = 1
+	}
+	if workers > 8 {
+		workers = 8
+	}
+
 	var wg sync.WaitGroup
 	for range workers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for j := range jobs {
+				if ctx.Err() != nil {
+					// Client disconnected; drain remaining jobs without processing.
+					continue
+				}
 				wp := j.wp
 				if err := regenPreview(ctx, wp); err != nil {
 					log.Printf("RegeneratePreviews: %s: %v", wp.LinkName, err)
