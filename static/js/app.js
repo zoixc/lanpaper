@@ -220,7 +220,7 @@ function buildSkeletonCard(isGrid) {
 
 function showSkeletons(count = 4) {
     DOM.linksList.innerHTML = '';
-    DOM.emptyState.style.display = 'none';
+    DOM.emptyState.classList.add('d-none');
     const isGrid = STATE.viewMode === 'grid';
     const frag = document.createDocumentFragment();
     for (let i = 0; i < count; i++) {
@@ -576,13 +576,13 @@ function showModal(type, titleKey, placeholderKey = '') {
         DOM.modalOverlay.classList.remove('hidden');
         DOM.modalOverlay.setAttribute('aria-hidden', 'false');
         DOM.modalInput.value = '';
-        DOM.modalInput.style.display = 'none';
+        DOM.modalInput.classList.add('d-none');
         DOM.modalList.innerHTML = '';
         DOM.modalList.classList.add('hidden');
         DOM.modalConfirm.onclick = null;
 
         if (type === 'input') {
-            DOM.modalInput.style.display = 'block';
+            DOM.modalInput.classList.remove('d-none');
             DOM.modalInput.placeholder = placeholderKey ? t(placeholderKey, 'https://...') : t('url_placeholder', 'https://...');
             DOM.modalInput.focus();
             DOM.modalInput.onkeydown = (e) => { if (e.key === 'Enter') confirmModal(); };
@@ -606,7 +606,7 @@ function closeModal() {
 
 
 function confirmModal() {
-    let result = DOM.modalInput.style.display !== 'none'
+    let result = !DOM.modalInput.classList.contains('d-none')
         ? DOM.modalInput.value.trim()
         : DOM.modalList.querySelector('.selected')?.dataset.value;
 
@@ -622,14 +622,14 @@ function confirmModal() {
 
 
 async function loadExternalImages() {
-    DOM.modalList.innerHTML = `<div style="grid-column: 1/-1; text-align: center;">${t('loading', 'Loading...')}</div>`;
+    DOM.modalList.innerHTML = `<div class="modal-list-msg">${t('loading', 'Loading...')}</div>`;
     try {
         const res = await fetch('/api/external-images');
         if (!res.ok) throw new Error('Failed');
         const files = await res.json();
 
         if (!files?.length) {
-            DOM.modalList.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">${t('server_empty', 'No images found')}</div>`;
+            DOM.modalList.innerHTML = `<div class="modal-list-msg muted">${t('server_empty', 'No images found')}</div>`;
             return;
         }
 
@@ -640,16 +640,16 @@ async function loadExternalImages() {
             div.dataset.value = file;
             const previewUrl = `/api/external-image-preview?path=${encodeURIComponent(file)}`;
             div.innerHTML = `
-                <img data-src="${previewUrl}" alt="${file}" style="opacity: 0; transition: opacity 0.3s;">
+                <img data-src="${previewUrl}" alt="${file}" class="lazy-image-fade">
                 <div class="image-name">${file}</div>
             `;
             const img = div.querySelector('img');
             if (STATE.lazyObserver) {
                 STATE.lazyObserver.observe(img);
-                img.addEventListener('load', () => img.style.opacity = '1');
+                img.addEventListener('load', () => img.classList.add('loaded'));
             } else {
                 img.src = img.dataset.src;
-                img.style.opacity = '1';
+                img.classList.add('loaded');
             }
             div.onclick = () => {
                 DOM.modalList.querySelectorAll('.image-option').forEach(el => el.classList.remove('selected'));
@@ -658,7 +658,7 @@ async function loadExternalImages() {
             DOM.modalList.appendChild(div);
         });
     } catch (_) {
-        DOM.modalList.innerHTML = `<div style="color:red; text-align:center;">${t('server_error', 'Error loading images')}</div>`;
+        DOM.modalList.innerHTML = `<div class="modal-list-msg error">${t('server_error', 'Error loading images')}</div>`;
     }
 }
 
@@ -700,10 +700,10 @@ async function loadLinks() {
 function renderLinks(wallpapers) {
     DOM.linksList.innerHTML = '';
     if (!wallpapers?.length) {
-        DOM.emptyState.style.display = 'block';
+        DOM.emptyState.classList.remove('d-none');
         return;
     }
-    DOM.emptyState.style.display = 'none';
+    DOM.emptyState.classList.add('d-none');
 
     const fragment = document.createDocumentFragment();
     wallpapers.forEach(link => {
@@ -814,7 +814,7 @@ function updateCard(card, link) {
                 t(resolvedPreview ? 'preview_unavailable' : 'image_unavailable', 'Image unavailable')
             );
             // object-position: top for portrait images (common for wallpapers)
-            img.style.objectPosition = 'top center';
+            img.classList.add('preview-top-center');
             previewWrapper.appendChild(img);
         }
     } else {
@@ -905,11 +905,11 @@ function setupCardEvents(card, link) {
         if (filename) await handleUpload(link, filename, card, true);
     });
 
-    card.ondragover = e => { e.preventDefault(); card.style.borderColor = 'var(--border-focus)'; };
-    card.ondragleave = () => card.style.borderColor = 'var(--border)';
+    card.ondragover = e => { e.preventDefault(); card.classList.add('drag-over'); };
+    card.ondragleave = () => card.classList.remove('drag-over');
     card.ondrop = async e => {
         e.preventDefault();
-        card.style.borderColor = 'var(--border)';
+        card.classList.remove('drag-over');
         if (e.dataTransfer.files.length) await handleUpload(link, e.dataTransfer.files[0], card);
     };
 
@@ -924,7 +924,7 @@ function setupCardEvents(card, link) {
         card.remove();
         STATE.wallpapers = STATE.wallpapers.filter(wp => wp.linkName !== link.linkName);
         updateSearchStats();
-        if (DOM.linksList.children.length === 0) DOM.emptyState.style.display = 'block';
+        if (DOM.linksList.children.length === 0) DOM.emptyState.classList.remove('d-none');
         showToast(t('deleted_success', 'Link deleted'), 'success');
     };
 }
@@ -973,7 +973,7 @@ function setupGlobalListeners() {
         if (STATE.createPending) return;
         const id = DOM.createInput.value.trim();
         if (!id) { showToast(t('invalid_id', 'ID is required'), 'error'); return; }
-        if (!/^[a-zA-Z0-9_-]{1,64}$/.test(id)) {
+        if (!/^[a-zA-Z0-9_\-]{1,64}$/.test(id)) {
             showToast(t('invalid_id_chars', 'Invalid ID format'), 'error');
             return;
         }
