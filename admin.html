@@ -12,7 +12,7 @@
   <!-- theme-color: respects system preference before JS loads -->
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#1c1c20" media="(prefers-color-scheme: dark)">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
 </head>
 <body>
@@ -89,7 +89,7 @@
                data-i18n-placeholder="input_placeholder"
                placeholder="Link ID (letters, numbers, - or _)"
                autocomplete="off"
-               pattern="[a-zA-Z0-9_-]+"
+               pattern="[a-zA-Z0-9_\-]+"
                maxlength="64"
                aria-label="Link ID"
                data-i18n-aria="aria_link_input">
@@ -141,7 +141,7 @@
     <section class="section">
       <h2 data-i18n="existing_links">Existing links</h2>
       <div class="links-list" id="linksList"></div>
-      <div class="empty-state" id="emptyState" data-i18n="no_links" style="display:none;">No links yet</div>
+      <div class="empty-state d-none" id="emptyState" data-i18n="no_links">No links yet</div>
     </section>
 
     <footer class="footer">
@@ -162,7 +162,7 @@
     <div class="modal">
       <h3 id="modalTitle" data-i18n="modal_default_title">Input</h3>
       <div class="modal-body" id="modalBody">
-        <input type="text" id="modalInput" class="input-field" placeholder="https://..." data-i18n-placeholder="url_placeholder">
+        <input type="text" id="modalInput" class="input-field d-none" placeholder="https://..." data-i18n-placeholder="url_placeholder">
         <div id="modalList" class="modal-list hidden"></div>
       </div>
       <div class="modal-actions">
@@ -177,11 +177,11 @@
     <div class="modal">
       <h3 id="confirmTitle" data-i18n="confirm_delete_title">Delete link?</h3>
       <div class="modal-body">
-        <p id="confirmMessage" style="color: var(--text-secondary); font-size: var(--text-base); line-height: 1.6;"></p>
+        <p id="confirmMessage"></p>
       </div>
       <div class="modal-actions">
         <button id="confirmCancelBtn" class="btn" data-i18n="modal_cancel">Cancel</button>
-        <button id="confirmDeleteBtn" class="btn btn--danger" style="width:auto; padding: 0 16px;" data-i18n="delete_btn">Delete</button>
+        <button id="confirmDeleteBtn" class="btn btn--danger" data-i18n="delete_btn">Delete</button>
       </div>
     </div>
   </div>
@@ -227,7 +227,7 @@
               </svg>
               <span data-i18n="set_image">File</span>
             </button>
-            <input type="file" class="file-input" accept="image/*,video/mp4,video/webm" style="display:none;">
+            <input type="file" class="file-input d-none" accept="image/*,video/mp4,video/webm">
             <button class="upload-menu-item paste-url-btn">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
