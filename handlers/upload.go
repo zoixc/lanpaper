@@ -56,8 +56,7 @@ var (
 	cachedInsecure  bool
 )
 
-// getTransport returns a cached *http.Transport, rebuilding it when proxy or
-// TLS settings have changed. Properly closes old transport to prevent leaks.
+// getTransport returns a cached *http.Transport, rebuilding when proxy/TLS settings change.
 func getTransport() *http.Transport {
 	transportMu.Lock()
 	defer transportMu.Unlock()
@@ -67,15 +66,12 @@ func getTransport() *http.Transport {
 	if cachedTransport != nil && cachedProxyHost == proxyHost && cachedInsecure == insecure {
 		return cachedTransport
 	}
-
-	// Close old transport to prevent connection leaks
 	if cachedTransport != nil {
 		cachedTransport.CloseIdleConnections()
 	}
 
 	t := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure}, //nolint:gosec
-		// SSRF-safe dialer: resolves DNS and blocks private IPs.
 		DialContext: (&ssrfSafeDialer{inner: &net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
@@ -96,13 +92,11 @@ func getTransport() *http.Transport {
 		}
 		t.Proxy = http.ProxyURL(proxyURL)
 	}
-	cachedTransport = t
-	cachedProxyHost = proxyHost
-	cachedInsecure = insecure
+	cachedTransport, cachedProxyHost, cachedInsecure = t, proxyHost, insecure
 	return t
 }
 
-// ssrfSafeDialer wraps net.Dialer and blocks connections to private/internal IPs.
+// ssrfSafeDialer resolves DNS and pins to the first IP, blocking private/internal addresses.
 type ssrfSafeDialer struct{ inner *net.Dialer }
 
 func (d *ssrfSafeDialer) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -117,53 +111,38 @@ func (d *ssrfSafeDialer) DialContext(ctx context.Context, network, addr string) 
 	for _, ipAddr := range ips {
 		ip := ipAddr.IP
 		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
-			return nil, fmt.Errorf("SSRF: connection to %s (%s) is blocked", host, ip)
+			return nil, fmt.Errorf("SSRF: blocked %s (%s)", host, ip)
 		}
 		for _, cidr := range utils.PrivateRanges() {
 			if cidr.Contains(ip) {
-				return nil, fmt.Errorf("SSRF: connection to %s (%s) is blocked", host, ip)
+				return nil, fmt.Errorf("SSRF: blocked %s (%s)", host, ip)
 			}
 		}
 	}
-	// Pin to the first resolved IP to prevent DNS rebinding attacks.
 	return d.inner.DialContext(ctx, network, net.JoinHostPort(ips[0].IP.String(), port))
 }
 
-// copyVideoToFile streams r into a new file at dst with buffering for better performance.
-func copyVideoToFile(r io.Reader, dst string) error {
+// copyVideoFile streams src (path or reader) into dst with a 1 MB buffer.
+// Pass a non-nil r to stream from a reader; otherwise src path is opened.
+func copyVideoFile(srcPath, dst string, r io.Reader) error {
+	if r == nil {
+		f, err := os.Open(srcPath)
+		if err != nil {
+			return fmt.Errorf("open: %w", err)
+		}
+		defer f.Close()
+		r = f
+	}
 	out, err := os.Create(dst)
 	if err != nil {
 		return fmt.Errorf("create: %w", err)
 	}
-	defer func() {
-		if cerr := out.Close(); cerr != nil {
-			log.Printf("Error closing %s: %v", dst, cerr)
-		}
-	}()
-
-	// Use buffered writer for better performance
+	defer out.Close()
 	bw := bufio.NewWriterSize(out, config.FileCopyBufferSize)
 	if _, err := io.Copy(bw, r); err != nil {
 		return fmt.Errorf("copy: %w", err)
 	}
-	if err := bw.Flush(); err != nil {
-		return fmt.Errorf("flush: %w", err)
-	}
-	return nil
-}
-
-// copyVideoFile copies a video from src to dst with buffering.
-func copyVideoFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("open: %w", err)
-	}
-	defer func() {
-		if cerr := in.Close(); cerr != nil {
-			log.Printf("Error closing %s: %v", src, cerr)
-		}
-	}()
-	return copyVideoToFile(in, dst)
+	return bw.Flush()
 }
 
 var mimeToExt = map[string]string{
@@ -184,9 +163,7 @@ func normalizeFormat(format string) string {
 	return format
 }
 
-// storedExt returns the on-disk extension.
-// Note: BMP and TIFF images are automatically re-encoded as JPEG for storage efficiency.
-// This conversion reduces file size while maintaining reasonable quality.
+// storedExt returns the on-disk extension; BMP/TIFF are re-encoded as JPEG.
 func storedExt(ext string) string {
 	if ext == "bmp" || ext == "tiff" {
 		return "jpg"
@@ -197,7 +174,7 @@ func storedExt(ext string) string {
 func checkImageDimensions(r io.ReadSeeker) error {
 	cfg, _, err := image.DecodeConfig(r)
 	if err != nil {
-		return nil // let the full decode produce the real error
+		return nil
 	}
 	if cfg.Width > config.MaxImageDimension || cfg.Height > config.MaxImageDimension {
 		return fmt.Errorf("image %dx%d exceeds %dx%d limit",
@@ -230,7 +207,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	maxBytes := int64(config.Current.MaxUploadMB) << 20
-
 	if r.ContentLength > maxBytes {
 		log.Printf("Security: rejected upload with Content-Length %d (max %d)", r.ContentLength, maxBytes)
 		http.Error(w, "File too large", http.StatusRequestEntityTooLarge)
@@ -264,19 +240,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	)
 
 	urlStr := r.FormValue("url")
-
 	if urlStr != "" {
 		if strings.HasPrefix(urlStr, "http://") || strings.HasPrefix(urlStr, "https://") {
-			parsed, parseErr := url.Parse(urlStr)
-			if parseErr != nil {
-				http.Error(w, "Invalid URL", http.StatusBadRequest)
-				return
-			}
-			// NOTE: We intentionally skip the pre-dial DNS check here.
-			// The ssrfSafeDialer in getTransport() performs a DNS-pinned SSRF check
-			// at connection time, which prevents DNS-rebinding attacks more reliably
-			// than a separate pre-check (which could race with a TTL-0 rebind).
-			_ = parsed // parsed is used above for scheme check
+			// ssrfSafeDialer handles SSRF prevention with DNS pinning at connection time.
 			img, ext, fileData, err = downloadImage(r.Context(), urlStr)
 		} else {
 			if !utils.IsValidLocalPath(urlStr) {
@@ -284,7 +250,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Invalid path", http.StatusBadRequest)
 				return
 			}
-			// Use utils.ValidateAndResolvePath to prevent path traversal and symlink escapes.
 			absPath, _, pathErr := utils.ValidateAndResolvePath(utils.ExternalBaseDir(), urlStr)
 			if pathErr != nil {
 				log.Printf("Security: path validation failed for %s: %v", urlStr, pathErr)
@@ -378,36 +343,32 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		removeFiles(oldWp.ImagePath, oldWp.PreviewPath)
 	}
 
-	// bmp/tiff are re-encoded as JPEG; the on-disk extension is "jpg".
 	saveExt := storedExt(ext)
 	originalPath := filepath.Join("static", "images", linkName+"."+saveExt)
 	previewPath := filepath.Join("static", "images", "previews", linkName+".webp")
 
 	if video {
+		var copyErr error
 		if urlStr == "" {
 			if _, err := upFile.Seek(0, io.SeekStart); err != nil {
 				log.Printf("Seek error before video copy: %v", err)
 				http.Error(w, "Failed to prepare video file", http.StatusInternalServerError)
 				return
 			}
-			if err := copyVideoToFile(upFile, originalPath); err != nil {
-				log.Printf("Error copying video to %s: %v", originalPath, err)
-				http.Error(w, "Failed to save video", http.StatusInternalServerError)
-				return
-			}
+			copyErr = copyVideoFile("", originalPath, upFile)
 		} else if !strings.HasPrefix(urlStr, "http") {
-			// Use ValidateAndResolvePath — absPath already validated earlier in this branch.
 			absPath, _, pathErr := utils.ValidateAndResolvePath(utils.ExternalBaseDir(), urlStr)
 			if pathErr != nil {
 				log.Printf("Security: path validation failed for video %s: %v", urlStr, pathErr)
 				http.Error(w, "Path outside allowed directory", http.StatusForbidden)
 				return
 			}
-			if err := copyVideoFile(absPath, originalPath); err != nil {
-				log.Printf("Error copying external video to %s: %v", originalPath, err)
-				http.Error(w, "Failed to copy video", http.StatusInternalServerError)
-				return
-			}
+			copyErr = copyVideoFile(absPath, originalPath, nil)
+		}
+		if copyErr != nil {
+			log.Printf("Error saving video %s: %v", originalPath, copyErr)
+			http.Error(w, "Failed to save video", http.StatusInternalServerError)
+			return
 		}
 		previewPath = ""
 	} else {
@@ -416,15 +377,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Save failed", http.StatusInternalServerError)
 			return
 		}
-		// Use config constants for thumbnail dimensions instead of hardcoded values.
 		if err := saveImage(thumbnail(img, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight), "webp", previewPath); err != nil {
 			log.Printf("Error saving preview %s: %v", previewPath, err)
-			// Clean up both files to avoid orphaned files on disk.
-			for _, p := range []string{originalPath, previewPath} {
-				if removeErr := os.Remove(p); removeErr != nil && !os.IsNotExist(removeErr) {
-					log.Printf("Error removing file after preview fail: %v", removeErr)
-				}
-			}
+			removeFiles(originalPath, previewPath)
 			http.Error(w, "Preview generation failed", http.StatusInternalServerError)
 			return
 		}
@@ -461,9 +416,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	storage.Global.Set(linkName, wp)
 	if err := storage.Global.Save(); err != nil {
-		// The file is already on disk but metadata wasn't persisted.
-		// Remove the orphaned files to keep disk and DB in sync.
-		log.Printf("Error saving after upload: %v — rolling back files", err)
+		log.Printf("Error saving after upload: %v — rolling back", err)
 		storage.Global.Delete(linkName)
 		removeFiles(originalPath, previewPath)
 		http.Error(w, "Failed to persist upload", http.StatusInternalServerError)
@@ -480,25 +433,15 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// saveImage encodes img to the given format and writes it to path.
-// On any encoding error the partially-written file is removed to avoid
-// leaving corrupted data on disk.
+// saveImage encodes img to path; removes the file on encode error.
 func saveImage(img image.Image, format, path string) error {
 	out, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("create: %w", err)
 	}
-
 	encodeErr := encodeImage(out, img, format)
-
-	// Always close the file.
 	closeErr := out.Close()
-	if closeErr != nil {
-		log.Printf("Error closing %s: %v", path, closeErr)
-	}
-
 	if encodeErr != nil {
-		// Remove the partially-written file so callers never see a corrupt file.
 		if removeErr := os.Remove(path); removeErr != nil && !os.IsNotExist(removeErr) {
 			log.Printf("Error removing partial file %s: %v", path, removeErr)
 		}
@@ -507,7 +450,7 @@ func saveImage(img image.Image, format, path string) error {
 	return closeErr
 }
 
-// encodeImage writes the image to w in the requested format.
+// encodeImage writes img to w in the requested format.
 func encodeImage(w io.Writer, img image.Image, format string) error {
 	switch format {
 	case "jpg", "jpeg":
@@ -523,22 +466,15 @@ func encodeImage(w io.Writer, img image.Image, format string) error {
 	}
 }
 
-// loadLocalImage loads an image from local filesystem with context support for cancellation.
 func loadLocalImage(ctx context.Context, path string) (image.Image, string, []byte, error) {
-	// Check context before starting
 	if err := ctx.Err(); err != nil {
 		return nil, "", nil, err
 	}
-
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, "", nil, errors.New("file not found")
 	}
-	defer func() {
-		if cerr := f.Close(); cerr != nil {
-			log.Printf("Error closing %s: %v", path, cerr)
-		}
-	}()
+	defer f.Close()
 
 	head := make([]byte, 512)
 	n, _ := f.Read(head)
@@ -551,15 +487,13 @@ func loadLocalImage(ctx context.Context, path string) (image.Image, string, []by
 		log.Printf("Security: oversized local image %s: %v", path, dimErr)
 		return nil, "", nil, errors.New("image dimensions too large")
 	}
+	// Seek back once after dimension check; image.Decode reads from current position.
 	if _, err := f.Seek(0, io.SeekStart); err != nil {
 		return nil, "", nil, fmt.Errorf("seek: %w", err)
 	}
-
-	// Check context again before decoding
 	if err := ctx.Err(); err != nil {
 		return nil, "", nil, err
 	}
-
 	img, format, err := image.Decode(f)
 	if err != nil {
 		log.Printf("Image decode error for %s: %v", path, err)
@@ -574,7 +508,6 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 		return nil, "", nil, errors.New("invalid URL")
 	}
 
-	// One timeout governs the entire download.
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(config.DownloadTimeout)*time.Second)
 	defer cancel()
 
@@ -585,8 +518,6 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Lanpaper/1.0)")
 	req.Header.Set("Accept", "image/*,*/*;q=0.8")
 
-	// The ssrfSafeDialer in getTransport() handles SSRF prevention at connection
-	// time with DNS pinning, which is more reliable than a pre-dial check.
 	resp, err := (&http.Client{Transport: getTransport()}).Do(req)
 	if err != nil {
 		return nil, "", nil, errors.New("network error")
@@ -598,7 +529,7 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 	}
 
 	maxBytes := int64(config.Current.MaxUploadMB) << 20
-	if resp.ContentLength > 0 && resp.ContentLength > maxBytes {
+	if resp.ContentLength > maxBytes {
 		log.Printf("Security: rejected download Content-Length %d (max %d)", resp.ContentLength, maxBytes)
 		return nil, "", nil, errors.New("file too large")
 	}
@@ -607,13 +538,10 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 	if err != nil {
 		return nil, "", nil, errors.New("read error")
 	}
-
 	if dimErr := checkImageDimensions(bytes.NewReader(buf)); dimErr != nil {
 		log.Printf("Security: oversized remote image %s: %v", urlStr, dimErr)
 		return nil, "", nil, errors.New("image dimensions too large")
 	}
-
-	// Use the decoder-reported format, not Content-Type — CDNs often send application/octet-stream.
 	img, format, err := image.Decode(bytes.NewReader(buf))
 	if err != nil {
 		return nil, "", nil, errors.New("invalid or unsupported image format")
