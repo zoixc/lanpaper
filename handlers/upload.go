@@ -109,19 +109,31 @@ func (d *ssrfSafeDialer) DialContext(ctx context.Context, network, addr string) 
 	if err != nil || len(ips) == 0 {
 		return nil, fmt.Errorf("DNS resolution failed for %s", host)
 	}
+	// Pin to the first public IP to prevent DNS rebinding
+	var safeIP string
 	for _, ipAddr := range ips {
 		ip := ipAddr.IP
 		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
-			return nil, fmt.Errorf("SSRF: blocked %s (%s)", host, ip)
+			continue // skip private
 		}
+		isPrivate := false
 		for _, cidr := range utils.PrivateRanges() {
 			if cidr.Contains(ip) {
-				return nil, fmt.Errorf("SSRF: blocked %s (%s)", host, ip)
+				isPrivate = true
+				break
 			}
 		}
+		if !isPrivate {
+			safeIP = ip.String()
+			break
+		}
 	}
-	// Pin to the first resolved IP to prevent DNS rebinding.
-	return d.inner.DialContext(ctx, network, net.JoinHostPort(ips[0].IP.String(), port))
+
+	if safeIP == "" {
+		return nil, fmt.Errorf("SSRF: blocked %s (no safe public IP found)", host)
+	}
+
+	return d.inner.DialContext(ctx, network, net.JoinHostPort(safeIP, port))
 }
 
 // copyVideoFile streams src into dst with a buffered writer.
@@ -266,7 +278,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 		if err != nil {
 			log.Printf("Image load error for %s: %v", linkName, err)
-			http.Error(w, "Failed to load image", http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 	} else {
@@ -533,10 +545,16 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 		return nil, "", nil, errors.New("file too large")
 	}
 
-	buf, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes))
+	// Read one byte more than maxBytes to properly detect if file exceeds limit
+	buf, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
 	if err != nil {
 		return nil, "", nil, errors.New("read error")
 	}
+	if int64(len(buf)) > maxBytes {
+		log.Printf("Security: rejected download body > %d bytes", maxBytes)
+		return nil, "", nil, errors.New("file too large")
+	}
+
 	if dimErr := checkImageDimensions(bytes.NewReader(buf)); dimErr != nil {
 		log.Printf("Security: oversized remote image %s: %v", urlStr, dimErr)
 		return nil, "", nil, errors.New("image dimensions too large")
