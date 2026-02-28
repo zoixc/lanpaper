@@ -2,11 +2,8 @@ package utils
 
 import "lanpaper/config"
 
-// ExternalBaseDir returns the configured external image directory path.
-// This eliminates code duplication across handlers.
+// ExternalBaseDir returns the configured external image directory.
+// config.Load() always sets a non-empty default, so no fallback is needed.
 func ExternalBaseDir() string {
-	if d := config.Current.ExternalImageDir; d != "" {
-		return d
-	}
-	return "external/images"
+	return config.Current.ExternalImageDir
 }

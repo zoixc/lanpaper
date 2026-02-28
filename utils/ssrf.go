@@ -7,7 +7,7 @@ import (
 
 // privateRanges holds all IP networks that must never be contacted via
 // user-supplied URLs (SSRF prevention).
-var privateRanges_ []*net.IPNet
+var privateRanges []*net.IPNet
 
 func init() {
 	for _, cidr := range []string{
@@ -22,13 +22,13 @@ func init() {
 		"fe80::/10",      // IPv6 link-local
 	} {
 		if _, network, err := net.ParseCIDR(cidr); err == nil {
-			privateRanges_ = append(privateRanges_, network)
+			privateRanges = append(privateRanges, network)
 		}
 	}
 }
 
 // PrivateRanges returns the list of blocked IP networks (used by the SSRF-safe dialer).
-func PrivateRanges() []*net.IPNet { return privateRanges_ }
+func PrivateRanges() []*net.IPNet { return privateRanges }
 
 // IsBlockedIP reports whether host resolves to a private or reserved address.
 // Returns true on DNS failure to fail safe.
@@ -44,7 +44,7 @@ func IsBlockedIP(host string) bool {
 		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
 			return true
 		}
-		for _, network := range privateRanges_ {
+		for _, network := range privateRanges {
 			if network.Contains(ip) {
 				return true
 			}
