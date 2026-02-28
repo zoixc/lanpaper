@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"net/http"
@@ -95,7 +96,7 @@ func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 
 		h.Set("Content-Security-Policy", buildCSP(nonce))
 		if nonce != "" {
-			r = r.WithContext(contextWithNonce(r.Context(), nonce))
+			r = r.WithContext(context.WithValue(r.Context(), nonceKey, nonce))
 		}
 
 		// Apply public rate-limit only to routes that aren't admin or API.

@@ -47,9 +47,6 @@ type PaginatedResponse struct {
 }
 
 // Wallpapers handles GET /api/wallpapers.
-// Query params: category, has_image, sort (created|updated), order (asc|desc),
-// page (1-indexed), page_size (default 50, max 200).
-// Omitting page returns all results (backward compatible).
 func Wallpapers(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -198,7 +195,6 @@ func removeFiles(imagePath, previewPath string) {
 }
 
 // linkNameFromPath extracts and validates the link name from /api/link/{name}.
-// Returns ("", false) when the path has no valid name segment.
 func linkNameFromPath(path string) (string, bool) {
 	name := strings.TrimPrefix(path, "/api/link/")
 	name = strings.Trim(name, "/")
@@ -363,7 +359,7 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Security: skipping symlink escape: %s -> %s", path, realPath)
 			return nil
 		}
-		if isAllowedExt(filepath.Ext(d.Name())) {
+		if config.AllowedMediaExts[strings.ToLower(filepath.Ext(d.Name()))] {
 			if relPath, relErr := filepath.Rel(absRoot, path); relErr == nil {
 				files = append(files, filepath.ToSlash(relPath))
 			}
@@ -379,14 +375,6 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error encoding external images response: %v", err)
 	}
 }
-
-var allowedExts = map[string]bool{
-	".jpg": true, ".jpeg": true, ".png": true, ".gif": true,
-	".webp": true, ".bmp": true, ".tiff": true, ".tif": true,
-	".mp4": true, ".webm": true,
-}
-
-func isAllowedExt(ext string) bool { return allowedExts[strings.ToLower(ext)] }
 
 func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
 	pathParam := r.URL.Query().Get("path")
@@ -408,8 +396,6 @@ func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Content-Disposition", "inline")
-	// External preview images are static files — cache them for 5 minutes.
-	// Short enough to pick up new files without hammering the server.
 	h.Set("Cache-Control", "public, max-age=300")
 	http.ServeFile(w, r, absPath)
 }

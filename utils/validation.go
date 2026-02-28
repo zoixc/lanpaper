@@ -25,29 +25,16 @@ func IsValidLocalPath(path string) bool {
 		!strings.HasPrefix(clean, "\\\\")
 }
 
-var allowedMIMETypes = map[string]bool{
-	"image/jpeg": true, "image/png": true, "image/gif": true,
-	"image/webp": true, "image/bmp": true, "image/tiff": true,
-	"video/mp4": true, "video/webm": true,
-}
-
-// IsAllowedMimeType reports whether mimeType is an accepted upload type.
-func IsAllowedMimeType(mimeType string) bool {
-	return allowedMIMETypes[strings.ToLower(mimeType)]
-}
-
 // magicBytes holds expected file signatures for supported types.
 var magicBytes = map[string][]byte{
-	"jpg":  {0xFF, 0xD8, 0xFF},
-	"png":  {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A},
-	"gif":  {0x47, 0x49, 0x46, 0x38},
-	"webp": {0x52, 0x49, 0x46, 0x46}, // RIFF prefix; WEBP marker at offset 8 checked below
-	"bmp":  {0x42, 0x4D},
-	// TIFF accepts both little-endian (II) and big-endian (MM) byte orders.
-	// mimeToExt maps image/tiff -> "tiff", so we match either magic here.
+	"jpg":     {0xFF, 0xD8, 0xFF},
+	"png":     {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A},
+	"gif":     {0x47, 0x49, 0x46, 0x38},
+	"webp":    {0x52, 0x49, 0x46, 0x46}, // RIFF prefix; WEBP marker at offset 8 checked below
+	"bmp":     {0x42, 0x4D},
 	"tiff_le": {0x49, 0x49, 0x2A, 0x00}, // little-endian TIFF
 	"tiff_be": {0x4D, 0x4D, 0x00, 0x2A}, // big-endian TIFF
-	"webm": {0x1A, 0x45, 0xDF, 0xA3}, // EBML header
+	"webm":    {0x1A, 0x45, 0xDF, 0xA3}, // EBML header
 	// mp4 validated via ftyp box check in ValidateFileType
 }
 
@@ -79,7 +66,6 @@ func ValidateFileType(data []byte, expectedExt string) error {
 		}
 		return nil
 	case "tiff":
-		// Accept both little-endian (II) and big-endian (MM) TIFF.
 		if bytes.HasPrefix(data, magicBytes["tiff_le"]) || bytes.HasPrefix(data, magicBytes["tiff_be"]) {
 			return nil
 		}
@@ -102,7 +88,6 @@ func ValidateFileType(data []byte, expectedExt string) error {
 }
 
 // dangerousRune drops shell-special characters and replaces spaces with '_'.
-// Used by SanitizeFilename for a single-pass replacement.
 func dangerousRune(r rune) rune {
 	switch r {
 	case '$', '`', '|', ';', '[', ']', '(', ')', '&', '<', '>', '"', '\'':

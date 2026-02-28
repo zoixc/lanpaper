@@ -34,10 +34,3 @@ func ValidateAndResolvePath(baseDir, targetPath string) (absPath, realPath strin
 	}
 	return absPath, realPath, nil
 }
-
-// MustBeInDirectory is a convenience wrapper around ValidateAndResolvePath
-// that returns only the security error.
-func MustBeInDirectory(baseDir, targetPath string) error {
-	_, _, err := ValidateAndResolvePath(baseDir, targetPath)
-	return err
-}
