@@ -67,7 +67,7 @@
       </div>
     </header>
 
-    <!-- Create + Search/Sort — merged into one toolbar block -->
+    <!-- Create + Search/Sort merged toolbar -->
     <div class="toolbar-section">
       <form class="create-row" id="createForm">
         <input type="text" id="newLinkId" class="input-field"
@@ -167,12 +167,15 @@
       <div class="link-info">
         <div class="link-id-row">
           <div class="link-id" aria-label="Link ID"></div>
-          <!-- Icon-only copy button; JS sets aria-label and title -->
+          <!-- Copy button: shows clipboard icon by default, text on copied state -->
           <button class="copy-url-btn" aria-label="Copy URL" title="Copy URL">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="9" y="9" width="13" height="13" rx="2"/>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-            </svg>
+            <span class="copy-icon">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+            </span>
+            <span class="copy-text" data-i18n="copy_url">Copy URL</span>
           </button>
         </div>
         <div class="link-meta" aria-label="File info"></div>
@@ -215,7 +218,16 @@
           </div>
         </div>
 
-        <button class="btn btn--danger delete-btn" data-i18n="remove">Delete</button>
+        <!-- Square icon-only delete button -->
+        <button class="btn btn--danger delete-btn" aria-label="Delete" title="Delete">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            <path d="M10 11v6"/>
+            <path d="M14 11v6"/>
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          </svg>
+        </button>
       </div>
 
     </article>
