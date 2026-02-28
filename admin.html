@@ -6,6 +6,7 @@
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/skeleton.css">
   <link rel="stylesheet" href="/static/css/settings-menu.css">
   <link rel="manifest" href="/static/manifest.json">
   <!-- theme-color: respects system preference before JS loads -->
@@ -52,6 +53,16 @@
                   <line x1="12" y1="3" x2="12" y2="15"></line>
                 </svg>
                 <span data-i18n="import_json">Import</span>
+              </button>
+            </div>
+            <div class="settings-section">
+              <div class="settings-section-title" data-i18n="settings_maintenance">Maintenance</div>
+              <button class="settings-menu-item" id="regenPreviewsBtn" type="button">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="23 4 23 10 17 10"/>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+                <span data-i18n="regen_previews">Regenerate Previews</span>
               </button>
             </div>
           </div>
@@ -130,7 +141,7 @@
     <section class="section">
       <h2 data-i18n="existing_links">Existing links</h2>
       <div class="links-list" id="linksList"></div>
-      <div class="empty-state" id="emptyState" data-i18n="no_links">No links yet</div>
+      <div class="empty-state" id="emptyState" data-i18n="no_links" style="display:none;">No links yet</div>
     </section>
 
     <footer class="footer">

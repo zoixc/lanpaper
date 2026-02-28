@@ -91,6 +91,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadCompressionConfig();
     initCompression();
     loadAppVersion();
+    showSkeletons();
     await loadLinks();
     setupGlobalListeners();
 });
@@ -197,6 +198,38 @@ async function loadAppVersion() {
 }
 
 
+// SKELETON LOADING
+function buildSkeletonCard(isGrid) {
+    const card = document.createElement('div');
+    card.className = `skeleton-card ${isGrid ? 'grid-skeleton' : 'list-skeleton'}`;
+    card.setAttribute('aria-hidden', 'true');
+    card.innerHTML = `
+        <div class="skeleton-bone skeleton-preview"></div>
+        <div class="skeleton-info">
+            <div class="skeleton-bone skeleton-title"></div>
+            <div class="skeleton-bone skeleton-meta"></div>
+            <div class="skeleton-bone skeleton-meta-short"></div>
+        </div>
+        <div class="skeleton-actions">
+            <div class="skeleton-bone skeleton-btn"></div>
+            <div class="skeleton-bone skeleton-btn-sq"></div>
+        </div>
+    `;
+    return card;
+}
+
+function showSkeletons(count = 4) {
+    DOM.linksList.innerHTML = '';
+    DOM.emptyState.style.display = 'none';
+    const isGrid = STATE.viewMode === 'grid';
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < count; i++) {
+        frag.appendChild(buildSkeletonCard(isGrid));
+    }
+    DOM.linksList.appendChild(frag);
+}
+
+
 // THEME
 function initTheme() {
     const saved = localStorage.getItem('theme');
@@ -242,7 +275,6 @@ function applyTheme() {
         : DOM.themeBtn.querySelector('img[alt="Dark"]');
     if (activeIcon) activeIcon.classList.add('active');
 
-    // Update html lang is handled in setLanguage; theme change keeps current lang
     document.documentElement.setAttribute('data-theme', STATE.isDark ? 'dark' : 'light');
 }
 
@@ -781,6 +813,8 @@ function updateCard(card, link) {
                 'preview',
                 t(resolvedPreview ? 'preview_unavailable' : 'image_unavailable', 'Image unavailable')
             );
+            // object-position: top for portrait images (common for wallpapers)
+            img.style.objectPosition = 'top center';
             previewWrapper.appendChild(img);
         }
     } else {
@@ -790,7 +824,7 @@ function updateCard(card, link) {
         previewWrapper.appendChild(noImg);
     }
 
-    // Copy button: icon → "Copied!" (green) → fade out → icon
+    // Copy button
     const copyBtn = card.querySelector('.copy-url-btn');
     const newCopyBtn = copyBtn.cloneNode(true);
     copyBtn.parentNode.replaceChild(newCopyBtn, copyBtn);
@@ -986,6 +1020,32 @@ function setupGlobalListeners() {
     DOM.confirmOverlay.onclick = (e) => {
         if (e.target === DOM.confirmOverlay) closeConfirm(false);
     };
+
+    // Regenerate previews button
+    const regenBtn = document.getElementById('regenPreviewsBtn');
+    if (regenBtn) {
+        regenBtn.addEventListener('click', async () => {
+            regenBtn.disabled = true;
+            const origText = regenBtn.querySelector('span')?.textContent;
+            if (regenBtn.querySelector('span')) regenBtn.querySelector('span').textContent = t('regen_previews_running', 'Regenerating...');
+            try {
+                const result = await apiCall('/api/regenerate-previews', 'POST');
+                showToast(
+                    t('regen_previews_done', `Done: ${result.ok} ok, ${result.errors} errors, ${result.skipped} skipped`)
+                        .replace('{{ok}}', result.ok)
+                        .replace('{{errors}}', result.errors)
+                        .replace('{{skipped}}', result.skipped),
+                    result.errors > 0 ? 'info' : 'success'
+                );
+                // Reload cards so new previews appear
+                await loadLinks();
+            } catch (_) {}
+            finally {
+                regenBtn.disabled = false;
+                if (regenBtn.querySelector('span') && origText) regenBtn.querySelector('span').textContent = origText;
+            }
+        });
+    }
 }
 
 

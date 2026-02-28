@@ -66,6 +66,9 @@ func main() {
 	)
 	mux.HandleFunc("/api/external-images", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImages)))
 	mux.HandleFunc("/api/external-image-preview", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImagePreview)))
+	mux.HandleFunc("/api/regenerate-previews",
+		middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.RegeneratePreviews)),
+	)
 	mux.HandleFunc("/", handlers.Public)
 
 	port := config.Current.Port
