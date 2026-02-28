@@ -21,14 +21,27 @@ var staticSecurityHeaders = map[string]string{
 	"Cross-Origin-Embedder-Policy": "require-corp",
 }
 
-// CSP is split into two static halves; the nonce is inserted between them.
-// This avoids repeated string concatenation on every request.
-const (
-	cspPrefix = "default-src 'none'; " +
-		"script-src 'self' 'nonce-"
-	cspInfix = "'; " +
-		"style-src 'self' 'nonce-"
-	cspSuffix = "'; " +
+func buildCSP(nonce string) string {
+	if nonce == "" {
+		return "default-src 'none'; " +
+			"script-src 'self'; " +
+			"style-src 'self'; " +
+			"img-src 'self' https: data: blob:; " +
+			"media-src 'self' https: data: blob:; " +
+			"connect-src 'self'; " +
+			"font-src 'self'; " +
+			"manifest-src 'self'; " +
+			"worker-src 'self'; " +
+			"object-src 'none'; " +
+			"base-uri 'self'; " +
+			"form-action 'self'; " +
+			"frame-ancestors 'none'; " +
+			"upgrade-insecure-requests; " +
+			"block-all-mixed-content;"
+	}
+	return "default-src 'none'; " +
+		"script-src 'self' 'nonce-" + nonce + "'; " +
+		"style-src 'self' 'nonce-" + nonce + "'; " +
 		"img-src 'self' https: data: blob:; " +
 		"media-src 'self' https: data: blob:; " +
 		"connect-src 'self'; " +
@@ -41,10 +54,6 @@ const (
 		"frame-ancestors 'none'; " +
 		"upgrade-insecure-requests; " +
 		"block-all-mixed-content;"
-)
-
-func buildCSP(nonce string) string {
-	return strings.Join([]string{cspPrefix, cspInfix, cspSuffix}, nonce)
 }
 
 func generateNonce() (string, error) {
@@ -74,10 +83,7 @@ func NonceFromRequest(r *http.Request) string {
 // limiting. The CSP nonce is stored in the request context for templates.
 func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		nonce, err := generateNonce()
-		if err != nil {
-			nonce = ""
-		}
+		nonce, _ := generateNonce() // If err != nil, nonce is ""
 
 		h := w.Header()
 		for key, value := range staticSecurityHeaders {
@@ -86,8 +92,9 @@ func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 		if r.TLS != nil {
 			h.Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
 		}
+		
+		h.Set("Content-Security-Policy", buildCSP(nonce))
 		if nonce != "" {
-			h.Set("Content-Security-Policy", buildCSP(nonce))
 			r = r.WithContext(contextWithNonce(r.Context(), nonce))
 		}
 
