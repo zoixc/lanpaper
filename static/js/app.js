@@ -717,15 +717,12 @@ function updateCard(card, link) {
         previewWrapper.appendChild(noImg);
     }
 
-    // Copy button: icon → "Copied!" text → "Copy URL" text → icon
+    // Copy button: icon → "Copied!" (green) → fade out → icon
     const copyBtn = card.querySelector('.copy-url-btn');
     const newCopyBtn = copyBtn.cloneNode(true);
     copyBtn.parentNode.replaceChild(newCopyBtn, copyBtn);
 
-    const copyIcon = newCopyBtn.querySelector('.copy-icon');
     const copyText = newCopyBtn.querySelector('.copy-text');
-
-    // Set default label text from translations
     if (copyText) copyText.textContent = t('copy_url', 'Copy URL');
 
     let copyResetTimer = null;
@@ -733,24 +730,22 @@ function updateCard(card, link) {
     newCopyBtn.onclick = (e) => {
         e.preventDefault();
         navigator.clipboard.writeText(fullUrl).then(() => {
-            // Show "Copied!" state
+            if (copyResetTimer) clearTimeout(copyResetTimer);
+
+            // Phase 1: show "Copied!" text in green
             newCopyBtn.classList.add('copied');
             if (copyText) copyText.textContent = t('copied', 'Copied!');
             newCopyBtn.setAttribute('aria-label', t('copied', 'Copied!'));
 
-            if (copyResetTimer) clearTimeout(copyResetTimer);
             copyResetTimer = setTimeout(() => {
-                // Back to "Copy URL" text (no icon yet)
-                newCopyBtn.classList.remove('copied');
-                newCopyBtn.classList.add('reset-label');
-                if (copyText) copyText.textContent = t('copy_url', 'Copy URL');
-                newCopyBtn.setAttribute('aria-label', t('copy_url', 'Copy URL'));
+                // Phase 2: fade the button out
+                newCopyBtn.classList.add('fading-out');
 
-                // After brief moment, switch back to icon-only
+                // Phase 3: after fade completes, restore icon silently
                 copyResetTimer = setTimeout(() => {
-                    newCopyBtn.classList.remove('reset-label');
+                    newCopyBtn.classList.remove('copied', 'fading-out');
                     newCopyBtn.setAttribute('aria-label', t('copy_url', 'Copy URL'));
-                }, 1200);
+                }, 300); // matches CSS transition duration
             }, 1500);
         });
     };

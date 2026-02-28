@@ -417,12 +417,11 @@ body.dark .view-icon.light-theme-icon {
 .btn--secondary       { background: var(--btn-secondary); color: var(--text-secondary); }
 .btn--secondary:hover { background: var(--btn-secondary-hover); color: var(--text); }
 
-/* Ghost danger — quiet but visible */
+/* Ghost danger — square icon button */
 .btn--danger {
     background: var(--btn-danger);
     color: var(--btn-danger-text);
     border-color: var(--btn-danger-border);
-    /* square icon button */
     width: 34px;
     padding: 0;
     flex-shrink: 0;
@@ -528,7 +527,6 @@ body.dark .view-icon.light-theme-icon {
     min-height: 96px;
 }
 
-/* Hover: border color change only, no shadow */
 .link-card:hover {
     background: var(--card-hover);
     border-color: var(--border-hover);
@@ -630,8 +628,10 @@ body.dark .view-icon.light-theme-icon {
 
 /*
   Copy button:
-  - default: icon only (clipboard svg)
-  - .copied: shows text "Скопировано!" / "Copied!", icon hidden
+  - default: clipboard icon only
+  - .copied: green text "Copied!", icon hidden
+  - .fading-out: opacity fades to 0
+  - after fade: classes removed, icon reappears
 */
 .copy-url-btn {
     display: inline-flex;
@@ -651,7 +651,7 @@ body.dark .view-icon.light-theme-icon {
     cursor: pointer;
     flex-shrink: 0;
     white-space: nowrap;
-    transition: background .15s ease, border-color .15s ease, color .15s ease, min-width .15s ease;
+    transition: background .15s ease, border-color .15s ease, color .15s ease, opacity .3s ease;
 }
 
 .copy-url-btn .copy-icon { display: flex; align-items: center; }
@@ -667,7 +667,7 @@ body.dark .view-icon.light-theme-icon {
     transform: scale(0.92);
 }
 
-/* copied state: show text, hide icon */
+/* Copied state: show green text, hide icon */
 .copy-url-btn.copied {
     color: var(--success);
     border-color: var(--success);
@@ -677,9 +677,11 @@ body.dark .view-icon.light-theme-icon {
 .copy-url-btn.copied .copy-icon { display: none; }
 .copy-url-btn.copied .copy-text { display: inline; }
 
-/* after copied: back to icon + "Copy URL" text label */
-.copy-url-btn.reset-label .copy-icon { display: none; }
-.copy-url-btn.reset-label .copy-text { display: inline; color: var(--text-muted); }
+/* Fading out: smoothly go transparent before restoring icon */
+.copy-url-btn.fading-out {
+    opacity: 0;
+    pointer-events: none;
+}
 
 @keyframes copyPulse {
     0%, 100% { transform: scale(1); }
@@ -1306,7 +1308,6 @@ body.dark .toast {
     .actions-row     { justify-content: center; }
     .link-info       { align-items: center; }
 
-    /* On mobile list view, delete btn keeps square shape */
     .btn--danger { width: 34px; padding: 0; }
 
     .toast-container { left: 16px; right: 16px; bottom: 16px; }
