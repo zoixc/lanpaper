@@ -21,23 +21,16 @@
         <img src="/static/logo.svg" alt="Lanpaper" class="logo" width="120" height="40">
       </div>
       <div class="controls">
-        <!-- Settings Dropdown -->
         <div id="settingsDropdown" class="settings-dropdown">
           <button id="settingsBtn" class="theme-switcher" aria-label="Settings" data-i18n-aria="aria_settings" aria-expanded="false" aria-haspopup="true">
-            <!-- Light icon for dark theme -->
             <img src="/static/icons/settings.webp" class="settings-icon dark-theme-icon" alt="Settings" width="18" height="18">
-            <!-- Dark icon for light theme -->
             <img src="/static/icons/settings-dark.webp" class="settings-icon light-theme-icon" alt="Settings" width="18" height="18">
           </button>
-          
           <div class="settings-menu">
-            <!-- Language Section -->
             <div class="settings-section">
               <div class="settings-section-title" data-i18n="settings_language">Language</div>
               <div class="lang-options" id="langOptions"></div>
             </div>
-            
-            <!-- Export/Import Section -->
             <div class="settings-section">
               <div class="settings-section-title" data-i18n="settings_data">Data</div>
               <button class="settings-menu-item" id="exportBtn" type="button">
@@ -74,25 +67,21 @@
       </div>
     </header>
 
-    <!-- Create new link -->
-    <section class="section">
-      <h2 data-i18n="create_new_link">Create new link</h2>
-      <form class="create-card" id="createForm">
-        <div class="create-row">
-          <input type="text" id="newLinkId" class="input-field"
-                 data-i18n-placeholder="input_placeholder"
-                 placeholder="Link ID (letters, numbers, - or _)"
-                 autocomplete="off"
-                 pattern="[a-zA-Z0-9_-]+"
-                 aria-label="Link ID"
-                 data-i18n-aria="aria_link_input">
-        </div>
+    <!-- Create + Search/Sort — merged into one toolbar block -->
+    <div class="toolbar-section">
+      <form class="create-row" id="createForm">
+        <input type="text" id="newLinkId" class="input-field"
+               data-i18n-placeholder="input_placeholder"
+               placeholder="Link ID (letters, numbers, - or _)"
+               autocomplete="off"
+               pattern="[a-zA-Z0-9_-]+"
+               aria-label="Link ID"
+               data-i18n-aria="aria_link_input">
         <button type="submit" id="createLinkBtn" class="btn btn--primary" data-i18n="create_btn">Create</button>
       </form>
-    </section>
 
-    <!-- Search + Sort -->
-    <section class="section">
+      <div class="toolbar-divider"></div>
+
       <div class="search-sort-bar">
         <div class="search-container">
           <input
@@ -130,7 +119,7 @@
           </select>
         </div>
       </div>
-    </section>
+    </div>
 
     <!-- Links -->
     <section class="section">
@@ -178,7 +167,13 @@
       <div class="link-info">
         <div class="link-id-row">
           <div class="link-id" aria-label="Link ID"></div>
-          <button class="copy-url-btn" data-i18n="copy_url" aria-label="Copy URL">Copy URL</button>
+          <!-- Icon-only copy button; JS sets aria-label and title -->
+          <button class="copy-url-btn" aria-label="Copy URL" title="Copy URL">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </button>
         </div>
         <div class="link-meta" aria-label="File info"></div>
       </div>
@@ -220,7 +215,7 @@
           </div>
         </div>
 
-        <button class="btn btn--danger delete-btn" data-i18n="remove">Remove</button>
+        <button class="btn btn--danger delete-btn" data-i18n="remove">Delete</button>
       </div>
 
     </article>
