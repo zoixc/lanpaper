@@ -101,22 +101,21 @@ func ValidateFileType(data []byte, expectedExt string) error {
 	return nil
 }
 
-// SanitizeFilename returns a safe filename by extracting just the base name
-// (stripping any path components) and removing dangerous shell characters.
-func SanitizeFilename(name string) string {
-	// Extract only the base filename, discarding any path components.
-	// This handles both "../../../etc/passwd" → "passwd" and
-	// "/home/user/../file.jpg" → "file.jpg" correctly.
-	name = filepath.Base(name)
-
-	// Remove dangerous shell characters
-	dangerousChars := []string{"$", "`", "|", ";", "[", "]", "(", ")", "&", "<", ">", "\"", "'"}
-	for _, char := range dangerousChars {
-		name = strings.ReplaceAll(name, char, "")
+// dangerousRune returns -1 (drop) for shell-special characters and spaces→'_';
+// all other runes pass through unchanged. Used by SanitizeFilename for a
+// single-pass O(n) replacement instead of 13 separate ReplaceAll calls.
+func dangerousRune(r rune) rune {
+	switch r {
+	case '$', '`', '|', ';', '[', ']', '(', ')', '&', '<', '>', '"', '\'':
+		return -1
+	case ' ':
+		return '_'
 	}
+	return r
+}
 
-	// Replace spaces with underscores
-	name = strings.ReplaceAll(name, " ", "_")
-
-	return name
+// SanitizeFilename returns a safe filename: strips path components and
+// removes/replaces dangerous characters in a single pass.
+func SanitizeFilename(name string) string {
+	return strings.Map(dangerousRune, filepath.Base(name))
 }
