@@ -173,7 +173,20 @@ func (s *Store) Load() error {
 	if err := json.Unmarshal(data, &m); err != nil {
 		return err
 	}
-	for _, wp := range m {
+	for key, wp := range m {
+		if wp == nil {
+			// Corrupt or manually edited JSON — skip null entries to avoid panics.
+			log.Printf("Warning: skipping nil wallpaper entry for key %q in storage", key)
+			delete(m, key)
+			continue
+		}
+		// Ensure required fields are consistent; self-heal if LinkName was not persisted.
+		if wp.LinkName == "" {
+			wp.LinkName = key
+		}
+		if wp.ID == "" {
+			wp.ID = key
+		}
 		derivePaths(wp)
 	}
 	s.Lock()
@@ -190,7 +203,7 @@ func PruneOldImages(max int) {
 	Global.Lock()
 	var candidates []*Wallpaper
 	for _, wp := range Global.wallpapers {
-		if wp.HasImage {
+		if wp != nil && wp.HasImage {
 			clone := *wp
 			candidates = append(candidates, &clone)
 		}

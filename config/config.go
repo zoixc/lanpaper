@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
-	"unsafe"
 )
 
 type RateConfig struct {
@@ -228,6 +227,3 @@ func getEnvBool(key string, fallback bool) bool {
 	}
 	return fallback
 }
-
-// Ensure unsafe is used (needed for atomic.Pointer type alignment guarantee).
-var _ = unsafe.Sizeof(0)

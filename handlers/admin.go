@@ -34,6 +34,7 @@ type WallpaperResponse struct {
 	Preview   string `json:"preview,omitempty"`
 	MIMEType  string `json:"mimeType"`
 	SizeBytes int64  `json:"sizeBytes"`
+	ModTime   int64  `json:"modTime"`
 	CreatedAt int64  `json:"createdAt"`
 }
 
@@ -175,6 +176,7 @@ func toResponse(wp *storage.Wallpaper) WallpaperResponse {
 		Preview:   wp.Preview,
 		MIMEType:  wp.MIMEType,
 		SizeBytes: wp.SizeBytes,
+		ModTime:   wp.ModTime,
 		CreatedAt: wp.CreatedAt,
 	}
 }
@@ -237,17 +239,22 @@ func Link(w http.ResponseWriter, r *http.Request) {
 		if cat == "" {
 			cat = "other"
 		}
-		storage.Global.Set(req.LinkName, &storage.Wallpaper{
+		newWp := &storage.Wallpaper{
 			ID:        req.LinkName,
 			LinkName:  req.LinkName,
 			Category:  cat,
 			CreatedAt: time.Now().Unix(),
-		})
+		}
+		storage.Global.Set(req.LinkName, newWp)
 		if err := storage.Global.Save(); err != nil {
 			log.Printf("Error saving after link creation: %v", err)
 		}
 		log.Printf("Created link: %s (category: %s)", req.LinkName, cat)
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
+		if err := json.NewEncoder(w).Encode(toResponse(newWp)); err != nil {
+			log.Printf("Error encoding link creation response: %v", err)
+		}
 
 	case http.MethodPatch:
 		linkName, ok := linkNameFromPath(r.URL.Path)
@@ -284,7 +291,7 @@ func Link(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Printf("Patched link: %s (category: %s)", linkName, wp.Category)
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(wp); err != nil {
+		if err := json.NewEncoder(w).Encode(toResponse(wp)); err != nil {
 			log.Printf("Error encoding patch response: %v", err)
 		}
 
@@ -306,7 +313,7 @@ func Link(w http.ResponseWriter, r *http.Request) {
 		if err := storage.Global.Save(); err != nil {
 			log.Printf("Error saving after link deletion: %v", err)
 		}
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusNoContent)
 
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -401,6 +408,9 @@ func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Content-Disposition", "inline")
+	// External preview images are static files — cache them for 5 minutes.
+	// Short enough to pick up new files without hammering the server.
+	h.Set("Cache-Control", "public, max-age=300")
 	http.ServeFile(w, r, absPath)
 }
 
