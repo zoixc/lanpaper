@@ -8,7 +8,9 @@
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="stylesheet" href="/static/css/settings-menu.css">
   <link rel="manifest" href="/static/manifest.json">
-  <meta name="theme-color" content="#ffffff">
+  <!-- theme-color: respects system preference before JS loads -->
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1c1c20" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
 </head>
@@ -77,6 +79,7 @@
                placeholder="Link ID (letters, numbers, - or _)"
                autocomplete="off"
                pattern="[a-zA-Z0-9_-]+"
+               maxlength="64"
                aria-label="Link ID"
                data-i18n-aria="aria_link_input">
         <button type="submit" id="createLinkBtn" class="btn btn--primary" data-i18n="create_btn">Create</button>
@@ -144,7 +147,7 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Modal -->
-  <div id="modalOverlay" class="modal-overlay hidden">
+  <div id="modalOverlay" class="modal-overlay hidden" aria-modal="true" role="dialog">
     <div class="modal">
       <h3 id="modalTitle" data-i18n="modal_default_title">Input</h3>
       <div class="modal-body" id="modalBody">
@@ -154,6 +157,20 @@
       <div class="modal-actions">
         <button id="modalCancelBtn" class="btn" data-i18n="modal_cancel">Cancel</button>
         <button id="modalConfirmBtn" class="btn btn--primary" data-i18n="modal_ok">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Delete Modal -->
+  <div id="confirmOverlay" class="modal-overlay hidden" aria-modal="true" role="alertdialog">
+    <div class="modal">
+      <h3 id="confirmTitle" data-i18n="confirm_delete_title">Delete link?</h3>
+      <div class="modal-body">
+        <p id="confirmMessage" style="color: var(--text-secondary); font-size: var(--text-base); line-height: 1.6;"></p>
+      </div>
+      <div class="modal-actions">
+        <button id="confirmCancelBtn" class="btn" data-i18n="modal_cancel">Cancel</button>
+        <button id="confirmDeleteBtn" class="btn btn--danger" style="width:auto; padding: 0 16px;" data-i18n="delete_btn">Delete</button>
       </div>
     </div>
   </div>
@@ -169,7 +186,6 @@
       <div class="link-info">
         <div class="link-id-row">
           <div class="link-id" aria-label="Link ID"></div>
-          <!-- Copy button: shows clipboard icon by default, text on copied state -->
           <button class="copy-url-btn" aria-label="Copy URL" title="Copy URL">
             <span class="copy-icon">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -220,7 +236,6 @@
           </div>
         </div>
 
-        <!-- Square icon-only delete button -->
         <button class="btn btn--danger delete-btn" aria-label="Delete" title="Delete">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="3 6 5 6 21 6"/>

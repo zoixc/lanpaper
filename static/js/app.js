@@ -18,6 +18,7 @@ const STATE = {
     lazyObserver: null,
     compressionConfig: null,
     isDebug: false,
+    createPending: false,
 };
 
 
@@ -39,6 +40,12 @@ const DOM = {
     modalList: document.getElementById('modalList'),
     modalCancel: document.getElementById('modalCancelBtn'),
     modalConfirm: document.getElementById('modalConfirmBtn'),
+
+    confirmOverlay: document.getElementById('confirmOverlay'),
+    confirmTitle: document.getElementById('confirmTitle'),
+    confirmMessage: document.getElementById('confirmMessage'),
+    confirmCancel: document.getElementById('confirmCancelBtn'),
+    confirmDelete: document.getElementById('confirmDeleteBtn'),
 
     createInput: document.getElementById('newLinkId'),
     createForm: document.getElementById('createForm'),
@@ -132,7 +139,8 @@ function initLazyLoading() {
                 }
             }
         });
-    }, { rootMargin: '50px 0px', threshold: 0.01 });
+    // Larger rootMargin for taller mobile cards (160px preview height)
+    }, { rootMargin: '200px 0px', threshold: 0.01 });
 }
 
 
@@ -150,7 +158,9 @@ function initKeyboardShortcuts() {
             },
             'g': () => (e.ctrlKey || e.metaKey) && DOM.viewBtn.click(),
             'Escape': () => {
-                if (!DOM.modalOverlay.classList.contains('hidden')) {
+                if (!DOM.confirmOverlay.classList.contains('hidden')) {
+                    closeConfirm();
+                } else if (!DOM.modalOverlay.classList.contains('hidden')) {
                     closeModal();
                 } else if (DOM.searchInput.value) {
                     DOM.searchInput.value = '';
@@ -211,8 +221,15 @@ function initTheme() {
 function applyTheme() {
     document.body.classList.toggle('dark', STATE.isDark);
 
-    const themeColorMeta = document.querySelector('meta[name="theme-color"]');
-    if (themeColorMeta) themeColorMeta.content = STATE.isDark ? '#191919' : '#ffffff';
+    // Update both theme-color meta tags (light and dark media variants)
+    document.querySelectorAll('meta[name="theme-color"]').forEach(meta => {
+        const media = meta.getAttribute('media') || '';
+        if (media.includes('dark')) {
+            meta.content = STATE.isDark ? '#1c1c20' : '#1c1c20';
+        } else {
+            meta.content = STATE.isDark ? '#1c1c20' : '#ffffff';
+        }
+    });
 
     const logo = document.querySelector('.logo');
     if (logo) logo.src = STATE.isDark ? '/static/logo-dark.svg' : '/static/logo.svg';
@@ -224,6 +241,9 @@ function applyTheme() {
         ? DOM.themeBtn.querySelector('img[alt="Light"]')
         : DOM.themeBtn.querySelector('img[alt="Dark"]');
     if (activeIcon) activeIcon.classList.add('active');
+
+    // Update html lang is handled in setLanguage; theme change keeps current lang
+    document.documentElement.setAttribute('data-theme', STATE.isDark ? 'dark' : 'light');
 }
 
 
@@ -276,6 +296,9 @@ window.setLanguage = setLanguage;
 async function setLanguage(lang) {
     STATE.lang = lang;
     localStorage.setItem('lang', lang);
+
+    // Update <html lang> attribute for accessibility and SEO
+    document.documentElement.lang = lang;
 
     try {
         const res = await fetch(`/static/i18n/${lang}.json`);
@@ -468,15 +491,46 @@ function updateSearchStats() {
 
 
 // TOASTS
+const TOAST_ICONS = {
+    success: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+    error:   `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+    info:    `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+};
+
 function showToast(message, type = 'success') {
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
-    toast.innerHTML = `<span>${message}</span>`;
+    const icon = TOAST_ICONS[type] || TOAST_ICONS.info;
+    toast.innerHTML = `
+        <div class="toast-icon">${icon}</div>
+        <div class="toast-content">${message}</div>
+    `;
     DOM.toastContainer.appendChild(toast);
     setTimeout(() => {
         toast.classList.add('hiding');
         setTimeout(() => toast.remove(), 400);
     }, 3000);
+}
+
+
+// CONFIRM MODAL
+let confirmResolve = null;
+
+function showConfirm(message) {
+    return new Promise((resolve) => {
+        confirmResolve = resolve;
+        if (DOM.confirmMessage) DOM.confirmMessage.textContent = message;
+        DOM.confirmOverlay.classList.remove('hidden');
+        DOM.confirmOverlay.setAttribute('aria-hidden', 'false');
+        DOM.confirmDelete.focus();
+    });
+}
+
+function closeConfirm(result = false) {
+    DOM.confirmOverlay.classList.add('hidden');
+    DOM.confirmOverlay.setAttribute('aria-hidden', 'true');
+    if (confirmResolve) confirmResolve(result);
+    confirmResolve = null;
 }
 
 
@@ -699,17 +753,36 @@ function updateCard(card, link) {
     previewWrapper.innerHTML = '';
 
     if (link.hasImage) {
-        const resolvedPreview = link.previewPath || link.preview || '';
-        const imgSrc = resolvedPreview
-            ? '/' + resolvedPreview.replace(/^\//, '') + `?t=${Date.now()}`
-            : '/' + (link.imageUrl || '').replace(/^\//, '') || fullUrl;
-        const img = createLazyImage(
-            imgSrc,
-            resolvedPreview ? 'Preview' : 'Image',
-            'preview',
-            t(resolvedPreview ? 'preview_unavailable' : 'image_unavailable', 'Image unavailable')
-        );
-        previewWrapper.appendChild(img);
+        const isVid = category === 'video';
+        if (isVid) {
+            // Video: use <video> element for inline preview
+            const videoSrc = '/' + (link.imageUrl || '').replace(/^\//, '') + `?t=${Date.now()}`;
+            const video = document.createElement('video');
+            video.src = videoSrc;
+            video.className = 'preview';
+            video.autoplay = true;
+            video.muted = true;
+            video.loop = true;
+            video.playsInline = true;
+            video.setAttribute('playsinline', '');
+            video.setAttribute('preload', 'metadata');
+            video.onerror = () => {
+                previewWrapper.innerHTML = `<div class="no-image">${t('preview_unavailable', 'Preview unavailable')}</div>`;
+            };
+            previewWrapper.appendChild(video);
+        } else {
+            const resolvedPreview = link.previewPath || link.preview || '';
+            const imgSrc = resolvedPreview
+                ? '/' + resolvedPreview.replace(/^\//, '') + `?t=${Date.now()}`
+                : '/' + (link.imageUrl || '').replace(/^\//, '') || fullUrl;
+            const img = createLazyImage(
+                imgSrc,
+                resolvedPreview ? 'Preview' : 'Image',
+                'preview',
+                t(resolvedPreview ? 'preview_unavailable' : 'image_unavailable', 'Image unavailable')
+            );
+            previewWrapper.appendChild(img);
+        }
     } else {
         const noImg = document.createElement('div');
         noImg.className = 'no-image';
@@ -732,20 +805,16 @@ function updateCard(card, link) {
         navigator.clipboard.writeText(fullUrl).then(() => {
             if (copyResetTimer) clearTimeout(copyResetTimer);
 
-            // Phase 1: show "Copied!" text in green
             newCopyBtn.classList.add('copied');
             if (copyText) copyText.textContent = t('copied', 'Copied!');
             newCopyBtn.setAttribute('aria-label', t('copied', 'Copied!'));
 
             copyResetTimer = setTimeout(() => {
-                // Phase 2: fade the button out
                 newCopyBtn.classList.add('fading-out');
-
-                // Phase 3: after fade completes, restore icon silently
                 copyResetTimer = setTimeout(() => {
                     newCopyBtn.classList.remove('copied', 'fading-out');
                     newCopyBtn.setAttribute('aria-label', t('copy_url', 'Copy URL'));
-                }, 300); // matches CSS transition duration
+                }, 300);
             }, 1500);
         });
     };
@@ -811,15 +880,18 @@ function setupCardEvents(card, link) {
     };
 
     card.querySelector('.delete-btn').onclick = async () => {
-        if (confirm(t('confirm_delete', 'Delete link?'))) {
-            await apiCall(`/api/link/${link.linkName}`, 'DELETE');
-            ac.abort();
-            card.remove();
-            STATE.wallpapers = STATE.wallpapers.filter(wp => wp.linkName !== link.linkName);
-            updateSearchStats();
-            if (DOM.linksList.children.length === 0) DOM.emptyState.style.display = 'block';
-            showToast(t('deleted_success', 'Link deleted'), 'success');
-        }
+        const confirmed = await showConfirm(
+            t('confirm_delete_msg', `Delete "${link.linkName}"? This cannot be undone.`)
+                .replace('{{name}}', link.linkName)
+        );
+        if (!confirmed) return;
+        await apiCall(`/api/link/${link.linkName}`, 'DELETE');
+        ac.abort();
+        card.remove();
+        STATE.wallpapers = STATE.wallpapers.filter(wp => wp.linkName !== link.linkName);
+        updateSearchStats();
+        if (DOM.linksList.children.length === 0) DOM.emptyState.style.display = 'block';
+        showToast(t('deleted_success', 'Link deleted'), 'success');
     };
 }
 
@@ -863,12 +935,17 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
 function setupGlobalListeners() {
     DOM.createForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        // Debounce: prevent double-submit
+        if (STATE.createPending) return;
         const id = DOM.createInput.value.trim();
         if (!id) { showToast(t('invalid_id', 'ID is required'), 'error'); return; }
         if (!/^[a-zA-Z0-9_-]{1,64}$/.test(id)) {
             showToast(t('invalid_id_chars', 'Invalid ID format'), 'error');
             return;
         }
+        STATE.createPending = true;
+        const btn = DOM.createForm.querySelector('[type="submit"]');
+        if (btn) btn.disabled = true;
         try {
             await apiCall('/api/link', 'POST', { linkName: id });
             DOM.createInput.value = '';
@@ -893,10 +970,21 @@ function setupGlobalListeners() {
             }
             showToast(t('created_success', 'Link created'), 'success');
         } catch (_) {}
+        finally {
+            STATE.createPending = false;
+            if (btn) btn.disabled = false;
+        }
     });
 
     DOM.modalOverlay.onclick = (e) => {
         if (e.target === DOM.modalOverlay) closeModal();
+    };
+
+    // Confirm modal buttons
+    DOM.confirmCancel.onclick = () => closeConfirm(false);
+    DOM.confirmDelete.onclick = () => closeConfirm(true);
+    DOM.confirmOverlay.onclick = (e) => {
+        if (e.target === DOM.confirmOverlay) closeConfirm(false);
     };
 }
 
