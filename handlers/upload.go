@@ -272,11 +272,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Invalid URL", http.StatusBadRequest)
 				return
 			}
-			if err := utils.ValidateRemoteURL(parsed.Hostname()); err != nil {
-				log.Printf("Security: blocked SSRF attempt to %s", parsed.Hostname())
-				http.Error(w, "URL not allowed", http.StatusForbidden)
-				return
-			}
+			// NOTE: We intentionally skip the pre-dial DNS check here.
+			// The ssrfSafeDialer in getTransport() performs a DNS-pinned SSRF check
+			// at connection time, which prevents DNS-rebinding attacks more reliably
+			// than a separate pre-check (which could race with a TTL-0 rebind).
+			_ = parsed // parsed is used above for scheme check
 			img, ext, fileData, err = downloadImage(r.Context(), urlStr)
 		} else {
 			if !utils.IsValidLocalPath(urlStr) {
@@ -419,8 +419,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		// Use config constants for thumbnail dimensions instead of hardcoded values.
 		if err := saveImage(thumbnail(img, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight), "webp", previewPath); err != nil {
 			log.Printf("Error saving preview %s: %v", previewPath, err)
-			if removeErr := os.Remove(originalPath); removeErr != nil && !os.IsNotExist(removeErr) {
-				log.Printf("Error removing original after preview fail: %v", removeErr)
+			// Clean up both files to avoid orphaned files on disk.
+			for _, p := range []string{originalPath, previewPath} {
+				if removeErr := os.Remove(p); removeErr != nil && !os.IsNotExist(removeErr) {
+					log.Printf("Error removing file after preview fail: %v", removeErr)
+				}
 			}
 			http.Error(w, "Preview generation failed", http.StatusInternalServerError)
 			return
@@ -458,7 +461,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	storage.Global.Set(linkName, wp)
 	if err := storage.Global.Save(); err != nil {
-		log.Printf("Error saving after upload: %v", err)
+		// The file is already on disk but metadata wasn't persisted.
+		// Remove the orphaned files to keep disk and DB in sync.
+		log.Printf("Error saving after upload: %v — rolling back files", err)
+		storage.Global.Delete(linkName)
+		removeFiles(originalPath, previewPath)
+		http.Error(w, "Failed to persist upload", http.StatusInternalServerError)
+		return
 	}
 	if config.Current.MaxImages > 0 {
 		go storage.PruneOldImages(config.Current.MaxImages)
@@ -471,27 +480,46 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// saveImage encodes img to the given format and writes it to path.
+// On any encoding error the partially-written file is removed to avoid
+// leaving corrupted data on disk.
 func saveImage(img image.Image, format, path string) error {
 	out, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("create: %w", err)
 	}
-	defer func() {
-		if cerr := out.Close(); cerr != nil {
-			log.Printf("Error closing %s: %v", path, cerr)
+
+	encodeErr := encodeImage(out, img, format)
+
+	// Always close the file.
+	closeErr := out.Close()
+	if closeErr != nil {
+		log.Printf("Error closing %s: %v", path, closeErr)
+	}
+
+	if encodeErr != nil {
+		// Remove the partially-written file so callers never see a corrupt file.
+		if removeErr := os.Remove(path); removeErr != nil && !os.IsNotExist(removeErr) {
+			log.Printf("Error removing partial file %s: %v", path, removeErr)
 		}
-	}()
+		return encodeErr
+	}
+	return closeErr
+}
+
+// encodeImage writes the image to w in the requested format.
+func encodeImage(w io.Writer, img image.Image, format string) error {
 	switch format {
 	case "jpg", "jpeg":
-		return jpeg.Encode(out, img, &jpeg.Options{Quality: config.JPEGQuality})
+		return jpeg.Encode(w, img, &jpeg.Options{Quality: config.JPEGQuality})
 	case "png":
-		return png.Encode(out, img)
+		return png.Encode(w, img)
 	case "gif":
-		return gif.Encode(out, img, &gif.Options{NumColors: config.GIFColors})
+		return gif.Encode(w, img, &gif.Options{NumColors: config.GIFColors})
 	case "webp":
-		return webp.Encode(out, img, &webp.Options{Quality: config.WebPQuality})
+		return webp.Encode(w, img, &webp.Options{Quality: config.WebPQuality})
 	default:
-		return jpeg.Encode(out, img, &jpeg.Options{Quality: config.JPEGQuality})
+		return jpeg.Encode(w, img, &jpeg.Options{Quality: config.JPEGQuality})
 	}
 }
 
@@ -557,6 +585,8 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Lanpaper/1.0)")
 	req.Header.Set("Accept", "image/*,*/*;q=0.8")
 
+	// The ssrfSafeDialer in getTransport() handles SSRF prevention at connection
+	// time with DNS pinning, which is more reliable than a pre-dial check.
 	resp, err := (&http.Client{Transport: getTransport()}).Do(req)
 	if err != nil {
 		return nil, "", nil, errors.New("network error")

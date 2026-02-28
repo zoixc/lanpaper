@@ -72,7 +72,9 @@ func Wallpapers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wallpapers := storage.Global.GetAll()
+	// Use GetAllCopy so we can freely sort/filter without touching the cached
+	// snapshot or its original pointer values.
+	wallpapers := storage.Global.GetAllCopy()
 
 	// Apply filters efficiently
 	if cat := r.URL.Query().Get("category"); cat != "" {
@@ -95,7 +97,7 @@ func Wallpapers(w http.ResponseWriter, r *http.Request) {
 		wallpapers = filtered
 	}
 
-	// Apply sorting
+	// Apply sorting on the local copy.
 	if sf := r.URL.Query().Get("sort"); sf != "" {
 		desc := r.URL.Query().Get("order") != "asc"
 		sortWallpapers(wallpapers, sf, desc)
@@ -182,22 +184,26 @@ func sortWallpapers(wps []*storage.Wallpaper, field string, desc bool) {
 	})
 }
 
-func toResponse(wp *storage.Wallpaper) WallpaperResponse {
-	cat := wp.Category
-	if cat == "" {
-		switch {
-		case wp.MIMEType == "mp4" || wp.MIMEType == "webm":
-			cat = "video"
-		case wp.HasImage:
-			cat = "image"
-		default:
-			cat = "other"
-		}
+// inferCategory derives a display category when none is stored.
+func inferCategory(wp *storage.Wallpaper) string {
+	if wp.Category != "" {
+		return wp.Category
 	}
+	switch {
+	case wp.MIMEType == "mp4" || wp.MIMEType == "webm":
+		return "video"
+	case wp.HasImage:
+		return "image"
+	default:
+		return "other"
+	}
+}
+
+func toResponse(wp *storage.Wallpaper) WallpaperResponse {
 	return WallpaperResponse{
 		ID:        wp.ID,
 		LinkName:  wp.LinkName,
-		Category:  cat,
+		Category:  inferCategory(wp),
 		HasImage:  wp.HasImage,
 		ImageURL:  wp.ImageURL,
 		Preview:   wp.Preview,
@@ -207,9 +213,9 @@ func toResponse(wp *storage.Wallpaper) WallpaperResponse {
 	}
 }
 
-var validCategories = map[string]bool{
-	"tech": true, "life": true, "work": true, "other": true,
-}
+// validCategories is the canonical set of user-assignable category names.
+// Sourced from config so it can be extended without touching handler logic.
+var validCategories = config.ValidCategories
 
 func isValidCategory(cat string) bool { return validCategories[cat] }
 
@@ -434,6 +440,9 @@ func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("X-Content-Type-Options", "nosniff")
+	h := w.Header()
+	h.Set("X-Content-Type-Options", "nosniff")
+	// Instruct the browser to display the file inline rather than download it.
+	h.Set("Content-Disposition", "inline")
 	http.ServeFile(w, r, absPath)
 }

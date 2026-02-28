@@ -52,7 +52,25 @@ func buildCSP(nonce string) string {
 		"block-all-mixed-content;"
 }
 
+// nonceKey is the context key used to pass the CSP nonce to handlers/templates.
+type nonceKeyType struct{}
+
+var nonceKey nonceKeyType
+
+// NonceFromRequest retrieves the CSP nonce stored in the request context by
+// WithSecurity. Returns an empty string if no nonce is set.
+func NonceFromRequest(r *http.Request) string {
+	if v := r.Context().Value(nonceKey); v != nil {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
 // WithSecurity attaches security headers and applies public-endpoint rate limiting.
+// The generated CSP nonce is stored in the request context so handlers can
+// embed it into HTML templates via NonceFromRequest.
 // Must wrap every handler reachable without authentication.
 func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -74,10 +92,14 @@ func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 			h.Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
 		}
 
-		// CSP is always set; nonce is embedded server-side into HTML templates,
-		// never exposed via a response header (that would defeat the purpose).
+		// CSP is always set when nonce is available.
+		// The nonce is also injected into the request context so templates can
+		// embed it as attribute values — never read it from the response header.
 		if nonce != "" {
 			h.Set("Content-Security-Policy", buildCSP(nonce))
+			// Store nonce in context for use by downstream handlers.
+			import_ctx := r.Context()
+			r = r.WithContext(contextWithNonce(import_ctx, nonce))
 		}
 
 		// Rate limiting for public endpoints.

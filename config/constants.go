@@ -87,3 +87,12 @@ const (
 	// Larger buffer improves performance for large video files.
 	FileCopyBufferSize = 1024 * 1024
 )
+
+// ValidCategories is the canonical set of user-assignable category names.
+// Add new categories here — handler validation picks them up automatically.
+var ValidCategories = map[string]bool{
+	"tech":  true,
+	"life":  true,
+	"work":  true,
+	"other": true,
+}
