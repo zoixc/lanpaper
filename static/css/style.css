@@ -144,6 +144,14 @@ body.dark {
 /* ============================================================
    BASE
    ============================================================ */
+
+/* Prevent layout shift from scrollbar appearing/disappearing — desktop only */
+@media (min-width: 769px) {
+    html {
+        overflow-y: scroll;
+    }
+}
+
 body {
     font-family: var(--font-ui);
     font-size: var(--text-base);
@@ -152,10 +160,19 @@ body {
     color: var(--text);
     line-height: 1.6;
     min-height: 100vh;
+    min-height: 100dvh;
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Disable tap highlight on mobile */
+    -webkit-tap-highlight-color: transparent;
     transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* Remove tap highlight and add fast touch response on all interactive elements */
+button, a, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
 }
 
 
@@ -201,6 +218,10 @@ body {
     max-width: 1400px;
     width: 100%;
     padding: 28px 24px;
+    /* PWA safe area — respects iPhone notch / Dynamic Island / home bar */
+    padding-left: max(24px, env(safe-area-inset-left));
+    padding-right: max(24px, env(safe-area-inset-right));
+    padding-bottom: max(28px, env(safe-area-inset-bottom));
     margin: 0 auto;
 }
 
@@ -449,6 +470,8 @@ body.dark .view-icon.light-theme-icon {
     border-radius: var(--radius-sm);
     outline: none;
     transition: border-color .18s ease, box-shadow .18s ease;
+    /* Prevent iOS zoom on focus (font-size must be >= 16px visually — handled by meta viewport) */
+    font-size: max(var(--text-base), 16px);
 }
 
 .input-field:hover, .search-input:hover {
@@ -464,7 +487,7 @@ body.dark .view-icon.light-theme-icon {
     color: var(--text-muted);
 }
 
-.input-field  { flex: 1; min-width: 200px; width: 100%; }
+.input-field  { flex: 1; min-width: 0; width: 100%; }
 .search-input { flex: 1; min-width: 0; }
 
 
@@ -885,6 +908,8 @@ body.dark .custom-select-option.selected {
     opacity: 0;
     visibility: hidden;
     transition: opacity .25s ease, visibility .25s ease;
+    /* Respect safe area inside modal overlay */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 .modal-overlay:not(.hidden) {
@@ -998,6 +1023,9 @@ body.dark .custom-select-option.selected {
     position: fixed;
     bottom: 24px;
     right: 24px;
+    /* Respect home bar / bottom inset on iPhone */
+    bottom: max(24px, calc(env(safe-area-inset-bottom) + 12px));
+    right: max(24px, env(safe-area-inset-right));
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -1294,24 +1322,51 @@ body.dark .toast {
 
 
 /* ============================================================
-   RESPONSIVE
+   RESPONSIVE — MOBILE
    ============================================================ */
 @media (max-width: 768px) {
-    .container  { padding: 20px 16px; }
+    .container  { padding: 16px 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
     .header-row { padding: 14px 18px; }
     h1          { font-size: 1.5rem; }
 
-    .link-card  { grid-template-columns: 1fr; text-align: center; }
+    /* List view on mobile: single column, actions stretch full width */
+    .link-card {
+        grid-template-columns: auto 1fr;
+        grid-template-rows: auto auto;
+        text-align: left;
+    }
+    .link-card .preview-link {
+        grid-row: 1 / 3;
+        align-self: center;
+    }
+    .link-card .link-info {
+        align-self: center;
+    }
+    .link-card .actions-row {
+        grid-column: 2 / 3;
+        justify-content: flex-start;
+    }
+    .link-card .upload-dropdown {
+        flex: 1;
+    }
+    .link-card .upload-toggle-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
     .create-card { grid-template-columns: 1fr; text-align: center; }
 
-    .preview-wrapper { margin: 0 auto; width: 80px; height: 60px; }
-    .actions-row     { justify-content: center; }
-    .link-info       { align-items: center; }
+    .preview-wrapper { width: 80px; height: 60px; }
+    .link-info       { align-items: flex-start; }
 
     .btn--danger { width: 34px; padding: 0; }
 
-    .toast-container { left: 16px; right: 16px; bottom: 16px; }
-    .toast           { min-width: unset; max-width: 100%; }
+    .toast-container {
+        left: max(16px, env(safe-area-inset-left));
+        right: max(16px, env(safe-area-inset-right));
+        bottom: max(16px, calc(env(safe-area-inset-bottom) + 8px));
+    }
+    .toast { min-width: unset; max-width: 100%; }
 
     .links-list.grid-view {
         grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -1326,9 +1381,6 @@ body.dark .toast {
     .custom-select,
     .custom-select-btn { width: 100%; }
 
-    .upload-dropdown,
-    .upload-toggle-btn { width: 100%; }
-    .upload-toggle-btn { justify-content: center; }
     .upload-menu {
         left: 0; right: 0;
         transform: translateY(-6px) scale(0.96);
