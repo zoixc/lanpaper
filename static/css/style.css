@@ -164,12 +164,10 @@ body {
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    /* Disable tap highlight on mobile */
     -webkit-tap-highlight-color: transparent;
     transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-/* Remove tap highlight and add fast touch response on all interactive elements */
 button, a, [role="button"] {
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
@@ -199,7 +197,7 @@ button, a, [role="button"] {
 
 
 /* ============================================================
-   BACKGROUND — static, no animation
+   BACKGROUND
    ============================================================ */
 .network-bg {
     position: fixed;
@@ -218,7 +216,6 @@ button, a, [role="button"] {
     max-width: 1400px;
     width: 100%;
     padding: 28px 24px;
-    /* PWA safe area — respects iPhone notch / Dynamic Island / home bar */
     padding-left: max(24px, env(safe-area-inset-left));
     padding-right: max(24px, env(safe-area-inset-right));
     padding-bottom: max(28px, env(safe-area-inset-bottom));
@@ -413,7 +410,8 @@ body.dark .view-icon.light-theme-icon {
     transition: background .15s cubic-bezier(0.4,0,.2,1),
                 border-color .15s cubic-bezier(0.4,0,.2,1),
                 color .15s cubic-bezier(0.4,0,.2,1),
-                transform .12s cubic-bezier(0.4,0,.2,1);
+                transform .12s cubic-bezier(0.4,0,.2,1),
+                opacity .15s ease;
 }
 
 .btn:hover {
@@ -423,6 +421,15 @@ body.dark .view-icon.light-theme-icon {
 
 .btn:active {
     transform: scale(0.98);
+}
+
+/* p.9 — disabled state: visually muted, no pointer, no transform */
+.btn:disabled,
+.btn[disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+    transform: none;
 }
 
 .btn--primary {
@@ -470,7 +477,6 @@ body.dark .view-icon.light-theme-icon {
     border-radius: var(--radius-sm);
     outline: none;
     transition: border-color .18s ease, box-shadow .18s ease;
-    /* Prevent iOS zoom on focus */
     font-size: max(var(--text-base), 16px);
 }
 
@@ -492,7 +498,7 @@ body.dark .view-icon.light-theme-icon {
 
 
 /* ============================================================
-   TOOLBAR — create + search/sort merged into one section
+   TOOLBAR
    ============================================================ */
 .toolbar-section {
     background: var(--card-bg);
@@ -649,13 +655,6 @@ body.dark .view-icon.light-theme-icon {
     color: var(--text-muted);
 }
 
-/*
-  Copy button:
-  - default: clipboard icon only
-  - .copied: green text "Copied!", icon hidden
-  - .fading-out: opacity fades to 0
-  - after fade: classes removed, icon reappears
-*/
 .copy-url-btn {
     display: inline-flex;
     align-items: center;
@@ -690,7 +689,6 @@ body.dark .view-icon.light-theme-icon {
     transform: scale(0.92);
 }
 
-/* Copied state: show green text, hide icon */
 .copy-url-btn.copied {
     color: var(--success);
     border-color: var(--success);
@@ -700,7 +698,6 @@ body.dark .view-icon.light-theme-icon {
 .copy-url-btn.copied .copy-icon { display: none; }
 .copy-url-btn.copied .copy-text { display: inline; }
 
-/* Fading out: smoothly go transparent before restoring icon */
 .copy-url-btn.fading-out {
     opacity: 0;
     pointer-events: none;
@@ -908,7 +905,6 @@ body.dark .custom-select-option.selected {
     opacity: 0;
     visibility: hidden;
     transition: opacity .25s ease, visibility .25s ease;
-    /* Respect safe area inside modal overlay */
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
@@ -993,7 +989,7 @@ body.dark .custom-select-option.selected {
 }
 
 .image-option.selected::after {
-    content: "✓";
+    content: "\2713";
     position: absolute;
     top: 4px; right: 4px;
     display: flex;
@@ -1023,7 +1019,6 @@ body.dark .custom-select-option.selected {
     position: fixed;
     bottom: 24px;
     right: 24px;
-    /* Respect home bar / bottom inset on iPhone */
     bottom: max(24px, calc(env(safe-area-inset-bottom) + 12px));
     right: max(24px, env(safe-area-inset-right));
     display: flex;
@@ -1182,7 +1177,6 @@ body.dark .toast {
     justify-content: stretch;
 }
 
-/* Upload button takes remaining space, delete is fixed square */
 .links-list.grid-view .upload-dropdown {
     flex: 1;
     min-width: 0;
@@ -1329,7 +1323,6 @@ body.dark .toast {
     .header-row { padding: 14px 18px; }
     h1          { font-size: 1.5rem; }
 
-    /* List view on mobile: vertical card — preview on top, info + actions below */
     .link-card {
         display: flex;
         flex-direction: column;
@@ -1338,7 +1331,6 @@ body.dark .toast {
         min-height: unset;
     }
 
-    /* Preview stretches full width with a nice fixed height */
     .link-card .preview-link {
         width: 100%;
         align-self: unset;
@@ -1354,7 +1346,6 @@ body.dark .toast {
         border-top: none;
     }
 
-    /* Info and actions inside a padded content area */
     .link-card .link-info {
         padding: 0 14px;
         align-items: flex-start;
@@ -1389,7 +1380,6 @@ body.dark .toast {
         grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     }
 
-    /* Grid view on mobile: restore flex-direction column (already set in grid-view rules) */
     .links-list.grid-view .link-card {
         padding: 14px;
         flex-direction: column;

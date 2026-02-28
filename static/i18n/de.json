@@ -13,6 +13,7 @@
 
   "settings_language": "Sprache",
   "settings_data": "Daten",
+  "settings_maintenance": "Wartung",
   "export_json": "Exportieren",
   "import_json": "Importieren",
   "export_success": "Daten erfolgreich exportiert",
@@ -21,6 +22,10 @@
   "import_error": "Import fehlgeschlagen: Ungültige Datei",
   "import_confirm": "{{count}} Links importieren? Dies ersetzt die aktuellen Daten.",
   "sync_in_progress": "Daten werden mit Server synchronisiert...",
+
+  "regen_previews": "Vorschauen neu erstellen",
+  "regen_previews_running": "Wird erstellt...",
+  "regen_previews_done": "Fertig: {{ok}} ok, {{errors}} Fehler, {{skipped}} übersprungen",
 
   "enter_image_url_title": "Aus URL einfügen",
   "select_server_title": "Aus Galerie wählen",
@@ -35,6 +40,9 @@
   "created_success": "Link erstellt",
   "deleted_success": "Link gelöscht",
   "confirm_delete": "Diesen Link löschen?",
+  "confirm_delete_title": "Link löschen?",
+  "confirm_delete_msg": "\"{{name}}\" löschen? Dies kann nicht rückgängig gemacht werden.",
+  "delete_btn": "Löschen",
 
   "loading": "Laden...",
   "server_empty": "Ordner ist leer",

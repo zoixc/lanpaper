@@ -24,19 +24,19 @@ type RegeneratePreviewsResult struct {
 }
 
 // RegeneratePreviews re-generates WebP thumbnails for every stored image entry.
-// Only POST is accepted. It runs up to 4 workers concurrently.
+// Only POST is accepted. Runs up to 4 workers concurrently.
 func RegeneratePreviews(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	wallpapers := storage.Global.All()
+	// GetAllCopy returns a deep copy — safe to mutate without holding the lock.
+	wallpapers := storage.Global.GetAllCopy()
 
 	total := len(wallpapers)
 	skipped := 0
 
-	// Collect jobs: only images (not video, not empty)
 	type job struct{ wp *storage.Wallpaper }
 	jobs := make(chan job, total)
 	for _, wp := range wallpapers {
@@ -55,7 +55,6 @@ func RegeneratePreviews(w http.ResponseWriter, r *http.Request) {
 		failed   []string
 	)
 
-	// Capture context before goroutines so we can pass it in
 	ctx := r.Context()
 
 	const workers = 4
@@ -106,13 +105,14 @@ func regenPreview(ctx context.Context, wp *storage.Wallpaper) error {
 	if err := saveImage(thumb, "webp", previewPath); err != nil {
 		return err
 	}
+	// Write back via Set so the store's sorted snapshot is invalidated.
 	wp.PreviewPath = previewPath
 	wp.Preview = "/static/images/previews/" + wp.LinkName + ".webp"
 	storage.Global.Set(wp.LinkName, wp)
 	return nil
 }
 
-// cleanStalePreviewFiles removes .webp files in previews/ that have no matching storage entry.
+// cleanStalePreviewFiles removes .webp files in previews/ with no matching storage entry.
 func cleanStalePreviewFiles() {
 	previewDir := filepath.Join("static", "images", "previews")
 	entries, err := os.ReadDir(previewDir)
