@@ -2,8 +2,8 @@ package config
 
 const (
 	MaxImageDimension = 16384 // max width/height in pixels; prevents decompression bombs
-	ThumbnailMaxWidth  = 200
-	ThumbnailMaxHeight = 160
+	ThumbnailMaxWidth  = 640
+	ThumbnailMaxHeight = 360
 	JPEGQuality        = 85
 	WebPQuality        = 85
 	GIFColors          = 256
