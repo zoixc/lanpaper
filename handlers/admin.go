@@ -236,7 +236,7 @@ func Link(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 
 	case http.MethodPatch:
-		linkName := filepath.Base(strings.TrimSuffix(r.URL.Path, "/"))
+		linkName := strings.TrimPrefix(r.URL.Path, "/api/link/")
 		if !isValidLinkName(linkName) {
 			http.Error(w, "Invalid link", http.StatusBadRequest)
 			return
@@ -275,7 +275,7 @@ func Link(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case http.MethodDelete:
-		linkName := filepath.Base(strings.TrimSuffix(r.URL.Path, "/"))
+		linkName := strings.TrimPrefix(r.URL.Path, "/api/link/")
 		if !isValidLinkName(linkName) {
 			http.Error(w, "Invalid link", http.StatusBadRequest)
 			return
