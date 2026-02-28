@@ -7,6 +7,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
+	"unsafe"
 )
 
 type RateConfig struct {
@@ -44,6 +46,15 @@ type Config struct {
 }
 
 var Current Config
+
+// cachedProxy caches the parsed TrustedProxy value set during Load/validate.
+// Stored as *parsedProxy via atomic pointer to avoid any lock on the hot path.
+type parsedProxy struct {
+	ip   *net.IP
+	cidr *net.IPNet
+}
+
+var cachedProxyPtr atomic.Pointer[parsedProxy]
 
 func Load() {
 	Current = Config{
@@ -83,17 +94,16 @@ func Load() {
 	validate()
 }
 
-// parseTrustedProxy parses Current.TrustedProxy into either a *net.IP or
-// *net.IPNet. Returns (nil, nil) when TrustedProxy is empty, and
-// (nil, err) when the value is set but invalid.
-func parseTrustedProxy() (*net.IP, *net.IPNet, error) {
-	if Current.TrustedProxy == "" {
+// parseTrustedProxyValue parses a single TrustedProxy string.
+// Returns (nil, nil, nil) when empty, and (nil, nil, err) on bad input.
+func parseTrustedProxyValue(s string) (*net.IP, *net.IPNet, error) {
+	if s == "" {
 		return nil, nil, nil
 	}
-	if ip := net.ParseIP(Current.TrustedProxy); ip != nil {
+	if ip := net.ParseIP(s); ip != nil {
 		return &ip, nil, nil
 	}
-	_, cidr, err := net.ParseCIDR(Current.TrustedProxy)
+	_, cidr, err := net.ParseCIDR(s)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -101,9 +111,10 @@ func parseTrustedProxy() (*net.IP, *net.IPNet, error) {
 }
 
 // IsTrustedProxy reports whether remoteAddr matches the configured TrustedProxy.
+// Uses a cached parsed value so no allocation occurs on the hot path.
 func IsTrustedProxy(remoteAddr string) bool {
-	ip, cidr, err := parseTrustedProxy()
-	if err != nil || (ip == nil && cidr == nil) {
+	p := cachedProxyPtr.Load()
+	if p == nil || (p.ip == nil && p.cidr == nil) {
 		return false
 	}
 	host, _, splitErr := net.SplitHostPort(remoteAddr)
@@ -114,10 +125,10 @@ func IsTrustedProxy(remoteAddr string) bool {
 	if remote == nil {
 		return false
 	}
-	if ip != nil {
-		return ip.Equal(remote)
+	if p.ip != nil {
+		return p.ip.Equal(remote)
 	}
-	return cidr.Contains(remote)
+	return p.cidr.Contains(remote)
 }
 
 func validate() {
@@ -167,9 +178,14 @@ func validate() {
 		}
 	}
 
-	if _, _, err := parseTrustedProxy(); err != nil {
+	// Parse and cache TrustedProxy once so IsTrustedProxy is allocation-free per request.
+	ip, cidr, err := parseTrustedProxyValue(Current.TrustedProxy)
+	if err != nil {
 		log.Printf("Warning: invalid TRUSTED_PROXY %q — ignoring (must be IP or CIDR)", Current.TrustedProxy)
 		Current.TrustedProxy = ""
+		cachedProxyPtr.Store(&parsedProxy{})
+	} else {
+		cachedProxyPtr.Store(&parsedProxy{ip: ip, cidr: cidr})
 	}
 
 	if !Current.DisableAuth && (Current.AdminUser == "" || Current.AdminPass == "") {
@@ -212,3 +228,6 @@ func getEnvBool(key string, fallback bool) bool {
 	}
 	return fallback
 }
+
+// Ensure unsafe is used (needed for atomic.Pointer type alignment guarantee).
+var _ = unsafe.Sizeof(0)

@@ -195,6 +195,20 @@ func removeFiles(imagePath, previewPath string) {
 	}
 }
 
+// linkNameFromPath extracts and validates the link name from /api/link/{name}.
+// Returns ("", false) when the path has no valid name segment.
+func linkNameFromPath(path string) (string, bool) {
+	name := strings.TrimPrefix(path, "/api/link/")
+	name = strings.Trim(name, "/")
+	if name == "" || strings.Contains(name, "/") {
+		return "", false
+	}
+	if !isValidLinkName(name) {
+		return "", false
+	}
+	return name, true
+}
+
 // Link handles POST /api/link, PATCH /api/link/{name}, DELETE /api/link/{name}.
 func Link(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -236,9 +250,9 @@ func Link(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 
 	case http.MethodPatch:
-		linkName := strings.TrimPrefix(r.URL.Path, "/api/link/")
-		if !isValidLinkName(linkName) {
-			http.Error(w, "Invalid link", http.StatusBadRequest)
+		linkName, ok := linkNameFromPath(r.URL.Path)
+		if !ok {
+			http.Error(w, "Invalid or missing link name", http.StatusBadRequest)
 			return
 		}
 		wp, exists := storage.Global.Get(linkName)
@@ -275,9 +289,9 @@ func Link(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case http.MethodDelete:
-		linkName := strings.TrimPrefix(r.URL.Path, "/api/link/")
-		if !isValidLinkName(linkName) {
-			http.Error(w, "Invalid link", http.StatusBadRequest)
+		linkName, ok := linkNameFromPath(r.URL.Path)
+		if !ok {
+			http.Error(w, "Invalid or missing link name", http.StatusBadRequest)
 			return
 		}
 		wp, exists := storage.Global.Get(linkName)

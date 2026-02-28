@@ -32,7 +32,8 @@ func StartCleaner() {
 		now := time.Now()
 		muCounts.Lock()
 		for key, c := range counts {
-			if now.Sub(c.windowFrom) > cleanerInterval {
+			// Rate window is 1 minute; keep entries only within that window.
+			if now.Sub(c.windowFrom) > time.Minute {
 				delete(counts, key)
 			}
 		}

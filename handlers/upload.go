@@ -97,7 +97,8 @@ func getTransport() *http.Transport {
 	return t
 }
 
-// ssrfSafeDialer resolves DNS and pins to the first IP, blocking private/internal addresses.
+// ssrfSafeDialer resolves DNS and pins to the first public IP,
+// blocking private/internal addresses via utils.PrivateRanges.
 type ssrfSafeDialer struct{ inner *net.Dialer }
 
 func (d *ssrfSafeDialer) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -109,12 +110,12 @@ func (d *ssrfSafeDialer) DialContext(ctx context.Context, network, addr string) 
 	if err != nil || len(ips) == 0 {
 		return nil, fmt.Errorf("DNS resolution failed for %s", host)
 	}
-	// Pin to the first public IP to prevent DNS rebinding
+	// Pin to the first public IP to prevent DNS rebinding.
 	var safeIP string
 	for _, ipAddr := range ips {
 		ip := ipAddr.IP
 		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
-			continue // skip private
+			continue
 		}
 		isPrivate := false
 		for _, cidr := range utils.PrivateRanges() {
@@ -128,11 +129,10 @@ func (d *ssrfSafeDialer) DialContext(ctx context.Context, network, addr string) 
 			break
 		}
 	}
-
 	if safeIP == "" {
-		return nil, fmt.Errorf("SSRF: blocked %s (no safe public IP found)", host)
+		// Do not expose internal host name to the client.
+		return nil, errors.New("address is not allowed")
 	}
-
 	return d.inner.DialContext(ctx, network, net.JoinHostPort(safeIP, port))
 }
 
@@ -278,7 +278,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 		if err != nil {
 			log.Printf("Image load error for %s: %v", linkName, err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, "Failed to load image", http.StatusBadRequest)
 			return
 		}
 	} else {
@@ -466,15 +466,15 @@ func saveImage(img image.Image, format, path string) error {
 func encodeImage(w io.Writer, img image.Image, format string) error {
 	switch format {
 	case "jpg", "jpeg":
-		return jpeg.Encode(w, img, &jpeg.Options{Quality: config.JPEGQuality})
+		return jpeg.Encode(w, img, &jpeg.Options{Quality: config.DefaultCompressionQuality})
 	case "png":
 		return png.Encode(w, img)
 	case "gif":
 		return gif.Encode(w, img, &gif.Options{NumColors: config.GIFColors})
 	case "webp":
-		return webp.Encode(w, img, &webp.Options{Quality: config.WebPQuality})
+		return webp.Encode(w, img, &webp.Options{Quality: float32(config.WebPQuality)})
 	default:
-		return jpeg.Encode(w, img, &jpeg.Options{Quality: config.JPEGQuality})
+		return jpeg.Encode(w, img, &jpeg.Options{Quality: config.DefaultCompressionQuality})
 	}
 }
 
@@ -545,7 +545,7 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 		return nil, "", nil, errors.New("file too large")
 	}
 
-	// Read one byte more than maxBytes to properly detect if file exceeds limit
+	// Read one byte more than maxBytes to properly detect if file exceeds limit.
 	buf, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
 	if err != nil {
 		return nil, "", nil, errors.New("read error")

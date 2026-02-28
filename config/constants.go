@@ -1,15 +1,17 @@
 package config
 
 const (
-	MaxImageDimension = 16384 // max width/height in pixels; prevents decompression bombs
+	MaxImageDimension  = 16384 // max width/height in pixels; prevents decompression bombs
 	ThumbnailMaxWidth  = 640
 	ThumbnailMaxHeight = 360
-	JPEGQuality        = 85
-	WebPQuality        = 85
-	GIFColors          = 256
-
+	// DefaultCompressionQuality is the canonical JPEG/WebP quality used everywhere.
+	// JPEGQuality and WebPQuality are aliases kept for readability at call sites.
 	DefaultCompressionQuality = 85
-	DefaultCompressionScale   = 100
+	JPEGQuality               = DefaultCompressionQuality
+	WebPQuality               = DefaultCompressionQuality
+	GIFColors                 = 256
+
+	DefaultCompressionScale = 100
 )
 
 const (
@@ -34,8 +36,8 @@ const (
 )
 
 const (
-	DefaultMaxWalkDepth  = 3
-	FileCopyBufferSize   = 1024 * 1024 // 1 MB
+	DefaultMaxWalkDepth = 3
+	FileCopyBufferSize  = 1024 * 1024 // 1 MB
 )
 
 // ValidCategories is the canonical set of user-assignable category names.

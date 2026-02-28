@@ -43,8 +43,10 @@ var magicBytes = map[string][]byte{
 	"gif":  {0x47, 0x49, 0x46, 0x38},
 	"webp": {0x52, 0x49, 0x46, 0x46}, // RIFF prefix; WEBP marker at offset 8 checked below
 	"bmp":  {0x42, 0x4D},
-	"tif":  {0x49, 0x49, 0x2A, 0x00}, // little-endian TIFF
-	"tiff": {0x4D, 0x4D, 0x00, 0x2A}, // big-endian TIFF
+	// TIFF accepts both little-endian (II) and big-endian (MM) byte orders.
+	// mimeToExt maps image/tiff -> "tiff", so we match either magic here.
+	"tiff_le": {0x49, 0x49, 0x2A, 0x00}, // little-endian TIFF
+	"tiff_be": {0x4D, 0x4D, 0x00, 0x2A}, // big-endian TIFF
 	"webm": {0x1A, 0x45, 0xDF, 0xA3}, // EBML header
 	// mp4 validated via ftyp box check in ValidateFileType
 }
@@ -76,6 +78,13 @@ func ValidateFileType(data []byte, expectedExt string) error {
 			return fmt.Errorf("file does not match MP4 structure")
 		}
 		return nil
+	case "tiff":
+		// Accept both little-endian (II) and big-endian (MM) TIFF.
+		if bytes.HasPrefix(data, magicBytes["tiff_le"]) || bytes.HasPrefix(data, magicBytes["tiff_be"]) {
+			return nil
+		}
+		log.Printf("Security: magic bytes mismatch for TIFF: got %v", data[:4])
+		return fmt.Errorf("file content does not match extension tiff")
 	}
 	magic, ok := magicBytes[ext]
 	if !ok {

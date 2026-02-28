@@ -184,17 +184,19 @@ func (s *Store) Load() error {
 }
 
 // PruneOldImages removes the oldest images when count exceeds max,
-// preserving empty slots.
+// preserving empty slots. File I/O is performed outside the lock
+// to avoid blocking Get/Set during disk operations.
 func PruneOldImages(max int) {
 	Global.Lock()
-	defer Global.Unlock()
-
 	var candidates []*Wallpaper
 	for _, wp := range Global.wallpapers {
 		if wp.HasImage {
-			candidates = append(candidates, wp)
+			clone := *wp
+			candidates = append(candidates, &clone)
 		}
 	}
+	Global.Unlock()
+
 	if len(candidates) <= max {
 		return
 	}
@@ -213,11 +215,16 @@ func PruneOldImages(max int) {
 				log.Printf("Error pruning preview %s: %v", wp.PreviewPath, err)
 			}
 		}
-		*wp = Wallpaper{ID: wp.ID, LinkName: wp.LinkName, Category: wp.Category, CreatedAt: wp.CreatedAt}
+		// Reset the store entry: clear image fields, keep slot metadata.
+		Global.Set(wp.ID, &Wallpaper{
+			ID:        wp.ID,
+			LinkName:  wp.LinkName,
+			Category:  wp.Category,
+			CreatedAt: wp.CreatedAt,
+		})
 	}
 
-	Global.sortedSnap = nil
-	if err := atomicWrite(dataFile, Global.wallpapers); err != nil {
+	if err := Global.Save(); err != nil {
 		log.Printf("Error saving after pruning: %v", err)
 	}
 }
