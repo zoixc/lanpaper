@@ -344,7 +344,7 @@ h1::before {
 
 #themeToggle:active,
 #viewToggle:active {
-    transform: scale(0.95);
+    transform: scale(0.92);
 }
 
 .theme-icon,
@@ -357,8 +357,8 @@ h1::before {
     transform: translate(-50%, -50%);
     opacity: 0;
     pointer-events: none;
-    transition: opacity .2s ease,
-                transform .2s cubic-bezier(0.34, 1.56, .64, 1);
+    transition: opacity .22s ease,
+                transform .28s cubic-bezier(0.34, 1.56, .64, 1);
 }
 
 .theme-icon.active,
@@ -368,15 +368,34 @@ h1::before {
     pointer-events: auto;
 }
 
+/* Theme toggle: spin-scale out/in */
 #themeToggle .theme-icon:not(.active) {
-    transform: translate(-50%, -50%) scale(0.5) rotate(-180deg);
+    transform: translate(-50%, -50%) scale(0.4) rotate(-200deg);
 }
 
+/* View toggle: morphing cross-fade with a slight lateral slide + scale bounce */
 #viewToggle .view-icon:not(.active) {
-    transform: translate(-50%, -50%) scale(0.8) rotateY(90deg);
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.55) rotate(45deg);
+    transition: opacity .2s ease,
+                transform .25s cubic-bezier(0.55, 0, 1, 0.45);
 }
 #viewToggle .view-icon.active {
-    transform: translate(-50%, -50%) scale(1) rotateY(0deg);
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    transition: opacity .22s ease,
+                transform .32s cubic-bezier(0.34, 1.56, .64, 1);
+}
+
+/* Subtle button-level rotation on toggle (applied via JS class) */
+#viewToggle.toggling {
+    animation: viewToggleBounce .35s cubic-bezier(0.34, 1.56, .64, 1);
+}
+@keyframes viewToggleBounce {
+    0%   { transform: scale(1) rotate(0deg); }
+    40%  { transform: scale(0.82) rotate(-18deg); }
+    70%  { transform: scale(1.08) rotate(6deg); }
+    100% { transform: scale(1) rotate(0deg); }
 }
 
 body:not(.dark) .view-icon.dark-theme-icon,
@@ -825,6 +844,7 @@ body.dark .view-icon.light-theme-icon {
 .custom-select-option {
     display: flex;
     align-items: center;
+
     width: 100%;
     padding: 8px 12px;
     gap: 8px;
