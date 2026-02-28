@@ -42,6 +42,7 @@ func init() {
 
 var uploadSem chan struct{}
 
+// InitUploadSemaphore sets the maximum number of concurrent uploads.
 func InitUploadSemaphore(n int) {
 	if n <= 0 {
 		n = 2
@@ -119,11 +120,12 @@ func (d *ssrfSafeDialer) DialContext(ctx context.Context, network, addr string) 
 			}
 		}
 	}
+	// Pin to the first resolved IP to prevent DNS rebinding.
 	return d.inner.DialContext(ctx, network, net.JoinHostPort(ips[0].IP.String(), port))
 }
 
-// copyVideoFile streams src (path or reader) into dst with a 1 MB buffer.
-// Pass a non-nil r to stream from a reader; otherwise src path is opened.
+// copyVideoFile streams src into dst with a buffered writer.
+// Pass a non-nil r to stream from a reader; otherwise srcPath is opened.
 func copyVideoFile(srcPath, dst string, r io.Reader) error {
 	if r == nil {
 		f, err := os.Open(srcPath)
@@ -174,7 +176,7 @@ func storedExt(ext string) string {
 func checkImageDimensions(r io.ReadSeeker) error {
 	cfg, _, err := image.DecodeConfig(r)
 	if err != nil {
-		return nil
+		return nil // let the full decode surface the real error
 	}
 	if cfg.Width > config.MaxImageDimension || cfg.Height > config.MaxImageDimension {
 		return fmt.Errorf("image %dx%d exceeds %dx%d limit",
@@ -183,7 +185,6 @@ func checkImageDimensions(r io.ReadSeeker) error {
 	return nil
 }
 
-// thumbnail resizes src to fit within maxW×maxH using bilinear scaling.
 func thumbnail(src image.Image, maxW, maxH int) image.Image {
 	b := src.Bounds()
 	scale := min(float64(maxW)/float64(b.Dx()), float64(maxH)/float64(b.Dy()))
@@ -450,7 +451,6 @@ func saveImage(img image.Image, format, path string) error {
 	return closeErr
 }
 
-// encodeImage writes img to w in the requested format.
 func encodeImage(w io.Writer, img image.Image, format string) error {
 	switch format {
 	case "jpg", "jpeg":
@@ -487,7 +487,6 @@ func loadLocalImage(ctx context.Context, path string) (image.Image, string, []by
 		log.Printf("Security: oversized local image %s: %v", path, dimErr)
 		return nil, "", nil, errors.New("image dimensions too large")
 	}
-	// Seek back once after dimension check; image.Decode reads from current position.
 	if _, err := f.Seek(0, io.SeekStart); err != nil {
 		return nil, "", nil, fmt.Errorf("seek: %w", err)
 	}
@@ -542,6 +541,7 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 		log.Printf("Security: oversized remote image %s: %v", urlStr, dimErr)
 		return nil, "", nil, errors.New("image dimensions too large")
 	}
+	// Use decoder-reported format, not Content-Type — CDNs often send application/octet-stream.
 	img, format, err := image.Decode(bytes.NewReader(buf))
 	if err != nil {
 		return nil, "", nil, errors.New("invalid or unsupported image format")

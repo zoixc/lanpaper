@@ -93,10 +93,9 @@ func Wallpapers(w http.ResponseWriter, r *http.Request) {
 		total := len(wallpapers)
 		totalPages := max(1, (total+pageSize-1)/pageSize)
 		start, end := pageWindow(page, pageSize, total)
-		resp := toResponses(wallpapers[start:end])
 		if err := json.NewEncoder(w).Encode(PaginatedResponse{
-			Data: resp, Total: total, Page: page,
-			PageSize: pageSize, TotalPages: totalPages,
+			Data: toResponses(wallpapers[start:end]), Total: total,
+			Page: page, PageSize: pageSize, TotalPages: totalPages,
 		}); err != nil {
 			log.Printf("Error encoding paginated response: %v", err)
 		}
@@ -184,6 +183,7 @@ var validCategories = config.ValidCategories
 
 func isValidCategory(cat string) bool { return validCategories[cat] }
 
+// removeFiles deletes image and optional preview files, ignoring not-found errors.
 func removeFiles(imagePath, previewPath string) {
 	if err := os.Remove(imagePath); err != nil && !os.IsNotExist(err) {
 		log.Printf("Error removing image %s: %v", imagePath, err)
@@ -390,7 +390,6 @@ func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, absPath)
 }
 
-// jsonEmpty writes an empty JSON array response.
 func jsonEmpty(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write([]byte("[]\n"))
