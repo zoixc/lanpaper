@@ -62,6 +62,26 @@ func (s *Store) Delete(id string) {
 	s.sortedSnap = nil
 }
 
+// Rename atomically renames oldName -> newName in the store.
+// Returns false if oldName not found or newName already exists.
+func (s *Store) Rename(oldName, newName string) (*Wallpaper, bool) {
+	s.Lock()
+	defer s.Unlock()
+	wp, ok := s.wallpapers[oldName]
+	if !ok {
+		return nil, false
+	}
+	if _, exists := s.wallpapers[newName]; exists {
+		return nil, false
+	}
+	wp.ID = newName
+	wp.LinkName = newName
+	s.wallpapers[newName] = wp
+	delete(s.wallpapers, oldName)
+	s.sortedSnap = nil
+	return wp, true
+}
+
 func sortSnap(snap []*Wallpaper) {
 	sort.Slice(snap, func(i, j int) bool {
 		if snap[i].HasImage != snap[j].HasImage {

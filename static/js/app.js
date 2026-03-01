@@ -254,7 +254,6 @@ function initTheme() {
 function applyTheme() {
     document.body.classList.toggle('dark', STATE.isDark);
 
-    // Update both theme-color meta tags (light and dark media variants)
     document.querySelectorAll('meta[name="theme-color"]').forEach(meta => {
         const media = meta.getAttribute('media') || '';
         if (media.includes('dark')) {
@@ -328,8 +327,6 @@ window.setLanguage = setLanguage;
 async function setLanguage(lang) {
     STATE.lang = lang;
     localStorage.setItem('lang', lang);
-
-    // Update <html lang> attribute for accessibility and SEO
     document.documentElement.lang = lang;
 
     try {
@@ -480,8 +477,6 @@ function filterWallpapers() {
     const query = STATE.searchQuery;
     STATE.filteredWallpapers = STATE.wallpapers.filter(wp => {
         const name = (wp.linkName || wp.id || '').toLowerCase();
-        // Search by link name only — imageUrl is an internal server path,
-        // not something the user typed or knows.
         return name.includes(query);
     });
 }
@@ -641,7 +636,6 @@ async function loadExternalImages() {
             div.className = 'image-option';
             div.dataset.value = file;
             const previewUrl = `/api/external-image-preview?path=${encodeURIComponent(file)}`;
-            // Sanitise file name before inserting as text to avoid XSS via crafted filenames
             const nameEl = document.createElement('div');
             nameEl.className = 'image-name';
             nameEl.textContent = file;
@@ -732,7 +726,6 @@ function detectCategory(link) {
     const mime = link.mimeType || '';
     if (mime === 'mp4' || mime === 'webm') return 'video';
     if (mime) return 'image';
-    // Fallback: infer from stored extension in URL.
     const ext = (link.imageUrl || '').split('.').pop().toLowerCase();
     if (ext === 'mp4' || ext === 'webm') return 'video';
     if (ext) return 'image';
@@ -759,9 +752,123 @@ function createLazyImage(src, alt = 'Image', className = 'preview', errorMsg) {
 }
 
 
+// ============================================================
+// INLINE RENAME
+// ============================================================
+const VALID_LINK_RE = /^[a-zA-Z0-9][a-zA-Z0-9_\-]{0,63}$/;
+
+function setupInlineRename(card, link) {
+    const linkIdEl = card.querySelector('.link-id');
+    if (!linkIdEl) return;
+
+    // Pencil hint shown on hover via CSS; double-click to activate
+    linkIdEl.title = t('rename_hint', 'Double-click to rename');
+    linkIdEl.setAttribute('role', 'button');
+    linkIdEl.tabIndex = 0;
+
+    const startEdit = () => {
+        if (linkIdEl.querySelector('input')) return; // already editing
+
+        const currentName = link.linkName;
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = currentName;
+        input.className = 'link-id-input';
+        input.maxLength = 64;
+        input.setAttribute('aria-label', t('rename_input_label', 'New link name'));
+        input.setAttribute('pattern', '[a-zA-Z0-9_\\-]+');
+        input.spellcheck = false;
+
+        linkIdEl.textContent = '';
+        linkIdEl.appendChild(input);
+        linkIdEl.classList.add('editing');
+
+        // Select all on focus so user can type immediately
+        input.focus();
+        input.select();
+
+        let committed = false;
+
+        const commit = async () => {
+            if (committed) return;
+            committed = true;
+
+            const newName = input.value.trim();
+
+            // Restore label regardless of outcome first
+            linkIdEl.classList.remove('editing');
+
+            if (!newName || newName === currentName) {
+                linkIdEl.textContent = currentName;
+                return;
+            }
+
+            if (!VALID_LINK_RE.test(newName)) {
+                linkIdEl.textContent = currentName;
+                showToast(t('invalid_id_chars', 'Invalid ID format'), 'error');
+                return;
+            }
+
+            // Optimistic update
+            linkIdEl.textContent = newName;
+            card.dataset.linkName = newName;
+
+            try {
+                const updated = await apiCall(
+                    `/api/link/${encodeURIComponent(currentName)}`,
+                    'PATCH',
+                    { newLinkName: newName }
+                );
+                if (!updated) throw new Error('Empty response');
+
+                // Sync state
+                const idx = STATE.wallpapers.findIndex(wp => wp.linkName === currentName);
+                if (idx !== -1) STATE.wallpapers[idx] = updated;
+                link.linkName = updated.linkName;
+
+                // Re-render copy button URL
+                updateCard(card, updated);
+                setupInlineRename(card, updated);
+
+                showToast(t('renamed_success', `Renamed to "${updated.linkName}"`), 'success');
+                filterAndSort();
+            } catch (_) {
+                // Roll back on error (apiCall already showed toast)
+                linkIdEl.textContent = currentName;
+                card.dataset.linkName = currentName;
+                link.linkName = currentName;
+            }
+        };
+
+        const cancel = () => {
+            if (committed) return;
+            committed = true;
+            linkIdEl.classList.remove('editing');
+            linkIdEl.textContent = currentName;
+        };
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter')  { e.preventDefault(); commit(); }
+            if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+        });
+        input.addEventListener('blur', commit);
+    };
+
+    linkIdEl.addEventListener('dblclick', startEdit);
+    linkIdEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); startEdit(); }
+    });
+}
+
+
 function updateCard(card, link) {
     const linkName = link.linkName || link.id;
-    card.querySelector('.link-id').textContent = linkName;
+    const linkIdEl = card.querySelector('.link-id');
+
+    // Don't overwrite if currently in edit mode
+    if (!linkIdEl.querySelector('input')) {
+        linkIdEl.textContent = linkName;
+    }
     card.dataset.linkName = linkName;
 
     const fullUrl = `${window.location.origin}/${linkName}`;
@@ -769,13 +876,12 @@ function updateCard(card, link) {
     const previewLink = card.querySelector('.preview-link');
     previewLink.href = fullUrl;
     previewLink.setAttribute('aria-label', t('aria_open_image', 'Open image'));
-    card.querySelector('.link-id').setAttribute('aria-label', t('aria_link_id', 'Link ID'));
+    linkIdEl.setAttribute('aria-label', t('aria_link_id', 'Link ID'));
 
     const category = link.hasImage ? detectCategory(link) : 'other';
 
     let fileType;
     if (link.mimeType) {
-        // mimeType from server is already the stored extension (e.g. "jpg", "mp4")
         fileType = link.mimeType.toUpperCase();
     } else if (link.hasImage) {
         const ext = (link.imageUrl || '').split('.').pop();
@@ -784,54 +890,62 @@ function updateCard(card, link) {
         fileType = t('no_image', 'No image');
     }
 
-    const dateStr = link.createdAt ? formatDate(link.createdAt) : '—';
-    const sizeStr = link.sizeBytes ? ` · ${formatKB(link.sizeBytes)}` : '';
+    const dateStr = link.createdAt ? formatDate(link.createdAt) : '\u2014';
+    const sizeStr = link.sizeBytes ? ` \u00b7 ${formatKB(link.sizeBytes)}` : '';
 
     const linkMeta = card.querySelector('.link-meta');
-    linkMeta.textContent = `${category} · ${fileType}${sizeStr} · ${dateStr}`;
+    linkMeta.textContent = `${category} \u00b7 ${fileType}${sizeStr} \u00b7 ${dateStr}`;
     linkMeta.setAttribute('aria-label', t('aria_file_info', 'File info'));
 
     const previewWrapper = card.querySelector('.preview-wrapper');
-    previewWrapper.innerHTML = '';
 
-    if (link.hasImage) {
-        const isVid = category === 'video';
-        if (isVid) {
-            // Video: use <video> element for inline preview.
-            // Append a cache-busting timestamp so re-uploads are reflected immediately.
-            const videoSrc = '/' + (link.imageUrl || '').replace(/^\//, '') + `?t=${link.modTime || Date.now()}`;
-            const video = document.createElement('video');
-            video.src = videoSrc;
-            video.className = 'preview';
-            video.autoplay = true;
-            video.muted = true;
-            video.loop = true;
-            video.playsInline = true;
-            video.setAttribute('playsinline', '');
-            video.setAttribute('preload', 'metadata');
-            video.onerror = () => {
-                previewWrapper.innerHTML = `<div class="no-image">${t('preview_unavailable', 'Preview unavailable')}</div>`;
-            };
-            previewWrapper.appendChild(video);
+    // Only re-build preview when it has actually changed (avoid video flicker)
+    const prevSrc = previewWrapper.dataset.src || '';
+    const newSrc  = link.hasImage ? (link.preview || link.imageUrl || '') : '';
+    const srcChanged = prevSrc !== newSrc;
+
+    if (srcChanged) {
+        previewWrapper.dataset.src = newSrc;
+        previewWrapper.innerHTML = '';
+
+        if (link.hasImage) {
+            const isVid = (category === 'video');
+            if (isVid) {
+                const videoSrc = '/' + (link.imageUrl || '').replace(/^\//, '') + `?t=${link.modTime || Date.now()}`;
+                const video = document.createElement('video');
+                video.src = videoSrc;
+                video.className = 'preview';
+                video.autoplay = true;
+                video.muted = true;
+                video.loop = true;
+                video.playsInline = true;
+                video.setAttribute('playsinline', '');
+                video.setAttribute('preload', 'metadata');
+                video.onerror = () => {
+                    previewWrapper.innerHTML = '';
+                    previewWrapper.appendChild(buildNoImageSVG());
+                };
+                previewWrapper.appendChild(video);
+            } else {
+                const resolvedPreview = link.preview || '';
+                const imgSrc = resolvedPreview
+                    ? '/' + resolvedPreview.replace(/^\//, '') + `?t=${link.modTime || Date.now()}`
+                    : '/' + (link.imageUrl || '').replace(/^\//, '');
+                const img = createLazyImage(
+                    imgSrc,
+                    resolvedPreview ? 'Preview' : 'Image',
+                    'preview'
+                );
+                img.classList.add('preview-top-center');
+                img.onerror = () => {
+                    previewWrapper.innerHTML = '';
+                    previewWrapper.appendChild(buildNoImageSVG());
+                };
+                previewWrapper.appendChild(img);
+            }
         } else {
-            const resolvedPreview = link.preview || '';
-            const imgSrc = resolvedPreview
-                ? '/' + resolvedPreview.replace(/^\//, '') + `?t=${link.modTime || Date.now()}`
-                : '/' + (link.imageUrl || '').replace(/^\//, '');
-            const img = createLazyImage(
-                imgSrc,
-                resolvedPreview ? 'Preview' : 'Image',
-                'preview',
-                t(resolvedPreview ? 'preview_unavailable' : 'image_unavailable', 'Image unavailable')
-            );
-            img.classList.add('preview-top-center');
-            previewWrapper.appendChild(img);
+            previewWrapper.appendChild(buildNoImageSVG());
         }
-    } else {
-        const noImg = document.createElement('div');
-        noImg.className = 'no-image';
-        noImg.textContent = t('no_image', 'No image');
-        previewWrapper.appendChild(noImg);
     }
 
     // Copy button
@@ -868,6 +982,19 @@ function updateCard(card, link) {
 }
 
 
+// Build the SVG no-image placeholder programmatically (same shape as in HTML template)
+function buildNoImageSVG() {
+    const wrap = document.createElement('div');
+    wrap.className = 'no-image';
+    wrap.innerHTML = `<svg class="no-image-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M8 48 L24 24 L36 38 L44 28 L56 48 Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
+      <circle cx="46" cy="18" r="5" stroke="currentColor" stroke-width="2" fill="none"/>
+      <rect x="6" y="8" width="52" height="44" rx="4" stroke="currentColor" stroke-width="2" fill="none"/>
+    </svg>`;
+    return wrap;
+}
+
+
 function setupCardEvents(card, link) {
     const fileInput = card.querySelector('.file-input');
     const dropdown = card.querySelector('.upload-dropdown');
@@ -879,6 +1006,9 @@ function setupCardEvents(card, link) {
     new MutationObserver((_, obs) => {
         if (!document.contains(card)) { ac.abort(); obs.disconnect(); }
     }).observe(document.body, { childList: true, subtree: true });
+
+    // Inline rename
+    setupInlineRename(card, link);
 
     toggleBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -916,7 +1046,7 @@ function setupCardEvents(card, link) {
 
     card.querySelector('.select-server-btn').addEventListener('click', async () => {
         dropdown.classList.remove('open');
-        toggleBtn.setAttribute('aria-expanded', 'false');
+        toggleBtn.setAttribute('aria-enabled', 'false');
         const filename = await showModal('grid', 'select_server_title');
         if (filename) await handleUpload(link, filename, card, true);
     });
@@ -937,7 +1067,7 @@ function setupCardEvents(card, link) {
         try {
             await apiCall(`/api/link/${encodeURIComponent(link.linkName)}`, 'DELETE');
         } catch (_) {
-            return; // apiCall already showed a toast
+            return;
         }
         ac.abort();
         card.remove();
@@ -969,7 +1099,6 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
                     showToast(`🗜️ Compressed: ${info.percent}% smaller (${formatKB(info.saved)} saved)`, 'success');
                 }
             } catch (_) {
-                // Compression failed — fall back to original file
                 fileToUpload = fileOrUrl;
             }
         }
@@ -979,7 +1108,6 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
     try {
         const updatedLink = await apiCall('/api/upload', 'POST', formData, true);
         if (!updatedLink) return;
-        // Preserve createdAt if the server didn't return it (shouldn't happen, but defensive)
         if (!updatedLink.createdAt && link.createdAt) updatedLink.createdAt = link.createdAt;
         const idx = STATE.wallpapers.findIndex(wp => wp.linkName === updatedLink.linkName);
         if (idx !== -1) STATE.wallpapers[idx] = updatedLink;
@@ -997,8 +1125,7 @@ function setupGlobalListeners() {
         if (STATE.createPending) return;
         const id = DOM.createInput.value.trim();
         if (!id) { showToast(t('invalid_id', 'ID is required'), 'error'); return; }
-        // Keep in sync with server-side isValidLinkName: 1-64 chars, alphanumeric + _ -
-        if (!/^[a-zA-Z0-9][a-zA-Z0-9_\-]{0,63}$/.test(id)) {
+        if (!VALID_LINK_RE.test(id)) {
             showToast(t('invalid_id_chars', 'Invalid ID format'), 'error');
             return;
         }
@@ -1008,6 +1135,8 @@ function setupGlobalListeners() {
         try {
             await apiCall('/api/link', 'POST', { linkName: id });
             DOM.createInput.value = '';
+            // Return focus to input so user can create next link immediately
+            DOM.createInput.focus();
             const newLinkObj = {
                 linkName: id,
                 hasImage: false,
@@ -1081,5 +1210,5 @@ function formatKB(bytes) {
 }
 
 function formatDate(ts) {
-    return ts ? new Date(ts * 1000).toLocaleDateString() : '—';
+    return ts ? new Date(ts * 1000).toLocaleDateString() : '\u2014';
 }

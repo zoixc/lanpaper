@@ -258,16 +258,85 @@ func Link(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid or missing link name", http.StatusBadRequest)
 			return
 		}
-		wp, exists := storage.Global.Get(linkName)
-		if !exists {
-			http.Error(w, "Link not found", http.StatusNotFound)
-			return
-		}
+
 		var req struct {
-			Category *string `json:"category"`
+			NewLinkName *string `json:"newLinkName"`
+			Category    *string `json:"category"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		// --- Rename ---
+		if req.NewLinkName != nil {
+			newName := *req.NewLinkName
+			if !isValidLinkName(newName) {
+				http.Error(w, "Invalid new link name", http.StatusBadRequest)
+				return
+			}
+			if newName == linkName {
+				// No-op rename — return current state.
+				wp, exists := storage.Global.Get(linkName)
+				if !exists {
+					http.Error(w, "Link not found", http.StatusNotFound)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(toResponse(wp))
+				return
+			}
+			if _, exists := storage.Global.Get(newName); exists {
+				http.Error(w, "Link name already taken", http.StatusConflict)
+				return
+			}
+
+			// Rename physical files if image is present.
+			wpOld, exists := storage.Global.Get(linkName)
+			if !exists {
+				http.Error(w, "Link not found", http.StatusNotFound)
+				return
+			}
+			if wpOld.HasImage && wpOld.MIMEType != "" {
+				oldImg := filepath.Join("static", "images", linkName+"."+wpOld.MIMEType)
+				newImg := filepath.Join("static", "images", newName+"."+wpOld.MIMEType)
+				if err := os.Rename(oldImg, newImg); err != nil && !os.IsNotExist(err) {
+					log.Printf("Error renaming image file %s -> %s: %v", oldImg, newImg, err)
+					http.Error(w, "Failed to rename image file", http.StatusInternalServerError)
+					return
+				}
+				// Update stored URL.
+				wpOld.ImageURL = "static/images/" + newName + "." + wpOld.MIMEType
+				// Rename preview if present.
+				if wpOld.MIMEType != "mp4" && wpOld.MIMEType != "webm" {
+					oldPrev := filepath.Join("static", "images", "previews", linkName+".webp")
+					newPrev := filepath.Join("static", "images", "previews", newName+".webp")
+					if err := os.Rename(oldPrev, newPrev); err != nil && !os.IsNotExist(err) {
+						log.Printf("Warning: could not rename preview %s -> %s: %v", oldPrev, newPrev, err)
+					}
+					wpOld.Preview = "static/images/previews/" + newName + ".webp"
+				}
+				storage.Global.Set(linkName, wpOld) // update URLs before rename
+			}
+
+			wp, ok := storage.Global.Rename(linkName, newName)
+			if !ok {
+				http.Error(w, "Rename failed", http.StatusInternalServerError)
+				return
+			}
+			if err := storage.Global.Save(); err != nil {
+				log.Printf("Error saving after rename: %v", err)
+			}
+			log.Printf("Renamed link: %s -> %s", linkName, newName)
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(toResponse(wp))
+			return
+		}
+
+		// --- Category patch (existing behaviour) ---
+		wp, exists := storage.Global.Get(linkName)
+		if !exists {
+			http.Error(w, "Link not found", http.StatusNotFound)
 			return
 		}
 		if req.Category != nil {
