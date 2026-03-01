@@ -774,15 +774,15 @@ body.dark .view-icon.light-theme-icon {
 
 .link-id-input {
     font-family: var(--font-mono-bold);
-    font-size: 0.9375rem;
+    font-size: 0.98rem;
     font-weight: 700;
     color: var(--text);
     background: var(--bg);
-    border: 2px solid var(--accent);
+    border: 1px solid var(--accent);
     border-radius: var(--radius-sm);
     /* Compensate for parent's lost margin by applying same negative margin to input */
-    padding: 3px 7px;
-    margin: -4px 0;
+    padding: 0px 7px;
+    margin: 0px 0;
     line-height: 1.4;
     outline: none;
     width: 100%;
