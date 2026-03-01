@@ -147,7 +147,17 @@
     <section class="section">
       <h2 data-i18n="existing_links">Existing links</h2>
       <div class="links-list" id="linksList"></div>
-      <div class="empty-state d-none" id="emptyState" data-i18n="no_links">No links yet</div>
+      <div class="empty-state d-none" id="emptyState">
+        <svg class="empty-state-icon" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <!-- Folder -->
+          <path d="M20 30 H50 L58 38 H100 V90 H20 Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round" fill="none" opacity="0.6"/>
+          <!-- Image icon inside -->
+          <rect x="35" y="50" width="50" height="32" rx="2" stroke="currentColor" stroke-width="2.5" fill="none"/>
+          <path d="M40 74 L50 62 L58 70 L65 63 L80 74 Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
+          <circle cx="72" cy="58" r="3" fill="currentColor"/>
+        </svg>
+        <div class="empty-state-text" data-i18n="no_links">No links yet. Create one above!</div>
+      </div>
     </section>
 
     <footer class="footer">
