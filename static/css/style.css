@@ -145,10 +145,16 @@ body.dark {
    BASE
    ============================================================ */
 
-/* Prevent layout shift from scrollbar appearing/disappearing — desktop only */
+/*
+  Reserve space for the scrollbar without forcing it to always show.
+  scrollbar-gutter: stable prevents layout shift when content grows
+  (e.g. when a dropdown opens) and eliminates the double-scrollbar
+  bug that occurred with the old `overflow-y: scroll` approach.
+  Desktop-only — mobile browsers hide the scrollbar overlay-style anyway.
+*/
 @media (min-width: 769px) {
     html {
-        overflow-y: scroll;
+        scrollbar-gutter: stable;
     }
 }
 
