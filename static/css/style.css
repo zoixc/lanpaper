@@ -389,47 +389,20 @@ h1::before {
     transform: translate(-50%, -50%) scale(0.4) rotate(-200deg);
 }
 
-/* View toggle: Liquid Morph animation */
+/* View toggle: Slide & Fade */
 #viewToggle .view-icon {
-    transition: transform 0.6s cubic-bezier(0.68, -0.55, 0.27, 1.55),
-                opacity 0.4s ease,
-                filter 0.4s ease;
+    transition: opacity 0.25s ease,
+                transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 #viewToggle .view-icon:not(.active) {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.1);
-    filter: blur(8px);
+    transform: translate(-50%, -50%) translateY(4px) scale(0.9);
 }
 
 #viewToggle .view-icon.active {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-    filter: blur(0px);
-}
-
-/* Liquid Pulse button animation */
-#viewToggle.toggling {
-    animation: liquidPulse 0.6s ease-out;
-}
-
-@keyframes liquidPulse {
-    0%, 100% { 
-        transform: scale(1); 
-        border-radius: var(--radius-sm);
-    }
-    25% { 
-        transform: scale(0.85); 
-        border-radius: 50%; 
-    }
-    50% { 
-        transform: scale(1.1); 
-        border-radius: 30%; 
-    }
-    75% { 
-        transform: scale(0.95); 
-        border-radius: var(--radius-sm); 
-    }
+    transform: translate(-50%, -50%) translateY(0) scale(1);
 }
 
 body:not(.dark) .view-icon.dark-theme-icon,
