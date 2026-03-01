@@ -93,7 +93,13 @@
                maxlength="255"
                aria-label="Link ID"
                data-i18n-aria="aria_link_input">
-        <button type="submit" id="createLinkBtn" class="btn btn--primary" data-i18n="create_btn">Create</button>
+        <button type="submit" id="createLinkBtn" class="btn btn--primary" data-i18n="create_btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          <span data-i18n="create_btn">Create</span>
+        </button>
       </form>
 
       <div class="toolbar-divider"></div>
@@ -191,7 +197,19 @@
     <article class="link-card" role="article">
 
       <a class="preview-link" target="_blank" rel="noopener noreferrer" aria-label="Open image">
-        <div class="preview-wrapper"></div>
+        <div class="preview-wrapper">
+          <!-- Shown only when no image is set -->
+          <div class="no-image">
+            <svg class="no-image-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <!-- mountains -->
+              <path d="M8 48 L24 24 L36 38 L44 28 L56 48 Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
+              <!-- sun -->
+              <circle cx="46" cy="18" r="5" stroke="currentColor" stroke-width="2" fill="none"/>
+              <!-- frame -->
+              <rect x="6" y="8" width="52" height="44" rx="4" stroke="currentColor" stroke-width="2" fill="none"/>
+            </svg>
+          </div>
+        </div>
       </a>
 
       <div class="link-info">
@@ -212,7 +230,7 @@
 
       <div class="actions-row">
         <div class="upload-dropdown">
-          <button class="btn btn--primary upload-toggle-btn" aria-haspopup="true" aria-expanded="false">
+          <button class="btn btn--upload upload-toggle-btn" aria-haspopup="true" aria-expanded="false">
             <span data-i18n="set_image">Upload</span>
             <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M1 1l4 4 4-4"/>

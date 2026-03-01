@@ -37,6 +37,12 @@
     --btn-danger-border-hover: #c0392b;
     --lang-button:         #f4f2ed;
 
+    /* Upload button — softer than btn-primary, but still distinct */
+    --btn-upload:         #eceae4;
+    --btn-upload-hover:   #e2e0d8;
+    --btn-upload-text:    #2a2a28;
+    --btn-upload-border:  #ccc9c0;
+
     --shadow-sm:    0 1px 3px rgba(42, 42, 40, 0.08);
     --shadow-md:    0 2px 8px rgba(42, 42, 40, 0.1);
     --shadow-lg:    0 4px 16px rgba(42, 42, 40, 0.12);
@@ -104,6 +110,12 @@ body.dark {
     --btn-danger-border:   rgba(224, 82, 82, 0.3);
     --btn-danger-border-hover: #e05252;
     --lang-button:         #26262c;
+
+    /* Upload button dark — matches secondary style */
+    --btn-upload:         #2e2f38;
+    --btn-upload-hover:   #3a3b47;
+    --btn-upload-text:    #dde1e8;
+    --btn-upload-border:  #4a4d58;
 
     --shadow-sm:    0 1px 4px rgba(0, 0, 0, 0.2);
     --shadow-md:    0 2px 10px rgba(0, 0, 0, 0.25);
@@ -470,6 +482,18 @@ body.dark .view-icon.light-theme-icon {
 .btn--secondary       { background: var(--btn-secondary); color: var(--text-secondary); }
 .btn--secondary:hover { background: var(--btn-secondary-hover); color: var(--text); }
 
+/* Upload button — visually softer than btn-primary, accent on hover */
+.btn--upload {
+    background: var(--btn-upload);
+    color: var(--btn-upload-text);
+    border-color: var(--btn-upload-border);
+}
+.btn--upload:hover {
+    background: var(--btn-upload-hover);
+    border-color: var(--border-focus);
+    color: var(--text);
+}
+
 /* Ghost danger — square icon button */
 .btn--danger {
     background: var(--btn-danger);
@@ -634,16 +658,31 @@ body.dark .view-icon.light-theme-icon {
     display: block;
 }
 
+/* No-image placeholder */
 .preview-wrapper .no-image {
     position: absolute;
     inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
+    color: var(--border-focus);
+    transition: color .18s ease;
+}
+
+.preview-link:hover .preview-wrapper .no-image {
     color: var(--text-muted);
-    font-size: var(--text-xs);
-    text-align: center;
-    padding: 4px;
+}
+
+.no-image-icon {
+    width: 48px;
+    height: 48px;
+    opacity: 0.55;
+}
+
+/* Hide placeholder once real media is present */
+.preview-wrapper:has(img) .no-image,
+.preview-wrapper:has(video) .no-image {
+    display: none;
 }
 
 .preview { border: none !important; outline: none !important; }
@@ -1193,6 +1232,12 @@ body.dark .toast {
 .links-list.grid-view .preview-wrapper {
     width: 100% !important;
     height: 100% !important;
+}
+
+/* Scale up placeholder icon in grid view */
+.links-list.grid-view .no-image-icon {
+    width: 40px;
+    height: 40px;
 }
 
 .links-list.grid-view .link-info {
