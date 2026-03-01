@@ -399,6 +399,19 @@ function initSearchSort() {
         });
     }
 
+    // Clickable counter to reset search
+    if (DOM.searchStats) {
+        DOM.searchStats.addEventListener('click', () => {
+            if (STATE.searchQuery) {
+                DOM.searchInput.value = '';
+                STATE.searchQuery = '';
+                localStorage.setItem('searchQuery', '');
+                filterAndSort();
+                showToast(t('search_reset', 'Search cleared'), 'info');
+            }
+        });
+    }
+
     initCustomSelect();
 }
 
@@ -508,12 +521,21 @@ function updateSearchStats() {
     if (!DOM.searchStats) return;
     const total = STATE.wallpapers.length;
     const shown = STATE.filteredWallpapers.length;
-    if (STATE.searchQuery) {
+
+    // Make counter clickable when filtered
+    const isFiltered = STATE.searchQuery !== '';
+    DOM.searchStats.classList.toggle('clickable', isFiltered);
+
+    if (isFiltered) {
         const tpl = t('search_found', 'Found {{shown}} of {{total}}');
         DOM.searchStats.textContent = tpl.replace('{{shown}}', shown).replace('{{total}}', total);
+        DOM.searchStats.title = t('click_to_reset', 'Click to reset search');
+        DOM.searchStats.style.cursor = 'pointer';
     } else {
         const tpl = t('search_total', 'Total: {{total}}');
         DOM.searchStats.textContent = tpl.replace('{{total}}', total);
+        DOM.searchStats.title = '';
+        DOM.searchStats.style.cursor = 'default';
     }
 }
 
@@ -1064,16 +1086,24 @@ function setupCardEvents(card, link) {
             .replace('{{name}}', link.linkName);
         const confirmed = await showConfirm(msg);
         if (!confirmed) return;
+
+        // Add delete animation
+        card.classList.add('deleting');
+
+        // Wait for animation before API call
+        await new Promise(resolve => setTimeout(resolve, 350));
+
         try {
             await apiCall(`/api/link/${encodeURIComponent(link.linkName)}`, 'DELETE');
+            ac.abort();
+            card.remove();
+            STATE.wallpapers = STATE.wallpapers.filter(wp => wp.linkName !== link.linkName);
+            filterAndSort();
+            showToast(t('deleted_success', 'Link deleted'), 'success');
         } catch (_) {
-            return;
+            // Remove animation class on error
+            card.classList.remove('deleting');
         }
-        ac.abort();
-        card.remove();
-        STATE.wallpapers = STATE.wallpapers.filter(wp => wp.linkName !== link.linkName);
-        filterAndSort();
-        showToast(t('deleted_success', 'Link deleted'), 'success');
     };
 }
 
