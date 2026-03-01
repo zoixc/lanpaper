@@ -158,11 +158,14 @@ body.dark {
    ============================================================ */
 
 /*
-  Always show scrollbar gutter to prevent layout shift.
-  This reserves space even when content doesn't overflow.
+  CRITICAL FIX: Force scrollbar to always be visible
+  This prevents layout shift when content toggles between overflow/no-overflow states.
+  - scrollbar-gutter: stable (modern browsers)
+  - overflow-y: scroll (fallback for all browsers)
 */
 html {
     scrollbar-gutter: stable;
+    overflow-y: scroll;
 }
 
 body {
@@ -729,6 +732,8 @@ body.dark .view-icon.light-theme-icon {
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
+    /* Fixed min-height prevents layout shift during inline rename */
+    min-height: 30px;
 }
 
 .link-id {
@@ -745,6 +750,10 @@ body.dark .view-icon.light-theme-icon {
     margin: -4px -8px;
     border-radius: var(--radius-sm);
     border: 1px solid transparent;
+    /* Fixed height prevents expansion during edit mode */
+    min-height: 30px;
+    display: inline-flex;
+    align-items: center;
     transition: background .15s ease, border-color .15s ease;
 }
 
@@ -758,13 +767,13 @@ body.dark .view-icon.light-theme-icon {
     transform: scale(0.98);
 }
 
-/* No pencil icon to avoid clipping */
-
 .link-id.editing {
+    /* When editing, neutralize all offsets but keep height stable */
     padding: 0;
     margin: 0;
     background: transparent;
     border-color: transparent;
+    min-height: 30px;
 }
 
 .link-id-input {
@@ -779,6 +788,8 @@ body.dark .view-icon.light-theme-icon {
     outline: none;
     width: 100%;
     min-width: 120px;
+    /* Match parent min-height to prevent expansion */
+    height: 30px;
     box-shadow: var(--shadow-focus);
     transition: border-color .18s ease;
 }
