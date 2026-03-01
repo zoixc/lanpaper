@@ -732,8 +732,6 @@ body.dark .view-icon.light-theme-icon {
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
-    /* Fixed min-height prevents layout shift during inline rename */
-    min-height: 30px;
 }
 
 .link-id {
@@ -746,12 +744,11 @@ body.dark .view-icon.light-theme-icon {
     text-overflow: ellipsis;
     position: relative;
     cursor: pointer;
+    /* padding + border = hover button dimensions */
     padding: 4px 8px;
     margin: -4px -8px;
     border-radius: var(--radius-sm);
     border: 1px solid transparent;
-    /* Fixed height prevents expansion during edit mode */
-    min-height: 30px;
     display: inline-flex;
     align-items: center;
     transition: background .15s ease, border-color .15s ease;
@@ -768,12 +765,11 @@ body.dark .view-icon.light-theme-icon {
 }
 
 .link-id.editing {
-    /* When editing, neutralize all offsets but keep height stable */
+    /* Neutralize all styling when input is shown */
     padding: 0;
     margin: 0;
     background: transparent;
     border-color: transparent;
-    min-height: 30px;
 }
 
 .link-id-input {
@@ -784,12 +780,13 @@ body.dark .view-icon.light-theme-icon {
     background: var(--bg);
     border: 2px solid var(--accent);
     border-radius: var(--radius-sm);
-    padding: 4px 8px;
+    /* Match .link-id dimensions: padding 4px + border 1px = 5px total vertical space
+       Input needs: padding 4px + border 2px = 6px, but compensate with line-height */
+    padding: 3px 7px;
+    line-height: 1.4;
     outline: none;
     width: 100%;
     min-width: 120px;
-    /* Match parent min-height to prevent expansion */
-    height: 30px;
     box-shadow: var(--shadow-focus);
     transition: border-color .18s ease;
 }
