@@ -305,8 +305,6 @@ func Link(w http.ResponseWriter, r *http.Request) {
 					http.Error(w, "Failed to rename image file", http.StatusInternalServerError)
 					return
 				}
-				// Update stored URL.
-				wpOld.ImageURL = "static/images/" + newName + "." + wpOld.MIMEType
 				// Rename preview if present.
 				if wpOld.MIMEType != "mp4" && wpOld.MIMEType != "webm" {
 					oldPrev := filepath.Join("static", "images", "previews", linkName+".webp")
@@ -314,16 +312,26 @@ func Link(w http.ResponseWriter, r *http.Request) {
 					if err := os.Rename(oldPrev, newPrev); err != nil && !os.IsNotExist(err) {
 						log.Printf("Warning: could not rename preview %s -> %s: %v", oldPrev, newPrev, err)
 					}
-					wpOld.Preview = "static/images/previews/" + newName + ".webp"
 				}
-				storage.Global.Set(linkName, wpOld) // update URLs before rename
 			}
 
+			// Rename in storage (moves key from linkName → newName).
 			wp, ok := storage.Global.Rename(linkName, newName)
 			if !ok {
 				http.Error(w, "Rename failed", http.StatusInternalServerError)
 				return
 			}
+
+			// NOW update URLs to reflect new name.
+			if wp.HasImage && wp.MIMEType != "" {
+				wp.ImageURL = "static/images/" + newName + "." + wp.MIMEType
+				if wp.MIMEType != "mp4" && wp.MIMEType != "webm" {
+					wp.Preview = "static/images/previews/" + newName + ".webp"
+				}
+				// Save updated URLs back into storage.
+				storage.Global.Set(newName, wp)
+			}
+
 			if err := storage.Global.Save(); err != nil {
 				log.Printf("Error saving after rename: %v", err)
 			}
