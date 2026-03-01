@@ -158,16 +158,11 @@ body.dark {
    ============================================================ */
 
 /*
-  Reserve space for the scrollbar without forcing it to always show.
-  scrollbar-gutter: stable prevents layout shift when content grows
-  (e.g. when a dropdown opens) and eliminates the double-scrollbar
-  bug that occurred with the old `overflow-y: scroll` approach.
-  Desktop-only — mobile browsers hide the scrollbar overlay-style anyway.
+  Always show scrollbar gutter to prevent layout shift.
+  This reserves space even when content doesn't overflow.
 */
-@media (min-width: 769px) {
-    html {
-        scrollbar-gutter: stable;
-    }
+html {
+    scrollbar-gutter: stable;
 }
 
 body {
@@ -749,35 +744,27 @@ body.dark .view-icon.light-theme-icon {
     padding: 4px 8px;
     margin: -4px -8px;
     border-radius: var(--radius-sm);
-    transition: background .15s ease;
+    border: 1px solid transparent;
+    transition: background .15s ease, border-color .15s ease;
 }
 
-/* Inline edit styling */
+/* Hover effect matches other buttons */
 .link-id:not(.editing):hover {
     background: var(--btn-secondary);
+    border-color: var(--border);
 }
 
-.link-id:not(.editing)::after {
-    content: '✎';
-    position: absolute;
-    right: -2px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 0.75rem;
-    opacity: 0;
-    color: var(--text-muted);
-    transition: opacity .2s ease;
-    pointer-events: none;
+.link-id:not(.editing):active {
+    transform: scale(0.98);
 }
 
-.link-id:not(.editing):hover::after {
-    opacity: 0.6;
-}
+/* No pencil icon to avoid clipping */
 
 .link-id.editing {
     padding: 0;
     margin: 0;
     background: transparent;
+    border-color: transparent;
 }
 
 .link-id-input {
