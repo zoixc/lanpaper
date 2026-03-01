@@ -765,9 +765,9 @@ body.dark .view-icon.light-theme-icon {
 }
 
 .link-id.editing {
-    /* Neutralize all styling when input is shown */
+    /* Keep vertical negative margin to prevent downward shift */
     padding: 0;
-    margin: 0;
+    margin: -4px 0;
     background: transparent;
     border-color: transparent;
 }
