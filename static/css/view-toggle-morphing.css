@@ -1,0 +1,155 @@
+/* ============================================================
+   VIEW TOGGLE - MORPHING ANIMATION
+   Pure CSS/SVG transformation: 3 bars → 6 squares
+   ============================================================ */
+
+.view-toggle-morphing {
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    position: relative;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .15s ease, border-color .15s ease, transform .12s ease;
+    flex-shrink: 0;
+}
+
+.view-toggle-morphing:hover {
+    background: var(--btn-secondary);
+    border-color: var(--border);
+}
+
+.view-toggle-morphing:active {
+    transform: scale(0.92);
+}
+
+/* SVG container */
+.view-icon-svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+
+/* Individual bars - each will split into 2 squares */
+.view-bar {
+    fill: currentColor;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: center;
+}
+
+/* ============================================================
+   LIST VIEW (default) - 3 horizontal bars
+   ============================================================ */
+.view-toggle-morphing[data-view="list"] .view-bar-1 {
+    x: 1;
+    y: 2;
+    width: 16;
+    height: 2.5;
+    rx: 1;
+}
+
+.view-toggle-morphing[data-view="list"] .view-bar-2 {
+    x: 1;
+    y: 7.75;
+    width: 16;
+    height: 2.5;
+    rx: 1;
+}
+
+.view-toggle-morphing[data-view="list"] .view-bar-3 {
+    x: 1;
+    y: 13.5;
+    width: 16;
+    height: 2.5;
+    rx: 1;
+}
+
+/* ============================================================
+   GRID VIEW - 6 squares (2x3 grid)
+   Each bar splits into 2 squares
+   ============================================================ */
+.view-toggle-morphing[data-view="grid"] .view-bar-1 {
+    x: 1;
+    y: 1;
+    width: 6.5;
+    height: 4.5;
+    rx: 1.5;
+}
+
+.view-toggle-morphing[data-view="grid"] .view-bar-2 {
+    x: 1;
+    y: 6.75;
+    width: 6.5;
+    height: 4.5;
+    rx: 1.5;
+}
+
+.view-toggle-morphing[data-view="grid"] .view-bar-3 {
+    x: 1;
+    y: 12.5;
+    width: 6.5;
+    height: 4.5;
+    rx: 1.5;
+}
+
+/* Second column of squares (appears by duplicating bars with transform) */
+.view-bar-1-clone,
+.view-bar-2-clone,
+.view-bar-3-clone {
+    fill: currentColor;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: center;
+}
+
+/* LIST: clones are hidden (opacity + scale) */
+.view-toggle-morphing[data-view="list"] .view-bar-1-clone,
+.view-toggle-morphing[data-view="list"] .view-bar-2-clone,
+.view-toggle-morphing[data-view="list"] .view-bar-3-clone {
+    opacity: 0;
+    transform: translateX(-5px) scale(0.5);
+}
+
+/* GRID: clones appear as second column */
+.view-toggle-morphing[data-view="grid"] .view-bar-1-clone {
+    x: 10.5;
+    y: 1;
+    width: 6.5;
+    height: 4.5;
+    rx: 1.5;
+    opacity: 1;
+    transform: translateX(0) scale(1);
+}
+
+.view-toggle-morphing[data-view="grid"] .view-bar-2-clone {
+    x: 10.5;
+    y: 6.75;
+    width: 6.5;
+    height: 4.5;
+    rx: 1.5;
+    opacity: 1;
+    transform: translateX(0) scale(1);
+}
+
+.view-toggle-morphing[data-view="grid"] .view-bar-3-clone {
+    x: 10.5;
+    y: 12.5;
+    width: 6.5;
+    height: 4.5;
+    rx: 1.5;
+    opacity: 1;
+    transform: translateX(0) scale(1);
+}
+
+/* Color adapts to theme */
+.view-toggle-morphing {
+    color: var(--text);
+}
+
+.view-toggle-morphing:hover {
+    color: var(--text);
+}
