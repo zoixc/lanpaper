@@ -3,7 +3,7 @@
   "input_placeholder": "ID del enlace (letras, números, - o _)",
   "create_btn": "Crear",
   "existing_links": "Enlaces",
-  "no_links": "No hay enlaces",
+  "no_links": "Sin enlaces",
   "no_image": "Sin imagen",
   "copy_url": "Copiar URL",
   "set_image": "Subir",
@@ -23,16 +23,16 @@
   "import_confirm": "¿Importar {{count}} enlaces? Esto reemplazará los datos actuales.",
   "sync_in_progress": "Sincronizando datos con el servidor...",
 
-  "regen_previews": "Regenerar miniaturas",
+  "regen_previews": "Regenerar vistas previas",
   "regen_previews_running": "Regenerando...",
-  "regen_previews_done": "Listo: {{ok}} correctos, {{errors}} errores, {{skipped}} omitidos",
+  "regen_previews_done": "Hecho: {{ok}} ok, {{errors}} errores, {{skipped}} omitidos",
 
   "enter_image_url_title": "Pegar desde URL",
-  "select_server_title": "Seleccionar de galería",
+  "select_server_title": "Seleccionar desde galería",
   "enter_image_url": "URL de imagen:",
   "url_placeholder": "https://...",
 
-  "invalid_id": "ID es requerido",
+  "invalid_id": "El ID es obligatorio",
   "invalid_id_chars": "Use a-z, 0-9, - o _",
   "invalid_image": "Formato de archivo inválido",
 
@@ -53,13 +53,13 @@
   "modal_ok": "OK",
   "modal_default_title": "Entrada",
 
-  "search_placeholder": "Buscar por nombre o archivo...",
+  "search_placeholder": "Buscar por nombre de enlace o archivo...",
   "search_total": "Total: {{total}}",
   "search_found": "{{shown}} de {{total}} encontrados",
 
   "sort_by": "Ordenar por:",
-  "name_asc": "Nombre (A\u2013Z)",
-  "name_desc": "Nombre (Z\u2013A)",
+  "name_asc": "Nombre (A–Z)",
+  "name_desc": "Nombre (Z–A)",
   "date_new": "Más recientes primero",
   "date_old": "Más antiguos primero",
 
@@ -72,7 +72,7 @@
   "aria_file_info": "Información del archivo",
   "aria_settings": "Configuración",
   "aria_toggle_view": "Cambiar vista",
-  "aria_toggle_theme": "Alternar modo oscuro",
+  "aria_toggle_theme": "Cambiar modo oscuro",
   "aria_search": "Buscar fondos de pantalla",
   "aria_link_input": "ID del enlace",
 
