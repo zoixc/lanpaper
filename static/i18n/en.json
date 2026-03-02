@@ -37,9 +37,11 @@
   "invalid_image": "Invalid file format",
 
   "upload_success": "Uploaded!",
+  "upload_error": "Upload failed",
   "created_success": "Link created",
   "renamed_success": "Renamed to \"{{name}}\"",
   "deleted_success": "Link deleted",
+  "link_taken": "Link name already taken",
   "confirm_delete": "Delete this link?",
   "confirm_delete_title": "Delete link?",
   "confirm_delete_msg": "Delete \"{{name}}\"? This cannot be undone.",
@@ -49,6 +51,7 @@
   "server_empty": "Folder is empty",
   "server_error": "Access error",
   "copied": "Copied!",
+  "copy_error": "Failed to copy URL",
 
   "modal_cancel": "Cancel",
   "modal_ok": "OK",
@@ -57,6 +60,8 @@
   "search_placeholder": "Search by link name or file...",
   "search_total": "Total: {{total}}",
   "search_found": "Found {{shown}} of {{total}}",
+  "search_reset": "Search cleared",
+  "click_to_reset": "Click to reset search",
 
   "sort_by": "Sort by:",
   "name_asc": "Name (A\u2013Z)",
@@ -67,6 +72,11 @@
   "load_error": "Failed to load links",
   "preview_unavailable": "Preview unavailable",
   "image_unavailable": "Image unavailable",
+
+  "compression_saved": "Compressed: {{percent}}% smaller ({{saved}} saved)",
+
+  "rename_hint": "Double-click to rename",
+  "rename_input_label": "New link name",
 
   "aria_open_image": "Open image",
   "aria_link_id": "Link ID",

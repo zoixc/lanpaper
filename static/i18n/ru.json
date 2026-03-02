@@ -37,9 +37,11 @@
   "invalid_image": "Неверный формат файла",
 
   "upload_success": "Загружено!",
+  "upload_error": "Ошибка загрузки",
   "created_success": "Ссылка создана",
   "renamed_success": "Переименовано в \"{{name}}\"",
   "deleted_success": "Ссылка удалена",
+  "link_taken": "Имя ссылки уже занято",
   "confirm_delete": "Удалить эту ссылку?",
   "confirm_delete_title": "Удалить ссылку?",
   "confirm_delete_msg": "Удалить \"{{name}}\"? Это действие нельзя отменить.",
@@ -49,6 +51,7 @@
   "server_empty": "Папка пуста",
   "server_error": "Ошибка доступа",
   "copied": "Скопировано!",
+  "copy_error": "Не удалось скопировать URL",
 
   "modal_cancel": "Отмена",
   "modal_ok": "OK",
@@ -57,6 +60,8 @@
   "search_placeholder": "Поиск по имени или файлу...",
   "search_total": "Всего: {{total}}",
   "search_found": "Найдено {{shown}} из {{total}}",
+  "search_reset": "Поиск сброшен",
+  "click_to_reset": "Нажмите для сброса поиска",
 
   "sort_by": "Сортировка:",
   "name_asc": "Имя (А–Я)",
@@ -67,6 +72,11 @@
   "load_error": "Не удалось загрузить ссылки",
   "preview_unavailable": "Превью недоступно",
   "image_unavailable": "Изображение недоступно",
+
+  "compression_saved": "Сжато: на {{percent}}% меньше (сэкономлено {{saved}})",
+
+  "rename_hint": "Двойной клик для переименования",
+  "rename_input_label": "Новое имя ссылки",
 
   "aria_open_image": "Открыть изображение",
   "aria_link_id": "ID ссылки",

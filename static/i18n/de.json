@@ -37,9 +37,11 @@
   "invalid_image": "Ungültiges Dateiformat",
 
   "upload_success": "Hochgeladen!",
+  "upload_error": "Upload fehlgeschlagen",
   "created_success": "Link erstellt",
   "renamed_success": "Umbenannt in \"{{name}}\"",
   "deleted_success": "Link gelöscht",
+  "link_taken": "Link-Name bereits vergeben",
   "confirm_delete": "Diesen Link löschen?",
   "confirm_delete_title": "Link löschen?",
   "confirm_delete_msg": "\"{{name}}\" löschen? Dies kann nicht rückgängig gemacht werden.",
@@ -49,6 +51,7 @@
   "server_empty": "Ordner ist leer",
   "server_error": "Zugriffsfehler",
   "copied": "Kopiert!",
+  "copy_error": "URL konnte nicht kopiert werden",
 
   "modal_cancel": "Abbrechen",
   "modal_ok": "OK",
@@ -57,6 +60,8 @@
   "search_placeholder": "Suche nach Link-Name oder Datei...",
   "search_total": "Gesamt: {{total}}",
   "search_found": "{{shown}} von {{total}} gefunden",
+  "search_reset": "Suche zurückgesetzt",
+  "click_to_reset": "Klicken zum Zurücksetzen der Suche",
 
   "sort_by": "Sortieren nach:",
   "name_asc": "Name (A–Z)",
@@ -67,6 +72,11 @@
   "load_error": "Fehler beim Laden der Links",
   "preview_unavailable": "Vorschau nicht verfügbar",
   "image_unavailable": "Bild nicht verfügbar",
+
+  "compression_saved": "Komprimiert: {{percent}}% kleiner ({{saved}} gespart)",
+
+  "rename_hint": "Doppelklick zum Umbenennen",
+  "rename_input_label": "Neuer Link-Name",
 
   "aria_open_image": "Bild öffnen",
   "aria_link_id": "Link-ID",

@@ -37,9 +37,11 @@
   "invalid_image": "Formato de archivo inválido",
 
   "upload_success": "¡Subido!",
+  "upload_error": "Error al subir",
   "created_success": "Enlace creado",
   "renamed_success": "Renombrado a \"{{name}}\"",
   "deleted_success": "Enlace eliminado",
+  "link_taken": "Nombre de enlace ya existe",
   "confirm_delete": "¿Eliminar este enlace?",
   "confirm_delete_title": "¿Eliminar enlace?",
   "confirm_delete_msg": "¿Eliminar \"{{name}}\"? Esta acción no se puede deshacer.",
@@ -49,6 +51,7 @@
   "server_empty": "La carpeta está vacía",
   "server_error": "Error de acceso",
   "copied": "¡Copiado!",
+  "copy_error": "No se pudo copiar la URL",
 
   "modal_cancel": "Cancelar",
   "modal_ok": "OK",
@@ -57,6 +60,8 @@
   "search_placeholder": "Buscar por nombre de enlace o archivo...",
   "search_total": "Total: {{total}}",
   "search_found": "{{shown}} de {{total}} encontrados",
+  "search_reset": "Búsqueda borrada",
+  "click_to_reset": "Haga clic para restablecer la búsqueda",
 
   "sort_by": "Ordenar por:",
   "name_asc": "Nombre (A–Z)",
@@ -67,6 +72,11 @@
   "load_error": "Error al cargar enlaces",
   "preview_unavailable": "Vista previa no disponible",
   "image_unavailable": "Imagen no disponible",
+
+  "compression_saved": "Comprimido: {{percent}}% más pequeño ({{saved}} ahorrados)",
+
+  "rename_hint": "Doble clic para renombrar",
+  "rename_input_label": "Nuevo nombre de enlace",
 
   "aria_open_image": "Abrir imagen",
   "aria_link_id": "ID del enlace",
