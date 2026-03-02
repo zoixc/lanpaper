@@ -35,13 +35,12 @@
   "invalid_id": "ID is required",
   "invalid_id_chars": "Use a-z, 0-9, - or _",
   "invalid_image": "Invalid file format",
+  "link_taken": "Link name already taken",
 
   "upload_success": "Uploaded!",
-  "upload_error": "Upload failed",
   "created_success": "Link created",
   "renamed_success": "Renamed to \"{{name}}\"",
   "deleted_success": "Link deleted",
-  "link_taken": "Link name already taken",
   "confirm_delete": "Delete this link?",
   "confirm_delete_title": "Delete link?",
   "confirm_delete_msg": "Delete \"{{name}}\"? This cannot be undone.",
@@ -73,8 +72,7 @@
   "preview_unavailable": "Preview unavailable",
   "image_unavailable": "Image unavailable",
 
-  "compression_saved": "Compressed: {{percent}}% smaller ({{saved}} saved)",
-
+  "compression_saved": "\ud83d\udddc\ufe0f Compressed: {{percent}}% smaller ({{saved}} saved)",
   "rename_hint": "Double-click to rename",
   "rename_input_label": "New link name",
 

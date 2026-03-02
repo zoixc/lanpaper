@@ -35,13 +35,12 @@
   "invalid_id": "ID обязателен",
   "invalid_id_chars": "Используйте a-z, 0-9, - или _",
   "invalid_image": "Неверный формат файла",
+  "link_taken": "Имя ссылки уже занято",
 
   "upload_success": "Загружено!",
-  "upload_error": "Ошибка загрузки",
   "created_success": "Ссылка создана",
   "renamed_success": "Переименовано в \"{{name}}\"",
   "deleted_success": "Ссылка удалена",
-  "link_taken": "Имя ссылки уже занято",
   "confirm_delete": "Удалить эту ссылку?",
   "confirm_delete_title": "Удалить ссылку?",
   "confirm_delete_msg": "Удалить \"{{name}}\"? Это действие нельзя отменить.",
@@ -61,7 +60,7 @@
   "search_total": "Всего: {{total}}",
   "search_found": "Найдено {{shown}} из {{total}}",
   "search_reset": "Поиск сброшен",
-  "click_to_reset": "Нажмите для сброса поиска",
+  "click_to_reset": "Нажмите, чтобы сбросить поиск",
 
   "sort_by": "Сортировка:",
   "name_asc": "Имя (А–Я)",
@@ -73,8 +72,7 @@
   "preview_unavailable": "Превью недоступно",
   "image_unavailable": "Изображение недоступно",
 
-  "compression_saved": "Сжато: на {{percent}}% меньше (сэкономлено {{saved}})",
-
+  "compression_saved": "🗜️ Сжато: на {{percent}}% меньше (сохранено {{saved}})",
   "rename_hint": "Двойной клик для переименования",
   "rename_input_label": "Новое имя ссылки",
 

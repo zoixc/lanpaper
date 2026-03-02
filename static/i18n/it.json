@@ -35,13 +35,12 @@
   "invalid_id": "L'ID è obbligatorio",
   "invalid_id_chars": "Usa a-z, 0-9, - o _",
   "invalid_image": "Formato file non valido",
+  "link_taken": "Nome link già occupato",
 
   "upload_success": "Caricato!",
-  "upload_error": "Caricamento fallito",
   "created_success": "Link creato",
   "renamed_success": "Rinominato in \"{{name}}\"",
   "deleted_success": "Link eliminato",
-  "link_taken": "Nome link già in uso",
   "confirm_delete": "Eliminare questo link?",
   "confirm_delete_title": "Eliminare link?",
   "confirm_delete_msg": "Eliminare \"{{name}}\"? Questa azione non può essere annullata.",
@@ -51,7 +50,7 @@
   "server_empty": "La cartella è vuota",
   "server_error": "Errore di accesso",
   "copied": "Copiato!",
-  "copy_error": "Impossibile copiare l'URL",
+  "copy_error": "Copia URL fallita",
 
   "modal_cancel": "Annulla",
   "modal_ok": "OK",
@@ -61,7 +60,7 @@
   "search_total": "Totale: {{total}}",
   "search_found": "{{shown}} di {{total}} trovati",
   "search_reset": "Ricerca cancellata",
-  "click_to_reset": "Clicca per reimpostare la ricerca",
+  "click_to_reset": "Clicca per azzerare la ricerca",
 
   "sort_by": "Ordina per:",
   "name_asc": "Nome (A–Z)",
@@ -73,8 +72,7 @@
   "preview_unavailable": "Anteprima non disponibile",
   "image_unavailable": "Immagine non disponibile",
 
-  "compression_saved": "Compresso: {{percent}}% più piccolo ({{saved}} risparmiati)",
-
+  "compression_saved": "🗜️ Compresso: {{percent}}% più piccolo ({{saved}} risparmiato)",
   "rename_hint": "Doppio clic per rinominare",
   "rename_input_label": "Nuovo nome link",
 
