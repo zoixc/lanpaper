@@ -1,0 +1,18 @@
+<!-- 
+    VIEW TOGGLE - MORPHING ANIMATION
+    Replace the existing #viewToggle button in admin.html with this code
+-->
+
+<button id="viewToggleMorphing" class="view-toggle-morphing" data-view="list" aria-label="Switch to grid view">
+    <svg class="view-icon-svg" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <!-- Main bars (left column in grid, full width in list) -->
+        <rect class="view-bar view-bar-1" />
+        <rect class="view-bar view-bar-2" />
+        <rect class="view-bar view-bar-3" />
+        
+        <!-- Clone bars (right column in grid, hidden in list) -->
+        <rect class="view-bar-1-clone" />
+        <rect class="view-bar-2-clone" />
+        <rect class="view-bar-3-clone" />
+    </svg>
+</button>
