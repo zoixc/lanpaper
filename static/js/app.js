@@ -372,6 +372,22 @@ function updateAriaLabels() {
 }
 
 
+// SERVER ERROR TRANSLATION
+function translateServerError(errorText) {
+    // Map known server errors to translation keys
+    const errorMap = {
+        'Link name already taken': 'link_taken',
+        'Link exists': 'link_taken',
+        'Invalid link name': 'invalid_id_chars',
+        'Link not found': 'link_not_found',
+        'Invalid JSON': 'invalid_json',
+    };
+
+    const key = errorMap[errorText];
+    return key ? t(key, errorText) : errorText;
+}
+
+
 // SEARCH & SORT
 function initSearchSort() {
     if (!DOM.searchInput) return;
@@ -704,7 +720,8 @@ async function apiCall(url, method = 'GET', body = null, isFormData = false) {
         const contentType = res.headers.get('content-type');
         return contentType?.includes('application/json') ? res.json() : null;
     } catch (e) {
-        showToast(e.message, 'error');
+        const translatedMsg = translateServerError(e.message);
+        showToast(translatedMsg, 'error');
         throw e;
     }
 }
@@ -913,11 +930,11 @@ function updateCard(card, link) {
         fileType = t('no_image', 'No image');
     }
 
-    const dateStr = link.createdAt ? formatDate(link.createdAt) : '\u2014';
-    const sizeStr = link.sizeBytes ? ` \u00b7 ${formatKB(link.sizeBytes)}` : '';
+    const dateStr = link.createdAt ? formatDate(link.createdAt) : '—';
+    const sizeStr = link.sizeBytes ? ` · ${formatKB(link.sizeBytes)}` : '';
 
     const linkMeta = card.querySelector('.link-meta');
-    linkMeta.textContent = `${category} \u00b7 ${fileType}${sizeStr} \u00b7 ${dateStr}`;
+    linkMeta.textContent = `${category} · ${fileType}${sizeStr} · ${dateStr}`;
     linkMeta.setAttribute('aria-label', t('aria_file_info', 'File info'));
 
     const previewWrapper = card.querySelector('.preview-wrapper');
@@ -1244,5 +1261,5 @@ function formatKB(bytes) {
 }
 
 function formatDate(ts) {
-    return ts ? new Date(ts * 1000).toLocaleDateString() : '\u2014';
+    return ts ? new Date(ts * 1000).toLocaleDateString() : '—';
 }
