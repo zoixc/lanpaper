@@ -38,6 +38,7 @@
 
   "upload_success": "Téléchargé !",
   "created_success": "Lien créé",
+  "renamed_success": "Renommé en \"{{name}}\"",
   "deleted_success": "Lien supprimé",
   "confirm_delete": "Supprimer ce lien ?",
   "confirm_delete_title": "Supprimer le lien ?",

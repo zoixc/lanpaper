@@ -38,6 +38,7 @@
 
   "upload_success": "Caricato!",
   "created_success": "Link creato",
+  "renamed_success": "Rinominato in \"{{name}}\"",
   "deleted_success": "Link eliminato",
   "confirm_delete": "Eliminare questo link?",
   "confirm_delete_title": "Eliminare link?",

@@ -38,6 +38,7 @@
 
   "upload_success": "Загружено!",
   "created_success": "Ссылка создана",
+  "renamed_success": "Переименовано в \"{{name}}\"",
   "deleted_success": "Ссылка удалена",
   "confirm_delete": "Удалить эту ссылку?",
   "confirm_delete_title": "Удалить ссылку?",
