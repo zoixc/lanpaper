@@ -1127,7 +1127,10 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
                 fileToUpload = await STATE.compressor.compress(fileOrUrl);
                 if (fileToUpload.size < originalSize) {
                     const info = ImageCompressor.getCompressionInfo(originalSize, fileToUpload.size);
-                    showToast(`🗜️ Compressed: ${info.percent}% smaller (${formatKB(info.saved)} saved)`, 'success');
+                    const msg = t('compression_saved', '🗜️ Compressed: {{percent}}% smaller ({{saved}} saved)')
+                        .replace('{{percent}}', info.percent)
+                        .replace('{{saved}}', formatKB(info.saved));
+                    showToast(msg, 'success');
                 }
             } catch (_) {
                 fileToUpload = fileOrUrl;
