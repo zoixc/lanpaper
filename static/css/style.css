@@ -365,10 +365,6 @@ h1::before {
     transform: scale(0.92);
 }
 
-/* ============================================================
-   ICON ANIMATIONS - ULTRA SMOOTH CROSSFADE
-   ============================================================ */
-
 .theme-icon,
 .view-icon {
     position: absolute;
@@ -376,21 +372,50 @@ h1::before {
     left: 50%;
     width: 18px;
     height: 18px;
-    /* Always perfectly centered - NO transforms except translate */
+    /* Always centered, never shifts */
     transform: translate(-50%, -50%);
     opacity: 0;
     pointer-events: none;
-    /* Pure opacity fade - buttery smooth, zero jitter */
-    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform, opacity;
 }
 
-.theme-icon.active,
-.view-icon.active {
+/* Theme toggle: spin-scale animation */
+.theme-icon {
+    transition: opacity .22s ease,
+                transform .28s cubic-bezier(0.34, 1.56, .64, 1);
+}
+
+.theme-icon.active {
     opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
     pointer-events: auto;
 }
 
-/* Hide wrong theme icons instantly */
+.theme-icon:not(.active) {
+    transform: translate(-50%, -50%) scale(0.4) rotate(-200deg);
+}
+
+/* View toggle: Modern smooth scale + rotate animation */
+.view-icon {
+    /* Smooth spring-like transition with perfect centering */
+    transition: opacity 0.32s cubic-bezier(0.34, 1.56, 0.64, 1),
+                transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.view-icon.active {
+    opacity: 1;
+    /* Always perfectly centered */
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    pointer-events: auto;
+}
+
+.view-icon:not(.active) {
+    opacity: 0;
+    /* Scale down + slight rotation for smooth morph effect */
+    transform: translate(-50%, -50%) scale(0.5) rotate(90deg);
+}
+
+/* Hide wrong theme icons (prevent flash) */
 body:not(.dark) .view-icon.dark-theme-icon,
 body.dark .view-icon.light-theme-icon {
     opacity: 0 !important;
