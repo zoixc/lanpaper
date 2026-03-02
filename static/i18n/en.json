@@ -36,6 +36,8 @@
   "invalid_id_chars": "Use a-z, 0-9, - or _",
   "invalid_image": "Invalid file format",
   "link_taken": "Link name already taken",
+  "link_not_found": "Link not found",
+  "invalid_json": "Invalid data format",
 
   "upload_success": "Uploaded!",
   "created_success": "Link created",
