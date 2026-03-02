@@ -852,7 +852,8 @@ function setupInlineRename(card, link) {
                 updateCard(card, updated);
                 setupInlineRename(card, updated);
 
-                showToast(t('renamed_success', `Renamed to "${updated.linkName}"`), 'success');
+                const msg = t('renamed_success', 'Renamed to "{{name}}"').replace('{{name}}', updated.linkName);
+                showToast(msg, 'success');
                 filterAndSort();
             } catch (_) {
                 // Roll back on error (apiCall already showed toast)
