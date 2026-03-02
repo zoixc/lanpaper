@@ -1,9 +1,9 @@
 {
-  "create_new_link": "Crear enlace",
+  "create_new_link": "Crear nuevo enlace",
   "input_placeholder": "ID del enlace (letras, números, - o _)",
   "create_btn": "Crear",
   "existing_links": "Enlaces",
-  "no_links": "Sin enlaces",
+  "no_links": "Aún no hay enlaces",
   "no_image": "Sin imagen",
   "copy_url": "Copiar URL",
   "set_image": "Subir",
@@ -28,14 +28,16 @@
   "regen_previews_done": "Hecho: {{ok}} ok, {{errors}} errores, {{skipped}} omitidos",
 
   "enter_image_url_title": "Pegar desde URL",
-  "select_server_title": "Seleccionar desde galería",
+  "select_server_title": "Seleccionar de galería",
   "enter_image_url": "URL de imagen:",
   "url_placeholder": "https://...",
 
-  "invalid_id": "El ID es obligatorio",
+  "invalid_id": "Se requiere ID",
   "invalid_id_chars": "Use a-z, 0-9, - o _",
   "invalid_image": "Formato de archivo inválido",
-  "link_taken": "Nombre de enlace ya ocupado",
+  "link_taken": "El nombre del enlace ya está en uso",
+  "link_not_found": "Enlace no encontrado",
+  "invalid_json": "Formato de datos inválido",
 
   "upload_success": "¡Subido!",
   "created_success": "Enlace creado",
@@ -43,7 +45,7 @@
   "deleted_success": "Enlace eliminado",
   "confirm_delete": "¿Eliminar este enlace?",
   "confirm_delete_title": "¿Eliminar enlace?",
-  "confirm_delete_msg": "¿Eliminar \"{{name}}\"? Esta acción no se puede deshacer.",
+  "confirm_delete_msg": "¿Eliminar \"{{name}}\"? Esto no se puede deshacer.",
   "delete_btn": "Eliminar",
 
   "loading": "Cargando...",
@@ -58,13 +60,13 @@
 
   "search_placeholder": "Buscar por nombre de enlace o archivo...",
   "search_total": "Total: {{total}}",
-  "search_found": "{{shown}} de {{total}} encontrados",
+  "search_found": "Encontrados {{shown}} de {{total}}",
   "search_reset": "Búsqueda borrada",
-  "click_to_reset": "Clic para reiniciar búsqueda",
+  "click_to_reset": "Clic para restablecer búsqueda",
 
   "sort_by": "Ordenar por:",
-  "name_asc": "Nombre (A–Z)",
-  "name_desc": "Nombre (Z–A)",
+  "name_asc": "Nombre (A\u2013Z)",
+  "name_desc": "Nombre (Z\u2013A)",
   "date_new": "Más recientes primero",
   "date_old": "Más antiguos primero",
 

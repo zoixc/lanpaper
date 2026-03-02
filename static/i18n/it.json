@@ -1,14 +1,14 @@
 {
-  "create_new_link": "Crea link",
-  "input_placeholder": "ID del link (lettere, numeri, - o _)",
+  "create_new_link": "Crea nuovo link",
+  "input_placeholder": "ID link (lettere, numeri, - o _)",
   "create_btn": "Crea",
-  "existing_links": "Links",
-  "no_links": "Nessun link",
+  "existing_links": "Link",
+  "no_links": "Nessun link ancora",
   "no_image": "Nessuna immagine",
   "copy_url": "Copia URL",
   "set_image": "Carica",
   "paste_url": "Da URL",
-  "select_server": "Dalla galleria",
+  "select_server": "Da galleria",
   "remove": "Rimuovi",
 
   "settings_language": "Lingua",
@@ -20,7 +20,7 @@
   "export_error": "Esportazione fallita",
   "import_success": "Dati importati con successo",
   "import_error": "Importazione fallita: File non valido",
-  "import_confirm": "Importare {{count}} links? Questo sostituirà i dati attuali.",
+  "import_confirm": "Importare {{count}} link? Questo sostituirà i dati attuali.",
   "sync_in_progress": "Sincronizzazione dati con il server...",
 
   "regen_previews": "Rigenera anteprime",
@@ -28,14 +28,16 @@
   "regen_previews_done": "Fatto: {{ok}} ok, {{errors}} errori, {{skipped}} saltati",
 
   "enter_image_url_title": "Incolla da URL",
-  "select_server_title": "Seleziona dalla galleria",
+  "select_server_title": "Seleziona da galleria",
   "enter_image_url": "URL immagine:",
   "url_placeholder": "https://...",
 
-  "invalid_id": "L'ID è obbligatorio",
+  "invalid_id": "ID richiesto",
   "invalid_id_chars": "Usa a-z, 0-9, - o _",
   "invalid_image": "Formato file non valido",
-  "link_taken": "Nome link già occupato",
+  "link_taken": "Nome del link già in uso",
+  "link_not_found": "Link non trovato",
+  "invalid_json": "Formato dati non valido",
 
   "upload_success": "Caricato!",
   "created_success": "Link creato",
@@ -43,32 +45,32 @@
   "deleted_success": "Link eliminato",
   "confirm_delete": "Eliminare questo link?",
   "confirm_delete_title": "Eliminare link?",
-  "confirm_delete_msg": "Eliminare \"{{name}}\"? Questa azione non può essere annullata.",
+  "confirm_delete_msg": "Eliminare \"{{name}}\"? Questa operazione non può essere annullata.",
   "delete_btn": "Elimina",
 
   "loading": "Caricamento...",
   "server_empty": "La cartella è vuota",
   "server_error": "Errore di accesso",
   "copied": "Copiato!",
-  "copy_error": "Copia URL fallita",
+  "copy_error": "Impossibile copiare l'URL",
 
   "modal_cancel": "Annulla",
   "modal_ok": "OK",
-  "modal_default_title": "Inserimento",
+  "modal_default_title": "Input",
 
   "search_placeholder": "Cerca per nome link o file...",
   "search_total": "Totale: {{total}}",
-  "search_found": "{{shown}} di {{total}} trovati",
+  "search_found": "Trovati {{shown}} di {{total}}",
   "search_reset": "Ricerca cancellata",
-  "click_to_reset": "Clicca per azzerare la ricerca",
+  "click_to_reset": "Clicca per reimpostare la ricerca",
 
   "sort_by": "Ordina per:",
-  "name_asc": "Nome (A–Z)",
-  "name_desc": "Nome (Z–A)",
-  "date_new": "Più recenti prima",
-  "date_old": "Più vecchi prima",
+  "name_asc": "Nome (A\u2013Z)",
+  "name_desc": "Nome (Z\u2013A)",
+  "date_new": "Prima i più recenti",
+  "date_old": "Prima i più vecchi",
 
-  "load_error": "Impossibile caricare i links",
+  "load_error": "Impossibile caricare i link",
   "preview_unavailable": "Anteprima non disponibile",
   "image_unavailable": "Immagine non disponibile",
 
@@ -77,13 +79,13 @@
   "rename_input_label": "Nuovo nome link",
 
   "aria_open_image": "Apri immagine",
-  "aria_link_id": "ID del link",
-  "aria_file_info": "Info file",
+  "aria_link_id": "ID link",
+  "aria_file_info": "Informazioni file",
   "aria_settings": "Impostazioni",
   "aria_toggle_view": "Cambia vista",
   "aria_toggle_theme": "Cambia modalità scura",
   "aria_search": "Cerca sfondi",
-  "aria_link_input": "ID del link",
+  "aria_link_input": "ID link",
 
   "shortcuts_hint": "Scorciatoie: Ctrl+N (nuovo), Ctrl+F (cerca), Ctrl+G (vista), T (tema)"
 }

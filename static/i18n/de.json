@@ -20,11 +20,11 @@
   "export_error": "Export fehlgeschlagen",
   "import_success": "Daten erfolgreich importiert",
   "import_error": "Import fehlgeschlagen: Ungültige Datei",
-  "import_confirm": "{{count}} Links importieren? Dies ersetzt die aktuellen Daten.",
-  "sync_in_progress": "Synchronisiere Daten mit Server...",
+  "import_confirm": "{{count}} Links importieren? Aktuelle Daten werden ersetzt.",
+  "sync_in_progress": "Daten werden mit Server synchronisiert...",
 
   "regen_previews": "Vorschauen neu generieren",
-  "regen_previews_running": "Generiere neu...",
+  "regen_previews_running": "Wird regeneriert...",
   "regen_previews_done": "Fertig: {{ok}} ok, {{errors}} Fehler, {{skipped}} übersprungen",
 
   "enter_image_url_title": "Von URL einfügen",
@@ -36,6 +36,8 @@
   "invalid_id_chars": "Verwenden Sie a-z, 0-9, - oder _",
   "invalid_image": "Ungültiges Dateiformat",
   "link_taken": "Link-Name bereits vergeben",
+  "link_not_found": "Link nicht gefunden",
+  "invalid_json": "Ungültiges Datenformat",
 
   "upload_success": "Hochgeladen!",
   "created_success": "Link erstellt",
@@ -56,19 +58,19 @@
   "modal_ok": "OK",
   "modal_default_title": "Eingabe",
 
-  "search_placeholder": "Suche nach Link-Name oder Datei...",
+  "search_placeholder": "Nach Link-Name oder Datei suchen...",
   "search_total": "Gesamt: {{total}}",
   "search_found": "{{shown}} von {{total}} gefunden",
-  "search_reset": "Suche zurückgesetzt",
-  "click_to_reset": "Klicken zum Zurücksetzen der Suche",
+  "search_reset": "Suche gelöscht",
+  "click_to_reset": "Klicken, um Suche zurückzusetzen",
 
   "sort_by": "Sortieren nach:",
-  "name_asc": "Name (A–Z)",
-  "name_desc": "Name (Z–A)",
+  "name_asc": "Name (A\u2013Z)",
+  "name_desc": "Name (Z\u2013A)",
   "date_new": "Neueste zuerst",
   "date_old": "Älteste zuerst",
 
-  "load_error": "Fehler beim Laden der Links",
+  "load_error": "Links konnten nicht geladen werden",
   "preview_unavailable": "Vorschau nicht verfügbar",
   "image_unavailable": "Bild nicht verfügbar",
 
@@ -78,12 +80,12 @@
 
   "aria_open_image": "Bild öffnen",
   "aria_link_id": "Link-ID",
-  "aria_file_info": "Dateiinformationen",
+  "aria_file_info": "Dateiinformation",
   "aria_settings": "Einstellungen",
   "aria_toggle_view": "Ansicht umschalten",
   "aria_toggle_theme": "Dunkelmodus umschalten",
   "aria_search": "Hintergrundbilder suchen",
   "aria_link_input": "Link-ID",
 
-  "shortcuts_hint": "Tastenkürzel: Strg+N (neu), Strg+F (suchen), Strg+G (Ansicht), T (Thema)"
+  "shortcuts_hint": "Tastenkombinationen: Strg+N (neu), Strg+F (suchen), Strg+G (Ansicht), T (Thema)"
 }

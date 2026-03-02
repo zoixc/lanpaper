@@ -1,9 +1,9 @@
 {
-  "create_new_link": "Créer un lien",
+  "create_new_link": "Créer un nouveau lien",
   "input_placeholder": "ID du lien (lettres, chiffres, - ou _)",
   "create_btn": "Créer",
   "existing_links": "Liens",
-  "no_links": "Aucun lien",
+  "no_links": "Pas encore de liens",
   "no_image": "Pas d'image",
   "copy_url": "Copier l'URL",
   "set_image": "Télécharger",
@@ -17,9 +17,9 @@
   "export_json": "Exporter",
   "import_json": "Importer",
   "export_success": "Données exportées avec succès",
-  "export_error": "Échec de l'export",
+  "export_error": "Échec de l'exportation",
   "import_success": "Données importées avec succès",
-  "import_error": "Échec de l'import : Fichier invalide",
+  "import_error": "Échec de l'importation : Fichier invalide",
   "import_confirm": "Importer {{count}} liens ? Cela remplacera les données actuelles.",
   "sync_in_progress": "Synchronisation des données avec le serveur...",
 
@@ -32,10 +32,12 @@
   "enter_image_url": "URL de l'image :",
   "url_placeholder": "https://...",
 
-  "invalid_id": "L'ID est obligatoire",
+  "invalid_id": "L'ID est requis",
   "invalid_id_chars": "Utilisez a-z, 0-9, - ou _",
   "invalid_image": "Format de fichier invalide",
-  "link_taken": "Nom de lien déjà pris",
+  "link_taken": "Le nom du lien est déjà pris",
+  "link_not_found": "Lien non trouvé",
+  "invalid_json": "Format de données invalide",
 
   "upload_success": "Téléchargé !",
   "created_success": "Lien créé",
@@ -43,7 +45,7 @@
   "deleted_success": "Lien supprimé",
   "confirm_delete": "Supprimer ce lien ?",
   "confirm_delete_title": "Supprimer le lien ?",
-  "confirm_delete_msg": "Supprimer \"{{name}}\" ? Cette action est irréversible.",
+  "confirm_delete_msg": "Supprimer \"{{name}}\" ? Ceci ne peut pas être annulé.",
   "delete_btn": "Supprimer",
 
   "loading": "Chargement...",
@@ -58,19 +60,19 @@
 
   "search_placeholder": "Rechercher par nom de lien ou fichier...",
   "search_total": "Total : {{total}}",
-  "search_found": "{{shown}} sur {{total}} trouvés",
+  "search_found": "{{shown}} trouvés sur {{total}}",
   "search_reset": "Recherche effacée",
   "click_to_reset": "Cliquer pour réinitialiser la recherche",
 
   "sort_by": "Trier par :",
-  "name_asc": "Nom (A–Z)",
-  "name_desc": "Nom (Z–A)",
+  "name_asc": "Nom (A\u2013Z)",
+  "name_desc": "Nom (Z\u2013A)",
   "date_new": "Plus récents d'abord",
   "date_old": "Plus anciens d'abord",
 
   "load_error": "Échec du chargement des liens",
-  "preview_unavailable": "Aperçu indisponible",
-  "image_unavailable": "Image indisponible",
+  "preview_unavailable": "Aperçu non disponible",
+  "image_unavailable": "Image non disponible",
 
   "compression_saved": "🗜️ Compressé : {{percent}}% plus petit ({{saved}} économisé)",
   "rename_hint": "Double-clic pour renommer",
@@ -78,12 +80,12 @@
 
   "aria_open_image": "Ouvrir l'image",
   "aria_link_id": "ID du lien",
-  "aria_file_info": "Informations fichier",
+  "aria_file_info": "Informations du fichier",
   "aria_settings": "Paramètres",
   "aria_toggle_view": "Basculer la vue",
-  "aria_toggle_theme": "Basculer mode sombre",
+  "aria_toggle_theme": "Basculer le mode sombre",
   "aria_search": "Rechercher des fonds d'écran",
   "aria_link_input": "ID du lien",
 
-  "shortcuts_hint": "Raccourcis : Ctrl+N (nouveau), Ctrl+F (rechercher), Ctrl+G (vue), T (thème)"
+  "shortcuts_hint": "Raccourcis : Ctrl+N (nouveau), Ctrl+F (recherche), Ctrl+G (vue), T (thème)"
 }

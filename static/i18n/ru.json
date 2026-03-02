@@ -1,9 +1,9 @@
 {
-  "create_new_link": "Создать ссылку",
+  "create_new_link": "Создать новую ссылку",
   "input_placeholder": "ID ссылки (буквы, цифры, - или _)",
   "create_btn": "Создать",
   "existing_links": "Ссылки",
-  "no_links": "Нет ссылок",
+  "no_links": "Ссылок пока нет",
   "no_image": "Нет изображения",
   "copy_url": "Копировать URL",
   "set_image": "Загрузить",
@@ -19,13 +19,13 @@
   "export_success": "Данные успешно экспортированы",
   "export_error": "Ошибка экспорта",
   "import_success": "Данные успешно импортированы",
-  "import_error": "Ошибка импорта: неверный файл",
+  "import_error": "Ошибка импорта: некорректный файл",
   "import_confirm": "Импортировать {{count}} ссылок? Текущие данные будут заменены.",
   "sync_in_progress": "Синхронизация данных с сервером...",
 
-  "regen_previews": "Пересоздать превью",
-  "regen_previews_running": "Пересоздаём...",
-  "regen_previews_done": "Готово: {{ok}} ок, {{errors}} ошибок, {{skipped}} пропущено",
+  "regen_previews": "Перегенерация превью",
+  "regen_previews_running": "Обработка...",
+  "regen_previews_done": "Готово: {{ok}} успешно, {{errors}} ошибок, {{skipped}} пропущено",
 
   "enter_image_url_title": "Вставить из URL",
   "select_server_title": "Выбрать из галереи",
@@ -36,6 +36,8 @@
   "invalid_id_chars": "Используйте a-z, 0-9, - или _",
   "invalid_image": "Неверный формат файла",
   "link_taken": "Имя ссылки уже занято",
+  "link_not_found": "Ссылка не найдена",
+  "invalid_json": "Неверный формат данных",
 
   "upload_success": "Загружено!",
   "created_success": "Ссылка создана",
@@ -53,18 +55,18 @@
   "copy_error": "Не удалось скопировать URL",
 
   "modal_cancel": "Отмена",
-  "modal_ok": "OK",
+  "modal_ok": "ОК",
   "modal_default_title": "Ввод",
 
-  "search_placeholder": "Поиск по имени или файлу...",
+  "search_placeholder": "Поиск по имени ссылки или файлу...",
   "search_total": "Всего: {{total}}",
   "search_found": "Найдено {{shown}} из {{total}}",
   "search_reset": "Поиск сброшен",
   "click_to_reset": "Нажмите, чтобы сбросить поиск",
 
-  "sort_by": "Сортировка:",
-  "name_asc": "Имя (А–Я)",
-  "name_desc": "Имя (Я–А)",
+  "sort_by": "Сортировать:",
+  "name_asc": "Имя (А\u2013Я)",
+  "name_desc": "Имя (Я\u2013А)",
   "date_new": "Сначала новые",
   "date_old": "Сначала старые",
 
@@ -72,7 +74,7 @@
   "preview_unavailable": "Превью недоступно",
   "image_unavailable": "Изображение недоступно",
 
-  "compression_saved": "🗜️ Сжато: на {{percent}}% меньше (сохранено {{saved}})",
+  "compression_saved": "🗜️ Сжато: на {{percent}}% меньше (сэкономлено {{saved}})",
   "rename_hint": "Двойной клик для переименования",
   "rename_input_label": "Новое имя ссылки",
 
@@ -81,9 +83,9 @@
   "aria_file_info": "Информация о файле",
   "aria_settings": "Настройки",
   "aria_toggle_view": "Переключить вид",
-  "aria_toggle_theme": "Переключить тёмную тему",
+  "aria_toggle_theme": "Переключить темную тему",
   "aria_search": "Поиск обоев",
   "aria_link_input": "ID ссылки",
 
-  "shortcuts_hint": "Горячие клавиши: Ctrl+N (создать), Ctrl+F (поиск), Ctrl+G (вид), T (тема)"
+  "shortcuts_hint": "Shortcuts: Ctrl+N (новая), Ctrl+F (поиск), Ctrl+G (вид), T (тема)"
 }
