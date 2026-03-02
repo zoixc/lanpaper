@@ -68,11 +68,15 @@
           </div>
         </div>
 
-        <button id="viewToggle" class="theme-switcher" aria-label="Toggle view" data-i18n-aria="aria_toggle_view">
-          <img src="/static/icons/grid-dark.png" class="view-icon list-icon light-theme-icon" alt="List">
-          <img src="/static/icons/grid-light.png" class="view-icon list-icon dark-theme-icon" alt="List">
-          <img src="/static/icons/list-dark.png" class="view-icon grid-icon light-theme-icon active" alt="Grid">
-          <img src="/static/icons/list-light.png" class="view-icon grid-icon dark-theme-icon active" alt="Grid">
+        <button id="viewToggle" class="theme-switcher" data-view="list" aria-label="Toggle view" data-i18n-aria="aria_toggle_view">
+          <svg class="view-toggle-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <rect class="bar bar-1" x="4" y="6" width="16" height="2" rx="1"/>
+            <rect class="bar bar-1-clone" x="4" y="6" width="16" height="2" rx="1"/>
+            <rect class="bar bar-2" x="4" y="11" width="16" height="2" rx="1"/>
+            <rect class="bar bar-2-clone" x="4" y="11" width="16" height="2" rx="1"/>
+            <rect class="bar bar-3" x="4" y="16" width="16" height="2" rx="1"/>
+            <rect class="bar bar-3-clone" x="4" y="16" width="16" height="2" rx="1"/>
+          </svg>
         </button>
 
         <button id="themeToggle" class="theme-switcher" aria-label="Toggle dark mode" data-i18n-aria="aria_toggle_theme">
