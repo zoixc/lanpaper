@@ -350,7 +350,6 @@ h1::before {
     align-items: center;
     justify-content: center;
     transition: background .15s ease, border-color .15s ease, transform .12s ease;
-    /* Prevent button size changes */
     flex-shrink: 0;
 }
 
@@ -365,14 +364,12 @@ h1::before {
     transform: scale(0.92);
 }
 
-.theme-icon,
-.view-icon {
+.theme-icon {
     position: absolute;
     top: 50%;
     left: 50%;
     width: 18px;
     height: 18px;
-    /* Always centered, never shifts */
     transform: translate(-50%, -50%);
     opacity: 0;
     pointer-events: none;
@@ -395,29 +392,40 @@ h1::before {
     transform: translate(-50%, -50%) scale(0.4) rotate(-200deg);
 }
 
-/* View toggle: Smooth fade without bounce */
-.view-icon {
-    transition: opacity 0.25s ease,
-                transform 0.25s ease;
+/* ============================================================
+   VIEW TOGGLE — SVG MORPHING ANIMATION
+   ============================================================ */
+.view-toggle-svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+    color: var(--text);
 }
 
-.view-icon.active {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1) rotate(0deg);
-    pointer-events: auto;
+.view-toggle-svg .bar {
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.25s ease;
+    transform-origin: center;
 }
 
-.view-icon:not(.active) {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.85) rotate(0deg);
-}
+/* List view (default): 3 horizontal bars */
+#viewToggle[data-view="list"] .bar-1 { transform: translateX(0) translateY(0); width: 16; }
+#viewToggle[data-view="list"] .bar-2 { transform: translateX(0) translateY(0); width: 16; }
+#viewToggle[data-view="list"] .bar-3 { transform: translateX(0) translateY(0); width: 16; }
+#viewToggle[data-view="list"] .bar-1-clone,
+#viewToggle[data-view="list"] .bar-2-clone,
+#viewToggle[data-view="list"] .bar-3-clone { opacity: 0; transform: scale(0.3); }
 
-/* Hide wrong theme icons (prevent flash) */
-body:not(.dark) .view-icon.dark-theme-icon,
-body.dark .view-icon.light-theme-icon {
-    opacity: 0 !important;
-    pointer-events: none !important;
-}
+/* Grid view: bars split into 6 squares (2×3 grid) */
+#viewToggle[data-view="grid"] .bar-1 { transform: translateX(-3.5px) translateY(0) scale(0.9, 1); width: 6; }
+#viewToggle[data-view="grid"] .bar-1-clone { opacity: 1; transform: translateX(3.5px) translateY(0) scale(0.9, 1); width: 6; }
+
+#viewToggle[data-view="grid"] .bar-2 { transform: translateX(-3.5px) translateY(0) scale(0.9, 1); width: 6; }
+#viewToggle[data-view="grid"] .bar-2-clone { opacity: 1; transform: translateX(3.5px) translateY(0) scale(0.9, 1); width: 6; }
+
+#viewToggle[data-view="grid"] .bar-3 { transform: translateX(-3.5px) translateY(0) scale(0.9, 1); width: 6; }
+#viewToggle[data-view="grid"] .bar-3-clone { opacity: 1; transform: translateX(3.5px) translateY(0) scale(0.9, 1); width: 6; }
 
 
 /* ============================================================
