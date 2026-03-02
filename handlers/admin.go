@@ -322,13 +322,15 @@ func Link(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// NOW update URLs to reflect new name.
+			// NOW update URLs + runtime paths to reflect new name.
 			if wp.HasImage && wp.MIMEType != "" {
 				wp.ImageURL = "static/images/" + newName + "." + wp.MIMEType
+				wp.ImagePath = filepath.Join("static", "images", newName+"."+wp.MIMEType)
 				if wp.MIMEType != "mp4" && wp.MIMEType != "webm" {
 					wp.Preview = "static/images/previews/" + newName + ".webp"
+					wp.PreviewPath = filepath.Join("static", "images", "previews", newName+".webp")
 				}
-				// Save updated URLs back into storage.
+				// Save updated URLs + paths back into storage.
 				storage.Global.Set(newName, wp)
 			}
 
@@ -336,7 +338,7 @@ func Link(w http.ResponseWriter, r *http.Request) {
 				log.Printf("Error saving after rename: %v", err)
 			}
 			log.Printf("Renamed link: %s -> %s", linkName, newName)
-			w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(toResponse(wp))
 			return
 		}
