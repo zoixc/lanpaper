@@ -1,0 +1,13 @@
+<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Row 1: splits into 2 squares -->
+  <rect class="morph-bar bar-1-left" x="2" y="3" width="6" height="2.5" rx="1" fill="currentColor"/>
+  <rect class="morph-bar bar-1-right" x="10" y="3" width="6" height="2.5" rx="1" fill="currentColor"/>
+  
+  <!-- Row 2: splits into 2 squares -->
+  <rect class="morph-bar bar-2-left" x="2" y="7.75" width="6" height="2.5" rx="1" fill="currentColor"/>
+  <rect class="morph-bar bar-2-right" x="10" y="7.75" width="6" height="2.5" rx="1" fill="currentColor"/>
+  
+  <!-- Row 3: splits into 2 squares -->
+  <rect class="morph-bar bar-3-left" x="2" y="12.5" width="6" height="2.5" rx="1" fill="currentColor"/>
+  <rect class="morph-bar bar-3-right" x="10" y="12.5" width="6" height="2.5" rx="1" fill="currentColor"/>
+</svg>
