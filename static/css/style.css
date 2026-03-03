@@ -389,22 +389,27 @@ h1::before {
     transform: translate(-50%, -50%) scale(0.4) rotate(-200deg);
 }
 
-/* View toggle: Gentle rotation + scale animation */
+/* View toggle: Horizontal slide animation */
 #viewToggle .view-icon {
     transition: opacity 0.28s ease-out,
                 transform 0.28s ease-out;
 }
 
-/* Outgoing icon: subtle rotate + gentle scale down */
+/* Outgoing icon: slide left + fade out */
 #viewToggle .view-icon:not(.active) {
     opacity: 0;
-    transform: translate(-50%, -50%) rotate(-45deg) scale(0.75);
+    transform: translate(calc(-50% - 12px), -50%);
 }
 
-/* Incoming icon: rotate from opposite + scale up */
+/* Incoming icon: slide in from right + fade in */
 #viewToggle .view-icon.active {
     opacity: 1;
-    transform: translate(-50%, -50%) rotate(0deg) scale(1);
+    transform: translate(-50%, -50%);
+}
+
+/* Initial state for incoming icon (before active) */
+#viewToggle .view-icon {
+    transform: translate(calc(-50% + 12px), -50%);
 }
 
 /* Hide theme-inappropriate icons */
