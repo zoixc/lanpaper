@@ -513,6 +513,16 @@ function filterWallpapers() {
 
 function sortWallpapers(list) {
     const sorted = [...list];
+    
+    // Primary sort: pinned items always first
+    sorted.sort((a, b) => {
+        const aPin = a.pinned ? 1 : 0;
+        const bPin = b.pinned ? 1 : 0;
+        if (aPin !== bPin) return bPin - aPin;
+        return 0;
+    });
+    
+    // Secondary sort: user-selected sorting within pinned/unpinned groups
     const sortFns = {
         name_asc:  (a, b) => (a.linkName || '').localeCompare(b.linkName || ''),
         name_desc: (a, b) => (b.linkName || '').localeCompare(a.linkName || ''),
@@ -520,7 +530,14 @@ function sortWallpapers(list) {
         date_asc:  (a, b) => (a.createdAt || 0) - (b.createdAt || 0),
     };
     const sortFn = sortFns[STATE.sortBy];
-    if (sortFn) sorted.sort(sortFn);
+    if (sortFn) {
+        // Separate pinned and unpinned, sort each group
+        const pinned = sorted.filter(x => x.pinned);
+        const unpinned = sorted.filter(x => !x.pinned);
+        pinned.sort(sortFn);
+        unpinned.sort(sortFn);
+        return [...pinned, ...unpinned];
+    }
     return sorted;
 }
 
@@ -739,6 +756,66 @@ async function loadLinks() {
 }
 
 
+// ============================================================
+// PIN / UNPIN
+// ============================================================
+async function togglePin(link, card) {
+    try {
+        const updatedLink = await apiCall(
+            `/api/link/${encodeURIComponent(link.linkName)}/pin`,
+            'POST'
+        );
+        if (!updatedLink) return;
+
+        // Update state
+        const idx = STATE.wallpapers.findIndex(wp => wp.linkName === link.linkName);
+        if (idx !== -1) {
+            STATE.wallpapers[idx] = updatedLink;
+        }
+        link.pinned = updatedLink.pinned;
+
+        // Update UI
+        const pinBtn = card.querySelector('.pin-btn');
+        if (pinBtn) {
+            pinBtn.classList.toggle('pinned', updatedLink.pinned);
+            const ariaKey = updatedLink.pinned ? 'aria_unpin' : 'aria_pin';
+            const ariaLabel = t(ariaKey, updatedLink.pinned ? 'Unpin this link' : 'Pin this link to top');
+            pinBtn.setAttribute('aria-label', ariaLabel);
+            pinBtn.title = ariaLabel;
+        }
+
+        // Show toast
+        const msgKey = updatedLink.pinned ? 'pinned' : 'unpinned';
+        const msg = t(msgKey, updatedLink.pinned ? 'Pinned to top' : 'Unpinned');
+        showToast(msg, 'success');
+
+        // Re-sort and re-render to move item
+        filterAndSort();
+    } catch (_) {
+        // Error already shown by apiCall
+    }
+}
+
+
+function setupPinButton(card, link) {
+    const pinBtn = card.querySelector('.pin-btn');
+    if (!pinBtn) return;
+
+    // Set initial state
+    pinBtn.classList.toggle('pinned', !!link.pinned);
+    const ariaKey = link.pinned ? 'aria_unpin' : 'aria_pin';
+    const ariaLabel = t(ariaKey, link.pinned ? 'Unpin this link' : 'Pin this link to top');
+    pinBtn.setAttribute('aria-label', ariaLabel);
+    pinBtn.title = ariaLabel;
+
+    pinBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        togglePin(link, card);
+    });
+}
+
+
 function renderLinks(wallpapers) {
     DOM.linksList.innerHTML = '';
     if (!wallpapers?.length) {
@@ -753,6 +830,7 @@ function renderLinks(wallpapers) {
         const article = clone.querySelector('article');
         updateCard(article, link);
         setupCardEvents(article, link);
+        setupPinButton(article, link);
         fragment.appendChild(article);
     });
     DOM.linksList.appendChild(fragment);
@@ -868,6 +946,7 @@ function setupInlineRename(card, link) {
                 // Re-render copy button URL
                 updateCard(card, updated);
                 setupInlineRename(card, updated);
+                setupPinButton(card, updated);
 
                 const msg = t('renamed_success', 'Renamed to "{{name}}"').replace('{{name}}', updated.linkName);
                 showToast(msg, 'success');
@@ -985,6 +1064,12 @@ function updateCard(card, link) {
             }
         } else {
             previewWrapper.appendChild(buildNoImageSVG());
+        }
+        
+        // Re-add pin button after rebuilding preview
+        const pinBtn = card.querySelector('.pin-btn');
+        if (pinBtn) {
+            previewWrapper.insertBefore(pinBtn, previewWrapper.firstChild);
         }
     }
 
@@ -1164,6 +1249,7 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
         if (idx !== -1) STATE.wallpapers[idx] = updatedLink;
         else STATE.wallpapers.push(updatedLink);
         updateCard(card, updatedLink);
+        setupPinButton(card, updatedLink);
         filterAndSort();
         showToast(t('upload_success', 'Uploaded!'), 'success');
     } catch (_) {}
@@ -1196,6 +1282,7 @@ function setupGlobalListeners() {
                 createdAt: Math.floor(Date.now() / 1000),
                 imageUrl: '',
                 preview: '',
+                pinned: false,
             };
             STATE.wallpapers.push(newLinkObj);
             filterAndSort();
