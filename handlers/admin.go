@@ -36,6 +36,8 @@ type WallpaperResponse struct {
 	SizeBytes int64  `json:"sizeBytes"`
 	ModTime   int64  `json:"modTime"`
 	CreatedAt int64  `json:"createdAt"`
+	IsPinned  bool   `json:"isPinned"`
+	PinnedAt  int64  `json:"pinnedAt,omitempty"`
 }
 
 type PaginatedResponse struct {
@@ -175,6 +177,8 @@ func toResponse(wp *storage.Wallpaper) WallpaperResponse {
 		SizeBytes: wp.SizeBytes,
 		ModTime:   wp.ModTime,
 		CreatedAt: wp.CreatedAt,
+		IsPinned:  wp.IsPinned,
+		PinnedAt:  wp.PinnedAt,
 	}
 }
 
@@ -338,7 +342,7 @@ func Link(w http.ResponseWriter, r *http.Request) {
 				log.Printf("Error saving after rename: %v", err)
 			}
 			log.Printf("Renamed link: %s -> %s", linkName, newName)
-		w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(toResponse(wp))
 			return
 		}
@@ -392,6 +396,61 @@ func Link(w http.ResponseWriter, r *http.Request) {
 
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// TogglePin handles PATCH /api/link/{name}/pin to toggle pin status.
+func TogglePin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract link name from path /api/link/{name}/pin
+	path := strings.TrimPrefix(r.URL.Path, "/api/link/")
+	path = strings.TrimSuffix(path, "/pin")
+	linkName := strings.Trim(path, "/")
+
+	if linkName == "" || !isValidLinkName(linkName) {
+		http.Error(w, "Invalid link name", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		IsPinned bool `json:"isPinned"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	wp, exists := storage.Global.Get(linkName)
+	if !exists {
+		http.Error(w, "Link not found", http.StatusNotFound)
+		return
+	}
+
+	wp.IsPinned = req.IsPinned
+	if req.IsPinned {
+		wp.PinnedAt = time.Now().Unix()
+	} else {
+		wp.PinnedAt = 0
+	}
+
+	storage.Global.Set(linkName, wp)
+	if err := storage.Global.Save(); err != nil {
+		log.Printf("Error saving after pin toggle: %v", err)
+	}
+
+	action := "unpinned"
+	if req.IsPinned {
+		action = "pinned"
+	}
+	log.Printf("Link %s: %s", linkName, action)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(toResponse(wp)); err != nil {
+		log.Printf("Error encoding pin toggle response: %v", err)
 	}
 }
 

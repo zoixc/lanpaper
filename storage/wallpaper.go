@@ -22,6 +22,8 @@ type Wallpaper struct {
 	SizeBytes int64  `json:"sizeBytes"`
 	ModTime   int64  `json:"modTime"`
 	CreatedAt int64  `json:"createdAt"`
+	IsPinned  bool   `json:"isPinned"`
+	PinnedAt  int64  `json:"pinnedAt,omitempty"`
 
 	// Not persisted; derived from MIMEType on Load.
 	ImagePath   string `json:"-"`
@@ -84,9 +86,19 @@ func (s *Store) Rename(oldName, newName string) (*Wallpaper, bool) {
 
 func sortSnap(snap []*Wallpaper) {
 	sort.Slice(snap, func(i, j int) bool {
+		// Pinned links always come first
+		if snap[i].IsPinned != snap[j].IsPinned {
+			return snap[i].IsPinned
+		}
+		// Among pinned, sort by PinnedAt (most recent first)
+		if snap[i].IsPinned && snap[j].IsPinned {
+			return snap[i].PinnedAt > snap[j].PinnedAt
+		}
+		// Then by image presence
 		if snap[i].HasImage != snap[j].HasImage {
 			return snap[i].HasImage
 		}
+		// Then by modification/creation time
 		if snap[i].HasImage {
 			return snap[i].ModTime > snap[j].ModTime
 		}
@@ -94,8 +106,8 @@ func sortSnap(snap []*Wallpaper) {
 	})
 }
 
-// GetAll returns a sorted snapshot: images first (newest ModTime), then empty
-// slots (newest CreatedAt). Callers must not modify the returned pointers.
+// GetAll returns a sorted snapshot: pinned first, then images (newest ModTime),
+// then empty slots (newest CreatedAt). Callers must not modify the returned pointers.
 // The result is cached until the store is mutated.
 func (s *Store) GetAll() []*Wallpaper {
 	s.RLock()
@@ -254,6 +266,8 @@ func PruneOldImages(max int) {
 			LinkName:  wp.LinkName,
 			Category:  wp.Category,
 			CreatedAt: wp.CreatedAt,
+			IsPinned:  wp.IsPinned,
+			PinnedAt:  wp.PinnedAt,
 		})
 	}
 
