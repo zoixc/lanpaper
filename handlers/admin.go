@@ -36,7 +36,7 @@ type WallpaperResponse struct {
 	SizeBytes int64  `json:"sizeBytes"`
 	ModTime   int64  `json:"modTime"`
 	CreatedAt int64  `json:"createdAt"`
-	IsPinned  bool   `json:"pinned"`
+	Pinned    bool   `json:"pinned"`
 	PinnedAt  int64  `json:"pinnedAt,omitempty"`
 }
 
@@ -177,7 +177,7 @@ func toResponse(wp *storage.Wallpaper) WallpaperResponse {
 		SizeBytes: wp.SizeBytes,
 		ModTime:   wp.ModTime,
 		CreatedAt: wp.CreatedAt,
-		IsPinned:  wp.IsPinned,
+		Pinned:    wp.IsPinned,
 		PinnedAt:  wp.PinnedAt,
 	}
 }
