@@ -1,9 +1,9 @@
 {
   "create_new_link": "Crear nuevo enlace",
-  "input_placeholder": "ID del enlace (letras, números, - o _)",
+  "input_placeholder": "ID de enlace (letras, números, - o _)",
   "create_btn": "Crear",
   "existing_links": "Enlaces",
-  "no_links": "Aún no hay enlaces",
+  "no_links": "Sin enlaces aún",
   "no_image": "Sin imagen",
   "copy_url": "Copiar URL",
   "set_image": "Subir",
@@ -11,31 +11,38 @@
   "select_server": "Desde galería",
   "remove": "Eliminar",
 
+  "pin": "Fijar",
+  "unpin": "Desfijar",
+  "pinned": "Fijado arriba",
+  "unpinned": "Desfijado",
+  "aria_pin": "Fijar este enlace arriba",
+  "aria_unpin": "Desfijar este enlace",
+
   "settings_language": "Idioma",
   "settings_data": "Datos",
   "settings_maintenance": "Mantenimiento",
   "export_json": "Exportar",
   "import_json": "Importar",
   "export_success": "Datos exportados correctamente",
-  "export_error": "Error al exportar",
+  "export_error": "Exportación fallida",
   "import_success": "Datos importados correctamente",
-  "import_error": "Error al importar: Archivo inválido",
+  "import_error": "Importación fallida: Archivo inválido",
   "import_confirm": "¿Importar {{count}} enlaces? Esto reemplazará los datos actuales.",
   "sync_in_progress": "Sincronizando datos con el servidor...",
 
-  "regen_previews": "Regenerar vistas previas",
+  "regen_previews": "Regenerar miniaturas",
   "regen_previews_running": "Regenerando...",
   "regen_previews_done": "Hecho: {{ok}} ok, {{errors}} errores, {{skipped}} omitidos",
 
   "enter_image_url_title": "Pegar desde URL",
-  "select_server_title": "Seleccionar de galería",
+  "select_server_title": "Seleccionar desde galería",
   "enter_image_url": "URL de imagen:",
   "url_placeholder": "https://...",
 
   "invalid_id": "Se requiere ID",
   "invalid_id_chars": "Use a-z, 0-9, - o _",
   "invalid_image": "Formato de archivo inválido",
-  "link_taken": "El nombre del enlace ya está en uso",
+  "link_taken": "Nombre de enlace ya utilizado",
   "link_not_found": "Enlace no encontrado",
   "invalid_json": "Formato de datos inválido",
 
@@ -49,7 +56,7 @@
   "delete_btn": "Eliminar",
 
   "loading": "Cargando...",
-  "server_empty": "La carpeta está vacía",
+  "server_empty": "Carpeta vacía",
   "server_error": "Error de acceso",
   "copied": "¡Copiado!",
   "copy_error": "Error al copiar URL",
@@ -74,18 +81,18 @@
   "preview_unavailable": "Vista previa no disponible",
   "image_unavailable": "Imagen no disponible",
 
-  "compression_saved": "🗜️ Comprimido: {{percent}}% más pequeño ({{saved}} ahorrado)",
+  "compression_saved": "\ud83d\udddc\ufe0f Comprimido: {{percent}}% más pequeño ({{saved}} ahorrado)",
   "rename_hint": "Doble clic para renombrar",
   "rename_input_label": "Nuevo nombre de enlace",
 
   "aria_open_image": "Abrir imagen",
-  "aria_link_id": "ID del enlace",
-  "aria_file_info": "Información del archivo",
+  "aria_link_id": "ID de enlace",
+  "aria_file_info": "Info del archivo",
   "aria_settings": "Configuración",
   "aria_toggle_view": "Cambiar vista",
   "aria_toggle_theme": "Cambiar modo oscuro",
   "aria_search": "Buscar fondos de pantalla",
-  "aria_link_input": "ID del enlace",
+  "aria_link_input": "ID de enlace",
 
   "shortcuts_hint": "Atajos: Ctrl+N (nuevo), Ctrl+F (buscar), Ctrl+G (vista), T (tema)"
 }
