@@ -396,8 +396,8 @@ h1::before {
    VIEW TOGGLE — SVG MORPHING ANIMATION
    ============================================================ */
 .view-toggle-svg {
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     fill: currentColor;
     color: var(--text);
 }
@@ -405,7 +405,7 @@ h1::before {
 .view-toggle-svg rect {
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
                 opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    transform-origin: center;
+    transform-origin: left center;
 }
 
 /* LIST VIEW: 3 horizontal bars stretched via scaleX */
@@ -413,42 +413,42 @@ h1::before {
 #viewToggle[data-view="list"] .bar-2,
 #viewToggle[data-view="list"] .bar-3 {
     opacity: 1;
-    transform: scaleX(3.5);
+    transform: scaleX(4);
 }
 
 #viewToggle[data-view="list"] .bar-1-clone,
 #viewToggle[data-view="list"] .bar-2-clone,
 #viewToggle[data-view="list"] .bar-3-clone {
     opacity: 0;
-    transform: scale(0);
+    transform: translateX(16px) scale(0);
 }
 
 /* GRID VIEW: 6 squares (2×3 grid) via translateX */
 #viewToggle[data-view="grid"] .bar-1 {
     opacity: 1;
-    transform: translateX(-3px);
+    transform: scaleX(1);
 }
 #viewToggle[data-view="grid"] .bar-1-clone {
     opacity: 1;
-    transform: translateX(3px);
+    transform: translateX(7px) scaleX(1);
 }
 
 #viewToggle[data-view="grid"] .bar-2 {
     opacity: 1;
-    transform: translateX(-3px);
+    transform: scaleX(1);
 }
 #viewToggle[data-view="grid"] .bar-2-clone {
     opacity: 1;
-    transform: translateX(3px);
+    transform: translateX(7px) scaleX(1);
 }
 
 #viewToggle[data-view="grid"] .bar-3 {
     opacity: 1;
-    transform: translateX(-3px);
+    transform: scaleX(1);
 }
 #viewToggle[data-view="grid"] .bar-3-clone {
     opacity: 1;
-    transform: translateX(3px);
+    transform: translateX(7px) scaleX(1);
 }
 
 
