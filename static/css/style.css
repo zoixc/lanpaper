@@ -389,19 +389,19 @@ h1::before {
     transform: translate(-50%, -50%) scale(0.4) rotate(-200deg);
 }
 
-/* View toggle: Rotation + Scale animation */
+/* View toggle: Gentle rotation + scale animation */
 #viewToggle .view-icon {
-    transition: opacity 0.32s cubic-bezier(0.34, 1.2, 0.64, 1),
-                transform 0.32s cubic-bezier(0.34, 1.2, 0.64, 1);
+    transition: opacity 0.28s ease-out,
+                transform 0.28s ease-out;
 }
 
-/* Outgoing icon: rotate counter-clockwise + scale down */
+/* Outgoing icon: subtle rotate + gentle scale down */
 #viewToggle .view-icon:not(.active) {
     opacity: 0;
-    transform: translate(-50%, -50%) rotate(-90deg) scale(0.6);
+    transform: translate(-50%, -50%) rotate(-45deg) scale(0.75);
 }
 
-/* Incoming icon: rotate from clockwise + scale up */
+/* Incoming icon: rotate from opposite + scale up */
 #viewToggle .view-icon.active {
     opacity: 1;
     transform: translate(-50%, -50%) rotate(0deg) scale(1);
