@@ -64,6 +64,9 @@
     --info: #3b82f6;
     --info-light: rgba(59, 130, 246, 0.08);
 
+    --pin-color: #fbbf24;
+    --pin-bg: rgba(251, 191, 36, 0.1);
+
     --z-toast:    9999;
     --z-modal:    5000;
     --z-dropdown: 1000;
@@ -126,6 +129,9 @@ body.dark {
     --success-light: rgba(16, 185, 129, 0.12);
     --error-light: rgba(239, 68, 68, 0.12);
     --info-light: rgba(59, 130, 246, 0.12);
+
+    --pin-color: #fbbf24;
+    --pin-bg: rgba(251, 191, 36, 0.15);
 }
 
 
@@ -683,6 +689,82 @@ body.dark .view-icon.light-theme-icon {
 
 .preview { border: none !important; outline: none !important; }
 .preview-top-center { object-position: top center; }
+
+
+/* ============================================================
+   PIN BUTTON
+   ============================================================ */
+.pin-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 50%;
+    cursor: pointer;
+    opacity: 0;
+    transform: scale(0.85);
+    transition: opacity 0.2s ease,
+                transform 0.2s ease,
+                background 0.2s ease,
+                border-color 0.2s ease;
+    z-index: 10;
+    backdrop-filter: blur(4px);
+}
+
+.link-card:hover .pin-btn {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.pin-btn:hover {
+    background: rgba(0, 0, 0, 0.8);
+    border-color: rgba(255, 255, 255, 0.25);
+    transform: scale(1.08);
+}
+
+.pin-btn:active {
+    transform: scale(0.95);
+}
+
+.pin-btn svg {
+    width: 16px;
+    height: 16px;
+    transition: fill 0.2s ease, stroke 0.2s ease;
+}
+
+.pin-btn:not(.pinned) svg {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.9);
+}
+
+.pin-btn.pinned {
+    opacity: 1;
+    background: var(--pin-bg);
+    border-color: var(--pin-color);
+}
+
+.pin-btn.pinned svg {
+    fill: var(--pin-color);
+    stroke: var(--pin-color);
+    animation: pinBounce 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes pinBounce {
+    0% { transform: scale(0.3) rotate(-45deg); }
+    50% { transform: scale(1.2) rotate(5deg); }
+    100% { transform: scale(1) rotate(0deg); }
+}
+
+.pin-btn.pinned:hover {
+    background: rgba(251, 191, 36, 0.25);
+    transform: scale(1.08);
+}
 
 
 /* ============================================================
