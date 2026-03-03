@@ -389,22 +389,25 @@ h1::before {
     transform: translate(-50%, -50%) scale(0.4) rotate(-200deg);
 }
 
-/* View toggle: Slide & Fade */
+/* View toggle: Rotation + Scale animation */
 #viewToggle .view-icon {
-    transition: opacity 0.25s ease,
-                transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.32s cubic-bezier(0.34, 1.2, 0.64, 1),
+                transform 0.32s cubic-bezier(0.34, 1.2, 0.64, 1);
 }
 
+/* Outgoing icon: rotate counter-clockwise + scale down */
 #viewToggle .view-icon:not(.active) {
     opacity: 0;
-    transform: translate(-50%, -50%) translateY(4px) scale(0.9);
+    transform: translate(-50%, -50%) rotate(-90deg) scale(0.6);
 }
 
+/* Incoming icon: rotate from clockwise + scale up */
 #viewToggle .view-icon.active {
     opacity: 1;
-    transform: translate(-50%, -50%) translateY(0) scale(1);
+    transform: translate(-50%, -50%) rotate(0deg) scale(1);
 }
 
+/* Hide theme-inappropriate icons */
 body:not(.dark) .view-icon.dark-theme-icon,
 body.dark .view-icon.light-theme-icon {
     opacity: 0 !important;
