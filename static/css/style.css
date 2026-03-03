@@ -389,7 +389,7 @@ h1::before {
     transform: translate(-50%, -50%) scale(0.4) rotate(-200deg);
 }
 
-/* View toggle: Horizontal slide animation */
+/* View toggle: Slide + Fade animation */
 #viewToggle .view-icon {
     transition: opacity 0.28s ease-out,
                 transform 0.28s ease-out;
@@ -398,18 +398,13 @@ h1::before {
 /* Outgoing icon: slide left + fade out */
 #viewToggle .view-icon:not(.active) {
     opacity: 0;
-    transform: translate(calc(-50% - 12px), -50%);
+    transform: translate(calc(-50% - 8px), -50%);
 }
 
-/* Incoming icon: slide in from right + fade in */
+/* Incoming icon: centered + fully visible */
 #viewToggle .view-icon.active {
     opacity: 1;
     transform: translate(-50%, -50%);
-}
-
-/* Initial state for incoming icon (before active) */
-#viewToggle .view-icon {
-    transform: translate(calc(-50% + 12px), -50%);
 }
 
 /* Hide theme-inappropriate icons */
@@ -549,7 +544,6 @@ body.dark .view-icon.light-theme-icon {
 .toolbar-section {
     background: var(--card-bg);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
     padding: var(--padding);
     margin-bottom: var(--gap);
     display: flex;
