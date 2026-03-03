@@ -68,18 +68,11 @@
           </div>
         </div>
 
-        <button id="viewToggle" class="theme-switcher" data-view="list" aria-label="Toggle view" data-i18n-aria="aria_toggle_view">
-          <svg class="view-toggle-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <!-- Row 1 -->
-            <rect class="bar bar-1" x="4" y="6" width="4" height="3" rx="1.5"/>
-            <rect class="bar bar-1-clone" x="4" y="6" width="4" height="3" rx="1.5"/>
-            <!-- Row 2 -->
-            <rect class="bar bar-2" x="4" y="10.5" width="4" height="3" rx="1.5"/>
-            <rect class="bar bar-2-clone" x="4" y="10.5" width="4" height="3" rx="1.5"/>
-            <!-- Row 3 -->
-            <rect class="bar bar-3" x="4" y="15" width="4" height="3" rx="1.5"/>
-            <rect class="bar bar-3-clone" x="4" y="15" width="4" height="3" rx="1.5"/>
-          </svg>
+        <button id="viewToggle" class="theme-switcher" aria-label="Toggle view" data-i18n-aria="aria_toggle_view">
+          <img src="/static/icons/grid-dark.png" class="view-icon list-icon light-theme-icon" alt="List">
+          <img src="/static/icons/grid-light.png" class="view-icon list-icon dark-theme-icon" alt="List">
+          <img src="/static/icons/list-dark.png" class="view-icon grid-icon light-theme-icon active" alt="Grid">
+          <img src="/static/icons/list-light.png" class="view-icon grid-icon dark-theme-icon active" alt="Grid">
         </button>
 
         <button id="themeToggle" class="theme-switcher" aria-label="Toggle dark mode" data-i18n-aria="aria_toggle_theme">
@@ -103,7 +96,7 @@
         <button type="submit" id="createLinkBtn" class="btn btn--primary" data-i18n="create_btn">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y12="12"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
           <span data-i18n="create_btn">Create</span>
         </button>
