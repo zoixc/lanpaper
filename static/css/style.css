@@ -36,8 +36,6 @@
     --btn-danger-border:   rgba(192, 57, 43, 0.35);
     --btn-danger-border-hover: #c0392b;
     --lang-button:         #f4f2ed;
-
-    /* Upload button — softer than btn-primary, but still distinct */
     --btn-upload:         #eceae4;
     --btn-upload-hover:   #e2e0d8;
     --btn-upload-text:    #2a2a28;
@@ -110,8 +108,6 @@ body.dark {
     --btn-danger-border:   rgba(224, 82, 82, 0.3);
     --btn-danger-border-hover: #e05252;
     --lang-button:         #26262c;
-
-    /* Upload button dark — matches secondary style */
     --btn-upload:         #2e2f38;
     --btn-upload-hover:   #3a3b47;
     --btn-upload-text:    #dde1e8;
@@ -156,13 +152,6 @@ body.dark {
 /* ============================================================
    BASE
    ============================================================ */
-
-/*
-  CRITICAL FIX: Force scrollbar to always be visible
-  This prevents layout shift when content toggles between overflow/no-overflow states.
-  - scrollbar-gutter: stable (modern browsers)
-  - overflow-y: scroll (fallback for all browsers)
-*/
 html {
     scrollbar-gutter: stable;
     overflow-y: scroll;
@@ -180,7 +169,6 @@ body {
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    -webkit-tap-highlight-color: transparent;
     transition: background-color 0.25s ease, color 0.25s ease;
 }
 
@@ -373,6 +361,9 @@ h1::before {
     transform: translate(-50%, -50%);
     opacity: 0;
     pointer-events: none;
+}
+
+.theme-icon {
     transition: opacity .22s ease,
                 transform .28s cubic-bezier(0.34, 1.56, .64, 1);
 }
@@ -380,34 +371,32 @@ h1::before {
 .theme-icon.active,
 .view-icon.active {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1) rotate(0deg);
     pointer-events: auto;
 }
 
-/* Theme toggle: spin-scale out/in */
+.theme-icon.active {
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+}
+
 #themeToggle .theme-icon:not(.active) {
     transform: translate(-50%, -50%) scale(0.4) rotate(-200deg);
 }
 
-/* View toggle: Scale Fade animation */
-#viewToggle .view-icon {
+.view-icon {
     transition: opacity 0.3s ease-out,
                 transform 0.3s ease-out;
 }
 
-/* Outgoing icon: scale down + fade out */
 #viewToggle .view-icon:not(.active) {
     opacity: 0;
     transform: translate(-50%, -50%) scale(0.7);
 }
 
-/* Incoming icon: normal scale + fully visible */
 #viewToggle .view-icon.active {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
 }
 
-/* Hide theme-inappropriate icons */
 body:not(.dark) .view-icon.dark-theme-icon,
 body.dark .view-icon.light-theme-icon {
     opacity: 0 !important;
@@ -452,7 +441,6 @@ body.dark .view-icon.light-theme-icon {
     transform: scale(0.98);
 }
 
-/* p.9 — disabled state: visually muted, no pointer, no transform */
 .btn:disabled,
 .btn[disabled] {
     opacity: 0.45;
@@ -474,7 +462,6 @@ body.dark .view-icon.light-theme-icon {
 .btn--secondary       { background: var(--btn-secondary); color: var(--text-secondary); }
 .btn--secondary:hover { background: var(--btn-secondary-hover); color: var(--text); }
 
-/* Upload button — visually softer than btn-primary, accent on hover */
 .btn--upload {
     background: var(--btn-upload);
     color: var(--btn-upload-text);
@@ -486,7 +473,6 @@ body.dark .view-icon.light-theme-icon {
     color: var(--text);
 }
 
-/* Ghost danger — square icon button */
 .btn--danger {
     background: var(--btn-danger);
     color: var(--btn-danger-text);
@@ -498,7 +484,6 @@ body.dark .view-icon.light-theme-icon {
 .btn--danger:hover {
     background: var(--btn-danger-hover);
     border-color: var(--btn-danger-border-hover);
-    color: var(--btn-danger-text);
 }
 
 
@@ -510,7 +495,7 @@ body.dark .view-icon.light-theme-icon {
     height: 40px;
     padding: 0 14px;
     font-family: var(--font-ui);
-    font-size: var(--text-base);
+    font-size: max(var(--text-base), 16px);
     font-weight: var(--fw-normal);
     color: var(--text);
     background: var(--bg);
@@ -518,19 +503,21 @@ body.dark .view-icon.light-theme-icon {
     border-radius: var(--radius-sm);
     outline: none;
     transition: border-color .18s ease, box-shadow .18s ease;
-    font-size: max(var(--text-base), 16px);
 }
 
-.input-field:hover, .search-input:hover {
+.input-field:hover,
+.search-input:hover {
     border-color: var(--border-hover);
 }
 
-.input-field:focus, .search-input:focus {
+.input-field:focus,
+.search-input:focus {
     border-color: var(--accent);
     box-shadow: var(--shadow-focus);
 }
 
-.input-field::placeholder, .search-input::placeholder {
+.input-field::placeholder,
+.search-input::placeholder {
     color: var(--text-muted);
 }
 
@@ -606,21 +593,14 @@ body.dark .view-icon.light-theme-icon {
     border-color: var(--border-focus);
 }
 
-/* Card deletion animation */
 .link-card.deleting {
     animation: cardDelete 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
     pointer-events: none;
 }
 
 @keyframes cardDelete {
-    0% {
-        opacity: 1;
-        transform: scale(1) translateY(0);
-    }
-    50% {
-        opacity: 0.5;
-        transform: scale(0.95) translateY(-4px);
-    }
+    0% { opacity: 1; transform: scale(1) translateY(0); }
+    50% { opacity: 0.5; transform: scale(0.95) translateY(-4px); }
     100% {
         opacity: 0;
         transform: scale(0.9) translateY(8px);
@@ -676,7 +656,6 @@ body.dark .view-icon.light-theme-icon {
     display: block;
 }
 
-/* No-image placeholder */
 .preview-wrapper .no-image {
     position: absolute;
     inset: 0;
@@ -697,17 +676,13 @@ body.dark .view-icon.light-theme-icon {
     opacity: 0.55;
 }
 
-/* Hide placeholder once real media is present */
 .preview-wrapper:has(img) .no-image,
 .preview-wrapper:has(video) .no-image {
     display: none;
 }
 
 .preview { border: none !important; outline: none !important; }
-
-.preview-top-center {
-    object-position: top center;
-}
+.preview-top-center { object-position: top center; }
 
 
 /* ============================================================
@@ -738,7 +713,6 @@ body.dark .view-icon.light-theme-icon {
     text-overflow: ellipsis;
     position: relative;
     cursor: pointer;
-    /* padding + border = hover button dimensions */
     padding: 4px 8px;
     margin: -4px -8px;
     border-radius: var(--radius-sm);
@@ -748,7 +722,6 @@ body.dark .view-icon.light-theme-icon {
     transition: background .15s ease, border-color .15s ease;
 }
 
-/* Hover effect matches other buttons */
 .link-id:not(.editing):hover {
     background: var(--btn-secondary);
     border-color: var(--border);
@@ -759,7 +732,6 @@ body.dark .view-icon.light-theme-icon {
 }
 
 .link-id.editing {
-    /* Neutralize all styling when input is shown */
     padding: 0;
     margin: 0;
     background: transparent;
@@ -774,9 +746,8 @@ body.dark .view-icon.light-theme-icon {
     background: var(--bg);
     border: 1px solid var(--accent);
     border-radius: var(--radius-sm);
-    /* Compensate for parent's lost margin by applying same negative margin to input */
-    padding: 0px 7px;
-    margin: 0px 0;
+    padding: 0 7px;
+    margin: 0;
     line-height: 1.4;
     outline: none;
     width: 100%;
@@ -862,7 +833,6 @@ body.dark .view-icon.light-theme-icon {
     gap: 6px;
 }
 
-/* Enhanced empty state with SVG illustration */
 .empty-state {
     display: flex;
     flex-direction: column;
@@ -913,7 +883,7 @@ body.dark .view-icon.light-theme-icon {
 }
 
 .upload-dropdown.open .upload-toggle-btn svg,
-.custom-select.open   .custom-select-btn svg {
+.custom-select.open .custom-select-btn svg {
     transform: rotate(180deg);
     opacity: 1;
 }
@@ -977,7 +947,6 @@ body.dark .view-icon.light-theme-icon {
 .custom-select-option {
     display: flex;
     align-items: center;
-
     width: 100%;
     padding: 8px 12px;
     gap: 8px;
@@ -1017,14 +986,16 @@ body.dark .custom-select-option.selected {
     background: var(--accent);
     color: #ffffff;
     border-color: var(--accent);
-    font-weight: 700;
 }
 
 
 /* ============================================================
    CUSTOM SELECT
    ============================================================ */
-.custom-select { display: inline-flex; align-items: center; }
+.custom-select {
+    display: inline-flex;
+    align-items: center;
+}
 
 .custom-select-btn {
     justify-content: space-between;
@@ -1095,7 +1066,7 @@ body.dark .custom-select-option.selected {
     color: var(--text);
 }
 
-.modal-body    { margin-bottom: 20px; max-height: 50vh; overflow-y: auto; }
+.modal-body { margin-bottom: 20px; max-height: 50vh; overflow-y: auto; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
 .modal-list {
@@ -1109,12 +1080,8 @@ body.dark .custom-select-option.selected {
     grid-column: 1/-1;
     text-align: center;
 }
-.modal-list-msg.error {
-    color: var(--error);
-}
-.modal-list-msg.muted {
-    color: var(--text-muted);
-}
+.modal-list-msg.error { color: var(--error); }
+.modal-list-msg.muted { color: var(--text-muted); }
 
 .image-option {
     aspect-ratio: 1;
@@ -1141,7 +1108,8 @@ body.dark .custom-select-option.selected {
 
 .image-option .image-name {
     position: absolute;
-    bottom: 0; left: 0;
+    bottom: 0;
+    left: 0;
     width: 100%;
     padding: 4px;
     background: rgba(0,0,0,.85);
@@ -1163,11 +1131,13 @@ body.dark .custom-select-option.selected {
 .image-option.selected::after {
     content: "\2713";
     position: absolute;
-    top: 4px; right: 4px;
+    top: 4px;
+    right: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 22px; height: 22px;
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
     background: var(--success);
     color: #fff;
@@ -1189,8 +1159,6 @@ body.dark .custom-select-option.selected {
    ============================================================ */
 .toast-container {
     position: fixed;
-    bottom: 24px;
-    right: 24px;
     bottom: max(24px, calc(env(safe-area-inset-bottom) + 12px));
     right: max(24px, env(safe-area-inset-right));
     display: flex;
@@ -1226,7 +1194,9 @@ body.dark .toast {
 .toast::before {
     content: '';
     position: absolute;
-    left: 0; top: 0; bottom: 0;
+    left: 0;
+    top: 0;
+    bottom: 0;
     width: 3px;
 }
 
@@ -1270,7 +1240,9 @@ body.dark .toast {
 .toast::after {
     content: '';
     position: absolute;
-    bottom: 0; left: 0; right: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
     height: 2px;
     background: currentColor;
     opacity: 0.12;
@@ -1322,7 +1294,6 @@ body.dark .toast {
     height: 100% !important;
 }
 
-/* Scale up placeholder icon in grid view */
 .links-list.grid-view .no-image-icon {
     width: 40px;
     height: 40px;
@@ -1343,7 +1314,7 @@ body.dark .toast {
     width: 100%;
 }
 
-.links-list.grid-view .link-id   { word-break: break-word; white-space: normal; }
+.links-list.grid-view .link-id { word-break: break-word; white-space: normal; }
 .links-list.grid-view .link-meta { font-size: var(--text-sm); }
 
 .links-list.grid-view .actions-row {
@@ -1359,12 +1330,14 @@ body.dark .toast {
     flex: 1;
     min-width: 0;
 }
+
 .links-list.grid-view .upload-toggle-btn {
     width: 100%;
     justify-content: center;
     height: 32px;
     font-size: var(--text-sm);
 }
+
 .links-list.grid-view .btn--danger {
     width: 32px;
     height: 32px;
@@ -1428,8 +1401,20 @@ body.dark .toast {
     flex-wrap: wrap;
 }
 
-.search-container { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
-.sort-container   { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.search-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.sort-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
 
 .search-stats {
     flex-shrink: 0;
@@ -1454,7 +1439,6 @@ body.dark .toast {
     transition: border-color .18s ease, color .18s ease, background .15s ease;
 }
 
-/* Clickable when filtered */
 .search-stats.clickable {
     cursor: pointer;
 }
@@ -1479,25 +1463,22 @@ body.dark .toast {
 
 
 /* ============================================================
-   UTILITY ANIMATIONS / CLASSES
+   UTILITY CLASSES
    ============================================================ */
+.d-none { display: none !important; }
+.shake { animation: shake 0.35s ease; }
+
 @keyframes shake {
     0%, 100% { transform: translateX(0); }
     10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
     20%, 40%, 60%, 80% { transform: translateX(4px); }
 }
 
-.shake { animation: shake 0.35s ease; }
-
-.d-none { display: none !important; }
-
 .lazy-image-fade {
     opacity: 0;
     transition: opacity 0.3s ease;
 }
-.lazy-image-fade.loaded {
-    opacity: 1;
-}
+.lazy-image-fade.loaded { opacity: 1; }
 
 #confirmMessage {
     color: var(--text-secondary);
@@ -1512,7 +1493,7 @@ body.dark .toast {
 
 
 /* ============================================================
-   BACKDROP FILTERS — desktop only
+   RESPONSIVE
    ============================================================ */
 @media (min-width: 769px) {
     .upload-menu,
@@ -1524,14 +1505,10 @@ body.dark .toast {
     }
 }
 
-
-/* ============================================================
-   RESPONSIVE — MOBILE
-   ============================================================ */
 @media (max-width: 768px) {
-    .container  { padding: 16px 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+    .container { padding: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
     .header-row { padding: 14px 18px; }
-    h1          { font-size: 1.5rem; }
+    h1 { font-size: 1.5rem; }
 
     .link-card {
         display: flex;
@@ -1547,6 +1524,7 @@ body.dark .toast {
         border-radius: var(--radius) var(--radius) 0 0;
         overflow: hidden;
     }
+
     .link-card .preview-wrapper {
         width: 100%;
         height: 160px;
@@ -1561,22 +1539,17 @@ body.dark .toast {
         align-items: flex-start;
         align-self: unset;
     }
+
     .link-card .actions-row {
         padding: 0 14px 14px;
         align-self: unset;
         justify-content: flex-start;
         width: 100%;
     }
-    .link-card .upload-dropdown {
-        flex: 1;
-    }
-    .link-card .upload-toggle-btn {
-        width: 100%;
-        justify-content: center;
-    }
 
+    .link-card .upload-dropdown { flex: 1; }
+    .link-card .upload-toggle-btn { width: 100%; justify-content: center; }
     .create-card { grid-template-columns: 1fr; text-align: center; }
-
     .btn--danger { width: 34px; padding: 0; }
 
     .toast-container {
@@ -1594,29 +1567,32 @@ body.dark .toast {
         padding: 14px;
         flex-direction: column;
     }
+
     .links-list.grid-view .link-card .preview-link {
         border-radius: var(--radius-sm);
         overflow: hidden;
     }
+
     .links-list.grid-view .link-card .preview-wrapper {
         height: 100%;
         border-radius: var(--radius-sm);
         border: 1px solid var(--border);
     }
+
     .links-list.grid-view .link-card .link-info { padding: 0; }
     .links-list.grid-view .link-card .actions-row { padding: 0; }
 
-    .search-sort-bar  { flex-direction: column; align-items: stretch; }
+    .search-sort-bar { flex-direction: column; align-items: stretch; }
     .search-container,
-    .sort-container   { width: 100%; }
-    .search-stats     { max-width: 100%; justify-content: flex-start; text-align: left; }
-    .sort-container   { justify-content: flex-start; }
-
+    .sort-container { width: 100%; }
+    .search-stats { max-width: 100%; justify-content: flex-start; text-align: left; }
+    .sort-container { justify-content: flex-start; }
     .custom-select,
     .custom-select-btn { width: 100%; }
 
     .upload-menu {
-        left: 0; right: 0;
+        left: 0;
+        right: 0;
         transform: translateY(-6px) scale(0.96);
         min-width: unset;
     }
@@ -1625,10 +1601,6 @@ body.dark .toast {
     }
 }
 
-
-/* ============================================================
-   ACCESSIBILITY
-   ============================================================ */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: .01ms !important;
