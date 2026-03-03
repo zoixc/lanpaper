@@ -1025,7 +1025,17 @@ function updateCard(card, link) {
 
     if (srcChanged) {
         previewWrapper.dataset.src = newSrc;
+        
+        // Save pin button reference before clearing
+        const existingPinBtn = previewWrapper.querySelector('.pin-btn');
+        
+        // Clear content
         previewWrapper.innerHTML = '';
+        
+        // Re-add pin button first
+        if (existingPinBtn) {
+            previewWrapper.appendChild(existingPinBtn);
+        }
 
         if (link.hasImage) {
             const isVid = (category === 'video');
@@ -1041,7 +1051,10 @@ function updateCard(card, link) {
                 video.setAttribute('playsinline', '');
                 video.setAttribute('preload', 'metadata');
                 video.onerror = () => {
+                    // Keep pin button when showing error
+                    const pinBtn = previewWrapper.querySelector('.pin-btn');
                     previewWrapper.innerHTML = '';
+                    if (pinBtn) previewWrapper.appendChild(pinBtn);
                     previewWrapper.appendChild(buildNoImageSVG());
                 };
                 previewWrapper.appendChild(video);
@@ -1057,19 +1070,16 @@ function updateCard(card, link) {
                 );
                 img.classList.add('preview-top-center');
                 img.onerror = () => {
+                    // Keep pin button when showing error
+                    const pinBtn = previewWrapper.querySelector('.pin-btn');
                     previewWrapper.innerHTML = '';
+                    if (pinBtn) previewWrapper.appendChild(pinBtn);
                     previewWrapper.appendChild(buildNoImageSVG());
                 };
                 previewWrapper.appendChild(img);
             }
         } else {
             previewWrapper.appendChild(buildNoImageSVG());
-        }
-        
-        // Re-add pin button after rebuilding preview
-        const pinBtn = card.querySelector('.pin-btn');
-        if (pinBtn) {
-            previewWrapper.insertBefore(pinBtn, previewWrapper.firstChild);
         }
     }
 

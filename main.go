@@ -117,7 +117,8 @@ func main() {
 
 // handleLinkRoutes routes /api/link/{name}/pin to TogglePin, everything else to Link
 func handleLinkRoutes(w http.ResponseWriter, r *http.Request) {
-	if strings.HasSuffix(r.URL.Path, "/pin") {
+	// Check if this is a pin toggle request (must be POST to /pin)
+	if strings.HasSuffix(r.URL.Path, "/pin") && r.Method == http.MethodPost {
 		handlers.TogglePin(w, r)
 	} else {
 		handlers.Link(w, r)
