@@ -36,7 +36,7 @@ type WallpaperResponse struct {
 	SizeBytes int64  `json:"sizeBytes"`
 	ModTime   int64  `json:"modTime"`
 	CreatedAt int64  `json:"createdAt"`
-	IsPinned  bool   `json:"isPinned"`
+	IsPinned  bool   `json:"pinned"`
 	PinnedAt  int64  `json:"pinnedAt,omitempty"`
 }
 
@@ -399,9 +399,9 @@ func Link(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// TogglePin handles PATCH /api/link/{name}/pin to toggle pin status.
+// TogglePin handles POST /api/link/{name}/pin to toggle pin status.
 func TogglePin(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPatch {
+	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -416,22 +416,15 @@ func TogglePin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		IsPinned bool `json:"isPinned"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
-	}
-
 	wp, exists := storage.Global.Get(linkName)
 	if !exists {
 		http.Error(w, "Link not found", http.StatusNotFound)
 		return
 	}
 
-	wp.IsPinned = req.IsPinned
-	if req.IsPinned {
+	// Toggle pin state
+	wp.IsPinned = !wp.IsPinned
+	if wp.IsPinned {
 		wp.PinnedAt = time.Now().Unix()
 	} else {
 		wp.PinnedAt = 0
@@ -443,7 +436,7 @@ func TogglePin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	action := "unpinned"
-	if req.IsPinned {
+	if wp.IsPinned {
 		action = "pinned"
 	}
 	log.Printf("Link %s: %s", linkName, action)
