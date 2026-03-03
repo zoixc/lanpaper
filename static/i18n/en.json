@@ -11,6 +11,13 @@
   "select_server": "From gallery",
   "remove": "Remove",
 
+  "pin": "Pin",
+  "unpin": "Unpin",
+  "pinned": "Pinned to top",
+  "unpinned": "Unpinned",
+  "aria_pin": "Pin this link to top",
+  "aria_unpin": "Unpin this link",
+
   "settings_language": "Language",
   "settings_data": "Data",
   "settings_maintenance": "Maintenance",
