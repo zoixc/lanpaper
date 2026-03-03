@@ -396,36 +396,55 @@ h1::before {
    VIEW TOGGLE — SVG MORPHING ANIMATION
    ============================================================ */
 .view-toggle-svg {
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     fill: currentColor;
     color: var(--text);
 }
 
-.view-toggle-svg .bar {
-    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-                width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.25s ease;
-    transform-origin: center;
+.view-toggle-svg rect {
+    rx: 1.5;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* List view (default): 3 horizontal bars */
-#viewToggle[data-view="list"] .bar-1 { transform: translateX(0) translateY(0); width: 16; }
-#viewToggle[data-view="list"] .bar-2 { transform: translateX(0) translateY(0); width: 16; }
-#viewToggle[data-view="list"] .bar-3 { transform: translateX(0) translateY(0); width: 16; }
+/* LIST VIEW: 3 horizontal bars (18×2.5px each) */
+#viewToggle[data-view="list"] .bar-1,
+#viewToggle[data-view="list"] .bar-2,
+#viewToggle[data-view="list"] .bar-3 {
+    opacity: 1;
+}
+
 #viewToggle[data-view="list"] .bar-1-clone,
 #viewToggle[data-view="list"] .bar-2-clone,
-#viewToggle[data-view="list"] .bar-3-clone { opacity: 0; transform: scale(0.3); }
+#viewToggle[data-view="list"] .bar-3-clone {
+    opacity: 0;
+    transform: scale(0);
+}
 
-/* Grid view: bars split into 6 squares (2×3 grid) */
-#viewToggle[data-view="grid"] .bar-1 { transform: translateX(-3.5px) translateY(0) scale(0.9, 1); width: 6; }
-#viewToggle[data-view="grid"] .bar-1-clone { opacity: 1; transform: translateX(3.5px) translateY(0) scale(0.9, 1); width: 6; }
+/* GRID VIEW: 6 squares (7×7px, arranged 2×3) */
+#viewToggle[data-view="grid"] .bar-1 {
+    transform: translateX(-5.5px);
+}
+#viewToggle[data-view="grid"] .bar-1-clone {
+    opacity: 1;
+    transform: translateX(5.5px) scale(1);
+}
 
-#viewToggle[data-view="grid"] .bar-2 { transform: translateX(-3.5px) translateY(0) scale(0.9, 1); width: 6; }
-#viewToggle[data-view="grid"] .bar-2-clone { opacity: 1; transform: translateX(3.5px) translateY(0) scale(0.9, 1); width: 6; }
+#viewToggle[data-view="grid"] .bar-2 {
+    transform: translateX(-5.5px);
+}
+#viewToggle[data-view="grid"] .bar-2-clone {
+    opacity: 1;
+    transform: translateX(5.5px) scale(1);
+}
 
-#viewToggle[data-view="grid"] .bar-3 { transform: translateX(-3.5px) translateY(0) scale(0.9, 1); width: 6; }
-#viewToggle[data-view="grid"] .bar-3-clone { opacity: 1; transform: translateX(3.5px) translateY(0) scale(0.9, 1); width: 6; }
+#viewToggle[data-view="grid"] .bar-3 {
+    transform: translateX(-5.5px);
+}
+#viewToggle[data-view="grid"] .bar-3-clone {
+    opacity: 1;
+    transform: translateX(5.5px) scale(1);
+}
 
 
 /* ============================================================
