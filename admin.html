@@ -18,6 +18,19 @@
 <body>
   <div class="network-bg"></div>
 
+  <!-- Drop Overlay -->
+  <div id="dropOverlay" class="drop-overlay hidden">
+    <div class="drop-overlay-content">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <div class="drop-overlay-title" data-i18n="drop_files_here">Drop files here</div>
+      <div class="drop-overlay-hint" data-i18n="drop_hint">Links will be created automatically</div>
+    </div>
+  </div>
+
   <div class="container">
 
     <!-- Header -->
