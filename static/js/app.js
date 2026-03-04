@@ -1325,9 +1325,22 @@ function setupCardEvents(card, link) {
         try {
             await apiCall(`/api/link/${encodeURIComponent(link.linkName)}`, 'DELETE');
             ac.abort();
-            card.remove();
+            
+            // Remove from state
             STATE.wallpapers = STATE.wallpapers.filter(wp => wp.linkName !== link.linkName);
-            filterAndSort();
+            STATE.filteredWallpapers = STATE.filteredWallpapers.filter(wp => wp.linkName !== link.linkName);
+            
+            // Update stats without re-rendering
+            updateSearchStats();
+            
+            // Remove card from DOM
+            card.remove();
+            
+            // Show empty state if needed
+            if (!DOM.linksList.children.length) {
+                DOM.emptyState.classList.remove('d-none');
+            }
+            
             showToast(t('deleted_success', 'Link deleted'), 'success');
         } catch (_) {
             // Remove animation class on error
