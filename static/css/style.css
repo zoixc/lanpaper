@@ -25,6 +25,7 @@
     --accent-light:     #f0a070;
     --accent-dark:      #c94410;
     --accent-subtle:    rgba(242, 109, 57, 0.08);
+    --accent-rgb:       242, 109, 57;
 
     --btn-primary:         #454542;
     --btn-primary-hover:   #2c2c2a;
@@ -71,6 +72,7 @@
     --z-toast:    9999;
     --z-modal:    5000;
     --z-dropdown: 1000;
+    --z-drop-overlay: 9998;
     --z-header:   100;
 
     --font-ui:       'Google', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -101,6 +103,7 @@ body.dark {
     --accent-light:     #7b8fd4;
     --accent-dark:      #5c6fbb;
     --accent-subtle:    rgba(110, 127, 204, 0.12);
+    --accent-rgb:       110, 127, 204;
 
     --btn-primary:         #dde1e8;
     --btn-primary-hover:   #ffffff;
@@ -218,6 +221,65 @@ button, a, [role="button"] {
     pointer-events: none;
     background-color: var(--bg);
     transition: background-color 0.25s ease;
+}
+
+
+/* ============================================================
+   DROP OVERLAY
+   ============================================================ */
+.drop-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(var(--accent-rgb), 0.08);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--z-drop-overlay);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.drop-overlay:not(.hidden) {
+    opacity: 1;
+}
+
+.drop-overlay-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 48px;
+    border: 3px dashed var(--accent);
+    border-radius: var(--radius-lg);
+    background: var(--card-bg);
+    box-shadow: var(--shadow-lg);
+    animation: dropBounce 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes dropBounce {
+    0% { transform: scale(0.8); opacity: 0; }
+    60% { transform: scale(1.05); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.drop-overlay svg {
+    color: var(--accent);
+    opacity: 0.9;
+}
+
+.drop-overlay-title {
+    font-family: var(--font-ui);
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.drop-overlay-hint {
+    font-family: var(--font-ui);
+    font-size: var(--text-base);
+    color: var(--text-muted);
 }
 
 
