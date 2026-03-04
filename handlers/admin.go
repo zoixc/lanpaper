@@ -256,7 +256,7 @@ func Link(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Error encoding link creation response: %v", err)
 		}
 
-	case http.MethodPATCH:
+	case http.MethodPatch:
 		linkName, ok := linkNameFromPath(r.URL.Path)
 		if !ok {
 			http.Error(w, "Invalid or missing link name", http.StatusBadRequest)
