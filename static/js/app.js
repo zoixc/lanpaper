@@ -1450,6 +1450,14 @@ function setupGlobalListeners() {
     DOM.confirmOverlay.onclick = (e) => {
         if (e.target === DOM.confirmOverlay) closeConfirm(false);
     };
+    
+    // Add Enter key handler for confirm delete dialog
+    DOM.confirmOverlay.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !DOM.confirmOverlay.classList.contains('hidden')) {
+            e.preventDefault();
+            closeConfirm(true); // Confirm deletion on Enter
+        }
+    });
 
     const regenBtn = document.getElementById('regenPreviewsBtn');
     if (regenBtn) {
