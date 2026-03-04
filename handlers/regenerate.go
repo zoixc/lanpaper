@@ -26,6 +26,8 @@ type RegeneratePreviewsResult struct {
 	Failed  []string `json:"failed,omitempty"`
 }
 
+const maxFailedItems = 100
+
 // RegeneratePreviews re-generates WebP thumbnails for every stored image entry.
 // Only POST is accepted. Worker count scales with available CPUs (capped at 8).
 func RegeneratePreviews(w http.ResponseWriter, r *http.Request) {
@@ -73,15 +75,21 @@ func RegeneratePreviews(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			defer wg.Done()
 			for j := range jobs {
+				// Check context cancellation immediately
 				if ctx.Err() != nil {
-					continue
+					return
 				}
 				wp := j.wp
 				if err := regenPreview(ctx, wp); err != nil {
 					log.Printf("RegeneratePreviews: %s: %v", wp.LinkName, err)
 					errCount.Add(1)
+					// Limit failed array to prevent memory exhaustion
 					failedMu.Lock()
-					failed = append(failed, wp.LinkName)
+					if len(failed) < maxFailedItems {
+						failed = append(failed, wp.LinkName)
+					} else if len(failed) == maxFailedItems {
+						failed = append(failed, "...and more")
+					}
 					failedMu.Unlock()
 				} else {
 					okCount.Add(1)
