@@ -18,8 +18,10 @@ http://your-server/tv        →  swap video/image from the browser, no reconfig
 
 - **Permanent links with swappable content** — the core idea
 - Upload images (JPEG, PNG, GIF, WebP, BMP, TIFF) and videos (MP4, WebM)
+- **True lossless mode** — copy files directly without re-encoding when `quality=100` and `scale=100`
+- Configurable compression quality and image scaling
 - Load content from URL or a local server directory
-- Automatic thumbnail generation with configurable compression
+- Automatic thumbnail generation
 - Basic Auth for admin panel (auto-disabled if no credentials set)
 - Security: CSP, magic bytes validation, path traversal protection, rate limiting
 - Docker with multi-arch images (amd64, arm64) — works on Raspberry Pi and TV boxes
@@ -116,7 +118,7 @@ Useful when running behind external authentication (Tinyauth, Nginx Proxy Manage
 | `RATE_PUBLIC_PER_MIN` | `120` | Public endpoint rate limit (req/min) |
 | `RATE_UPLOAD_PER_MIN` | `20` | Upload rate limit (req/min) |
 | `RATE_BURST` | `10` | Rate limit burst size |
-| `COMPRESSION_QUALITY` | `85` | JPEG/WebP quality (1-100, higher = better quality) |
+| `COMPRESSION_QUALITY` | `85` | JPEG/WebP quality (1-100, 100 = lossless mode) |
 | `COMPRESSION_SCALE` | `100` | Image scale percentage (1-100, 100 = no resize) |
 | `PROXY_TYPE` | `http` | Proxy type: `http`, `socks5` |
 | `PROXY_HOST` | `` | Proxy host |
@@ -131,27 +133,55 @@ Useful when running behind external authentication (Tinyauth, Nginx Proxy Manage
 - Range: 1-100
 - Default: 85
 - Higher values = better quality, larger files
-- Set to 100 for minimal quality loss
+- **100 = lossless mode** (see below)
 
 **Scale** (`COMPRESSION_SCALE` or `compression.scale`):
 - Range: 1-100 (percentage)
 - Default: 100 (no resize)
 - Scales image dimensions (e.g., 50 = half size)
-- Full resolution base: 1920×1080
+- **100 = no scaling** (original resolution)
 
-**Example: Disable compression completely:**
+### Lossless Mode
+
+When **both** `quality=100` **and** `scale=100` are set, Lanpaper enters **true lossless mode**:
+
+- Files are **copied directly** without any decoding/re-encoding
+- **Zero quality loss** - original file is preserved bit-for-bit
+- Works for: JPEG, PNG, GIF, WebP (not BMP/TIFF - they're always converted to JPEG)
+- Logs show `lossless` mode indicator
+
+**Why lossless matters:**
+- JPEG at quality=100 is **not** truly lossless - it still applies lossy compression
+- Re-encoding (decode → encode) **always** loses quality, even at quality=100
+- Lossless mode bypasses re-encoding entirely - original file is saved as-is
+
+**Examples:**
+
 ```bash
+# Lossless mode via environment variables
 COMPRESSION_QUALITY=100 COMPRESSION_SCALE=100 go run .
 ```
 
-Or in `config.json`:
 ```json
+// Lossless mode via config.json
 {
   "compression": {
     "quality": 100,
     "scale": 100
   }
 }
+```
+
+**Log output:**
+```
+Lossless mode enabled for image.jpg (quality=100, scale=100)
+Uploaded: mylink (jpg, 1024 KB, lossless)
+```
+
+**Compression mode:**
+```bash
+COMPRESSION_QUALITY=85 COMPRESSION_SCALE=100 go run .
+# Uploaded: mylink (jpg, 256 KB, compressed)
 ```
 
 ### Via config.json
