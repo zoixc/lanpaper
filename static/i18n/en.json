@@ -18,6 +18,10 @@
   "aria_pin": "Pin this link to top",
   "aria_unpin": "Unpin this link",
 
+  "drop_files_here": "Drop files here",
+  "drop_hint": "Links will be created automatically",
+  "link_created_uploaded": "Created \"{{name}}\" and uploaded",
+
   "settings_language": "Language",
   "settings_data": "Data",
   "settings_maintenance": "Maintenance",
