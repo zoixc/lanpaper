@@ -1,6 +1,6 @@
 {
   "create_new_link": "Crear nuevo enlace",
-  "input_placeholder": "ID del enlace (letras, números, - o _)",
+  "input_placeholder": "ID de enlace (letras, números, - o _)",
   "create_btn": "Crear",
   "existing_links": "Enlaces",
   "no_links": "Aún no hay enlaces",
@@ -11,16 +11,21 @@
   "select_server": "Desde galería",
   "remove": "Eliminar",
 
+  "upload_file": "Archivo",
+  "upload_url": "URL",
+  "upload_server": "Servidor",
+
   "pin": "Anclar",
   "unpin": "Desanclar",
   "pinned": "Anclado arriba",
   "unpinned": "Desanclado",
-  "aria_pin": "Anclar enlace arriba",
-  "aria_unpin": "Desanclar enlace",
+  "aria_pin": "Anclar este enlace arriba",
+  "aria_unpin": "Desanclar este enlace",
 
   "drop_files_here": "Suelta archivos aquí",
   "drop_hint": "Los enlaces se crearán automáticamente",
-  "link_created_uploaded": "Se creó \"{{name}}\" y se subió",
+  "link_created_uploaded": "Creado \"{{name}}\" y subido",
+  "dragdrop_hint": "Arrastra archivos a cualquier lugar para subir",
 
   "settings_language": "Idioma",
   "settings_data": "Datos",
@@ -28,27 +33,28 @@
   "export_json": "Exportar",
   "import_json": "Importar",
   "export_success": "Datos exportados correctamente",
-  "export_error": "Error al exportar",
+  "export_error": "Exportación fallida",
   "import_success": "Datos importados correctamente",
-  "import_error": "Error al importar: Archivo inválido",
+  "import_error": "Importación fallida: Archivo inválido",
   "import_confirm": "¿Importar {{count}} enlaces? Esto reemplazará los datos actuales.",
   "sync_in_progress": "Sincronizando datos con el servidor...",
 
   "regen_previews": "Regenerar vistas previas",
   "regen_previews_running": "Regenerando...",
-  "regen_previews_done": "Hecho: {{ok}} ok, {{errors}} errores, {{skipped}} omitidos",
+  "regen_previews_done": "Listo: {{ok}} ok, {{errors}} errores, {{skipped}} omitidos",
 
   "enter_image_url_title": "Pegar desde URL",
-  "select_server_title": "Seleccionar de la galería",
-  "enter_image_url": "URL de la imagen:",
+  "select_server_title": "Seleccionar de galería",
+  "enter_image_url": "URL de imagen:",
   "url_placeholder": "https://...",
 
   "invalid_id": "Se requiere ID",
-  "invalid_id_chars": "Use a-z, 0-9, - o _",
+  "invalid_id_chars": "Usa a-z, 0-9, - o _",
   "invalid_image": "Formato de archivo inválido",
   "link_taken": "Nombre de enlace ya usado",
   "link_not_found": "Enlace no encontrado",
   "invalid_json": "Formato de datos inválido",
+  "network_error": "Error de red - revisa tu conexión",
 
   "upload_success": "¡Subido!",
   "created_success": "Enlace creado",
@@ -60,7 +66,7 @@
   "delete_btn": "Eliminar",
 
   "loading": "Cargando...",
-  "server_empty": "La carpeta está vacía",
+  "server_empty": "Carpeta vacía",
   "server_error": "Error de acceso",
   "copied": "¡Copiado!",
   "copy_error": "Error al copiar URL",
@@ -72,8 +78,8 @@
   "search_placeholder": "Buscar por nombre de enlace o archivo...",
   "search_total": "Total: {{total}}",
   "search_found": "Encontrados {{shown}} de {{total}}",
-  "search_reset": "Búsqueda borrada",
-  "click_to_reset": "Haga clic para restablecer la búsqueda",
+  "search_reset": "Búsqueda limpiada",
+  "click_to_reset": "Clic para reiniciar búsqueda",
 
   "sort_by": "Ordenar por:",
   "name_asc": "Nombre (A\u2013Z)",
@@ -90,13 +96,13 @@
   "rename_input_label": "Nuevo nombre de enlace",
 
   "aria_open_image": "Abrir imagen",
-  "aria_link_id": "ID del enlace",
-  "aria_file_info": "Información del archivo",
+  "aria_link_id": "ID de enlace",
+  "aria_file_info": "Info de archivo",
   "aria_settings": "Configuración",
   "aria_toggle_view": "Cambiar vista",
-  "aria_toggle_theme": "Alternar modo oscuro",
+  "aria_toggle_theme": "Cambiar modo oscuro",
   "aria_search": "Buscar fondos de pantalla",
-  "aria_link_input": "ID del enlace",
+  "aria_link_input": "ID de enlace",
 
   "shortcuts_hint": "Atajos: Ctrl+N (nuevo), Ctrl+F (buscar), Ctrl+G (vista), T (tema)"
 }
