@@ -86,12 +86,17 @@ func Load() {
 			Scale:   DefaultCompressionScale,
 		},
 	}
+	log.Printf("Config: loaded defaults (compression: quality=%d, scale=%d)", Current.Compression.Quality, Current.Compression.Scale)
 
 	// Step 2: Override with config.json (if exists)
 	if data, err := os.ReadFile("config.json"); err == nil {
 		if err := json.Unmarshal(data, &Current); err != nil {
 			log.Printf("Warning: failed to parse config.json: %v", err)
+		} else {
+			log.Printf("Config: loaded config.json (compression: quality=%d, scale=%d)", Current.Compression.Quality, Current.Compression.Scale)
 		}
+	} else {
+		log.Printf("Config: config.json not found, using defaults")
 	}
 
 	// Step 3: Override with environment variables (highest priority)
@@ -180,18 +185,30 @@ func Load() {
 	}
 
 	// Compression overrides (highest priority)
-	if v := os.Getenv("COMPRESSION_QUALITY"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
+	envQuality := os.Getenv("COMPRESSION_QUALITY")
+	envScale := os.Getenv("COMPRESSION_SCALE")
+	if envQuality != "" {
+		if n, err := strconv.Atoi(envQuality); err == nil {
+			log.Printf("Config: COMPRESSION_QUALITY env override: %d -> %d", Current.Compression.Quality, n)
 			Current.Compression.Quality = n
 		}
 	}
-	if v := os.Getenv("COMPRESSION_SCALE"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
+	if envScale != "" {
+		if n, err := strconv.Atoi(envScale); err == nil {
+			log.Printf("Config: COMPRESSION_SCALE env override: %d -> %d", Current.Compression.Scale, n)
 			Current.Compression.Scale = n
 		}
 	}
 
 	validate()
+	
+	// Final compression config log
+	mode := "compressed"
+	if Current.Compression.Quality == 100 && Current.Compression.Scale == 100 {
+		mode = "LOSSLESS"
+	}
+	log.Printf("Config: final compression settings - quality=%d, scale=%d (%s mode)", 
+		Current.Compression.Quality, Current.Compression.Scale, mode)
 }
 
 // parseTrustedProxyValue parses a single TrustedProxy string.
