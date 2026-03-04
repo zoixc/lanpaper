@@ -96,6 +96,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadLinks();
     setupGlobalListeners();
     setupGlobalDropZone();
+    showDragDropHint();
 });
 
 
@@ -186,6 +187,16 @@ function initKeyboardShortcuts() {
             showToast(`💡 ${t('shortcuts_hint', 'Shortcuts: Ctrl+N (new), Ctrl+F (search), Ctrl+G (view), T (theme)')}`, 'success');
             localStorage.setItem('shortcuts-seen', 'true');
         }, 2000);
+    }
+}
+
+
+function showDragDropHint() {
+    if (!localStorage.getItem('dragdrop-hint-seen')) {
+        setTimeout(() => {
+            showToast('💡 ' + t('dragdrop_hint', 'Drag & drop files anywhere to upload'), 'info');
+            localStorage.setItem('dragdrop-hint-seen', 'true');
+        }, 4000);
     }
 }
 
@@ -853,8 +864,13 @@ async function apiCall(url, method = 'GET', body = null, isFormData = false) {
         const contentType = res.headers.get('content-type');
         return contentType?.includes('application/json') ? res.json() : null;
     } catch (e) {
-        const translatedMsg = translateServerError(e.message);
-        showToast(translatedMsg, 'error');
+        // Better network error handling
+        if (e.name === 'TypeError' || e.message === 'Failed to fetch') {
+            showToast(t('network_error', 'Network error - check your connection'), 'error');
+        } else {
+            const translatedMsg = translateServerError(e.message);
+            showToast(translatedMsg, 'error');
+        }
         throw e;
     }
 }
