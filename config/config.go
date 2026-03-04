@@ -56,7 +56,6 @@ type parsedProxy struct {
 var cachedProxyPtr atomic.Pointer[parsedProxy]
 
 // Load loads configuration with priority: env vars > config.json > defaults
-// This ensures environment variables always override config.json settings.
 func Load() {
 	// Step 1: Load defaults
 	Current = Config{
@@ -86,17 +85,12 @@ func Load() {
 			Scale:   DefaultCompressionScale,
 		},
 	}
-	log.Printf("Config: loaded defaults (compression: quality=%d, scale=%d)", Current.Compression.Quality, Current.Compression.Scale)
 
 	// Step 2: Override with config.json (if exists)
 	if data, err := os.ReadFile("config.json"); err == nil {
 		if err := json.Unmarshal(data, &Current); err != nil {
 			log.Printf("Warning: failed to parse config.json: %v", err)
-		} else {
-			log.Printf("Config: loaded config.json (compression: quality=%d, scale=%d)", Current.Compression.Quality, Current.Compression.Scale)
 		}
-	} else {
-		log.Printf("Config: config.json not found, using defaults")
 	}
 
 	// Step 3: Override with environment variables (highest priority)
@@ -184,35 +178,29 @@ func Load() {
 		}
 	}
 
-	// Compression overrides (highest priority)
-	envQuality := os.Getenv("COMPRESSION_QUALITY")
-	envScale := os.Getenv("COMPRESSION_SCALE")
-	if envQuality != "" {
-		if n, err := strconv.Atoi(envQuality); err == nil {
-			log.Printf("Config: COMPRESSION_QUALITY env override: %d -> %d", Current.Compression.Quality, n)
+	// Compression overrides
+	if v := os.Getenv("COMPRESSION_QUALITY"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
 			Current.Compression.Quality = n
 		}
 	}
-	if envScale != "" {
-		if n, err := strconv.Atoi(envScale); err == nil {
-			log.Printf("Config: COMPRESSION_SCALE env override: %d -> %d", Current.Compression.Scale, n)
+	if v := os.Getenv("COMPRESSION_SCALE"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
 			Current.Compression.Scale = n
 		}
 	}
 
 	validate()
-	
-	// Final compression config log
+
 	mode := "compressed"
 	if Current.Compression.Quality == 100 && Current.Compression.Scale == 100 {
-		mode = "LOSSLESS"
+		mode = "lossless"
 	}
-	log.Printf("Config: final compression settings - quality=%d, scale=%d (%s mode)", 
+	log.Printf("Config loaded: compression quality=%d scale=%d (%s)",
 		Current.Compression.Quality, Current.Compression.Scale, mode)
 }
 
 // parseTrustedProxyValue parses a single TrustedProxy string.
-// Returns (nil, nil, nil) when empty, and (nil, nil, err) on bad input.
 func parseTrustedProxyValue(s string) (*net.IP, *net.IPNet, error) {
 	if s == "" {
 		return nil, nil, nil
@@ -228,7 +216,6 @@ func parseTrustedProxyValue(s string) (*net.IP, *net.IPNet, error) {
 }
 
 // IsTrustedProxy reports whether remoteAddr matches the configured TrustedProxy.
-// Uses a cached parsed value so no allocation occurs on the hot path.
 func IsTrustedProxy(remoteAddr string) bool {
 	p := cachedProxyPtr.Load()
 	if p == nil || (p.ip == nil && p.cidr == nil) {
@@ -295,7 +282,6 @@ func validate() {
 		}
 	}
 
-	// Parse and cache TrustedProxy once so IsTrustedProxy is allocation-free per request.
 	ip, cidr, err := parseTrustedProxyValue(Current.TrustedProxy)
 	if err != nil {
 		log.Printf("Warning: invalid TRUSTED_PROXY %q — ignoring (must be IP or CIDR)", Current.TrustedProxy)

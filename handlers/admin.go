@@ -137,8 +137,14 @@ func toResponses(wps []*storage.Wallpaper) []WallpaperResponse {
 	return out
 }
 
+// sortWallpapers sorts by the requested field while always keeping pinned
+// entries at the top, consistent with the default storage ordering.
 func sortWallpapers(wps []*storage.Wallpaper, field string, desc bool) {
-	sort.Slice(wps, func(i, j int) bool {
+	sort.SliceStable(wps, func(i, j int) bool {
+		// Pinned entries always sort first regardless of the requested field.
+		if wps[i].IsPinned != wps[j].IsPinned {
+			return wps[i].IsPinned
+		}
 		var vi, vj int64
 		if field == "updated" {
 			vi, vj = wps[i].ModTime, wps[j].ModTime
@@ -280,7 +286,6 @@ func Link(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if newName == linkName {
-				// No-op rename — return current state.
 				wp, exists := storage.Global.Get(linkName)
 				if !exists {
 					http.Error(w, "Link not found", http.StatusNotFound)
@@ -295,7 +300,6 @@ func Link(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// Rename physical files if image is present.
 			wpOld, exists := storage.Global.Get(linkName)
 			if !exists {
 				http.Error(w, "Link not found", http.StatusNotFound)
@@ -309,7 +313,6 @@ func Link(w http.ResponseWriter, r *http.Request) {
 					http.Error(w, "Failed to rename image file", http.StatusInternalServerError)
 					return
 				}
-				// Rename preview if present.
 				if wpOld.MIMEType != "mp4" && wpOld.MIMEType != "webm" {
 					oldPrev := filepath.Join("static", "images", "previews", linkName+".webp")
 					newPrev := filepath.Join("static", "images", "previews", newName+".webp")
@@ -319,22 +322,21 @@ func Link(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			// Rename in storage (moves key from linkName → newName).
 			wp, ok := storage.Global.Rename(linkName, newName)
 			if !ok {
 				http.Error(w, "Rename failed", http.StatusInternalServerError)
 				return
 			}
 
-			// NOW update URLs + runtime paths to reflect new name.
+			// Update URLs and runtime paths to reflect the new name.
+			// All URLs must start with a leading slash for correct browser resolution.
 			if wp.HasImage && wp.MIMEType != "" {
-				wp.ImageURL = "static/images/" + newName + "." + wp.MIMEType
+				wp.ImageURL = "/static/images/" + newName + "." + wp.MIMEType
 				wp.ImagePath = filepath.Join("static", "images", newName+"."+wp.MIMEType)
 				if wp.MIMEType != "mp4" && wp.MIMEType != "webm" {
-					wp.Preview = "static/images/previews/" + newName + ".webp"
+					wp.Preview = "/static/images/previews/" + newName + ".webp"
 					wp.PreviewPath = filepath.Join("static", "images", "previews", newName+".webp")
 				}
-				// Save updated URLs + paths back into storage.
 				storage.Global.Set(newName, wp)
 			}
 
@@ -347,7 +349,7 @@ func Link(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// --- Category patch (existing behaviour) ---
+		// --- Category patch ---
 		wp, exists := storage.Global.Get(linkName)
 		if !exists {
 			http.Error(w, "Link not found", http.StatusNotFound)
@@ -406,7 +408,6 @@ func TogglePin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract link name from path /api/link/{name}/pin
 	path := strings.TrimPrefix(r.URL.Path, "/api/link/")
 	path = strings.TrimSuffix(path, "/pin")
 	linkName := strings.Trim(path, "/")
@@ -422,7 +423,6 @@ func TogglePin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Toggle pin state
 	wp.IsPinned = !wp.IsPinned
 	if wp.IsPinned {
 		wp.PinnedAt = time.Now().Unix()

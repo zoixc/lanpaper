@@ -18,8 +18,7 @@ type counter struct {
 
 var (
 	muCounts sync.Mutex
-	// key format: "<namespace>:<ip>" — isolates limits per endpoint group
-	counts = map[string]*counter{}
+	counts   = map[string]*counter{}
 )
 
 // StartCleaner removes stale per-IP counters periodically.
@@ -32,7 +31,6 @@ func StartCleaner() {
 		now := time.Now()
 		muCounts.Lock()
 		for key, c := range counts {
-			// Rate window is 1 minute; keep entries only within that window.
 			if now.Sub(c.windowFrom) > time.Minute {
 				delete(counts, key)
 			}
@@ -68,17 +66,25 @@ func isOverLimit(ip string, perMin, burst int) bool {
 // clientIP returns the real client IP.
 // X-Real-IP and X-Forwarded-For are honoured only when the request originates
 // from the configured TrustedProxy, preventing IP spoofing.
+// Both headers are validated as proper IP addresses before use.
 func clientIP(r *http.Request) string {
 	if config.IsTrustedProxy(r.RemoteAddr) {
 		if xr := r.Header.Get("X-Real-IP"); xr != "" {
-			return strings.TrimSpace(xr)
+			candidate := strings.TrimSpace(xr)
+			if net.ParseIP(candidate) != nil {
+				return candidate
+			}
 		}
 		if xf := r.Header.Get("X-Forwarded-For"); xf != "" {
 			// XFF is comma-separated; take the leftmost (client) entry.
+			raw := xf
 			if idx := strings.IndexByte(xf, ','); idx >= 0 {
-				return strings.TrimSpace(xf[:idx])
+				raw = xf[:idx]
 			}
-			return strings.TrimSpace(xf)
+			candidate := strings.TrimSpace(raw)
+			if net.ParseIP(candidate) != nil {
+				return candidate
+			}
 		}
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)

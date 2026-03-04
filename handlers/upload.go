@@ -186,10 +186,13 @@ func canUseLosslessMode(ext string) bool {
 	return true
 }
 
+// checkImageDimensions returns an error if the image exceeds the allowed
+// dimensions. Unlike before, a decode error is now propagated so callers
+// can decide whether to reject the file.
 func checkImageDimensions(r io.ReadSeeker) error {
 	cfg, _, err := image.DecodeConfig(r)
 	if err != nil {
-		return nil
+		return fmt.Errorf("could not read image config: %w", err)
 	}
 	if cfg.Width > config.MaxImageDimension || cfg.Height > config.MaxImageDimension {
 		return fmt.Errorf("image %dx%d exceeds %dx%d limit",
@@ -347,7 +350,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 		if !video {
 			if dimErr := checkImageDimensions(upFile); dimErr != nil {
-				log.Printf("Security: oversized image %s: %v", safeFilename, dimErr)
+				log.Printf("Security: rejected image %s: %v", safeFilename, dimErr)
 				http.Error(w, "Image dimensions too large", http.StatusBadRequest)
 				return
 			}
@@ -357,12 +360,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// CRITICAL: Check lossless mode BEFORE decoding
+			// Check lossless mode BEFORE decoding
 			if canUseLosslessMode(ext) {
 				losslessMode = true
-				log.Printf("🔒 Lossless mode: %s (quality=%d, scale=%d) — skipping decode",
+				log.Printf("Lossless mode: %s (quality=%d, scale=%d) — skipping decode",
 					safeFilename, config.Current.Compression.Quality, config.Current.Compression.Scale)
-				// Read file data for lossless copy
 				fileData, err = io.ReadAll(upFile)
 				if err != nil {
 					log.Printf("Error reading file data: %v", err)
@@ -370,8 +372,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 			} else {
-				// Need to decode for compression
-				log.Printf("📦 Compression mode: %s (quality=%d, scale=%d)",
+				log.Printf("Compression mode: %s (quality=%d, scale=%d)",
 					safeFilename, config.Current.Compression.Quality, config.Current.Compression.Scale)
 				if img, _, err = image.Decode(upFile); err != nil {
 					log.Printf("Image decode error for %s: %v", safeFilename, err)
@@ -388,10 +389,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "File content does not match file type", http.StatusBadRequest)
 			return
 		}
-		// Check lossless for downloaded files
+		// Check lossless for downloaded/local files
 		if canUseLosslessMode(ext) {
 			losslessMode = true
-			log.Printf("🔒 Lossless mode: downloaded %s", linkName)
+			log.Printf("Lossless mode: downloaded %s", linkName)
 		}
 	}
 
@@ -447,12 +448,12 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Save failed", http.StatusInternalServerError)
 			return
 		}
-		// Generate preview from original file
+		// Generate preview by decoding from the already-read bytes
 		var previewImg image.Image
 		if len(fileData) > 0 {
 			previewImg, _, err = image.Decode(bytes.NewReader(fileData))
 		} else if upFile != nil {
-			if _, err := upFile.Seek(0, io.SeekStart); err == nil {
+			if _, seekErr := upFile.Seek(0, io.SeekStart); seekErr == nil {
 				previewImg, _, err = image.Decode(upFile)
 			}
 		}
@@ -529,7 +530,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	} else if video {
 		mode = "video"
 	}
-	log.Printf("✅ Uploaded: %s (%s, %d KB, %s)", linkName, saveExt, fi.Size()/1024, mode)
+	log.Printf("Uploaded: %s (%s, %d KB, %s)", linkName, saveExt, fi.Size()/1024, mode)
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(wp); err != nil {
 		log.Printf("Error encoding upload response: %v", err)
@@ -586,7 +587,7 @@ func loadLocalImage(ctx context.Context, path string) (image.Image, string, []by
 		return nil, "", nil, fmt.Errorf("seek: %w", err)
 	}
 	if dimErr := checkImageDimensions(f); dimErr != nil {
-		log.Printf("Security: oversized local image %s: %v", path, dimErr)
+		log.Printf("Security: rejected local image %s: %v", path, dimErr)
 		return nil, "", nil, errors.New("image dimensions too large")
 	}
 	if _, err := f.Seek(0, io.SeekStart); err != nil {
@@ -596,27 +597,22 @@ func loadLocalImage(ctx context.Context, path string) (image.Image, string, []by
 		return nil, "", nil, err
 	}
 
-	// Read entire file
 	fileData, err := io.ReadAll(f)
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("read: %w", err)
 	}
 
-	// Detect format from magic bytes
 	mimeType := http.DetectContentType(fileData)
 	ext, ok := mimeToExt[mimeType]
 	if !ok {
-		// Fallback to file extension
 		ext = strings.TrimPrefix(strings.ToLower(filepath.Ext(path)), ".")
 	}
 
-	// Check if lossless mode BEFORE decoding
 	if canUseLosslessMode(ext) {
-		log.Printf("🔒 Lossless mode: local file %s", path)
+		log.Printf("Lossless mode: local file %s", path)
 		return nil, ext, fileData, nil
 	}
 
-	// Decode for compression
 	img, format, err := image.Decode(bytes.NewReader(fileData))
 	if err != nil {
 		log.Printf("Image decode error for %s: %v", path, err)
@@ -667,24 +663,21 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 	}
 
 	if dimErr := checkImageDimensions(bytes.NewReader(buf)); dimErr != nil {
-		log.Printf("Security: oversized remote image %s: %v", urlStr, dimErr)
+		log.Printf("Security: rejected remote image %s: %v", urlStr, dimErr)
 		return nil, "", nil, errors.New("image dimensions too large")
 	}
 
-	// Detect format from content
 	mimeType := http.DetectContentType(buf)
 	ext, ok := mimeToExt[mimeType]
 	if !ok {
 		return nil, "", nil, errors.New("unsupported format")
 	}
 
-	// Check lossless mode BEFORE decoding
 	if canUseLosslessMode(ext) {
-		log.Printf("🔒 Lossless mode: downloaded %s", urlStr)
+		log.Printf("Lossless mode: downloaded %s", urlStr)
 		return nil, ext, buf, nil
 	}
 
-	// Decode for compression
 	img, format, err := image.Decode(bytes.NewReader(buf))
 	if err != nil {
 		return nil, "", nil, errors.New("invalid or unsupported image format")

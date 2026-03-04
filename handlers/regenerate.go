@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"image"
 	"log"
 	"net/http"
 	"os"
@@ -32,7 +34,6 @@ func RegeneratePreviews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// GetAllCopy returns a deep copy — safe to mutate without holding the lock.
 	wallpapers := storage.Global.GetAllCopy()
 
 	total := len(wallpapers)
@@ -58,7 +59,6 @@ func RegeneratePreviews(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	// Scale workers with CPU count; at least 1, at most 8.
 	workers := runtime.NumCPU()
 	if workers < 1 {
 		workers = 1
@@ -74,7 +74,6 @@ func RegeneratePreviews(w http.ResponseWriter, r *http.Request) {
 			defer wg.Done()
 			for j := range jobs {
 				if ctx.Err() != nil {
-					// Client disconnected; drain remaining jobs without processing.
 					continue
 				}
 				wp := j.wp
@@ -109,16 +108,27 @@ func RegeneratePreviews(w http.ResponseWriter, r *http.Request) {
 }
 
 func regenPreview(ctx context.Context, wp *storage.Wallpaper) error {
-	img, _, _, err := loadLocalImage(ctx, wp.ImagePath)
+	// loadLocalImage returns nil img when canUseLosslessMode is true.
+	// In that case we decode from the returned fileData bytes directly.
+	img, _, fileData, err := loadLocalImage(ctx, wp.ImagePath)
 	if err != nil {
 		return err
+	}
+	if img == nil {
+		// Lossless path: fileData holds the raw bytes — decode for thumbnail.
+		if len(fileData) == 0 {
+			return nil // nothing to do
+		}
+		img, _, err = image.Decode(bytes.NewReader(fileData))
+		if err != nil {
+			return err
+		}
 	}
 	previewPath := filepath.Join("static", "images", "previews", wp.LinkName+".webp")
 	thumb := thumbnail(img, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight)
 	if err := saveImage(thumb, "webp", previewPath); err != nil {
 		return err
 	}
-	// Write back via Set so the store's sorted snapshot is invalidated.
 	wp.PreviewPath = previewPath
 	wp.Preview = "/static/images/previews/" + wp.LinkName + ".webp"
 	storage.Global.Set(wp.LinkName, wp)
