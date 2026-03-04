@@ -18,6 +18,19 @@
 <body>
   <div class="network-bg"></div>
 
+  <!-- Drop Overlay -->
+  <div id="dropOverlay" class="drop-overlay hidden">
+    <div class="drop-overlay-content">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <div class="drop-overlay-title" data-i18n="drop_files_here">Drop files here</div>
+      <div class="drop-overlay-hint" data-i18n="drop_hint">Links will be created automatically</div>
+    </div>
+  </div>
+
   <div class="container">
 
     <!-- Header -->
@@ -93,7 +106,13 @@
                maxlength="255"
                aria-label="Link ID"
                data-i18n-aria="aria_link_input">
-        <button type="submit" id="createLinkBtn" class="btn btn--primary" data-i18n="create_btn">Create</button>
+        <button type="submit" id="createLinkBtn" class="btn btn--primary" data-i18n="create_btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          <span data-i18n="create_btn">Create</span>
+        </button>
       </form>
 
       <div class="toolbar-divider"></div>
@@ -141,7 +160,17 @@
     <section class="section">
       <h2 data-i18n="existing_links">Existing links</h2>
       <div class="links-list" id="linksList"></div>
-      <div class="empty-state d-none" id="emptyState" data-i18n="no_links">No links yet</div>
+      <div class="empty-state d-none" id="emptyState">
+        <svg class="empty-state-icon" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <!-- Folder -->
+          <path d="M20 30 H50 L58 38 H100 V90 H20 Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round" fill="none" opacity="0.6"/>
+          <!-- Image icon inside -->
+          <rect x="35" y="50" width="50" height="32" rx="2" stroke="currentColor" stroke-width="2.5" fill="none"/>
+          <path d="M40 74 L50 62 L58 70 L65 63 L80 74 Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
+          <circle cx="72" cy="58" r="3" fill="currentColor"/>
+        </svg>
+        <div class="empty-state-text" data-i18n="no_links">No links yet. Create one above!</div>
+      </div>
     </section>
 
     <footer class="footer">
@@ -191,7 +220,25 @@
     <article class="link-card" role="article">
 
       <a class="preview-link" target="_blank" rel="noopener noreferrer" aria-label="Open image">
-        <div class="preview-wrapper"></div>
+        <div class="preview-wrapper">
+          <!-- Pin button - Bookmark icon -->
+          <button class="pin-btn" aria-label="Pin this link" data-i18n-aria="aria_pin" title="Pin">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+            </svg>
+          </button>
+          <!-- Shown only when no image is set -->
+          <div class="no-image">
+            <svg class="no-image-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <!-- mountains -->
+              <path d="M8 48 L24 24 L36 38 L44 28 L56 48 Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
+              <!-- sun -->
+              <circle cx="46" cy="18" r="5" stroke="currentColor" stroke-width="2" fill="none"/>
+              <!-- frame -->
+              <rect x="6" y="8" width="52" height="44" rx="4" stroke="currentColor" stroke-width="2" fill="none"/>
+            </svg>
+          </div>
+        </div>
       </a>
 
       <div class="link-info">
@@ -212,7 +259,7 @@
 
       <div class="actions-row">
         <div class="upload-dropdown">
-          <button class="btn btn--primary upload-toggle-btn" aria-haspopup="true" aria-expanded="false">
+          <button class="btn btn--upload upload-toggle-btn" aria-haspopup="true" aria-expanded="false">
             <span data-i18n="set_image">Upload</span>
             <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M1 1l4 4 4-4"/>
@@ -225,7 +272,7 @@
                 <polyline points="17 8 12 3 7 8"/>
                 <line x1="12" y1="3" x2="12" y2="15"/>
               </svg>
-              <span data-i18n="set_image">File</span>
+              <span>File</span>
             </button>
             <input type="file" class="file-input d-none" accept="image/*,video/mp4,video/webm">
             <button class="upload-menu-item paste-url-btn">
@@ -233,7 +280,7 @@
                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
               </svg>
-              <span data-i18n="paste_url">URL</span>
+              <span>URL</span>
             </button>
             <button class="upload-menu-item select-server-btn">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -242,7 +289,7 @@
                 <line x1="6" y1="6" x2="6.01" y2="6"/>
                 <line x1="6" y1="18" x2="6.01" y2="18"/>
               </svg>
-              <span data-i18n="select_server">Server</span>
+              <span>Server</span>
             </button>
           </div>
         </div>
@@ -261,8 +308,8 @@
     </article>
   </template>
 
-  <script src="/static/js/settings-menu.js"></script>
-  <script src="/static/js/compressor.js"></script>
+  <script src="/static/js/settings-menu.js" defer></script>
+  <script src="/static/js/compressor.js" defer></script>
   <script src="/static/js/app.js" defer></script>
   <script src="/static/js/export-import.js" defer></script>
 </body>

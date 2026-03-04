@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Toggle Morphing Demo</title>
+    <style>
+        /* Base variables */
+        :root {
+            --bg: #f4f2ed;
+            --text: #2a2a28;
+            --border: #e0ddd6;
+            --border-hover: #ccc9c0;
+            --btn-secondary: #eceae4;
+            --radius-sm: 6px;
+        }
+
+        body.dark {
+            --bg: #1c1c20;
+            --text: #dde1e8;
+            --border: #35363d;
+            --border-hover: #4a4d58;
+            --btn-secondary: #2e2f38;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            transition: background 0.25s ease, color 0.25s ease;
+        }
+
+        .demo-container {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #888;
+            margin-bottom: 40px;
+        }
+
+        .button-showcase {
+            display: flex;
+            gap: 30px;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 50px;
+        }
+
+        .view-state {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        /* Import morphing CSS */
+        .view-toggle-morphing {
+            cursor: pointer;
+            width: 48px;
+            height: 48px;
+            position: relative;
+            background: transparent;
+            border: 2px solid transparent;
+            border-radius: var(--radius-sm);
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background .15s ease, border-color .15s ease, transform .12s ease;
+        }
+
+        .view-toggle-morphing:hover {
+            background: var(--btn-secondary);
+            border-color: var(--border);
+        }
+
+        .view-toggle-morphing:active {
+            transform: scale(0.92);
+        }
+
+        .view-icon-svg {
+            width: 24px;
+            height: 24px;
+            display: block;
+        }
+
+        .view-bar {
+            fill: currentColor;
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-origin: center;
+        }
+
+        /* LIST VIEW */
+        .view-toggle-morphing[data-view="list"] .view-bar-1 {
+            x: 1; y: 2; width: 22; height: 3.5; rx: 1.5;
+        }
+        .view-toggle-morphing[data-view="list"] .view-bar-2 {
+            x: 1; y: 10.25; width: 22; height: 3.5; rx: 1.5;
+        }
+        .view-toggle-morphing[data-view="list"] .view-bar-3 {
+            x: 1; y: 18.5; width: 22; height: 3.5; rx: 1.5;
+        }
+
+        /* GRID VIEW */
+        .view-toggle-morphing[data-view="grid"] .view-bar-1 {
+            x: 1; y: 1; width: 9; height: 6; rx: 2;
+        }
+        .view-toggle-morphing[data-view="grid"] .view-bar-2 {
+            x: 1; y: 9; width: 9; height: 6; rx: 2;
+        }
+        .view-toggle-morphing[data-view="grid"] .view-bar-3 {
+            x: 1; y: 17; width: 9; height: 6; rx: 2;
+        }
+
+        /* Clones */
+        .view-bar-1-clone,
+        .view-bar-2-clone,
+        .view-bar-3-clone {
+            fill: currentColor;
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-origin: center;
+        }
+
+        .view-toggle-morphing[data-view="list"] .view-bar-1-clone,
+        .view-toggle-morphing[data-view="list"] .view-bar-2-clone,
+        .view-toggle-morphing[data-view="list"] .view-bar-3-clone {
+            opacity: 0;
+            transform: translateX(-5px) scale(0.5);
+        }
+
+        .view-toggle-morphing[data-view="grid"] .view-bar-1-clone {
+            x: 14; y: 1; width: 9; height: 6; rx: 2;
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+        .view-toggle-morphing[data-view="grid"] .view-bar-2-clone {
+            x: 14; y: 9; width: 9; height: 6; rx: 2;
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+        .view-toggle-morphing[data-view="grid"] .view-bar-3-clone {
+            x: 14; y: 17; width: 9; height: 6; rx: 2;
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+
+        .view-toggle-morphing {
+            color: var(--text);
+        }
+
+        /* Preview cards */
+        .cards-preview {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .cards-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .cards-list.grid-view {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        .card-item {
+            background: var(--btn-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            text-align: left;
+            transition: all 0.25s ease;
+        }
+
+        .card-item:hover {
+            border-color: var(--border-hover);
+        }
+
+        .cards-list.grid-view .card-item {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: var(--btn-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .theme-toggle:hover {
+            border-color: var(--border-hover);
+        }
+
+        .code-snippet {
+            background: var(--btn-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 40px;
+            text-align: left;
+            max-width: 600px;
+            overflow-x: auto;
+        }
+
+        .code-snippet pre {
+            margin: 0;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <button class="theme-toggle" onclick="document.body.classList.toggle('dark')">Toggle Theme</button>
+
+    <div class="demo-container">
+        <h1>🎯 View Toggle Morphing</h1>
+        <p class="subtitle">Pure CSS/SVG animation • List ⟷ Grid</p>
+
+        <div class="button-showcase">
+            <div class="view-state" id="viewState">List View</div>
+            
+            <button id="viewToggleMorphing" class="view-toggle-morphing" data-view="list" aria-label="Toggle view">
+                <svg class="view-icon-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <rect class="view-bar view-bar-1" />
+                    <rect class="view-bar view-bar-2" />
+                    <rect class="view-bar view-bar-3" />
+                    <rect class="view-bar-1-clone" />
+                    <rect class="view-bar-2-clone" />
+                    <rect class="view-bar-3-clone" />
+                </svg>
+            </button>
+
+            <div class="view-state" id="viewStateAfter">Click to switch</div>
+        </div>
+
+        <div class="cards-preview">
+            <div class="cards-list" id="cardsList">
+                <div class="card-item">Card 1</div>
+                <div class="card-item">Card 2</div>
+                <div class="card-item">Card 3</div>
+                <div class="card-item">Card 4</div>
+                <div class="card-item">Card 5</div>
+                <div class="card-item">Card 6</div>
+            </div>
+        </div>
+
+        <div class="code-snippet">
+            <pre>// JavaScript
+viewToggle.addEventListener('click', () => {
+    const view = viewToggle.getAttribute('data-view');
+    const newView = view === 'list' ? 'grid' : 'list';
+    viewToggle.setAttribute('data-view', newView);
+    // CSS animates automatically!
+});</pre>
+        </div>
+    </div>
+
+    <script>
+        const viewToggle = document.getElementById('viewToggleMorphing');
+        const cardsList = document.getElementById('cardsList');
+        const viewState = document.getElementById('viewState');
+        const viewStateAfter = document.getElementById('viewStateAfter');
+
+        viewToggle.addEventListener('click', () => {
+            const currentView = viewToggle.getAttribute('data-view');
+            const newView = currentView === 'list' ? 'grid' : 'list';
+            
+            // Update button
+            viewToggle.setAttribute('data-view', newView);
+            
+            // Update cards
+            cardsList.classList.toggle('grid-view', newView === 'grid');
+            
+            // Update labels
+            if (newView === 'grid') {
+                viewState.textContent = 'Grid View';
+                viewStateAfter.textContent = '✨ Click again ✨';
+            } else {
+                viewState.textContent = 'List View';
+                viewStateAfter.textContent = 'Click to switch';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -63,7 +63,7 @@ func main() {
 	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Admin)))
 	mux.HandleFunc("/api/wallpapers", middleware.WithSecurity(handlers.Wallpapers))
 	mux.HandleFunc("/api/compression-config", middleware.WithSecurity(handlers.GetCompressionConfig))
-	mux.HandleFunc("/api/link/", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Link)))
+	mux.HandleFunc("/api/link/", middleware.WithSecurity(middleware.MaybeBasicAuth(handleLinkRoutes)))
 	mux.HandleFunc("/api/link", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Link)))
 	mux.HandleFunc("/api/upload",
 		middleware.WithSecurity(middleware.MaybeBasicAuth(
@@ -113,6 +113,16 @@ func main() {
 		log.Fatalf("Server error: %v", err)
 	}
 	log.Println("Server stopped.")
+}
+
+// handleLinkRoutes routes /api/link/{name}/pin to TogglePin, everything else to Link
+func handleLinkRoutes(w http.ResponseWriter, r *http.Request) {
+	// Check if this is a pin toggle request (must be POST to /pin)
+	if strings.HasSuffix(r.URL.Path, "/pin") && r.Method == http.MethodPost {
+		handlers.TogglePin(w, r)
+	} else {
+		handlers.Link(w, r)
+	}
 }
 
 func healthHandler(w http.ResponseWriter, _ *http.Request) {

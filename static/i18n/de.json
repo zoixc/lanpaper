@@ -1,15 +1,22 @@
 {
-  "create_new_link": "Link erstellen",
+  "create_new_link": "Neuen Link erstellen",
   "input_placeholder": "Link-ID (Buchstaben, Zahlen, - oder _)",
   "create_btn": "Erstellen",
   "existing_links": "Links",
-  "no_links": "Liste ist leer",
+  "no_links": "Noch keine Links",
   "no_image": "Kein Bild",
   "copy_url": "URL kopieren",
   "set_image": "Hochladen",
-  "paste_url": "Aus URL",
+  "paste_url": "Von URL",
   "select_server": "Aus Galerie",
-  "remove": "Löschen",
+  "remove": "Entfernen",
+
+  "pin": "Anheften",
+  "unpin": "Lösen",
+  "pinned": "An oberster Stelle angeheftet",
+  "unpinned": "Losgelöst",
+  "aria_pin": "Diesen Link oben anheften",
+  "aria_unpin": "Diesen Link lösen",
 
   "settings_language": "Sprache",
   "settings_data": "Daten",
@@ -23,21 +30,25 @@
   "import_confirm": "{{count}} Links importieren? Dies ersetzt die aktuellen Daten.",
   "sync_in_progress": "Daten werden mit Server synchronisiert...",
 
-  "regen_previews": "Vorschauen neu erstellen",
-  "regen_previews_running": "Wird erstellt...",
+  "regen_previews": "Vorschauen regenerieren",
+  "regen_previews_running": "Regenerierung läuft...",
   "regen_previews_done": "Fertig: {{ok}} ok, {{errors}} Fehler, {{skipped}} übersprungen",
 
-  "enter_image_url_title": "Aus URL einfügen",
-  "select_server_title": "Aus Galerie wählen",
+  "enter_image_url_title": "Von URL einfügen",
+  "select_server_title": "Aus Galerie auswählen",
   "enter_image_url": "Bild-URL:",
   "url_placeholder": "https://...",
 
   "invalid_id": "ID ist erforderlich",
-  "invalid_id_chars": "Nur a-z, 0-9, - oder _",
+  "invalid_id_chars": "Verwenden Sie a-z, 0-9, - oder _",
   "invalid_image": "Ungültiges Dateiformat",
+  "link_taken": "Linkname bereits vergeben",
+  "link_not_found": "Link nicht gefunden",
+  "invalid_json": "Ungültiges Datenformat",
 
   "upload_success": "Hochgeladen!",
   "created_success": "Link erstellt",
+  "renamed_success": "Umbenannt in \"{{name}}\"",
   "deleted_success": "Link gelöscht",
   "confirm_delete": "Diesen Link löschen?",
   "confirm_delete_title": "Link löschen?",
@@ -48,6 +59,7 @@
   "server_empty": "Ordner ist leer",
   "server_error": "Zugriffsfehler",
   "copied": "Kopiert!",
+  "copy_error": "URL konnte nicht kopiert werden",
 
   "modal_cancel": "Abbrechen",
   "modal_ok": "OK",
@@ -56,16 +68,22 @@
   "search_placeholder": "Nach Linkname oder Datei suchen...",
   "search_total": "Gesamt: {{total}}",
   "search_found": "{{shown}} von {{total}} gefunden",
+  "search_reset": "Suche gelöscht",
+  "click_to_reset": "Klicken zum Zurücksetzen der Suche",
 
-  "sort_by": "Sortierung:",
+  "sort_by": "Sortieren nach:",
   "name_asc": "Name (A\u2013Z)",
   "name_desc": "Name (Z\u2013A)",
   "date_new": "Neueste zuerst",
   "date_old": "Älteste zuerst",
 
-  "load_error": "Links konnten nicht geladen werden",
+  "load_error": "Fehler beim Laden der Links",
   "preview_unavailable": "Vorschau nicht verfügbar",
   "image_unavailable": "Bild nicht verfügbar",
+
+  "compression_saved": "\ud83d\udddc\ufe0f Komprimiert: {{percent}}% kleiner ({{saved}} gespart)",
+  "rename_hint": "Doppelklick zum Umbenennen",
+  "rename_input_label": "Neuer Linkname",
 
   "aria_open_image": "Bild öffnen",
   "aria_link_id": "Link-ID",
@@ -76,5 +94,5 @@
   "aria_search": "Hintergrundbilder suchen",
   "aria_link_input": "Link-ID",
 
-  "shortcuts_hint": "Tastenkürzel: Strg+N (neu), Strg+F (suchen), Strg+G (Ansicht), T (Design)"
+  "shortcuts_hint": "Tastenkürzel: Strg+N (neu), Strg+F (suchen), Strg+G (Ansicht), T (Theme)"
 }

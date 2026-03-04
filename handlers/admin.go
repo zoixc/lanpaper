@@ -36,6 +36,8 @@ type WallpaperResponse struct {
 	SizeBytes int64  `json:"sizeBytes"`
 	ModTime   int64  `json:"modTime"`
 	CreatedAt int64  `json:"createdAt"`
+	Pinned    bool   `json:"pinned"`
+	PinnedAt  int64  `json:"pinnedAt,omitempty"`
 }
 
 type PaginatedResponse struct {
@@ -175,6 +177,8 @@ func toResponse(wp *storage.Wallpaper) WallpaperResponse {
 		SizeBytes: wp.SizeBytes,
 		ModTime:   wp.ModTime,
 		CreatedAt: wp.CreatedAt,
+		Pinned:    wp.IsPinned,
+		PinnedAt:  wp.PinnedAt,
 	}
 }
 
@@ -258,16 +262,95 @@ func Link(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid or missing link name", http.StatusBadRequest)
 			return
 		}
-		wp, exists := storage.Global.Get(linkName)
-		if !exists {
-			http.Error(w, "Link not found", http.StatusNotFound)
-			return
-		}
+
 		var req struct {
-			Category *string `json:"category"`
+			NewLinkName *string `json:"newLinkName"`
+			Category    *string `json:"category"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		// --- Rename ---
+		if req.NewLinkName != nil {
+			newName := *req.NewLinkName
+			if !isValidLinkName(newName) {
+				http.Error(w, "Invalid new link name", http.StatusBadRequest)
+				return
+			}
+			if newName == linkName {
+				// No-op rename — return current state.
+				wp, exists := storage.Global.Get(linkName)
+				if !exists {
+					http.Error(w, "Link not found", http.StatusNotFound)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(toResponse(wp))
+				return
+			}
+			if _, exists := storage.Global.Get(newName); exists {
+				http.Error(w, "Link name already taken", http.StatusConflict)
+				return
+			}
+
+			// Rename physical files if image is present.
+			wpOld, exists := storage.Global.Get(linkName)
+			if !exists {
+				http.Error(w, "Link not found", http.StatusNotFound)
+				return
+			}
+			if wpOld.HasImage && wpOld.MIMEType != "" {
+				oldImg := filepath.Join("static", "images", linkName+"."+wpOld.MIMEType)
+				newImg := filepath.Join("static", "images", newName+"."+wpOld.MIMEType)
+				if err := os.Rename(oldImg, newImg); err != nil && !os.IsNotExist(err) {
+					log.Printf("Error renaming image file %s -> %s: %v", oldImg, newImg, err)
+					http.Error(w, "Failed to rename image file", http.StatusInternalServerError)
+					return
+				}
+				// Rename preview if present.
+				if wpOld.MIMEType != "mp4" && wpOld.MIMEType != "webm" {
+					oldPrev := filepath.Join("static", "images", "previews", linkName+".webp")
+					newPrev := filepath.Join("static", "images", "previews", newName+".webp")
+					if err := os.Rename(oldPrev, newPrev); err != nil && !os.IsNotExist(err) {
+						log.Printf("Warning: could not rename preview %s -> %s: %v", oldPrev, newPrev, err)
+					}
+				}
+			}
+
+			// Rename in storage (moves key from linkName → newName).
+			wp, ok := storage.Global.Rename(linkName, newName)
+			if !ok {
+				http.Error(w, "Rename failed", http.StatusInternalServerError)
+				return
+			}
+
+			// NOW update URLs + runtime paths to reflect new name.
+			if wp.HasImage && wp.MIMEType != "" {
+				wp.ImageURL = "static/images/" + newName + "." + wp.MIMEType
+				wp.ImagePath = filepath.Join("static", "images", newName+"."+wp.MIMEType)
+				if wp.MIMEType != "mp4" && wp.MIMEType != "webm" {
+					wp.Preview = "static/images/previews/" + newName + ".webp"
+					wp.PreviewPath = filepath.Join("static", "images", "previews", newName+".webp")
+				}
+				// Save updated URLs + paths back into storage.
+				storage.Global.Set(newName, wp)
+			}
+
+			if err := storage.Global.Save(); err != nil {
+				log.Printf("Error saving after rename: %v", err)
+			}
+			log.Printf("Renamed link: %s -> %s", linkName, newName)
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(toResponse(wp))
+			return
+		}
+
+		// --- Category patch (existing behaviour) ---
+		wp, exists := storage.Global.Get(linkName)
+		if !exists {
+			http.Error(w, "Link not found", http.StatusNotFound)
 			return
 		}
 		if req.Category != nil {
@@ -313,6 +396,54 @@ func Link(w http.ResponseWriter, r *http.Request) {
 
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// TogglePin handles POST /api/link/{name}/pin to toggle pin status.
+func TogglePin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract link name from path /api/link/{name}/pin
+	path := strings.TrimPrefix(r.URL.Path, "/api/link/")
+	path = strings.TrimSuffix(path, "/pin")
+	linkName := strings.Trim(path, "/")
+
+	if linkName == "" || !isValidLinkName(linkName) {
+		http.Error(w, "Invalid link name", http.StatusBadRequest)
+		return
+	}
+
+	wp, exists := storage.Global.Get(linkName)
+	if !exists {
+		http.Error(w, "Link not found", http.StatusNotFound)
+		return
+	}
+
+	// Toggle pin state
+	wp.IsPinned = !wp.IsPinned
+	if wp.IsPinned {
+		wp.PinnedAt = time.Now().Unix()
+	} else {
+		wp.PinnedAt = 0
+	}
+
+	storage.Global.Set(linkName, wp)
+	if err := storage.Global.Save(); err != nil {
+		log.Printf("Error saving after pin toggle: %v", err)
+	}
+
+	action := "unpinned"
+	if wp.IsPinned {
+		action = "pinned"
+	}
+	log.Printf("Link %s: %s", linkName, action)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(toResponse(wp)); err != nil {
+		log.Printf("Error encoding pin toggle response: %v", err)
 	}
 }
 

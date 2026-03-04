@@ -51,6 +51,7 @@ const DOM = {
     createForm: document.getElementById('createForm'),
 
     template: document.getElementById('linkCardTemplate'),
+    dropOverlay: document.getElementById('dropOverlay'),
 };
 
 const log = (...args) => STATE.isDebug && console.log(...args);
@@ -94,6 +95,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     showSkeletons();
     await loadLinks();
     setupGlobalListeners();
+    setupGlobalDropZone();
 });
 
 
@@ -254,7 +256,6 @@ function initTheme() {
 function applyTheme() {
     document.body.classList.toggle('dark', STATE.isDark);
 
-    // Update both theme-color meta tags (light and dark media variants)
     document.querySelectorAll('meta[name="theme-color"]').forEach(meta => {
         const media = meta.getAttribute('media') || '';
         if (media.includes('dark')) {
@@ -328,8 +329,6 @@ window.setLanguage = setLanguage;
 async function setLanguage(lang) {
     STATE.lang = lang;
     localStorage.setItem('lang', lang);
-
-    // Update <html lang> attribute for accessibility and SEO
     document.documentElement.lang = lang;
 
     try {
@@ -375,6 +374,22 @@ function updateAriaLabels() {
 }
 
 
+// SERVER ERROR TRANSLATION
+function translateServerError(errorText) {
+    // Map known server errors to translation keys
+    const errorMap = {
+        'Link name already taken': 'link_taken',
+        'Link exists': 'link_taken',
+        'Invalid link name': 'invalid_id_chars',
+        'Link not found': 'link_not_found',
+        'Invalid JSON': 'invalid_json',
+    };
+
+    const key = errorMap[errorText];
+    return key ? t(key, errorText) : errorText;
+}
+
+
 // SEARCH & SORT
 function initSearchSort() {
     if (!DOM.searchInput) return;
@@ -399,6 +414,19 @@ function initSearchSort() {
             STATE.sortBy = e.target.value;
             localStorage.setItem('sortBy', STATE.sortBy);
             filterAndSort();
+        });
+    }
+
+    // Clickable counter to reset search
+    if (DOM.searchStats) {
+        DOM.searchStats.addEventListener('click', () => {
+            if (STATE.searchQuery) {
+                DOM.searchInput.value = '';
+                STATE.searchQuery = '';
+                localStorage.setItem('searchQuery', '');
+                filterAndSort();
+                showToast(t('search_reset', 'Search cleared'), 'info');
+            }
         });
     }
 
@@ -480,8 +508,6 @@ function filterWallpapers() {
     const query = STATE.searchQuery;
     STATE.filteredWallpapers = STATE.wallpapers.filter(wp => {
         const name = (wp.linkName || wp.id || '').toLowerCase();
-        // Search by link name only — imageUrl is an internal server path,
-        // not something the user typed or knows.
         return name.includes(query);
     });
 }
@@ -489,6 +515,16 @@ function filterWallpapers() {
 
 function sortWallpapers(list) {
     const sorted = [...list];
+    
+    // Primary sort: pinned items always first
+    sorted.sort((a, b) => {
+        const aPin = a.pinned ? 1 : 0;
+        const bPin = b.pinned ? 1 : 0;
+        if (aPin !== bPin) return bPin - aPin;
+        return 0;
+    });
+    
+    // Secondary sort: user-selected sorting within pinned/unpinned groups
     const sortFns = {
         name_asc:  (a, b) => (a.linkName || '').localeCompare(b.linkName || ''),
         name_desc: (a, b) => (b.linkName || '').localeCompare(a.linkName || ''),
@@ -496,7 +532,14 @@ function sortWallpapers(list) {
         date_asc:  (a, b) => (a.createdAt || 0) - (b.createdAt || 0),
     };
     const sortFn = sortFns[STATE.sortBy];
-    if (sortFn) sorted.sort(sortFn);
+    if (sortFn) {
+        // Separate pinned and unpinned, sort each group
+        const pinned = sorted.filter(x => x.pinned);
+        const unpinned = sorted.filter(x => !x.pinned);
+        pinned.sort(sortFn);
+        unpinned.sort(sortFn);
+        return [...pinned, ...unpinned];
+    }
     return sorted;
 }
 
@@ -513,12 +556,135 @@ function updateSearchStats() {
     if (!DOM.searchStats) return;
     const total = STATE.wallpapers.length;
     const shown = STATE.filteredWallpapers.length;
-    if (STATE.searchQuery) {
+
+    // Make counter clickable when filtered
+    const isFiltered = STATE.searchQuery !== '';
+    DOM.searchStats.classList.toggle('clickable', isFiltered);
+
+    if (isFiltered) {
         const tpl = t('search_found', 'Found {{shown}} of {{total}}');
         DOM.searchStats.textContent = tpl.replace('{{shown}}', shown).replace('{{total}}', total);
+        DOM.searchStats.title = t('click_to_reset', 'Click to reset search');
+        DOM.searchStats.style.cursor = 'pointer';
     } else {
         const tpl = t('search_total', 'Total: {{total}}');
         DOM.searchStats.textContent = tpl.replace('{{total}}', total);
+        DOM.searchStats.title = '';
+        DOM.searchStats.style.cursor = 'default';
+    }
+}
+
+
+// ============================================================
+// GLOBAL DRAG & DROP
+// ============================================================
+function sanitizeLinkName(filename) {
+    // Remove extension
+    let name = filename.replace(/\.[^.]+$/, '');
+    // Replace non-alphanumeric with hyphens
+    name = name.replace(/[^a-zA-Z0-9]+/g, '-');
+    // Trim hyphens
+    name = name.replace(/^-+|-+$/g, '');
+    // Lowercase
+    name = name.toLowerCase();
+    // Max length
+    return name.slice(0, 64);
+}
+
+function showDropOverlay() {
+    if (DOM.dropOverlay) DOM.dropOverlay.classList.remove('hidden');
+}
+
+function hideDropOverlay() {
+    if (DOM.dropOverlay) DOM.dropOverlay.classList.add('hidden');
+}
+
+function setupGlobalDropZone() {
+    let dragCounter = 0;
+
+    document.body.addEventListener('dragenter', (e) => {
+        if (e.target.closest('.link-card')) return;
+        dragCounter++;
+        if (dragCounter === 1) showDropOverlay();
+    });
+
+    document.body.addEventListener('dragleave', (e) => {
+        if (e.target.closest('.link-card')) return;
+        dragCounter--;
+        if (dragCounter === 0) hideDropOverlay();
+    });
+
+    document.body.addEventListener('dragover', (e) => {
+        if (e.target.closest('.link-card')) return;
+        e.preventDefault();
+    });
+
+    document.body.addEventListener('drop', async (e) => {
+        if (e.target.closest('.link-card')) return;
+        e.preventDefault();
+        dragCounter = 0;
+        hideDropOverlay();
+
+        const files = Array.from(e.dataTransfer.files);
+        if (!files.length) return;
+
+        for (const file of files) {
+            await createAndUpload(file);
+        }
+    });
+}
+
+async function createAndUpload(file) {
+    const linkName = sanitizeLinkName(file.name);
+    
+    if (!linkName) {
+        showToast(t('invalid_id', 'Invalid filename'), 'error');
+        return;
+    }
+
+    // Check if file is valid image/video
+    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+        showToast(t('invalid_image', 'Invalid file format'), 'error');
+        return;
+    }
+
+    try {
+        // Step 1: Create link
+        await apiCall('/api/link', 'POST', { linkName });
+
+        // Step 2: Upload file
+        const formData = new FormData();
+        formData.append('linkName', linkName);
+
+        // Compress if image
+        let fileToUpload = file;
+        if (STATE.compressor && file.type.startsWith('image/')) {
+            const originalSize = file.size;
+            try {
+                fileToUpload = await STATE.compressor.compress(file);
+                if (fileToUpload.size < originalSize) {
+                    const info = ImageCompressor.getCompressionInfo(originalSize, fileToUpload.size);
+                    const msg = t('compression_saved', '🗜️ Compressed: {{percent}}% smaller ({{saved}} saved)')
+                        .replace('{{percent}}', info.percent)
+                        .replace('{{saved}}', formatKB(info.saved));
+                    showToast(msg, 'success');
+                }
+            } catch (_) {
+                fileToUpload = file;
+            }
+        }
+
+        formData.append('file', fileToUpload);
+        await apiCall('/api/upload', 'POST', formData, true);
+
+        const msg = t('link_created_uploaded', 'Created "{{name}}" and uploaded')
+            .replace('{{name}}', linkName);
+        showToast(msg, 'success');
+
+        // Refresh list
+        await loadLinks();
+    } catch (_) {
+        // Error already shown by apiCall
     }
 }
 
@@ -641,7 +807,6 @@ async function loadExternalImages() {
             div.className = 'image-option';
             div.dataset.value = file;
             const previewUrl = `/api/external-image-preview?path=${encodeURIComponent(file)}`;
-            // Sanitise file name before inserting as text to avoid XSS via crafted filenames
             const nameEl = document.createElement('div');
             nameEl.className = 'image-name';
             nameEl.textContent = file;
@@ -688,7 +853,8 @@ async function apiCall(url, method = 'GET', body = null, isFormData = false) {
         const contentType = res.headers.get('content-type');
         return contentType?.includes('application/json') ? res.json() : null;
     } catch (e) {
-        showToast(e.message, 'error');
+        const translatedMsg = translateServerError(e.message);
+        showToast(translatedMsg, 'error');
         throw e;
     }
 }
@@ -706,6 +872,66 @@ async function loadLinks() {
 }
 
 
+// ============================================================
+// PIN / UNPIN
+// ============================================================
+async function togglePin(link, card) {
+    try {
+        const updatedLink = await apiCall(
+            `/api/link/${encodeURIComponent(link.linkName)}/pin`,
+            'POST'
+        );
+        if (!updatedLink) return;
+
+        // Update state
+        const idx = STATE.wallpapers.findIndex(wp => wp.linkName === link.linkName);
+        if (idx !== -1) {
+            STATE.wallpapers[idx] = updatedLink;
+        }
+        link.pinned = updatedLink.pinned;
+
+        // Update UI
+        const pinBtn = card.querySelector('.pin-btn');
+        if (pinBtn) {
+            pinBtn.classList.toggle('pinned', updatedLink.pinned);
+            const ariaKey = updatedLink.pinned ? 'aria_unpin' : 'aria_pin';
+            const ariaLabel = t(ariaKey, updatedLink.pinned ? 'Unpin this link' : 'Pin this link to top');
+            pinBtn.setAttribute('aria-label', ariaLabel);
+            pinBtn.title = ariaLabel;
+        }
+
+        // Show toast
+        const msgKey = updatedLink.pinned ? 'pinned' : 'unpinned';
+        const msg = t(msgKey, updatedLink.pinned ? 'Pinned to top' : 'Unpinned');
+        showToast(msg, 'success');
+
+        // Re-sort and re-render to move item
+        filterAndSort();
+    } catch (_) {
+        // Error already shown by apiCall
+    }
+}
+
+
+function setupPinButton(card, link) {
+    const pinBtn = card.querySelector('.pin-btn');
+    if (!pinBtn) return;
+
+    // Set initial state
+    pinBtn.classList.toggle('pinned', !!link.pinned);
+    const ariaKey = link.pinned ? 'aria_unpin' : 'aria_pin';
+    const ariaLabel = t(ariaKey, link.pinned ? 'Unpin this link' : 'Pin this link to top');
+    pinBtn.setAttribute('aria-label', ariaLabel);
+    pinBtn.title = ariaLabel;
+
+    pinBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        togglePin(link, card);
+    });
+}
+
+
 function renderLinks(wallpapers) {
     DOM.linksList.innerHTML = '';
     if (!wallpapers?.length) {
@@ -720,6 +946,7 @@ function renderLinks(wallpapers) {
         const article = clone.querySelector('article');
         updateCard(article, link);
         setupCardEvents(article, link);
+        setupPinButton(article, link);
         fragment.appendChild(article);
     });
     DOM.linksList.appendChild(fragment);
@@ -732,7 +959,6 @@ function detectCategory(link) {
     const mime = link.mimeType || '';
     if (mime === 'mp4' || mime === 'webm') return 'video';
     if (mime) return 'image';
-    // Fallback: infer from stored extension in URL.
     const ext = (link.imageUrl || '').split('.').pop().toLowerCase();
     if (ext === 'mp4' || ext === 'webm') return 'video';
     if (ext) return 'image';
@@ -759,9 +985,125 @@ function createLazyImage(src, alt = 'Image', className = 'preview', errorMsg) {
 }
 
 
+// ============================================================
+// INLINE RENAME
+// ============================================================
+const VALID_LINK_RE = /^[a-zA-Z0-9][a-zA-Z0-9_\-]{0,63}$/;
+
+function setupInlineRename(card, link) {
+    const linkIdEl = card.querySelector('.link-id');
+    if (!linkIdEl) return;
+
+    // Pencil hint shown on hover via CSS; double-click to activate
+    linkIdEl.title = t('rename_hint', 'Double-click to rename');
+    linkIdEl.setAttribute('role', 'button');
+    linkIdEl.tabIndex = 0;
+
+    const startEdit = () => {
+        if (linkIdEl.querySelector('input')) return; // already editing
+
+        const currentName = link.linkName;
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = currentName;
+        input.className = 'link-id-input';
+        input.maxLength = 64;
+        input.setAttribute('aria-label', t('rename_input_label', 'New link name'));
+        input.setAttribute('pattern', '[a-zA-Z0-9_\\-]+');
+        input.spellcheck = false;
+
+        linkIdEl.textContent = '';
+        linkIdEl.appendChild(input);
+        linkIdEl.classList.add('editing');
+
+        // Select all on focus so user can type immediately
+        input.focus();
+        input.select();
+
+        let committed = false;
+
+        const commit = async () => {
+            if (committed) return;
+            committed = true;
+
+            const newName = input.value.trim();
+
+            // Restore label regardless of outcome first
+            linkIdEl.classList.remove('editing');
+
+            if (!newName || newName === currentName) {
+                linkIdEl.textContent = currentName;
+                return;
+            }
+
+            if (!VALID_LINK_RE.test(newName)) {
+                linkIdEl.textContent = currentName;
+                showToast(t('invalid_id_chars', 'Invalid ID format'), 'error');
+                return;
+            }
+
+            // Optimistic update
+            linkIdEl.textContent = newName;
+            card.dataset.linkName = newName;
+
+            try {
+                const updated = await apiCall(
+                    `/api/link/${encodeURIComponent(currentName)}`,
+                    'PATCH',
+                    { newLinkName: newName }
+                );
+                if (!updated) throw new Error('Empty response');
+
+                // Sync state
+                const idx = STATE.wallpapers.findIndex(wp => wp.linkName === currentName);
+                if (idx !== -1) STATE.wallpapers[idx] = updated;
+                link.linkName = updated.linkName;
+
+                // Re-render copy button URL
+                updateCard(card, updated);
+                setupInlineRename(card, updated);
+                setupPinButton(card, updated);
+
+                const msg = t('renamed_success', 'Renamed to "{{name}}"').replace('{{name}}', updated.linkName);
+                showToast(msg, 'success');
+                filterAndSort();
+            } catch (_) {
+                // Roll back on error (apiCall already showed toast)
+                linkIdEl.textContent = currentName;
+                card.dataset.linkName = currentName;
+                link.linkName = currentName;
+            }
+        };
+
+        const cancel = () => {
+            if (committed) return;
+            committed = true;
+            linkIdEl.classList.remove('editing');
+            linkIdEl.textContent = currentName;
+        };
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter')  { e.preventDefault(); commit(); }
+            if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+        });
+        input.addEventListener('blur', commit);
+    };
+
+    linkIdEl.addEventListener('dblclick', startEdit);
+    linkIdEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); startEdit(); }
+    });
+}
+
+
 function updateCard(card, link) {
     const linkName = link.linkName || link.id;
-    card.querySelector('.link-id').textContent = linkName;
+    const linkIdEl = card.querySelector('.link-id');
+
+    // Don't overwrite if currently in edit mode
+    if (!linkIdEl.querySelector('input')) {
+        linkIdEl.textContent = linkName;
+    }
     card.dataset.linkName = linkName;
 
     const fullUrl = `${window.location.origin}/${linkName}`;
@@ -769,13 +1111,12 @@ function updateCard(card, link) {
     const previewLink = card.querySelector('.preview-link');
     previewLink.href = fullUrl;
     previewLink.setAttribute('aria-label', t('aria_open_image', 'Open image'));
-    card.querySelector('.link-id').setAttribute('aria-label', t('aria_link_id', 'Link ID'));
+    linkIdEl.setAttribute('aria-label', t('aria_link_id', 'Link ID'));
 
     const category = link.hasImage ? detectCategory(link) : 'other';
 
     let fileType;
     if (link.mimeType) {
-        // mimeType from server is already the stored extension (e.g. "jpg", "mp4")
         fileType = link.mimeType.toUpperCase();
     } else if (link.hasImage) {
         const ext = (link.imageUrl || '').split('.').pop();
@@ -792,46 +1133,70 @@ function updateCard(card, link) {
     linkMeta.setAttribute('aria-label', t('aria_file_info', 'File info'));
 
     const previewWrapper = card.querySelector('.preview-wrapper');
-    previewWrapper.innerHTML = '';
 
-    if (link.hasImage) {
-        const isVid = category === 'video';
-        if (isVid) {
-            // Video: use <video> element for inline preview.
-            // Append a cache-busting timestamp so re-uploads are reflected immediately.
-            const videoSrc = '/' + (link.imageUrl || '').replace(/^\//, '') + `?t=${link.modTime || Date.now()}`;
-            const video = document.createElement('video');
-            video.src = videoSrc;
-            video.className = 'preview';
-            video.autoplay = true;
-            video.muted = true;
-            video.loop = true;
-            video.playsInline = true;
-            video.setAttribute('playsinline', '');
-            video.setAttribute('preload', 'metadata');
-            video.onerror = () => {
-                previewWrapper.innerHTML = `<div class="no-image">${t('preview_unavailable', 'Preview unavailable')}</div>`;
-            };
-            previewWrapper.appendChild(video);
-        } else {
-            const resolvedPreview = link.preview || '';
-            const imgSrc = resolvedPreview
-                ? '/' + resolvedPreview.replace(/^\//, '') + `?t=${link.modTime || Date.now()}`
-                : '/' + (link.imageUrl || '').replace(/^\//, '');
-            const img = createLazyImage(
-                imgSrc,
-                resolvedPreview ? 'Preview' : 'Image',
-                'preview',
-                t(resolvedPreview ? 'preview_unavailable' : 'image_unavailable', 'Image unavailable')
-            );
-            img.classList.add('preview-top-center');
-            previewWrapper.appendChild(img);
+    // Only re-build preview when it has actually changed (avoid video flicker)
+    const prevSrc = previewWrapper.dataset.src || '';
+    const newSrc  = link.hasImage ? (link.preview || link.imageUrl || '') : '';
+    const srcChanged = prevSrc !== newSrc;
+
+    if (srcChanged) {
+        previewWrapper.dataset.src = newSrc;
+        
+        // Save pin button reference before clearing
+        const existingPinBtn = previewWrapper.querySelector('.pin-btn');
+        
+        // Clear content
+        previewWrapper.innerHTML = '';
+        
+        // Re-add pin button first
+        if (existingPinBtn) {
+            previewWrapper.appendChild(existingPinBtn);
         }
-    } else {
-        const noImg = document.createElement('div');
-        noImg.className = 'no-image';
-        noImg.textContent = t('no_image', 'No image');
-        previewWrapper.appendChild(noImg);
+
+        if (link.hasImage) {
+            const isVid = (category === 'video');
+            if (isVid) {
+                const videoSrc = '/' + (link.imageUrl || '').replace(/^\//, '') + `?t=${link.modTime || Date.now()}`;
+                const video = document.createElement('video');
+                video.src = videoSrc;
+                video.className = 'preview';
+                video.autoplay = true;
+                video.muted = true;
+                video.loop = true;
+                video.playsInline = true;
+                video.setAttribute('playsinline', '');
+                video.setAttribute('preload', 'metadata');
+                video.onerror = () => {
+                    // Keep pin button when showing error
+                    const pinBtn = previewWrapper.querySelector('.pin-btn');
+                    previewWrapper.innerHTML = '';
+                    if (pinBtn) previewWrapper.appendChild(pinBtn);
+                    previewWrapper.appendChild(buildNoImageSVG());
+                };
+                previewWrapper.appendChild(video);
+            } else {
+                const resolvedPreview = link.preview || '';
+                const imgSrc = resolvedPreview
+                    ? '/' + resolvedPreview.replace(/^\//, '') + `?t=${link.modTime || Date.now()}`
+                    : '/' + (link.imageUrl || '').replace(/^\//, '');
+                const img = createLazyImage(
+                    imgSrc,
+                    resolvedPreview ? 'Preview' : 'Image',
+                    'preview'
+                );
+                img.classList.add('preview-top-center');
+                img.onerror = () => {
+                    // Keep pin button when showing error
+                    const pinBtn = previewWrapper.querySelector('.pin-btn');
+                    previewWrapper.innerHTML = '';
+                    if (pinBtn) previewWrapper.appendChild(pinBtn);
+                    previewWrapper.appendChild(buildNoImageSVG());
+                };
+                previewWrapper.appendChild(img);
+            }
+        } else {
+            previewWrapper.appendChild(buildNoImageSVG());
+        }
     }
 
     // Copy button
@@ -868,6 +1233,19 @@ function updateCard(card, link) {
 }
 
 
+// Build the SVG no-image placeholder programmatically (same shape as in HTML template)
+function buildNoImageSVG() {
+    const wrap = document.createElement('div');
+    wrap.className = 'no-image';
+    wrap.innerHTML = `<svg class="no-image-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M8 48 L24 24 L36 38 L44 28 L56 48 Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
+      <circle cx="46" cy="18" r="5" stroke="currentColor" stroke-width="2" fill="none"/>
+      <rect x="6" y="8" width="52" height="44" rx="4" stroke="currentColor" stroke-width="2" fill="none"/>
+    </svg>`;
+    return wrap;
+}
+
+
 function setupCardEvents(card, link) {
     const fileInput = card.querySelector('.file-input');
     const dropdown = card.querySelector('.upload-dropdown');
@@ -879,6 +1257,9 @@ function setupCardEvents(card, link) {
     new MutationObserver((_, obs) => {
         if (!document.contains(card)) { ac.abort(); obs.disconnect(); }
     }).observe(document.body, { childList: true, subtree: true });
+
+    // Inline rename
+    setupInlineRename(card, link);
 
     toggleBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -916,7 +1297,7 @@ function setupCardEvents(card, link) {
 
     card.querySelector('.select-server-btn').addEventListener('click', async () => {
         dropdown.classList.remove('open');
-        toggleBtn.setAttribute('aria-expanded', 'false');
+        toggleBtn.setAttribute('aria-enabled', 'false');
         const filename = await showModal('grid', 'select_server_title');
         if (filename) await handleUpload(link, filename, card, true);
     });
@@ -934,16 +1315,24 @@ function setupCardEvents(card, link) {
             .replace('{{name}}', link.linkName);
         const confirmed = await showConfirm(msg);
         if (!confirmed) return;
+
+        // Add delete animation
+        card.classList.add('deleting');
+
+        // Wait for animation before API call
+        await new Promise(resolve => setTimeout(resolve, 350));
+
         try {
             await apiCall(`/api/link/${encodeURIComponent(link.linkName)}`, 'DELETE');
+            ac.abort();
+            card.remove();
+            STATE.wallpapers = STATE.wallpapers.filter(wp => wp.linkName !== link.linkName);
+            filterAndSort();
+            showToast(t('deleted_success', 'Link deleted'), 'success');
         } catch (_) {
-            return; // apiCall already showed a toast
+            // Remove animation class on error
+            card.classList.remove('deleting');
         }
-        ac.abort();
-        card.remove();
-        STATE.wallpapers = STATE.wallpapers.filter(wp => wp.linkName !== link.linkName);
-        filterAndSort();
-        showToast(t('deleted_success', 'Link deleted'), 'success');
     };
 }
 
@@ -966,10 +1355,12 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
                 fileToUpload = await STATE.compressor.compress(fileOrUrl);
                 if (fileToUpload.size < originalSize) {
                     const info = ImageCompressor.getCompressionInfo(originalSize, fileToUpload.size);
-                    showToast(`🗜️ Compressed: ${info.percent}% smaller (${formatKB(info.saved)} saved)`, 'success');
+                    const msg = t('compression_saved', '🗜️ Compressed: {{percent}}% smaller ({{saved}} saved)')
+                        .replace('{{percent}}', info.percent)
+                        .replace('{{saved}}', formatKB(info.saved));
+                    showToast(msg, 'success');
                 }
             } catch (_) {
-                // Compression failed — fall back to original file
                 fileToUpload = fileOrUrl;
             }
         }
@@ -979,12 +1370,12 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
     try {
         const updatedLink = await apiCall('/api/upload', 'POST', formData, true);
         if (!updatedLink) return;
-        // Preserve createdAt if the server didn't return it (shouldn't happen, but defensive)
         if (!updatedLink.createdAt && link.createdAt) updatedLink.createdAt = link.createdAt;
         const idx = STATE.wallpapers.findIndex(wp => wp.linkName === updatedLink.linkName);
         if (idx !== -1) STATE.wallpapers[idx] = updatedLink;
         else STATE.wallpapers.push(updatedLink);
         updateCard(card, updatedLink);
+        setupPinButton(card, updatedLink);
         filterAndSort();
         showToast(t('upload_success', 'Uploaded!'), 'success');
     } catch (_) {}
@@ -997,8 +1388,7 @@ function setupGlobalListeners() {
         if (STATE.createPending) return;
         const id = DOM.createInput.value.trim();
         if (!id) { showToast(t('invalid_id', 'ID is required'), 'error'); return; }
-        // Keep in sync with server-side isValidLinkName: 1-64 chars, alphanumeric + _ -
-        if (!/^[a-zA-Z0-9][a-zA-Z0-9_\-]{0,63}$/.test(id)) {
+        if (!VALID_LINK_RE.test(id)) {
             showToast(t('invalid_id_chars', 'Invalid ID format'), 'error');
             return;
         }
@@ -1008,6 +1398,8 @@ function setupGlobalListeners() {
         try {
             await apiCall('/api/link', 'POST', { linkName: id });
             DOM.createInput.value = '';
+            // Return focus to input so user can create next link immediately
+            DOM.createInput.focus();
             const newLinkObj = {
                 linkName: id,
                 hasImage: false,
@@ -1016,6 +1408,7 @@ function setupGlobalListeners() {
                 createdAt: Math.floor(Date.now() / 1000),
                 imageUrl: '',
                 preview: '',
+                pinned: false,
             };
             STATE.wallpapers.push(newLinkObj);
             filterAndSort();
