@@ -51,6 +51,7 @@ const DOM = {
     createForm: document.getElementById('createForm'),
 
     template: document.getElementById('linkCardTemplate'),
+    dropOverlay: document.getElementById('dropOverlay'),
 };
 
 const log = (...args) => STATE.isDebug && console.log(...args);
@@ -94,6 +95,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     showSkeletons();
     await loadLinks();
     setupGlobalListeners();
+    setupGlobalDropZone();
 });
 
 
@@ -569,6 +571,120 @@ function updateSearchStats() {
         DOM.searchStats.textContent = tpl.replace('{{total}}', total);
         DOM.searchStats.title = '';
         DOM.searchStats.style.cursor = 'default';
+    }
+}
+
+
+// ============================================================
+// GLOBAL DRAG & DROP
+// ============================================================
+function sanitizeLinkName(filename) {
+    // Remove extension
+    let name = filename.replace(/\.[^.]+$/, '');
+    // Replace non-alphanumeric with hyphens
+    name = name.replace(/[^a-zA-Z0-9]+/g, '-');
+    // Trim hyphens
+    name = name.replace(/^-+|-+$/g, '');
+    // Lowercase
+    name = name.toLowerCase();
+    // Max length
+    return name.slice(0, 64);
+}
+
+function showDropOverlay() {
+    if (DOM.dropOverlay) DOM.dropOverlay.classList.remove('hidden');
+}
+
+function hideDropOverlay() {
+    if (DOM.dropOverlay) DOM.dropOverlay.classList.add('hidden');
+}
+
+function setupGlobalDropZone() {
+    let dragCounter = 0;
+
+    document.body.addEventListener('dragenter', (e) => {
+        if (e.target.closest('.link-card')) return;
+        dragCounter++;
+        if (dragCounter === 1) showDropOverlay();
+    });
+
+    document.body.addEventListener('dragleave', (e) => {
+        if (e.target.closest('.link-card')) return;
+        dragCounter--;
+        if (dragCounter === 0) hideDropOverlay();
+    });
+
+    document.body.addEventListener('dragover', (e) => {
+        if (e.target.closest('.link-card')) return;
+        e.preventDefault();
+    });
+
+    document.body.addEventListener('drop', async (e) => {
+        if (e.target.closest('.link-card')) return;
+        e.preventDefault();
+        dragCounter = 0;
+        hideDropOverlay();
+
+        const files = Array.from(e.dataTransfer.files);
+        if (!files.length) return;
+
+        for (const file of files) {
+            await createAndUpload(file);
+        }
+    });
+}
+
+async function createAndUpload(file) {
+    const linkName = sanitizeLinkName(file.name);
+    
+    if (!linkName) {
+        showToast(t('invalid_id', 'Invalid filename'), 'error');
+        return;
+    }
+
+    // Check if file is valid image/video
+    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+        showToast(t('invalid_image', 'Invalid file format'), 'error');
+        return;
+    }
+
+    try {
+        // Step 1: Create link
+        await apiCall('/api/link', 'POST', { linkName });
+
+        // Step 2: Upload file
+        const formData = new FormData();
+        formData.append('linkName', linkName);
+
+        // Compress if image
+        let fileToUpload = file;
+        if (STATE.compressor && file.type.startsWith('image/')) {
+            const originalSize = file.size;
+            try {
+                fileToUpload = await STATE.compressor.compress(file);
+                if (fileToUpload.size < originalSize) {
+                    const info = ImageCompressor.getCompressionInfo(originalSize, fileToUpload.size);
+                    const msg = t('compression_saved', '🗜️ Compressed: {{percent}}% smaller ({{saved}} saved)')
+                        .replace('{{percent}}', info.percent)
+                        .replace('{{saved}}', formatKB(info.saved));
+                    showToast(msg, 'success');
+                }
+            } catch (_) {
+                fileToUpload = file;
+            }
+        }
+
+        formData.append('file', fileToUpload);
+        await apiCall('/api/upload', 'POST', formData, true);
+
+        const msg = t('link_created_uploaded', 'Created "{{name}}" and uploaded')
+            .replace('{{name}}', linkName);
+        showToast(msg, 'success');
+
+        // Refresh list
+        await loadLinks();
+    } catch (_) {
+        // Error already shown by apiCall
     }
 }
 
