@@ -42,7 +42,6 @@ func init() {
 
 var uploadSem chan struct{}
 
-// InitUploadSemaphore sets the maximum number of concurrent uploads.
 func InitUploadSemaphore(n int) {
 	if n <= 0 {
 		n = 2
@@ -57,7 +56,6 @@ var (
 	cachedInsecure  bool
 )
 
-// getTransport returns a cached *http.Transport, rebuilding when proxy/TLS settings change.
 func getTransport() *http.Transport {
 	transportMu.Lock()
 	defer transportMu.Unlock()
@@ -72,7 +70,7 @@ func getTransport() *http.Transport {
 	}
 
 	t := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure}, //nolint:gosec
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
 		DialContext: (&ssrfSafeDialer{inner: &net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
@@ -97,8 +95,6 @@ func getTransport() *http.Transport {
 	return t
 }
 
-// ssrfSafeDialer resolves DNS and pins to the first public IP,
-// blocking private/internal addresses via utils.PrivateRanges.
 type ssrfSafeDialer struct{ inner *net.Dialer }
 
 func (d *ssrfSafeDialer) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -110,7 +106,6 @@ func (d *ssrfSafeDialer) DialContext(ctx context.Context, network, addr string) 
 	if err != nil || len(ips) == 0 {
 		return nil, fmt.Errorf("DNS resolution failed for %s", host)
 	}
-	// Pin to the first public IP to prevent DNS rebinding.
 	var safeIP string
 	for _, ipAddr := range ips {
 		ip := ipAddr.IP
@@ -130,13 +125,11 @@ func (d *ssrfSafeDialer) DialContext(ctx context.Context, network, addr string) 
 		}
 	}
 	if safeIP == "" {
-		// Do not expose internal host name to the client.
 		return nil, errors.New("address is not allowed")
 	}
 	return d.inner.DialContext(ctx, network, net.JoinHostPort(safeIP, port))
 }
 
-// copyFile streams src into dst with a buffered writer. Used for videos and lossless image copy.
 func copyFile(srcPath, dst string, r io.Reader) error {
 	if r == nil {
 		f, err := os.Open(srcPath)
@@ -176,7 +169,6 @@ func normalizeFormat(format string) string {
 	return format
 }
 
-// storedExt returns the on-disk extension; BMP/TIFF are re-encoded as JPEG.
 func storedExt(ext string) string {
 	if ext == "bmp" || ext == "tiff" {
 		return "jpg"
@@ -184,13 +176,10 @@ func storedExt(ext string) string {
 	return ext
 }
 
-// canUseLosslessMode returns true if compression is disabled (quality=100, scale=100)
-// and the format supports direct copy without re-encoding (not BMP/TIFF).
 func canUseLosslessMode(ext string) bool {
 	if config.Current.Compression.Quality != 100 || config.Current.Compression.Scale != 100 {
 		return false
 	}
-	// BMP and TIFF must be re-encoded to JPEG
 	if ext == "bmp" || ext == "tiff" {
 		return false
 	}
@@ -200,7 +189,7 @@ func canUseLosslessMode(ext string) bool {
 func checkImageDimensions(r io.ReadSeeker) error {
 	cfg, _, err := image.DecodeConfig(r)
 	if err != nil {
-		return nil // let the full decode surface the real error
+		return nil
 	}
 	if cfg.Width > config.MaxImageDimension || cfg.Height > config.MaxImageDimension {
 		return fmt.Errorf("image %dx%d exceeds %dx%d limit",
@@ -220,8 +209,6 @@ func thumbnail(src image.Image, maxW, maxH int) image.Image {
 	return dst
 }
 
-// scaleImage resizes the image based on compression scale percentage.
-// If scale is 100, returns the original image unchanged.
 func scaleImage(src image.Image, scalePercent int) image.Image {
 	if scalePercent >= 100 {
 		return src
@@ -277,19 +264,18 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var (
-		img         image.Image
-		ext         string
-		err         error
-		video       bool
-		fileData    []byte
-		upFile      multipart.File
+		img          image.Image
+		ext          string
+		err          error
+		video        bool
+		fileData     []byte
+		upFile       multipart.File
 		losslessMode bool
 	)
 
 	urlStr := r.FormValue("url")
 	if urlStr != "" {
 		if strings.HasPrefix(urlStr, "http://") || strings.HasPrefix(urlStr, "https://") {
-			// ssrfSafeDialer handles SSRF prevention with DNS pinning at connection time.
 			img, ext, fileData, err = downloadImage(r.Context(), urlStr)
 		} else {
 			if !utils.IsValidLocalPath(urlStr) {
@@ -365,17 +351,28 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Image dimensions too large", http.StatusBadRequest)
 				return
 			}
-			// Check if we can use lossless mode (direct copy without re-encoding)
+			if _, err := upFile.Seek(0, io.SeekStart); err != nil {
+				log.Printf("Seek error after dimension check: %v", err)
+				http.Error(w, "File seek error", http.StatusInternalServerError)
+				return
+			}
+
+			// CRITICAL: Check lossless mode BEFORE decoding
 			if canUseLosslessMode(ext) {
 				losslessMode = true
-				log.Printf("Lossless mode enabled for %s (quality=100, scale=100)", safeFilename)
-			} else {
-				// Need to decode for processing
-				if _, err := upFile.Seek(0, io.SeekStart); err != nil {
-					log.Printf("Seek error after dimension check: %v", err)
-					http.Error(w, "File seek error", http.StatusInternalServerError)
+				log.Printf("🔒 Lossless mode: %s (quality=%d, scale=%d) — skipping decode",
+					safeFilename, config.Current.Compression.Quality, config.Current.Compression.Scale)
+				// Read file data for lossless copy
+				fileData, err = io.ReadAll(upFile)
+				if err != nil {
+					log.Printf("Error reading file data: %v", err)
+					http.Error(w, "Read error", http.StatusInternalServerError)
 					return
 				}
+			} else {
+				// Need to decode for compression
+				log.Printf("📦 Compression mode: %s (quality=%d, scale=%d)",
+					safeFilename, config.Current.Compression.Quality, config.Current.Compression.Scale)
 				if img, _, err = image.Decode(upFile); err != nil {
 					log.Printf("Image decode error for %s: %v", safeFilename, err)
 					http.Error(w, "Invalid image", http.StatusBadRequest)
@@ -385,16 +382,16 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if len(fileData) > 0 && !video {
+	if len(fileData) > 0 && !video && !losslessMode {
 		if err := utils.ValidateFileType(fileData, ext); err != nil {
 			log.Printf("Security: magic bytes failed for link %s: %v", linkName, err)
 			http.Error(w, "File content does not match file type", http.StatusBadRequest)
 			return
 		}
-		// Check if we can use lossless mode for downloaded files
+		// Check lossless for downloaded files
 		if canUseLosslessMode(ext) {
 			losslessMode = true
-			log.Printf("Lossless mode enabled for downloaded %s", linkName)
+			log.Printf("🔒 Lossless mode: downloaded %s", linkName)
 		}
 	}
 
@@ -435,53 +432,41 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	} else if losslessMode {
 		// Lossless mode: copy file directly without re-encoding
 		var copyErr error
-		if urlStr == "" && upFile != nil {
+		if len(fileData) > 0 {
+			copyErr = copyFile("", originalPath, bytes.NewReader(fileData))
+		} else if urlStr == "" && upFile != nil {
 			if _, err := upFile.Seek(0, io.SeekStart); err != nil {
 				log.Printf("Seek error before lossless copy: %v", err)
 				http.Error(w, "Failed to prepare file", http.StatusInternalServerError)
 				return
 			}
 			copyErr = copyFile("", originalPath, upFile)
-		} else if len(fileData) > 0 {
-			// Downloaded file or local file data
-			copyErr = copyFile("", originalPath, bytes.NewReader(fileData))
 		}
 		if copyErr != nil {
 			log.Printf("Error saving lossless image %s: %v", originalPath, copyErr)
 			http.Error(w, "Save failed", http.StatusInternalServerError)
 			return
 		}
-		// Still need to generate preview from decoded image
-		if img != nil {
-			if err := saveImage(thumbnail(img, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight), "webp", previewPath); err != nil {
-				log.Printf("Error saving preview %s: %v", previewPath, err)
-				removeFiles(originalPath, previewPath)
-				http.Error(w, "Preview generation failed", http.StatusInternalServerError)
-				return
+		// Generate preview from original file
+		var previewImg image.Image
+		if len(fileData) > 0 {
+			previewImg, _, err = image.Decode(bytes.NewReader(fileData))
+		} else if upFile != nil {
+			if _, err := upFile.Seek(0, io.SeekStart); err == nil {
+				previewImg, _, err = image.Decode(upFile)
 			}
+		}
+		if err != nil || previewImg == nil {
+			log.Printf("Warning: failed to generate preview for %s: %v", linkName, err)
+			previewPath = ""
 		} else {
-			// Need to decode for preview generation
-			var previewImg image.Image
-			if len(fileData) > 0 {
-				previewImg, _, err = image.Decode(bytes.NewReader(fileData))
-			} else if upFile != nil {
-				if _, err := upFile.Seek(0, io.SeekStart); err == nil {
-					previewImg, _, err = image.Decode(upFile)
-				}
-			}
-			if err != nil || previewImg == nil {
-				log.Printf("Warning: failed to generate preview for %s: %v", linkName, err)
-				previewPath = "" // Skip preview if can't decode
-			} else {
-				if err := saveImage(thumbnail(previewImg, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight), "webp", previewPath); err != nil {
-					log.Printf("Error saving preview %s: %v", previewPath, err)
-					previewPath = ""
-				}
+			if err := saveImage(thumbnail(previewImg, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight), "webp", previewPath); err != nil {
+				log.Printf("Error saving preview %s: %v", previewPath, err)
+				previewPath = ""
 			}
 		}
 	} else {
 		// Normal mode: decode, process, and re-encode
-		// Apply compression scale
 		img = scaleImage(img, config.Current.Compression.Scale)
 
 		if err := saveImage(img, saveExt, originalPath); err != nil {
@@ -544,14 +529,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	} else if video {
 		mode = "video"
 	}
-	log.Printf("Uploaded: %s (%s, %d KB, %s)", linkName, saveExt, fi.Size()/1024, mode)
+	log.Printf("✅ Uploaded: %s (%s, %d KB, %s)", linkName, saveExt, fi.Size()/1024, mode)
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(wp); err != nil {
 		log.Printf("Error encoding upload response: %v", err)
 	}
 }
 
-// saveImage encodes img to path; removes the file on encode error.
 func saveImage(img image.Image, format, path string) error {
 	out, err := os.Create(path)
 	if err != nil {
@@ -568,7 +552,6 @@ func saveImage(img image.Image, format, path string) error {
 	return closeErr
 }
 
-// encodeImage uses dynamic compression quality from config.Current.Compression
 func encodeImage(w io.Writer, img image.Image, format string) error {
 	quality := config.Current.Compression.Quality
 	switch format {
@@ -613,13 +596,27 @@ func loadLocalImage(ctx context.Context, path string) (image.Image, string, []by
 		return nil, "", nil, err
 	}
 
-	// Read entire file for potential lossless copy
+	// Read entire file
 	fileData, err := io.ReadAll(f)
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("read: %w", err)
 	}
 
-	// Decode from fileData
+	// Detect format from magic bytes
+	mimeType := http.DetectContentType(fileData)
+	ext, ok := mimeToExt[mimeType]
+	if !ok {
+		// Fallback to file extension
+		ext = strings.TrimPrefix(strings.ToLower(filepath.Ext(path)), ".")
+	}
+
+	// Check if lossless mode BEFORE decoding
+	if canUseLosslessMode(ext) {
+		log.Printf("🔒 Lossless mode: local file %s", path)
+		return nil, ext, fileData, nil
+	}
+
+	// Decode for compression
 	img, format, err := image.Decode(bytes.NewReader(fileData))
 	if err != nil {
 		log.Printf("Image decode error for %s: %v", path, err)
@@ -660,7 +657,6 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 		return nil, "", nil, errors.New("file too large")
 	}
 
-	// Read one byte more than maxBytes to properly detect if file exceeds limit.
 	buf, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
 	if err != nil {
 		return nil, "", nil, errors.New("read error")
@@ -674,7 +670,21 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 		log.Printf("Security: oversized remote image %s: %v", urlStr, dimErr)
 		return nil, "", nil, errors.New("image dimensions too large")
 	}
-	// Use decoder-reported format, not Content-Type — CDNs often send application/octet-stream.
+
+	// Detect format from content
+	mimeType := http.DetectContentType(buf)
+	ext, ok := mimeToExt[mimeType]
+	if !ok {
+		return nil, "", nil, errors.New("unsupported format")
+	}
+
+	// Check lossless mode BEFORE decoding
+	if canUseLosslessMode(ext) {
+		log.Printf("🔒 Lossless mode: downloaded %s", urlStr)
+		return nil, ext, buf, nil
+	}
+
+	// Decode for compression
 	img, format, err := image.Decode(bytes.NewReader(buf))
 	if err != nil {
 		return nil, "", nil, errors.New("invalid or unsupported image format")
