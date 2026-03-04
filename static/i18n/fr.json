@@ -6,9 +6,9 @@
   "no_links": "Aucun lien pour le moment",
   "no_image": "Pas d'image",
   "copy_url": "Copier l'URL",
-  "set_image": "Téléverser",
+  "set_image": "Télécharger",
   "paste_url": "Depuis URL",
-  "select_server": "Depuis galerie",
+  "select_server": "Depuis la galerie",
   "remove": "Supprimer",
 
   "pin": "Épingler",
@@ -18,6 +18,10 @@
   "aria_pin": "Épingler ce lien en haut",
   "aria_unpin": "Désépingler ce lien",
 
+  "drop_files_here": "Déposez les fichiers ici",
+  "drop_hint": "Les liens seront créés automatiquement",
+  "link_created_uploaded": "\"{{name}}\" créé et téléchargé",
+
   "settings_language": "Langue",
   "settings_data": "Données",
   "settings_maintenance": "Maintenance",
@@ -26,50 +30,50 @@
   "export_success": "Données exportées avec succès",
   "export_error": "Échec de l'exportation",
   "import_success": "Données importées avec succès",
-  "import_error": "Échec de l'importation : fichier invalide",
+  "import_error": "Échec de l'importation : Fichier invalide",
   "import_confirm": "Importer {{count}} liens ? Cela remplacera les données actuelles.",
   "sync_in_progress": "Synchronisation des données avec le serveur...",
 
   "regen_previews": "Regénérer les aperçus",
-  "regen_previews_running": "Régénération en cours...",
+  "regen_previews_running": "Regénération...",
   "regen_previews_done": "Terminé : {{ok}} ok, {{errors}} erreurs, {{skipped}} ignorés",
 
-  "enter_image_url_title": "Coller depuis l'URL",
+  "enter_image_url_title": "Coller depuis URL",
   "select_server_title": "Sélectionner depuis la galerie",
   "enter_image_url": "URL de l'image :",
   "url_placeholder": "https://...",
 
-  "invalid_id": "L'ID est requis",
+  "invalid_id": "ID requis",
   "invalid_id_chars": "Utilisez a-z, 0-9, - ou _",
   "invalid_image": "Format de fichier invalide",
   "link_taken": "Nom de lien déjà utilisé",
   "link_not_found": "Lien introuvable",
   "invalid_json": "Format de données invalide",
 
-  "upload_success": "Téléversé !",
+  "upload_success": "Téléchargé !",
   "created_success": "Lien créé",
   "renamed_success": "Renommé en \"{{name}}\"",
   "deleted_success": "Lien supprimé",
   "confirm_delete": "Supprimer ce lien ?",
   "confirm_delete_title": "Supprimer le lien ?",
-  "confirm_delete_msg": "Supprimer \"{{name}}\" ? Cette action est irréversible.",
+  "confirm_delete_msg": "Supprimer \"{{name}}\" ? Cela ne peut pas être annulé.",
   "delete_btn": "Supprimer",
 
   "loading": "Chargement...",
-  "server_empty": "Dossier vide",
+  "server_empty": "Le dossier est vide",
   "server_error": "Erreur d'accès",
   "copied": "Copié !",
   "copy_error": "Échec de la copie de l'URL",
 
   "modal_cancel": "Annuler",
   "modal_ok": "OK",
-  "modal_default_title": "Saisie",
+  "modal_default_title": "Entrée",
 
   "search_placeholder": "Rechercher par nom de lien ou fichier...",
   "search_total": "Total : {{total}}",
   "search_found": "{{shown}} trouvés sur {{total}}",
   "search_reset": "Recherche effacée",
-  "click_to_reset": "Cliquer pour réinitialiser la recherche",
+  "click_to_reset": "Cliquez pour réinitialiser la recherche",
 
   "sort_by": "Trier par :",
   "name_asc": "Nom (A\u2013Z)",
@@ -82,17 +86,17 @@
   "image_unavailable": "Image indisponible",
 
   "compression_saved": "\ud83d\udddc\ufe0f Compressé : {{percent}}% plus petit ({{saved}} économisés)",
-  "rename_hint": "Double-clic pour renommer",
+  "rename_hint": "Double-cliquez pour renommer",
   "rename_input_label": "Nouveau nom de lien",
 
   "aria_open_image": "Ouvrir l'image",
   "aria_link_id": "ID du lien",
-  "aria_file_info": "Infos fichier",
+  "aria_file_info": "Informations sur le fichier",
   "aria_settings": "Paramètres",
-  "aria_toggle_view": "Basculer la vue",
-  "aria_toggle_theme": "Basculer le mode sombre",
+  "aria_toggle_view": "Changer de vue",
+  "aria_toggle_theme": "Activer le mode sombre",
   "aria_search": "Rechercher des fonds d'écran",
   "aria_link_input": "ID du lien",
 
-  "shortcuts_hint": "Raccourcis : Ctrl+N (nouveau), Ctrl+F (rechercher), Ctrl+G (vue), T (thème)"
+  "shortcuts_hint": "Raccourcis : Ctrl+N (nouveau), Ctrl+F (recherche), Ctrl+G (vue), T (thème)"
 }

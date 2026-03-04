@@ -13,10 +13,14 @@
 
   "pin": "Anheften",
   "unpin": "Lösen",
-  "pinned": "An oberster Stelle angeheftet",
-  "unpinned": "Losgelöst",
-  "aria_pin": "Diesen Link oben anheften",
-  "aria_unpin": "Diesen Link lösen",
+  "pinned": "Oben angeheftet",
+  "unpinned": "Gelöst",
+  "aria_pin": "Link oben anheften",
+  "aria_unpin": "Link lösen",
+
+  "drop_files_here": "Dateien hier ablegen",
+  "drop_hint": "Links werden automatisch erstellt",
+  "link_created_uploaded": "\"{{name}}\" erstellt und hochgeladen",
 
   "settings_language": "Sprache",
   "settings_data": "Daten",
@@ -27,11 +31,11 @@
   "export_error": "Export fehlgeschlagen",
   "import_success": "Daten erfolgreich importiert",
   "import_error": "Import fehlgeschlagen: Ungültige Datei",
-  "import_confirm": "{{count}} Links importieren? Dies ersetzt die aktuellen Daten.",
-  "sync_in_progress": "Daten werden mit Server synchronisiert...",
+  "import_confirm": "{{count}} Links importieren? Dies ersetzt aktuelle Daten.",
+  "sync_in_progress": "Synchronisiere Daten mit Server...",
 
-  "regen_previews": "Vorschauen regenerieren",
-  "regen_previews_running": "Regenerierung läuft...",
+  "regen_previews": "Vorschauen neu generieren",
+  "regen_previews_running": "Generiere...",
   "regen_previews_done": "Fertig: {{ok}} ok, {{errors}} Fehler, {{skipped}} übersprungen",
 
   "enter_image_url_title": "Von URL einfügen",
@@ -39,7 +43,7 @@
   "enter_image_url": "Bild-URL:",
   "url_placeholder": "https://...",
 
-  "invalid_id": "ID ist erforderlich",
+  "invalid_id": "ID erforderlich",
   "invalid_id_chars": "Verwenden Sie a-z, 0-9, - oder _",
   "invalid_image": "Ungültiges Dateiformat",
   "link_taken": "Linkname bereits vergeben",
@@ -48,14 +52,14 @@
 
   "upload_success": "Hochgeladen!",
   "created_success": "Link erstellt",
-  "renamed_success": "Umbenannt in \"{{name}}\"",
+  "renamed_success": "Umbenannt zu \"{{name}}\"",
   "deleted_success": "Link gelöscht",
   "confirm_delete": "Diesen Link löschen?",
   "confirm_delete_title": "Link löschen?",
   "confirm_delete_msg": "\"{{name}}\" löschen? Dies kann nicht rückgängig gemacht werden.",
   "delete_btn": "Löschen",
 
-  "loading": "Laden...",
+  "loading": "Lade...",
   "server_empty": "Ordner ist leer",
   "server_error": "Zugriffsfehler",
   "copied": "Kopiert!",
@@ -77,7 +81,7 @@
   "date_new": "Neueste zuerst",
   "date_old": "Älteste zuerst",
 
-  "load_error": "Fehler beim Laden der Links",
+  "load_error": "Links konnten nicht geladen werden",
   "preview_unavailable": "Vorschau nicht verfügbar",
   "image_unavailable": "Bild nicht verfügbar",
 
@@ -91,8 +95,8 @@
   "aria_settings": "Einstellungen",
   "aria_toggle_view": "Ansicht wechseln",
   "aria_toggle_theme": "Dunkelmodus umschalten",
-  "aria_search": "Hintergrundbilder suchen",
+  "aria_search": "Wallpaper suchen",
   "aria_link_input": "Link-ID",
 
-  "shortcuts_hint": "Tastenkürzel: Strg+N (neu), Strg+F (suchen), Strg+G (Ansicht), T (Theme)"
+  "shortcuts_hint": "Shortcuts: Strg+N (neu), Strg+F (suchen), Strg+G (Ansicht), T (Theme)"
 }

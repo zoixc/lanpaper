@@ -1,6 +1,6 @@
 {
   "create_new_link": "Crea nuovo collegamento",
-  "input_placeholder": "ID collegamento (lettere, numeri, - o _)",
+  "input_placeholder": "ID del collegamento (lettere, numeri, - o _)",
   "create_btn": "Crea",
   "existing_links": "Collegamenti",
   "no_links": "Nessun collegamento ancora",
@@ -11,12 +11,16 @@
   "select_server": "Dalla galleria",
   "remove": "Rimuovi",
 
-  "pin": "Blocca",
-  "unpin": "Sblocca",
-  "pinned": "Bloccato in alto",
-  "unpinned": "Sbloccato",
-  "aria_pin": "Blocca questo collegamento in alto",
-  "aria_unpin": "Sblocca questo collegamento",
+  "pin": "Fissa",
+  "unpin": "Stacca",
+  "pinned": "Fissato in alto",
+  "unpinned": "Staccato",
+  "aria_pin": "Fissa questo collegamento in alto",
+  "aria_unpin": "Stacca questo collegamento",
+
+  "drop_files_here": "Trascina i file qui",
+  "drop_hint": "I collegamenti verranno creati automaticamente",
+  "link_created_uploaded": "\"{{name}}\" creato e caricato",
 
   "settings_language": "Lingua",
   "settings_data": "Dati",
@@ -26,23 +30,23 @@
   "export_success": "Dati esportati con successo",
   "export_error": "Esportazione fallita",
   "import_success": "Dati importati con successo",
-  "import_error": "Importazione fallita: file non valido",
+  "import_error": "Importazione fallita: File non valido",
   "import_confirm": "Importare {{count}} collegamenti? Questo sostituirà i dati attuali.",
   "sync_in_progress": "Sincronizzazione dati con il server...",
 
   "regen_previews": "Rigenera anteprime",
-  "regen_previews_running": "Rigenerazione in corso...",
+  "regen_previews_running": "Rigenerazione...",
   "regen_previews_done": "Fatto: {{ok}} ok, {{errors}} errori, {{skipped}} saltati",
 
   "enter_image_url_title": "Incolla da URL",
   "select_server_title": "Seleziona dalla galleria",
-  "enter_image_url": "URL immagine:",
+  "enter_image_url": "URL dell'immagine:",
   "url_placeholder": "https://...",
 
   "invalid_id": "ID richiesto",
   "invalid_id_chars": "Usa a-z, 0-9, - o _",
   "invalid_image": "Formato file non valido",
-  "link_taken": "Nome collegamento già utilizzato",
+  "link_taken": "Nome collegamento già in uso",
   "link_not_found": "Collegamento non trovato",
   "invalid_json": "Formato dati non valido",
 
@@ -56,10 +60,10 @@
   "delete_btn": "Elimina",
 
   "loading": "Caricamento...",
-  "server_empty": "Cartella vuota",
+  "server_empty": "La cartella è vuota",
   "server_error": "Errore di accesso",
   "copied": "Copiato!",
-  "copy_error": "Impossibile copiare URL",
+  "copy_error": "Impossibile copiare l'URL",
 
   "modal_cancel": "Annulla",
   "modal_ok": "OK",
@@ -67,9 +71,9 @@
 
   "search_placeholder": "Cerca per nome collegamento o file...",
   "search_total": "Totale: {{total}}",
-  "search_found": "Trovati {{shown}} su {{total}}",
+  "search_found": "Trovati {{shown}} di {{total}}",
   "search_reset": "Ricerca cancellata",
-  "click_to_reset": "Clicca per reimpostare la ricerca",
+  "click_to_reset": "Fai clic per ripristinare la ricerca",
 
   "sort_by": "Ordina per:",
   "name_asc": "Nome (A\u2013Z)",
@@ -81,16 +85,16 @@
   "preview_unavailable": "Anteprima non disponibile",
   "image_unavailable": "Immagine non disponibile",
 
-  "compression_saved": "\ud83d\udddc\ufe0f Compresso: {{percent}}% più piccolo ({{saved}} risparmiato)",
+  "compression_saved": "\ud83d\udddc\ufe0f Compresso: {{percent}}% più piccolo ({{saved}} risparmiati)",
   "rename_hint": "Doppio clic per rinominare",
   "rename_input_label": "Nuovo nome collegamento",
 
   "aria_open_image": "Apri immagine",
   "aria_link_id": "ID collegamento",
-  "aria_file_info": "Info file",
+  "aria_file_info": "Informazioni file",
   "aria_settings": "Impostazioni",
   "aria_toggle_view": "Cambia vista",
-  "aria_toggle_theme": "Attiva/disattiva modalità scura",
+  "aria_toggle_theme": "Attiva modalità scura",
   "aria_search": "Cerca sfondi",
   "aria_link_input": "ID collegamento",
 
