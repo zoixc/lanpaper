@@ -169,21 +169,23 @@ func normalizeFormat(format string) string {
 	return format
 }
 
-func storedExt(ext string) string {
+// storedExt returns the file extension to use for storage.
+// In lossless mode, the original format is preserved.
+// In compression mode, BMP/TIFF are converted to JPEG.
+func storedExt(ext string, lossless bool) string {
+	if lossless {
+		return ext
+	}
 	if ext == "bmp" || ext == "tiff" {
 		return "jpg"
 	}
 	return ext
 }
 
+// canUseLosslessMode returns true if the file can be copied byte-for-byte
+// without re-encoding (quality=100, scale=100, any supported image format).
 func canUseLosslessMode(ext string) bool {
-	if config.Current.Compression.Quality != 100 || config.Current.Compression.Scale != 100 {
-		return false
-	}
-	if ext == "bmp" || ext == "tiff" {
-		return false
-	}
-	return true
+	return config.Current.Compression.Quality == 100 && config.Current.Compression.Scale == 100
 }
 
 // checkImageDimensions returns an error if the image exceeds the allowed
@@ -400,7 +402,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		removeFiles(oldWp.ImagePath, oldWp.PreviewPath)
 	}
 
-	saveExt := storedExt(ext)
+	saveExt := storedExt(ext, losslessMode)
 	originalPath := filepath.Join("static", "images", linkName+"."+saveExt)
 	previewPath := filepath.Join("static", "images", "previews", linkName+".webp")
 
