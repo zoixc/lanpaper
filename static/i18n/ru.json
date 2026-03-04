@@ -18,6 +18,10 @@
   "aria_pin": "Закрепить ссылку вверху",
   "aria_unpin": "Открепить ссылку",
 
+  "drop_files_here": "Перетащите файлы сюда",
+  "drop_hint": "Ссылки будут созданы автоматически",
+  "link_created_uploaded": "Создана ссылка \"{{name}}\" и загружен файл",
+
   "settings_language": "Язык",
   "settings_data": "Данные",
   "settings_maintenance": "Обслуживание",
