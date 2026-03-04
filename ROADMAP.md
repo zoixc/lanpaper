@@ -6,112 +6,29 @@
 
 ## 🎯 Priority 1: Core UX Improvements
 
-### 1.1 Закрепление ссылок (Pin/Favorite)
+### ✅ 1.1 Закрепление ссылок (Pin/Favorite) - COMPLETE
 
-**Описание:** Пользователь может отметить важные ссылки звёздочкой. Закрепленные ссылки отображаются в начале списка независимо от сортировки.
+**Описание:** Пользователь может отметить важные ссылки закладкой. Закрепленные ссылки отображаются в начале списка независимо от сортировки.
 
-**Backend изменения:**
+**Статус:** ✅ Полностью реализовано
 
-```go
-// storage/wallpaper.go
-type Wallpaper struct {
-    // ... existing fields
-    IsPinned  bool  `json:"isPinned"`
-    PinnedAt  int64 `json:"pinnedAt,omitempty"` // timestamp when pinned
-}
+**Реализовано:**
+- ✅ Backend: `IsPinned`, `PinnedAt` fields added to Wallpaper struct
+- ✅ Backend: Sorting logic updated to prioritize pinned items
+- ✅ API: `POST /api/link/{name}/pin` endpoint
+- ✅ Frontend: Bookmark icon (instead of pushpin)
+- ✅ Frontend: Pin button UI with hover states
+- ✅ Frontend: JavaScript toggle logic with optimistic updates
+- ✅ i18n: Translation keys for en, ru, uk
+- ✅ CSS: Pin button styling with pinned state
+- ✅ Pinned items sort by PinnedAt within pinned group
 
-// Обновить sortSnap для учета pinned:
-func sortSnap(snap []*Wallpaper) {
-    sort.Slice(snap, func(i, j int) bool {
-        // Pinned always first
-        if snap[i].IsPinned != snap[j].IsPinned {
-            return snap[i].IsPinned
-        }
-        // Then by image presence
-        if snap[i].HasImage != snap[j].HasImage {
-            return snap[i].HasImage
-        }
-        // Then by modification time
-        if snap[i].HasImage {
-            return snap[i].ModTime > snap[j].ModTime
-        }
-        return snap[i].CreatedAt > snap[j].CreatedAt
-    })
-}
+**Использование:**
 ```
-
-**API endpoints:**
-
-```go
-// handlers/admin.go
-// PATCH /api/link/{linkName}/pin
-func HandleTogglePin(w http.ResponseWriter, r *http.Request) {
-    // Toggle isPinned field
-    // Set/unset pinnedAt timestamp
-    // Return updated wallpaper
-}
+Кликните на иконку закладки 🔖 в правом верхнем углу превью
+→ Ссылка закрепляется вверху списка
+→ Кликните снова чтобы открепить
 ```
-
-**Frontend изменения:**
-
-```javascript
-// static/js/app.js
-// Add pin button to card
-const pinBtn = card.querySelector('.pin-btn');
-pinBtn.addEventListener('click', async () => {
-    const isPinned = !link.isPinned;
-    try {
-        const updated = await apiCall(
-            `/api/link/${encodeURIComponent(link.linkName)}/pin`,
-            'PATCH',
-            { isPinned }
-        );
-        link.isPinned = updated.isPinned;
-        updatePinIcon(pinBtn, updated.isPinned);
-        filterAndSort(); // Re-render with new order
-        showToast(
-            isPinned ? t('pinned', 'Pinned') : t('unpinned', 'Unpinned'),
-            'success'
-        );
-    } catch (e) {}
-});
-```
-
-**CSS:**
-
-```css
-.pin-btn {
-    opacity: 0.3;
-    transition: opacity 0.2s ease, transform 0.2s ease;
-}
-.pin-btn:hover { opacity: 0.7; }
-.pin-btn.pinned {
-    opacity: 1;
-    color: var(--accent);
-}
-.pin-btn.pinned svg {
-    fill: currentColor;
-}
-```
-
-**i18n ключи:**
-```json
-{
-    "pin": "Pin",
-    "unpin": "Unpin",
-    "pinned": "Pinned to top",
-    "unpinned": "Unpinned",
-    "aria_pin": "Pin this link",
-    "aria_unpin": "Unpin this link"
-}
-```
-
-**Тестирование:**
-- [ ] Pin/unpin работает корректно
-- [ ] Pinned ссылки всегда вверху
-- [ ] Сортировка не влияет на pinned
-- [ ] Состояние сохраняется после перезагрузки
-- [ ] Работает в grid и list view
 
 ---
 
@@ -719,14 +636,14 @@ func HandleRegenerateToken(w http.ResponseWriter, r *http.Request) {
 
 ## 📋 Implementation Checklist
 
-### Phase 1: Core UX (2-3 days)
-- [ ] Backend: Add `isPinned`, `pinnedAt` fields
-- [ ] Backend: Update sorting logic
-- [ ] API: `PATCH /api/link/{linkName}/pin`
-- [ ] Frontend: Pin button UI
-- [ ] Frontend: Pin state management
-- [ ] i18n: Add translation keys
-- [ ] Testing: Pin/unpin functionality
+### Phase 1: Core UX (2-3 days) ✅ COMPLETE
+- [x] Backend: Add `isPinned`, `pinnedAt` fields
+- [x] Backend: Update sorting logic
+- [x] API: `POST /api/link/{linkName}/pin`
+- [x] Frontend: Pin button UI
+- [x] Frontend: Pin state management
+- [x] i18n: Add translation keys
+- [x] Testing: Pin/unpin functionality
 
 ### Phase 2: Playlists Basic (3-4 days)
 - [ ] Backend: Add `playlistMode`, `schedule`, `playlistImages` fields
@@ -785,9 +702,9 @@ func HandleRegenerateToken(w http.ResponseWriter, r *http.Request) {
 
 ## 🗓️ Estimated Timeline
 
-**Total development time:** ~20-25 days
+**Total development time:** ~18-22 days (1 phase complete)
 
-- **Week 1:** Pin/favorite + Playlist basic
+- **Week 1:** ~~Pin/favorite~~ ✅ + Playlist basic
 - **Week 2:** Playlist advanced + Format support
 - **Week 3:** Drag & Drop + Analytics backend
 - **Week 4:** Analytics frontend + Private links
