@@ -72,14 +72,14 @@ func getTransport() *http.Transport {
 	t := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
 		DialContext: (&ssrfSafeDialer{inner: &net.Dialer{
-			Timeout:   30 * time.Second,
+			Timeout:   10 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}}).DialContext,
 		TLSHandshakeTimeout:   10 * time.Second,
 		MaxIdleConns:          20,
 		MaxIdleConnsPerHost:   5,
 		IdleConnTimeout:       90 * time.Second,
-		ResponseHeaderTimeout: 30 * time.Second,
+		ResponseHeaderTimeout: 10 * time.Second,
 	}
 	if proxyHost != "" {
 		proxyURL := &url.URL{
@@ -109,22 +109,13 @@ func (d *ssrfSafeDialer) DialContext(ctx context.Context, network, addr string) 
 	var safeIP string
 	for _, ipAddr := range ips {
 		ip := ipAddr.IP
-		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
-			continue
-		}
-		isPrivate := false
-		for _, cidr := range utils.PrivateRanges() {
-			if cidr.Contains(ip) {
-				isPrivate = true
-				break
-			}
-		}
-		if !isPrivate {
+		if !utils.IsPrivateOrLocalIP(ip) {
 			safeIP = ip.String()
 			break
 		}
 	}
 	if safeIP == "" {
+		log.Printf("[SECURITY] Blocked SSRF attempt: %s resolves only to private IPs", host)
 		return nil, errors.New("address is not allowed")
 	}
 	return d.inner.DialContext(ctx, network, net.JoinHostPort(safeIP, port))
@@ -246,7 +237,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	maxBytes := int64(config.Current.MaxUploadMB) << 20
 	if r.ContentLength > maxBytes {
-		log.Printf("Security: rejected upload with Content-Length %d (max %d)", r.ContentLength, maxBytes)
+		log.Printf("[SECURITY] Rejected upload with Content-Length %d (max %d)", r.ContentLength, maxBytes)
 		http.Error(w, "File too large", http.StatusRequestEntityTooLarge)
 		return
 	}
@@ -284,13 +275,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			img, ext, fileData, err = downloadImage(r.Context(), urlStr)
 		} else {
 			if !utils.IsValidLocalPath(urlStr) {
-				log.Printf("Security: blocked invalid path: %s", urlStr)
+				log.Printf("[SECURITY] Blocked invalid path: %s", urlStr)
 				http.Error(w, "Invalid path", http.StatusBadRequest)
 				return
 			}
 			absPath, _, pathErr := utils.ValidateAndResolvePath(utils.ExternalBaseDir(), urlStr)
 			if pathErr != nil {
-				log.Printf("Security: path validation failed for %s: %v", urlStr, pathErr)
+				log.Printf("[SECURITY] Path validation failed for %s: %v", urlStr, pathErr)
 				http.Error(w, "Path outside allowed directory", http.StatusForbidden)
 				return
 			}
@@ -316,7 +307,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		defer upFile.Close()
 
 		if header.Size > maxBytes {
-			log.Printf("Security: rejected file %s size %d (max %d)", header.Filename, header.Size, maxBytes)
+			log.Printf("[SECURITY] Rejected file %s size %d (max %d)", header.Filename, header.Size, maxBytes)
 			http.Error(w, "File too large", http.StatusRequestEntityTooLarge)
 			return
 		}
@@ -337,7 +328,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 		e, ok := mimeToExt[http.DetectContentType(head)]
 		if !ok {
-			log.Printf("Security: rejected %s — unsupported MIME type", safeFilename)
+			log.Printf("[SECURITY] Rejected %s — unsupported MIME type", safeFilename)
 			http.Error(w, "Unsupported file type", http.StatusBadRequest)
 			return
 		}
@@ -345,14 +336,14 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		video = isVideo(ext)
 
 		if err := utils.ValidateFileType(head, ext); err != nil {
-			log.Printf("Security: magic bytes failed for %s: %v", safeFilename, err)
+			log.Printf("[SECURITY] Magic bytes failed for %s: %v", safeFilename, err)
 			http.Error(w, "File content does not match file type", http.StatusBadRequest)
 			return
 		}
 
 		if !video {
 			if dimErr := checkImageDimensions(upFile); dimErr != nil {
-				log.Printf("Security: rejected image %s: %v", safeFilename, dimErr)
+				log.Printf("[SECURITY] Rejected image %s: %v", safeFilename, dimErr)
 				http.Error(w, "Image dimensions too large", http.StatusBadRequest)
 				return
 			}
@@ -387,7 +378,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	if len(fileData) > 0 && !video && !losslessMode {
 		if err := utils.ValidateFileType(fileData, ext); err != nil {
-			log.Printf("Security: magic bytes failed for link %s: %v", linkName, err)
+			log.Printf("[SECURITY] Magic bytes failed for link %s: %v", linkName, err)
 			http.Error(w, "File content does not match file type", http.StatusBadRequest)
 			return
 		}
@@ -418,7 +409,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		} else if !strings.HasPrefix(urlStr, "http") {
 			absPath, _, pathErr := utils.ValidateAndResolvePath(utils.ExternalBaseDir(), urlStr)
 			if pathErr != nil {
-				log.Printf("Security: path validation failed for video %s: %v", urlStr, pathErr)
+				log.Printf("[SECURITY] Path validation failed for video %s: %v", urlStr, pathErr)
 				http.Error(w, "Path outside allowed directory", http.StatusForbidden)
 				return
 			}
@@ -589,7 +580,7 @@ func loadLocalImage(ctx context.Context, path string) (image.Image, string, []by
 		return nil, "", nil, fmt.Errorf("seek: %w", err)
 	}
 	if dimErr := checkImageDimensions(f); dimErr != nil {
-		log.Printf("Security: rejected local image %s: %v", path, dimErr)
+		log.Printf("[SECURITY] Rejected local image %s: %v", path, dimErr)
 		return nil, "", nil, errors.New("image dimensions too large")
 	}
 	if _, err := f.Seek(0, io.SeekStart); err != nil {
@@ -629,7 +620,13 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 		return nil, "", nil, errors.New("invalid URL")
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(config.DownloadTimeout)*time.Second)
+	// SSRF protection: validate hostname before making request
+	if err := utils.ValidateURLHost(parsed.Host); err != nil {
+		log.Printf("[SECURITY] Blocked SSRF attempt: %s - %v", urlStr, err)
+		return nil, "", nil, errors.New("URL host is not allowed")
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
@@ -639,7 +636,11 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Lanpaper/1.0)")
 	req.Header.Set("Accept", "image/*,*/*;q=0.8")
 
-	resp, err := (&http.Client{Transport: getTransport()}).Do(req)
+	client := &http.Client{
+		Transport: getTransport(),
+		Timeout:   30 * time.Second,
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, "", nil, errors.New("network error")
 	}
@@ -650,8 +651,8 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 	}
 
 	maxBytes := int64(config.Current.MaxUploadMB) << 20
-	if resp.ContentLength > maxBytes {
-		log.Printf("Security: rejected download Content-Length %d (max %d)", resp.ContentLength, maxBytes)
+	if resp.ContentLength > 0 && resp.ContentLength > maxBytes {
+		log.Printf("[SECURITY] Rejected download Content-Length %d (max %d)", resp.ContentLength, maxBytes)
 		return nil, "", nil, errors.New("file too large")
 	}
 
@@ -660,12 +661,12 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 		return nil, "", nil, errors.New("read error")
 	}
 	if int64(len(buf)) > maxBytes {
-		log.Printf("Security: rejected download body > %d bytes", maxBytes)
+		log.Printf("[SECURITY] Rejected download body > %d bytes", maxBytes)
 		return nil, "", nil, errors.New("file too large")
 	}
 
 	if dimErr := checkImageDimensions(bytes.NewReader(buf)); dimErr != nil {
-		log.Printf("Security: rejected remote image %s: %v", urlStr, dimErr)
+		log.Printf("[SECURITY] Rejected remote image %s: %v", urlStr, dimErr)
 		return nil, "", nil, errors.New("image dimensions too large")
 	}
 
