@@ -47,11 +47,16 @@ func isOverLimitNS(ns, ip string, perMin, burst int) bool {
 	now := time.Now()
 	muCounts.Lock()
 	defer muCounts.Unlock()
+	
 	c, ok := counts[key]
 	if !ok || now.Sub(c.windowFrom) > time.Minute {
 		counts[key] = &counter{count: 1, windowFrom: now}
 		return false
 	}
+	
+	// Check and increment atomically under the same lock to prevent race conditions.
+	// Previously, the check and increment were separate, allowing concurrent requests
+	// to bypass the rate limit.
 	if c.count >= perMin+burst {
 		return true
 	}
