@@ -142,8 +142,8 @@ func toResponses(wps []*storage.Wallpaper) []WallpaperResponse {
 func sortWallpapers(wps []*storage.Wallpaper, field string, desc bool) {
 	sort.SliceStable(wps, func(i, j int) bool {
 		// Pinned entries always sort first regardless of the requested field.
-		if wps[i].Pinned != wps[j].Pinned {
-			return wps[i].Pinned
+		if wps[i].IsPinned != wps[j].IsPinned {
+			return wps[i].IsPinned
 		}
 		var vi, vj int64
 		if field == "updated" {
@@ -183,7 +183,7 @@ func toResponse(wp *storage.Wallpaper) WallpaperResponse {
 		SizeBytes: wp.SizeBytes,
 		ModTime:   wp.ModTime,
 		CreatedAt: wp.CreatedAt,
-		Pinned:    wp.Pinned,
+		Pinned:    wp.IsPinned,
 		PinnedAt:  wp.PinnedAt,
 	}
 }
@@ -423,8 +423,8 @@ func TogglePin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wp.Pinned = !wp.Pinned
-	if wp.Pinned {
+	wp.IsPinned = !wp.IsPinned
+	if wp.IsPinned {
 		wp.PinnedAt = time.Now().Unix()
 	} else {
 		wp.PinnedAt = 0
@@ -436,7 +436,7 @@ func TogglePin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	action := "unpinned"
-	if wp.Pinned {
+	if wp.IsPinned {
 		action = "pinned"
 	}
 	log.Printf("Link %s: %s", linkName, action)
