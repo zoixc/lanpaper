@@ -18,6 +18,8 @@ http://your-server/tv        →  swap video/image from the browser, no reconfig
 
 - **Permanent links with swappable content** — the core idea
 - Upload images (JPEG, PNG, GIF, WebP, BMP, TIFF) and videos (MP4, WebM)
+- **True lossless mode** — copy files directly without re-encoding when `quality=100` and `scale=100`
+- Configurable compression quality and image scaling
 - Load content from URL or a local server directory
 - Automatic thumbnail generation
 - Basic Auth for admin panel (auto-disabled if no credentials set)
@@ -83,6 +85,16 @@ go build -o lanpaper .
 
 ## Configuration
 
+### Configuration Priority
+
+Settings are loaded in this order (later sources override earlier ones):
+
+1. **Built-in defaults** — sensible defaults for all settings
+2. **config.json** — file-based configuration (optional)
+3. **Environment variables** — highest priority, always override config.json
+
+This means you can mix approaches: set base config in `config.json` and override specific values via env vars.
+
 ### Authentication Behavior
 
 Authentication is automatically disabled if credentials are not provided:
@@ -106,12 +118,71 @@ Useful when running behind external authentication (Tinyauth, Nginx Proxy Manage
 | `RATE_PUBLIC_PER_MIN` | `120` | Public endpoint rate limit (req/min) |
 | `RATE_UPLOAD_PER_MIN` | `20` | Upload rate limit (req/min) |
 | `RATE_BURST` | `10` | Rate limit burst size |
+| `COMPRESSION_QUALITY` | `85` | JPEG/WebP quality (1-100, 100 = lossless mode) |
+| `COMPRESSION_SCALE` | `100` | Image scale percentage (1-100, 100 = no resize) |
 | `PROXY_TYPE` | `http` | Proxy type: `http`, `socks5` |
 | `PROXY_HOST` | `` | Proxy host |
 | `PROXY_PORT` | `` | Proxy port |
 | `PROXY_USERNAME` | `` | Proxy username |
 | `PROXY_PASSWORD` | `` | Proxy password |
 | `INSECURE_SKIP_VERIFY` | `false` | Skip TLS verification for external requests |
+
+### Compression Settings
+
+**Quality** (`COMPRESSION_QUALITY` or `compression.quality`):
+- Range: 1-100
+- Default: 85
+- Higher values = better quality, larger files
+- **100 = lossless mode** (see below)
+
+**Scale** (`COMPRESSION_SCALE` or `compression.scale`):
+- Range: 1-100 (percentage)
+- Default: 100 (no resize)
+- Scales image dimensions (e.g., 50 = half size)
+- **100 = no scaling** (original resolution)
+
+### Lossless Mode
+
+When **both** `quality=100` **and** `scale=100` are set, Lanpaper enters **true lossless mode**:
+
+- Files are **copied directly** without any decoding/re-encoding
+- **Zero quality loss** - original file is preserved bit-for-bit
+- Works for: JPEG, PNG, GIF, WebP (not BMP/TIFF - they're always converted to JPEG)
+- Logs show `lossless` mode indicator
+
+**Why lossless matters:**
+- JPEG at quality=100 is **not** truly lossless - it still applies lossy compression
+- Re-encoding (decode → encode) **always** loses quality, even at quality=100
+- Lossless mode bypasses re-encoding entirely - original file is saved as-is
+
+**Examples:**
+
+```bash
+# Lossless mode via environment variables
+COMPRESSION_QUALITY=100 COMPRESSION_SCALE=100 go run .
+```
+
+```json
+// Lossless mode via config.json
+{
+  "compression": {
+    "quality": 100,
+    "scale": 100
+  }
+}
+```
+
+**Log output:**
+```
+Lossless mode enabled for image.jpg (quality=100, scale=100)
+Uploaded: mylink (jpg, 1024 KB, lossless)
+```
+
+**Compression mode:**
+```bash
+COMPRESSION_QUALITY=85 COMPRESSION_SCALE=100 go run .
+# Uploaded: mylink (jpg, 256 KB, compressed)
+```
 
 ### Via config.json
 
@@ -129,6 +200,10 @@ Useful when running behind external authentication (Tinyauth, Nginx Proxy Manage
     "publicPerMin": 120,
     "uploadPerMin": 20,
     "burst": 10
+  },
+  "compression": {
+    "quality": 100,
+    "scale": 100
   },
   "proxyType": "http",
   "proxyHost": "",
@@ -154,6 +229,7 @@ Useful when running behind external authentication (Tinyauth, Nginx Proxy Manage
 - `POST /api/upload` — Upload content (form: `file` or `url`, `linkName`)
 - `GET /api/external-images` — List files from server directory
 - `GET /api/external-image-preview?path=...` — Preview server file
+- `GET /api/compression-config` — Get current compression settings
 - `GET /health` — Health check (`status`, `version`, `uptime`)
 
 ## Behind Reverse Proxy

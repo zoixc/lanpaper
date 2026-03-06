@@ -11,12 +11,21 @@
   "select_server": "Из галереи",
   "remove": "Удалить",
 
+  "upload_file": "Файл",
+  "upload_url": "URL",
+  "upload_server": "Сервер",
+
   "pin": "Закрепить",
   "unpin": "Открепить",
   "pinned": "Закреплено вверху",
   "unpinned": "Откреплено",
   "aria_pin": "Закрепить ссылку вверху",
   "aria_unpin": "Открепить ссылку",
+
+  "drop_files_here": "Перетащите файлы сюда",
+  "drop_hint": "Ссылки будут созданы автоматически",
+  "link_created_uploaded": "Создана ссылка \"{{name}}\" и загружен файл",
+  "dragdrop_hint": "Перетащите файлы в любое место для загрузки",
 
   "settings_language": "Язык",
   "settings_data": "Данные",
@@ -45,6 +54,7 @@
   "link_taken": "Ссылка уже существует",
   "link_not_found": "Ссылка не найдена",
   "invalid_json": "Неправильный формат данных",
+  "network_error": "Ошибка сети - проверьте соединение",
 
   "upload_success": "Загружено!",
   "created_success": "Ссылка создана",

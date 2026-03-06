@@ -11,12 +11,21 @@
   "select_server": "Aus Galerie",
   "remove": "Entfernen",
 
+  "upload_file": "Datei",
+  "upload_url": "URL",
+  "upload_server": "Server",
+
   "pin": "Anheften",
-  "unpin": "Lösen",
-  "pinned": "An oberster Stelle angeheftet",
+  "unpin": "Loslösen",
+  "pinned": "Oben angeheftet",
   "unpinned": "Losgelöst",
   "aria_pin": "Diesen Link oben anheften",
-  "aria_unpin": "Diesen Link lösen",
+  "aria_unpin": "Diesen Link loslösen",
+
+  "drop_files_here": "Dateien hier ablegen",
+  "drop_hint": "Links werden automatisch erstellt",
+  "link_created_uploaded": "\"{{name}}\" erstellt und hochgeladen",
+  "dragdrop_hint": "Dateien überall ablegen zum Hochladen",
 
   "settings_language": "Sprache",
   "settings_data": "Daten",
@@ -27,39 +36,40 @@
   "export_error": "Export fehlgeschlagen",
   "import_success": "Daten erfolgreich importiert",
   "import_error": "Import fehlgeschlagen: Ungültige Datei",
-  "import_confirm": "{{count}} Links importieren? Dies ersetzt die aktuellen Daten.",
-  "sync_in_progress": "Daten werden mit Server synchronisiert...",
+  "import_confirm": "{{count}} Links importieren? Dies ersetzt aktuelle Daten.",
+  "sync_in_progress": "Synchronisiere mit Server...",
 
-  "regen_previews": "Vorschauen regenerieren",
-  "regen_previews_running": "Regenerierung läuft...",
+  "regen_previews": "Vorschauen neu generieren",
+  "regen_previews_running": "Regeneriere...",
   "regen_previews_done": "Fertig: {{ok}} ok, {{errors}} Fehler, {{skipped}} übersprungen",
 
   "enter_image_url_title": "Von URL einfügen",
-  "select_server_title": "Aus Galerie auswählen",
+  "select_server_title": "Aus Galerie wählen",
   "enter_image_url": "Bild-URL:",
   "url_placeholder": "https://...",
 
-  "invalid_id": "ID ist erforderlich",
-  "invalid_id_chars": "Verwenden Sie a-z, 0-9, - oder _",
+  "invalid_id": "ID erforderlich",
+  "invalid_id_chars": "Verwende a-z, 0-9, - oder _",
   "invalid_image": "Ungültiges Dateiformat",
   "link_taken": "Linkname bereits vergeben",
   "link_not_found": "Link nicht gefunden",
   "invalid_json": "Ungültiges Datenformat",
+  "network_error": "Netzwerkfehler - Verbindung prüfen",
 
   "upload_success": "Hochgeladen!",
   "created_success": "Link erstellt",
-  "renamed_success": "Umbenannt in \"{{name}}\"",
+  "renamed_success": "Umbenannt zu \"{{name}}\"",
   "deleted_success": "Link gelöscht",
   "confirm_delete": "Diesen Link löschen?",
   "confirm_delete_title": "Link löschen?",
   "confirm_delete_msg": "\"{{name}}\" löschen? Dies kann nicht rückgängig gemacht werden.",
   "delete_btn": "Löschen",
 
-  "loading": "Laden...",
+  "loading": "Lädt...",
   "server_empty": "Ordner ist leer",
   "server_error": "Zugriffsfehler",
   "copied": "Kopiert!",
-  "copy_error": "URL konnte nicht kopiert werden",
+  "copy_error": "Fehler beim Kopieren der URL",
 
   "modal_cancel": "Abbrechen",
   "modal_ok": "OK",
@@ -87,12 +97,12 @@
 
   "aria_open_image": "Bild öffnen",
   "aria_link_id": "Link-ID",
-  "aria_file_info": "Dateiinfo",
+  "aria_file_info": "Datei-Info",
   "aria_settings": "Einstellungen",
   "aria_toggle_view": "Ansicht wechseln",
   "aria_toggle_theme": "Dunkelmodus umschalten",
   "aria_search": "Hintergrundbilder suchen",
   "aria_link_input": "Link-ID",
 
-  "shortcuts_hint": "Tastenkürzel: Strg+N (neu), Strg+F (suchen), Strg+G (Ansicht), T (Theme)"
+  "shortcuts_hint": "Shortcuts: Strg+N (neu), Strg+F (suchen), Strg+G (Ansicht), T (Theme)"
 }

@@ -55,46 +55,152 @@ type parsedProxy struct {
 
 var cachedProxyPtr atomic.Pointer[parsedProxy]
 
+// Load loads configuration with priority: env vars > config.json > defaults
 func Load() {
+	// Step 1: Load defaults
 	Current = Config{
-		Port:                 getEnv("PORT", "8080"),
-		MaxUploadMB:          getEnvInt("MAX_UPLOAD_MB", DefaultMaxUploadMB),
-		MaxImages:            getEnvInt("MAX_IMAGES", 0),
-		MaxConcurrentUploads: getEnvInt("MAX_CONCURRENT_UPLOADS", DefaultMaxConcurrentUploads),
-		MaxWalkDepth:         getEnvInt("MAX_WALK_DEPTH", DefaultMaxWalkDepth),
-		ExternalImageDir:     getEnv("EXTERNAL_IMAGE_DIR", "external/images"),
-		AdminUser:            getEnv("ADMIN_USER", ""),
-		AdminPass:            getEnv("ADMIN_PASS", ""),
-		DisableAuth:          getEnvBool("DISABLE_AUTH", false),
-		InsecureSkipVerify:   getEnvBool("INSECURE_SKIP_VERIFY", false),
-		ProxyHost:            getEnv("PROXY_HOST", ""),
-		ProxyPort:            getEnv("PROXY_PORT", ""),
-		ProxyType:            getEnv("PROXY_TYPE", "http"),
-		ProxyUsername:        getEnvAny("PROXY_USERNAME", "PROXY_USER", ""),
-		ProxyPassword:        getEnvAny("PROXY_PASSWORD", "PROXY_PASS", ""),
-		TrustedProxy:         getEnv("TRUSTED_PROXY", ""),
+		Port:                 "8080",
+		MaxUploadMB:          DefaultMaxUploadMB,
+		MaxImages:            0,
+		MaxConcurrentUploads: DefaultMaxConcurrentUploads,
+		MaxWalkDepth:         DefaultMaxWalkDepth,
+		ExternalImageDir:     "external/images",
+		AdminUser:            "",
+		AdminPass:            "",
+		DisableAuth:          false,
+		InsecureSkipVerify:   false,
+		ProxyHost:            "",
+		ProxyPort:            "",
+		ProxyType:            "http",
+		ProxyUsername:        "",
+		ProxyPassword:        "",
+		TrustedProxy:         "",
 		Rate: RateConfig{
-			PublicPerMin: getEnvInt("RATE_PUBLIC_PER_MIN", DefaultPublicRatePerMin),
-			UploadPerMin: getEnvInt("RATE_UPLOAD_PER_MIN", DefaultUploadRatePerMin),
-			Burst:        getEnvInt("RATE_BURST", DefaultRateBurst),
+			PublicPerMin: DefaultPublicRatePerMin,
+			UploadPerMin: DefaultUploadRatePerMin,
+			Burst:        DefaultRateBurst,
 		},
 		Compression: CompressionConfig{
-			Quality: getEnvInt("COMPRESSION_QUALITY", DefaultCompressionQuality),
-			Scale:   getEnvInt("COMPRESSION_SCALE", DefaultCompressionScale),
+			Quality: DefaultCompressionQuality,
+			Scale:   DefaultCompressionScale,
 		},
 	}
 
+	// Step 2: Override with config.json (if exists)
 	if data, err := os.ReadFile("config.json"); err == nil {
 		if err := json.Unmarshal(data, &Current); err != nil {
 			log.Printf("Warning: failed to parse config.json: %v", err)
 		}
 	}
 
+	// Step 3: Override with environment variables (highest priority)
+	if v := os.Getenv("PORT"); v != "" {
+		Current.Port = v
+	}
+	if v := os.Getenv("MAX_UPLOAD_MB"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			Current.MaxUploadMB = n
+		}
+	}
+	if v := os.Getenv("MAX_IMAGES"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			Current.MaxImages = n
+		}
+	}
+	if v := os.Getenv("MAX_CONCURRENT_UPLOADS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			Current.MaxConcurrentUploads = n
+		}
+	}
+	if v := os.Getenv("MAX_WALK_DEPTH"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			Current.MaxWalkDepth = n
+		}
+	}
+	if v := os.Getenv("EXTERNAL_IMAGE_DIR"); v != "" {
+		Current.ExternalImageDir = v
+	}
+	if v := os.Getenv("ADMIN_USER"); v != "" {
+		Current.AdminUser = v
+	}
+	if v := os.Getenv("ADMIN_PASS"); v != "" {
+		Current.AdminPass = v
+	}
+	if v := os.Getenv("DISABLE_AUTH"); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			Current.DisableAuth = b
+		}
+	}
+	if v := os.Getenv("INSECURE_SKIP_VERIFY"); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			Current.InsecureSkipVerify = b
+		}
+	}
+	if v := os.Getenv("PROXY_HOST"); v != "" {
+		Current.ProxyHost = v
+	}
+	if v := os.Getenv("PROXY_PORT"); v != "" {
+		Current.ProxyPort = v
+	}
+	if v := os.Getenv("PROXY_TYPE"); v != "" {
+		Current.ProxyType = v
+	}
+	// Support both PROXY_USERNAME and PROXY_USER
+	if v := os.Getenv("PROXY_USERNAME"); v != "" {
+		Current.ProxyUsername = v
+	} else if v := os.Getenv("PROXY_USER"); v != "" {
+		Current.ProxyUsername = v
+	}
+	// Support both PROXY_PASSWORD and PROXY_PASS
+	if v := os.Getenv("PROXY_PASSWORD"); v != "" {
+		Current.ProxyPassword = v
+	} else if v := os.Getenv("PROXY_PASS"); v != "" {
+		Current.ProxyPassword = v
+	}
+	if v := os.Getenv("TRUSTED_PROXY"); v != "" {
+		Current.TrustedProxy = v
+	}
+
+	// Rate limiting overrides
+	if v := os.Getenv("RATE_PUBLIC_PER_MIN"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			Current.Rate.PublicPerMin = n
+		}
+	}
+	if v := os.Getenv("RATE_UPLOAD_PER_MIN"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			Current.Rate.UploadPerMin = n
+		}
+	}
+	if v := os.Getenv("RATE_BURST"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			Current.Rate.Burst = n
+		}
+	}
+
+	// Compression overrides
+	if v := os.Getenv("COMPRESSION_QUALITY"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			Current.Compression.Quality = n
+		}
+	}
+	if v := os.Getenv("COMPRESSION_SCALE"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			Current.Compression.Scale = n
+		}
+	}
+
 	validate()
+
+	mode := "compressed"
+	if Current.Compression.Quality == 100 && Current.Compression.Scale == 100 {
+		mode = "lossless"
+	}
+	log.Printf("Config loaded: compression quality=%d scale=%d (%s)",
+		Current.Compression.Quality, Current.Compression.Scale, mode)
 }
 
 // parseTrustedProxyValue parses a single TrustedProxy string.
-// Returns (nil, nil, nil) when empty, and (nil, nil, err) on bad input.
 func parseTrustedProxyValue(s string) (*net.IP, *net.IPNet, error) {
 	if s == "" {
 		return nil, nil, nil
@@ -110,7 +216,6 @@ func parseTrustedProxyValue(s string) (*net.IP, *net.IPNet, error) {
 }
 
 // IsTrustedProxy reports whether remoteAddr matches the configured TrustedProxy.
-// Uses a cached parsed value so no allocation occurs on the hot path.
 func IsTrustedProxy(remoteAddr string) bool {
 	p := cachedProxyPtr.Load()
 	if p == nil || (p.ip == nil && p.cidr == nil) {
@@ -177,7 +282,6 @@ func validate() {
 		}
 	}
 
-	// Parse and cache TrustedProxy once so IsTrustedProxy is allocation-free per request.
 	ip, cidr, err := parseTrustedProxyValue(Current.TrustedProxy)
 	if err != nil {
 		log.Printf("Warning: invalid TRUSTED_PROXY %q — ignoring (must be IP or CIDR)", Current.TrustedProxy)
@@ -190,40 +294,4 @@ func validate() {
 	if !Current.DisableAuth && (Current.AdminUser == "" || Current.AdminPass == "") {
 		Current.DisableAuth = true
 	}
-}
-
-func getEnv(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
-}
-
-// getEnvAny returns the first non-empty value among the given env keys;
-// the last argument is the fallback.
-func getEnvAny(keys ...string) string {
-	for _, key := range keys[:len(keys)-1] {
-		if v := os.Getenv(key); v != "" {
-			return v
-		}
-	}
-	return keys[len(keys)-1]
-}
-
-func getEnvInt(key string, fallback int) int {
-	if v := os.Getenv(key); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			return n
-		}
-	}
-	return fallback
-}
-
-func getEnvBool(key string, fallback bool) bool {
-	if v := os.Getenv(key); v != "" {
-		if b, err := strconv.ParseBool(v); err == nil {
-			return b
-		}
-	}
-	return fallback
 }

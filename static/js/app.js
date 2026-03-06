@@ -96,6 +96,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadLinks();
     setupGlobalListeners();
     setupGlobalDropZone();
+    showDragDropHint();
 });
 
 
@@ -186,6 +187,16 @@ function initKeyboardShortcuts() {
             showToast(`💡 ${t('shortcuts_hint', 'Shortcuts: Ctrl+N (new), Ctrl+F (search), Ctrl+G (view), T (theme)')}`, 'success');
             localStorage.setItem('shortcuts-seen', 'true');
         }, 2000);
+    }
+}
+
+
+function showDragDropHint() {
+    if (!localStorage.getItem('dragdrop-hint-seen')) {
+        setTimeout(() => {
+            showToast('💡 ' + t('dragdrop_hint', 'Drag & drop files anywhere to upload'), 'info');
+            localStorage.setItem('dragdrop-hint-seen', 'true');
+        }, 4000);
     }
 }
 
@@ -853,8 +864,13 @@ async function apiCall(url, method = 'GET', body = null, isFormData = false) {
         const contentType = res.headers.get('content-type');
         return contentType?.includes('application/json') ? res.json() : null;
     } catch (e) {
-        const translatedMsg = translateServerError(e.message);
-        showToast(translatedMsg, 'error');
+        // Better network error handling
+        if (e.name === 'TypeError' || e.message === 'Failed to fetch') {
+            showToast(t('network_error', 'Network error - check your connection'), 'error');
+        } else {
+            const translatedMsg = translateServerError(e.message);
+            showToast(translatedMsg, 'error');
+        }
         throw e;
     }
 }
@@ -1297,7 +1313,7 @@ function setupCardEvents(card, link) {
 
     card.querySelector('.select-server-btn').addEventListener('click', async () => {
         dropdown.classList.remove('open');
-        toggleBtn.setAttribute('aria-enabled', 'false');
+        toggleBtn.setAttribute('aria-expanded', 'false');
         const filename = await showModal('grid', 'select_server_title');
         if (filename) await handleUpload(link, filename, card, true);
     });
@@ -1325,9 +1341,22 @@ function setupCardEvents(card, link) {
         try {
             await apiCall(`/api/link/${encodeURIComponent(link.linkName)}`, 'DELETE');
             ac.abort();
-            card.remove();
+            
+            // Remove from state
             STATE.wallpapers = STATE.wallpapers.filter(wp => wp.linkName !== link.linkName);
-            filterAndSort();
+            STATE.filteredWallpapers = STATE.filteredWallpapers.filter(wp => wp.linkName !== link.linkName);
+            
+            // Update stats without re-rendering
+            updateSearchStats();
+            
+            // Remove card from DOM
+            card.remove();
+            
+            // Show empty state if needed
+            if (!DOM.linksList.children.length) {
+                DOM.emptyState.classList.remove('d-none');
+            }
+            
             showToast(t('deleted_success', 'Link deleted'), 'success');
         } catch (_) {
             // Remove animation class on error
@@ -1437,6 +1466,14 @@ function setupGlobalListeners() {
     DOM.confirmOverlay.onclick = (e) => {
         if (e.target === DOM.confirmOverlay) closeConfirm(false);
     };
+    
+    // Add Enter key handler for confirm delete dialog
+    DOM.confirmOverlay.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !DOM.confirmOverlay.classList.contains('hidden')) {
+            e.preventDefault();
+            closeConfirm(true); // Confirm deletion on Enter
+        }
+    });
 
     const regenBtn = document.getElementById('regenPreviewsBtn');
     if (regenBtn) {

@@ -141,7 +141,7 @@ func readyHandler(w http.ResponseWriter, _ *http.Request) {
 		Message string `json:"message,omitempty"`
 	}
 
-	checks := make(map[string]check, 2)
+	checks := make(map[string]check, 3)
 	ready := true
 
 	for _, entry := range []struct{ key, dir string }{
@@ -156,6 +156,17 @@ func readyHandler(w http.ResponseWriter, _ *http.Request) {
 		}
 	}
 
+	// Check disk space
+	if freeGB, err := getDiskFreeGB("."); err != nil {
+		checks["disk"] = check{OK: false, Message: "cannot check disk space"}
+		ready = false
+	} else if freeGB < 1 {
+		checks["disk"] = check{OK: false, Message: "low disk space"}
+		ready = false
+	} else {
+		checks["disk"] = check{OK: true}
+	}
+
 	code := http.StatusOK
 	status := "ready"
 	if !ready {
@@ -167,4 +178,14 @@ func readyHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.WriteHeader(code)
 	_ = json.NewEncoder(w).Encode(map[string]any{"status": status, "checks": checks})
+}
+
+// getDiskFreeGB returns free disk space in GB for the given path.
+func getDiskFreeGB(path string) (float64, error) {
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(path, &stat); err != nil {
+		return 0, err
+	}
+	freeBytes := stat.Bavail * uint64(stat.Bsize)
+	return float64(freeBytes) / (1024 * 1024 * 1024), nil
 }

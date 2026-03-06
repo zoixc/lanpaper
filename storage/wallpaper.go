@@ -207,12 +207,10 @@ func (s *Store) Load() error {
 	}
 	for key, wp := range m {
 		if wp == nil {
-			// Corrupt or manually edited JSON — skip null entries to avoid panics.
 			log.Printf("Warning: skipping nil wallpaper entry for key %q in storage", key)
 			delete(m, key)
 			continue
 		}
-		// Ensure required fields are consistent; self-heal if LinkName was not persisted.
 		if wp.LinkName == "" {
 			wp.LinkName = key
 		}
@@ -228,14 +226,15 @@ func (s *Store) Load() error {
 	return nil
 }
 
-// PruneOldImages removes the oldest images when count exceeds max,
-// preserving empty slots. File I/O is performed outside the lock
-// to avoid blocking Get/Set during disk operations.
+// PruneOldImages removes the oldest non-pinned images when count exceeds max,
+// preserving empty slots and pinned entries.
+// File I/O is performed outside the lock to avoid blocking Get/Set during disk operations.
 func PruneOldImages(max int) {
 	Global.Lock()
 	var candidates []*Wallpaper
 	for _, wp := range Global.wallpapers {
-		if wp != nil && wp.HasImage {
+		// Skip nil, empty slots, and pinned entries — they are never pruned.
+		if wp != nil && wp.HasImage && !wp.IsPinned {
 			clone := *wp
 			candidates = append(candidates, &clone)
 		}
@@ -260,7 +259,6 @@ func PruneOldImages(max int) {
 				log.Printf("Error pruning preview %s: %v", wp.PreviewPath, err)
 			}
 		}
-		// Reset the store entry: clear image fields, keep slot metadata.
 		Global.Set(wp.ID, &Wallpaper{
 			ID:        wp.ID,
 			LinkName:  wp.LinkName,

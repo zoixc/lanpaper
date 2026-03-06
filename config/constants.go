@@ -4,14 +4,9 @@ const (
 	MaxImageDimension  = 16384 // max width/height in pixels; prevents decompression bombs
 	ThumbnailMaxWidth  = 640
 	ThumbnailMaxHeight = 360
-	// DefaultCompressionQuality is the canonical JPEG/WebP quality used everywhere.
-	// JPEGQuality and WebPQuality are aliases kept for readability at call sites.
 	DefaultCompressionQuality = 85
-	JPEGQuality               = DefaultCompressionQuality
-	WebPQuality               = DefaultCompressionQuality
 	GIFColors                 = 256
-
-	DefaultCompressionScale = 100
+	DefaultCompressionScale   = 100
 )
 
 const (

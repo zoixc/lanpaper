@@ -38,6 +38,19 @@ COPY --from=builder /app/lanpaper .
 COPY admin.html .
 COPY static ./static
 
+# Verify critical static files exist
+RUN echo "Verifying static files..." && \
+    test -f static/css/style.css || (echo "ERROR: static/css/style.css missing!" && exit 1) && \
+    test -f static/css/skeleton.css || (echo "ERROR: static/css/skeleton.css missing!" && exit 1) && \
+    test -f static/css/settings-menu.css || (echo "ERROR: static/css/settings-menu.css missing!" && exit 1) && \
+    test -f static/js/app.js || (echo "ERROR: static/js/app.js missing!" && exit 1) && \
+    test -f static/js/compressor.js || (echo "ERROR: static/js/compressor.js missing!" && exit 1) && \
+    test -f static/js/settings-menu.js || (echo "ERROR: static/js/settings-menu.js missing!" && exit 1) && \
+    test -f static/logo.svg || (echo "ERROR: static/logo.svg missing!" && exit 1) && \
+    test -f static/favicon.svg || (echo "ERROR: static/favicon.svg missing!" && exit 1) && \
+    echo "✓ All critical static files present" && \
+    ls -lh static/css/ static/js/ static/*.svg
+
 RUN mkdir -p data static/images/previews external/images \
     && chown -R lanpaper:lanpaper /app
 

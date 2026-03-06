@@ -11,12 +11,21 @@
   "select_server": "From gallery",
   "remove": "Remove",
 
+  "upload_file": "File",
+  "upload_url": "URL",
+  "upload_server": "Server",
+
   "pin": "Pin",
   "unpin": "Unpin",
   "pinned": "Pinned to top",
   "unpinned": "Unpinned",
   "aria_pin": "Pin this link to top",
   "aria_unpin": "Unpin this link",
+
+  "drop_files_here": "Drop files here",
+  "drop_hint": "Links will be created automatically",
+  "link_created_uploaded": "Created \"{{name}}\" and uploaded",
+  "dragdrop_hint": "Drag & drop files anywhere to upload",
 
   "settings_language": "Language",
   "settings_data": "Data",
@@ -45,6 +54,7 @@
   "link_taken": "Link name already taken",
   "link_not_found": "Link not found",
   "invalid_json": "Invalid data format",
+  "network_error": "Network error - check your connection",
 
   "upload_success": "Uploaded!",
   "created_success": "Link created",
