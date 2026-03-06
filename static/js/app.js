@@ -1313,7 +1313,7 @@ function setupCardEvents(card, link) {
 
     card.querySelector('.select-server-btn').addEventListener('click', async () => {
         dropdown.classList.remove('open');
-        toggleBtn.setAttribute('aria-enabled', 'false');
+        toggleBtn.setAttribute('aria-expanded', 'false');
         const filename = await showModal('grid', 'select_server_title');
         if (filename) await handleUpload(link, filename, card, true);
     });
