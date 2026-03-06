@@ -21,6 +21,11 @@ var (
 	counts   = map[string]*counter{}
 )
 
+const (
+	// maxTrackedIPs prevents memory exhaustion from bot networks
+	maxTrackedIPs = 10000
+)
+
 // StartCleaner removes stale per-IP counters periodically.
 // Call once from main; runs until the process exits.
 func StartCleaner() {
@@ -30,9 +35,16 @@ func StartCleaner() {
 	for range ticker.C {
 		now := time.Now()
 		muCounts.Lock()
-		for key, c := range counts {
-			if now.Sub(c.windowFrom) > time.Minute {
-				delete(counts, key)
+		// Full reset if too many IPs tracked (prevents memory leak)
+		if len(counts) > maxTrackedIPs {
+			log.Printf("[SECURITY] Rate limiter: clearing %d tracked IPs (exceeded max %d)", len(counts), maxTrackedIPs)
+			counts = make(map[string]*counter)
+		} else {
+			// Normal cleanup of expired entries
+			for key, c := range counts {
+				if now.Sub(c.windowFrom) > time.Minute {
+					delete(counts, key)
+				}
 			}
 		}
 		muCounts.Unlock()
@@ -111,7 +123,7 @@ func RateLimit(fn RateLimitFunc) func(http.HandlerFunc) http.HandlerFunc {
 			perMin, burst := fn()
 			ip := clientIP(r)
 			if isOverLimitNS("upload", ip, perMin, burst) {
-				log.Printf("Rate limit exceeded for IP: %s", ip)
+				log.Printf("[SECURITY] Rate limit exceeded: ip=%s path=%s", ip, r.URL.Path)
 				http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 				return
 			}
