@@ -1,154 +1,21 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <title>Lanpaper</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  
-  <!-- DaisyUI + Tailwind CSS via CDN -->
-  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/dist/full.min.css" rel="stylesheet" type="text/css" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Custom styles for compatibility -->
-  <style>
-    /* Preserve network background animation */
-    .network-bg {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: -1;
-      background: linear-gradient(135deg, oklch(var(--b1)) 0%, oklch(var(--b2)) 100%);
-      opacity: 0.5;
-    }
-    
-    /* Card grid layout */
-    .links-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 1rem;
-    }
-    
-    /* List view */
-    .links-list-view .link-card {
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-    }
-    
-    .links-list-view .preview-wrapper {
-      width: 100px;
-      height: 75px;
-      flex-shrink: 0;
-    }
-    
-    /* Preview image styling */
-    .preview-wrapper {
-      position: relative;
-      aspect-ratio: 16/9;
-      border-radius: var(--rounded-box);
-      overflow: hidden;
-      background: oklch(var(--b3));
-    }
-    
-    .preview-wrapper img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    
-    /* Pin button overlay */
-    .pin-btn {
-      position: absolute;
-      top: 0.5rem;
-      right: 0.5rem;
-      z-index: 10;
-    }
-    
-    .pin-btn.pinned svg path {
-      fill: currentColor;
-    }
-    
-    /* Drop overlay */
-    .drop-overlay {
-      position: fixed;
-      inset: 0;
-      background: oklch(var(--b1) / 0.95);
-      backdrop-filter: blur(8px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
-      transition: opacity 0.2s;
-    }
-    
-    .drop-overlay.hidden {
-      display: none;
-    }
-    
-    .drop-overlay-content {
-      text-align: center;
-      color: oklch(var(--bc));
-    }
-    
-    .drop-overlay svg {
-      margin: 0 auto 1rem;
-      animation: bounce 1s infinite;
-    }
-    
-    @keyframes bounce {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-10px); }
-    }
-    
-    /* No image placeholder */
-    .no-image {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: oklch(var(--bc) / 0.3);
-    }
-    
-    .no-image-icon {
-      width: 40%;
-      height: 40%;
-    }
-    
-    /* Hide elements */
-    .d-none {
-      display: none !important;
-    }
-    
-    /* Empty state */
-    .empty-state {
-      text-align: center;
-      padding: 4rem 2rem;
-      color: oklch(var(--bc) / 0.5);
-    }
-    
-    .empty-state-icon {
-      width: 120px;
-      height: 120px;
-      margin: 0 auto 1rem;
-      opacity: 0.3;
-    }
-  </style>
-  
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/skeleton.css">
+  <link rel="stylesheet" href="/static/css/settings-menu.css">
   <link rel="manifest" href="/static/manifest.json">
+  <!-- theme-color: respects system preference before JS loads -->
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1c1c20" media="(prefers-color-scheme: dark)">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  
-  <script>
-    // Theme initialization before page load
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    document.documentElement.setAttribute('data-theme', savedTheme);
-  </script>
 </head>
-<body class="min-h-screen">
+<body>
   <div class="network-bg"></div>
 
   <!-- Drop Overlay -->
@@ -159,331 +26,288 @@
         <polyline points="17 8 12 3 7 8"/>
         <line x1="12" y1="3" x2="12" y2="15"/>
       </svg>
-      <div class="text-2xl font-bold mb-2" data-i18n="drop_files_here">Drop files here</div>
-      <div class="text-sm opacity-70" data-i18n="drop_hint">Links will be created automatically</div>
+      <div class="drop-overlay-title" data-i18n="drop_files_here">Drop files here</div>
+      <div class="drop-overlay-hint" data-i18n="drop_hint">Links will be created automatically</div>
     </div>
   </div>
 
-  <div class="container mx-auto px-4 py-6 max-w-7xl">
+  <div class="container">
 
     <!-- Header -->
-    <header class="navbar bg-base-100 rounded-box shadow-lg mb-6">
-      <div class="flex-1">
-        <img src="/static/logo.svg" alt="Lanpaper" class="h-10" width="120" height="40">
+    <header class="header-row">
+      <div class="logo-wrapper">
+        <img src="/static/logo.svg" alt="Lanpaper" class="logo" width="120" height="40">
       </div>
-      <div class="flex-none gap-2">
-        
-        <!-- Settings Dropdown -->
-        <div class="dropdown dropdown-end">
-          <button tabindex="0" class="btn btn-ghost btn-circle" aria-label="Settings" data-i18n-aria="aria_settings">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
+      <div class="controls">
+        <div id="settingsDropdown" class="settings-dropdown">
+          <button id="settingsBtn" class="theme-switcher" aria-label="Settings" data-i18n-aria="aria_settings" aria-expanded="false" aria-haspopup="true">
+            <img src="/static/icons/settings.webp" class="settings-icon dark-theme-icon" alt="Settings" width="18" height="18">
+            <img src="/static/icons/settings-dark.webp" class="settings-icon light-theme-icon" alt="Settings" width="18" height="18">
           </button>
-          <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-64 p-2 shadow-lg">
-            <!-- Language -->
-            <li class="menu-title">
-              <span data-i18n="settings_language">Language</span>
-            </li>
-            <li><a data-lang="en">🇬🇧 English</a></li>
-            <li><a data-lang="ru">🇷🇺 Русский</a></li>
-            <li><a data-lang="de">🇩🇪 Deutsch</a></li>
-            <li><a data-lang="es">🇪🇸 Español</a></li>
-            <li><a data-lang="fr">🇫🇷 Français</a></li>
-            <li><a data-lang="it">🇮🇹 Italiano</a></li>
-            
-            <li class="divider"></li>
-            
-            <!-- Theme Selection -->
-            <li class="menu-title">
-              <span data-i18n="settings_theme">Theme</span>
-            </li>
-            <li><a data-theme-select="light">☀️ Light</a></li>
-            <li><a data-theme-select="dark">🌙 Dark</a></li>
-            <li><a data-theme-select="cupcake">🧁 Cupcake</a></li>
-            <li><a data-theme-select="retro">📼 Retro</a></li>
-            <li><a data-theme-select="cyberpunk">🤖 Cyberpunk</a></li>
-            
-            <li class="divider"></li>
-            
-            <!-- Data -->
-            <li class="menu-title">
-              <span data-i18n="settings_data">Data</span>
-            </li>
-            <li>
-              <a id="exportBtn">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <div class="settings-menu">
+            <div class="settings-section">
+              <div class="settings-section-title" data-i18n="settings_language">Language</div>
+              <div class="lang-options" id="langOptions"></div>
+            </div>
+            <div class="settings-section">
+              <div class="settings-section-title" data-i18n="settings_data">Data</div>
+              <button class="settings-menu-item" id="exportBtn" type="button">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                   <polyline points="7 10 12 15 17 10"></polyline>
                   <line x1="12" y1="15" x2="12" y2="3"></line>
                 </svg>
                 <span data-i18n="export_json">Export</span>
-              </a>
-            </li>
-            <li>
-              <a id="importBtn">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              </button>
+              <button class="settings-menu-item" id="importBtn" type="button">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                   <polyline points="17 8 12 3 7 8"></polyline>
                   <line x1="12" y1="3" x2="12" y2="15"></line>
                 </svg>
                 <span data-i18n="import_json">Import</span>
-              </a>
-            </li>
-            
-            <li class="divider"></li>
-            
-            <!-- Maintenance -->
-            <li class="menu-title">
-              <span data-i18n="settings_maintenance">Maintenance</span>
-            </li>
-            <li>
-              <a id="regenPreviewsBtn">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              </button>
+            </div>
+            <div class="settings-section">
+              <div class="settings-section-title" data-i18n="settings_maintenance">Maintenance</div>
+              <button class="settings-menu-item" id="regenPreviewsBtn" type="button">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="23 4 23 10 17 10"/>
                   <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
                 </svg>
                 <span data-i18n="regen_previews">Regenerate Previews</span>
-              </a>
-            </li>
-          </ul>
+              </button>
+            </div>
+          </div>
         </div>
 
-        <!-- View Toggle -->
-        <button id="viewToggle" class="btn btn-ghost btn-circle" aria-label="Toggle view" data-i18n-aria="aria_toggle_view">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 view-icon grid-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-          </svg>
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 view-icon list-icon hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
+        <button id="viewToggle" class="theme-switcher" aria-label="Toggle view" data-i18n-aria="aria_toggle_view">
+          <img src="/static/icons/grid-dark.png" class="view-icon list-icon light-theme-icon" alt="List">
+          <img src="/static/icons/grid-light.png" class="view-icon list-icon dark-theme-icon" alt="List">
+          <img src="/static/icons/list-dark.png" class="view-icon grid-icon light-theme-icon active" alt="Grid">
+          <img src="/static/icons/list-light.png" class="view-icon grid-icon dark-theme-icon active" alt="Grid">
         </button>
 
+        <button id="themeToggle" class="theme-switcher" aria-label="Toggle dark mode" data-i18n-aria="aria_toggle_theme">
+          <img src="/static/icons/sun.png" alt="Dark" class="theme-icon active">
+          <img src="/static/icons/moon.png" alt="Light" class="theme-icon">
+        </button>
       </div>
     </header>
 
-    <!-- Create + Search/Sort Toolbar -->
-    <div class="card bg-base-100 shadow-lg mb-6">
-      <div class="card-body">
-        <div class="flex flex-col lg:flex-row gap-4">
-          
-          <!-- Create Form -->
-          <form id="createForm" class="flex gap-2 flex-1">
-            <input 
-              type="text" 
-              id="newLinkId" 
-              placeholder="Link ID (letters, numbers, - or _)" 
-              data-i18n-placeholder="input_placeholder"
-              class="input input-bordered flex-1" 
-              autocomplete="off"
-              pattern="[a-zA-Z0-9_\-]+"
-              maxlength="255"
-              aria-label="Link ID"
-              data-i18n-aria="aria_link_input"
-            />
-            <button type="submit" id="createLinkBtn" class="btn btn-primary gap-2">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <line x1="12" y1="5" x2="12" y2="19"/>
-                <line x1="5" y1="12" x2="19" y2="12"/>
+    <!-- Create + Search/Sort merged toolbar -->
+    <div class="toolbar-section">
+      <form class="create-row" id="createForm">
+        <input type="text" id="newLinkId" class="input-field"
+               data-i18n-placeholder="input_placeholder"
+               placeholder="Link ID (letters, numbers, - or _)"
+               autocomplete="off"
+               pattern="[a-zA-Z0-9_\-]+"
+               maxlength="255"
+               aria-label="Link ID"
+               data-i18n-aria="aria_link_input">
+        <button type="submit" id="createLinkBtn" class="btn btn--primary" data-i18n="create_btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          <span data-i18n="create_btn">Create</span>
+        </button>
+      </form>
+
+      <div class="toolbar-divider"></div>
+
+      <div class="search-sort-bar">
+        <div class="search-container">
+          <input
+            type="text"
+            id="searchInput"
+            class="search-input"
+            data-i18n-placeholder="search_placeholder"
+            placeholder="Search by link name or file..."
+            aria-label="Search wallpapers"
+            data-i18n-aria="aria_search"
+          >
+          <div id="searchStats" class="search-stats">Total: 0</div>
+        </div>
+        <div class="sort-container">
+          <label class="sort-label" data-i18n="sort_by">Sort by:</label>
+          <div class="custom-select" id="customSortSelect">
+            <button class="custom-select-btn" aria-haspopup="listbox" aria-expanded="false">
+              <span id="customSortLabel" data-i18n="date_new">Newest first</span>
+              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 1l4 4 4-4"/>
               </svg>
-              <span data-i18n="create_btn">Create</span>
             </button>
-          </form>
-
-          <div class="divider lg:divider-horizontal"></div>
-
-          <!-- Search and Sort -->
-          <div class="flex gap-2 flex-1">
-            <div class="relative flex-1">
-              <input
-                type="text"
-                id="searchInput"
-                placeholder="Search by link name or file..."
-                data-i18n-placeholder="search_placeholder"
-                class="input input-bordered w-full"
-                aria-label="Search wallpapers"
-                data-i18n-aria="aria_search"
-              />
-              <div id="searchStats" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-base-content/50">
-                Total: 0
-              </div>
+            <div class="custom-select-menu" role="listbox">
+              <div class="custom-select-option" data-value="name_asc" data-i18n="name_asc">Name (A-Z)</div>
+              <div class="custom-select-option" data-value="name_desc" data-i18n="name_desc">Name (Z-A)</div>
+              <div class="custom-select-option selected" data-value="date_desc" data-i18n="date_new">Newest first</div>
+              <div class="custom-select-option" data-value="date_asc" data-i18n="date_old">Oldest first</div>
             </div>
-            
-            <select id="sortSelect" class="select select-bordered">
-              <option value="name_asc" data-i18n="name_asc">Name (A-Z)</option>
-              <option value="name_desc" data-i18n="name_desc">Name (Z-A)</option>
-              <option value="date_desc" selected data-i18n="date_new">Newest first</option>
-              <option value="date_asc" data-i18n="date_old">Oldest first</option>
-            </select>
           </div>
-
+          <select id="sortSelect" class="sort-select" aria-hidden="true">
+            <option value="name_asc" data-i18n="name_asc">Name (A-Z)</option>
+            <option value="name_desc" data-i18n="name_desc">Name (Z-A)</option>
+            <option value="date_desc" selected data-i18n="date_new">Newest first</option>
+            <option value="date_asc" data-i18n="date_old">Oldest first</option>
+          </select>
         </div>
       </div>
     </div>
 
-    <!-- Links Section -->
-    <section>
-      <h2 class="text-2xl font-bold mb-4" data-i18n="existing_links">Existing links</h2>
-      <div class="links-grid" id="linksList"></div>
+    <!-- Links -->
+    <section class="section">
+      <h2 data-i18n="existing_links">Existing links</h2>
+      <div class="links-list" id="linksList"></div>
       <div class="empty-state d-none" id="emptyState">
-        <svg class="empty-state-icon" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <svg class="empty-state-icon" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <!-- Folder -->
           <path d="M20 30 H50 L58 38 H100 V90 H20 Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round" fill="none" opacity="0.6"/>
+          <!-- Image icon inside -->
           <rect x="35" y="50" width="50" height="32" rx="2" stroke="currentColor" stroke-width="2.5" fill="none"/>
           <path d="M40 74 L50 62 L58 70 L65 63 L80 74 Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
           <circle cx="72" cy="58" r="3" fill="currentColor"/>
         </svg>
-        <div class="text-lg" data-i18n="no_links">No links yet. Create one above!</div>
+        <div class="empty-state-text" data-i18n="no_links">No links yet. Create one above!</div>
       </div>
     </section>
 
-    <!-- Footer -->
-    <footer class="footer footer-center mt-12 p-4 text-base-content">
-      <div>
-        <a href="https://github.com/zoixc/lanpaper" target="_blank" rel="noopener noreferrer" class="link link-hover gap-2 inline-flex items-center">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
-          </svg>
-          GitHub | <span id="appVersion">v...</span>
-        </a>
-      </div>
+    <footer class="footer">
+      <a href="https://github.com/zoixc/lanpaper" target="_blank" rel="noopener noreferrer" class="github-link">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+        </svg>
+        GitHub | <span id="appVersion">v...</span>
+      </a>
     </footer>
   </div>
 
-  <!-- Toast Container -->
-  <div id="toastContainer" class="toast toast-end"></div>
+  <!-- Toast -->
+  <div id="toastContainer" class="toast-container"></div>
 
   <!-- Modal -->
-  <dialog id="modalOverlay" class="modal">
-    <div class="modal-box">
-      <h3 id="modalTitle" class="font-bold text-lg" data-i18n="modal_default_title">Input</h3>
-      <div id="modalBody" class="py-4">
-        <input 
-          type="text" 
-          id="modalInput" 
-          placeholder="https://..." 
-          data-i18n-placeholder="url_placeholder"
-          class="input input-bordered w-full d-none" 
-        />
-        <div id="modalList" class="hidden"></div>
+  <div id="modalOverlay" class="modal-overlay hidden" aria-modal="true" role="dialog">
+    <div class="modal">
+      <h3 id="modalTitle" data-i18n="modal_default_title">Input</h3>
+      <div class="modal-body" id="modalBody">
+        <input type="text" id="modalInput" class="input-field d-none" placeholder="https://..." data-i18n-placeholder="url_placeholder">
+        <div id="modalList" class="modal-list hidden"></div>
       </div>
-      <div class="modal-action">
+      <div class="modal-actions">
         <button id="modalCancelBtn" class="btn" data-i18n="modal_cancel">Cancel</button>
-        <button id="modalConfirmBtn" class="btn btn-primary" data-i18n="modal_ok">OK</button>
+        <button id="modalConfirmBtn" class="btn btn--primary" data-i18n="modal_ok">OK</button>
       </div>
     </div>
-    <form method="dialog" class="modal-backdrop">
-      <button>close</button>
-    </form>
-  </dialog>
+  </div>
 
   <!-- Confirm Delete Modal -->
-  <dialog id="confirmOverlay" class="modal">
-    <div class="modal-box">
-      <h3 id="confirmTitle" class="font-bold text-lg" data-i18n="confirm_delete_title">Delete link?</h3>
-      <p id="confirmMessage" class="py-4"></p>
-      <div class="modal-action">
+  <div id="confirmOverlay" class="modal-overlay hidden" aria-modal="true" role="alertdialog">
+    <div class="modal">
+      <h3 id="confirmTitle" data-i18n="confirm_delete_title">Delete link?</h3>
+      <div class="modal-body">
+        <p id="confirmMessage"></p>
+      </div>
+      <div class="modal-actions">
         <button id="confirmCancelBtn" class="btn" data-i18n="modal_cancel">Cancel</button>
-        <button id="confirmDeleteBtn" class="btn btn-error" data-i18n="delete_btn">Delete</button>
+        <button id="confirmDeleteBtn" class="btn btn--danger" data-i18n="delete_btn">Delete</button>
       </div>
     </div>
-    <form method="dialog" class="modal-backdrop">
-      <button>close</button>
-    </form>
-  </dialog>
+  </div>
 
   <!-- Link Card Template -->
   <template id="linkCardTemplate">
-    <article class="card bg-base-100 shadow-lg hover:shadow-xl transition-shadow link-card" role="article">
-      <figure class="preview-wrapper">
-        <a class="preview-link block w-full h-full" target="_blank" rel="noopener noreferrer" aria-label="Open image">
-          <button class="pin-btn btn btn-ghost btn-sm btn-circle" aria-label="Pin this link" data-i18n-aria="aria_pin">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <article class="link-card" role="article">
+
+      <a class="preview-link" target="_blank" rel="noopener noreferrer" aria-label="Open image">
+        <div class="preview-wrapper">
+          <!-- Pin button - Bookmark icon -->
+          <button class="pin-btn" aria-label="Pin this link" data-i18n-aria="aria_pin" title="Pin">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
             </svg>
           </button>
+          <!-- Shown only when no image is set -->
           <div class="no-image">
-            <svg class="no-image-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg class="no-image-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <!-- mountains -->
               <path d="M8 48 L24 24 L36 38 L44 28 L56 48 Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
+              <!-- sun -->
               <circle cx="46" cy="18" r="5" stroke="currentColor" stroke-width="2" fill="none"/>
+              <!-- frame -->
               <rect x="6" y="8" width="52" height="44" rx="4" stroke="currentColor" stroke-width="2" fill="none"/>
             </svg>
           </div>
-        </a>
-      </figure>
-      
-      <div class="card-body p-4">
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="link-id card-title text-base" aria-label="Link ID"></h3>
-          <button class="copy-url-btn btn btn-ghost btn-xs gap-1" aria-label="Copy URL" title="Copy URL">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="9" y="9" width="13" height="13" rx="2"/>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-            </svg>
+        </div>
+      </a>
+
+      <div class="link-info">
+        <div class="link-id-row">
+          <div class="link-id" aria-label="Link ID"></div>
+          <button class="copy-url-btn" aria-label="Copy URL" title="Copy URL">
+            <span class="copy-icon">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+            </span>
             <span class="copy-text" data-i18n="copy_url">Copy URL</span>
           </button>
         </div>
-        
-        <p class="link-meta text-xs text-base-content/60" aria-label="File info"></p>
-        
-        <div class="card-actions justify-end mt-2">
-          <div class="dropdown dropdown-end upload-dropdown">
-            <button tabindex="0" class="btn btn-primary btn-sm upload-toggle-btn" aria-haspopup="true" aria-expanded="false">
-              <span data-i18n="set_image">Upload</span>
-              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M1 1l4 4 4-4"/>
-              </svg>
-            </button>
-            <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow-lg upload-menu">
-              <li>
-                <a class="upload-file-btn">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="17 8 12 3 7 8"/>
-                    <line x1="12" y1="3" x2="12" y2="15"/>
-                  </svg>
-                  <span data-i18n="upload_file">File</span>
-                </a>
-              </li>
-              <input type="file" class="file-input d-none" accept="image/*,video/mp4,video/webm">
-              <li>
-                <a class="paste-url-btn">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-                  </svg>
-                  <span data-i18n="upload_url">URL</span>
-                </a>
-              </li>
-              <li>
-                <a class="select-server-btn">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="2" y="2" width="20" height="8" rx="2"/>
-                    <rect x="2" y="14" width="20" height="8" rx="2"/>
-                    <line x1="6" y1="6" x2="6.01" y2="6"/>
-                    <line x1="6" y1="18" x2="6.01" y2="18"/>
-                  </svg>
-                  <span data-i18n="upload_server">Server</span>
-                </a>
-              </li>
-            </ul>
-          </div>
+        <div class="link-meta" aria-label="File info"></div>
+      </div>
 
-          <button class="btn btn-error btn-sm btn-square delete-btn" aria-label="Delete" title="Delete">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="3 6 5 6 21 6"/>
-              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-              <path d="M10 11v6"/>
-              <path d="M14 11v6"/>
-              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+      <div class="actions-row">
+        <div class="upload-dropdown">
+          <button class="btn btn--upload upload-toggle-btn" aria-haspopup="true" aria-expanded="false">
+            <span data-i18n="set_image">Upload</span>
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 1l4 4 4-4"/>
             </svg>
           </button>
+          <div class="upload-menu">
+            <button class="upload-menu-item upload-file-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              <span data-i18n="upload_file">File</span>
+            </button>
+            <input type="file" class="file-input d-none" accept="image/*,video/mp4,video/webm">
+            <button class="upload-menu-item paste-url-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+              </svg>
+              <span data-i18n="upload_url">URL</span>
+            </button>
+            <button class="upload-menu-item select-server-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="2" width="20" height="8" rx="2"/>
+                <rect x="2" y="14" width="20" height="8" rx="2"/>
+                <line x1="6" y1="6" x2="6.01" y2="6"/>
+                <line x1="6" y1="18" x2="6.01" y2="18"/>
+              </svg>
+              <span data-i18n="upload_server">Server</span>
+            </button>
+          </div>
         </div>
+
+        <button class="btn btn--danger delete-btn" aria-label="Delete" title="Delete">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            <path d="M10 11v6"/>
+            <path d="M14 11v6"/>
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          </svg>
+        </button>
       </div>
+
     </article>
   </template>
 
-  <script src="/static/js/daisyui-compat.js" defer></script>
   <script src="/static/js/settings-menu.js" defer></script>
   <script src="/static/js/compressor.js" defer></script>
   <script src="/static/js/app.js" defer></script>
