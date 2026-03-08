@@ -43,10 +43,16 @@ func main() {
 	}
 
 	if err := storage.Global.Load(); err != nil {
-		log.Printf("Warning: failed to load wallpapers: %v", err)
+		if os.IsNotExist(err) {
+			log.Println("Info: no existing wallpapers data, starting fresh")
+		} else {
+			log.Fatalf("FATAL: corrupted storage file: %v", err)
+		}
 	}
 
+	// Start background cleaners
 	go middleware.StartCleaner()
+	go middleware.CleanExpiredCSRFTokens()
 
 	// Serve static files with long-lived cache for versioned assets.
 	// The app uses ?t=<timestamp> cache-busting on dynamic resources.
@@ -60,23 +66,31 @@ func main() {
 	))
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/health/ready", readyHandler)
-	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Admin)))
+	
+	// Admin panel with CSRF protection
+	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.CSRFProtection(middleware.MaybeBasicAuth(handlers.Admin))))
+	
+	// Read-only API endpoints (no CSRF needed)
 	mux.HandleFunc("/api/wallpapers", middleware.WithSecurity(handlers.Wallpapers))
 	mux.HandleFunc("/api/compression-config", middleware.WithSecurity(handlers.GetCompressionConfig))
-	mux.HandleFunc("/api/link/", middleware.WithSecurity(middleware.MaybeBasicAuth(handleLinkRoutes)))
-	mux.HandleFunc("/api/link", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Link)))
+	mux.HandleFunc("/api/external-images", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImages)))
+	mux.HandleFunc("/api/external-image-preview", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImagePreview)))
+	
+	// State-changing API endpoints with CSRF protection
+	mux.HandleFunc("/api/link/", middleware.WithSecurity(middleware.CSRFProtection(middleware.MaybeBasicAuth(handleLinkRoutes))))
+	mux.HandleFunc("/api/link", middleware.WithSecurity(middleware.CSRFProtection(middleware.MaybeBasicAuth(handlers.Link))))
 	mux.HandleFunc("/api/upload",
-		middleware.WithSecurity(middleware.MaybeBasicAuth(
+		middleware.WithSecurity(middleware.CSRFProtection(middleware.MaybeBasicAuth(
 			middleware.RateLimit(func() (int, int) {
 				return config.Current.Rate.UploadPerMin, config.Current.Rate.Burst
 			})(handlers.Upload),
-		)),
+		))),
 	)
-	mux.HandleFunc("/api/external-images", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImages)))
-	mux.HandleFunc("/api/external-image-preview", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImagePreview)))
 	mux.HandleFunc("/api/regenerate-previews",
-		middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.RegeneratePreviews)),
+		middleware.WithSecurity(middleware.CSRFProtection(middleware.MaybeBasicAuth(handlers.RegeneratePreviews))),
 	)
+	
+	// Public page (no auth/CSRF needed)
 	mux.HandleFunc("/", handlers.Public)
 
 	port := config.Current.Port
