@@ -32,6 +32,10 @@ type Config struct {
 	AdminPass            string            `json:"adminPass"`
 	DisableAuth          bool              `json:"disableAuth,omitempty"`
 	InsecureSkipVerify   bool              `json:"insecureSkipVerify,omitempty"`
+	// AllowPrivateURLFetch disables SSRF protection and allows fetching images
+	// from private/LAN IP addresses (e.g. local NAS, home server).
+	// WARNING: only enable this in trusted, isolated environments.
+	AllowPrivateURLFetch bool              `json:"allowPrivateURLFetch,omitempty"`
 	ProxyHost            string            `json:"proxyHost,omitempty"`
 	ProxyPort            string            `json:"proxyPort,omitempty"`
 	ProxyType            string            `json:"proxyType,omitempty"`
@@ -69,6 +73,7 @@ func Load() {
 		AdminPass:            "",
 		DisableAuth:          false,
 		InsecureSkipVerify:   false,
+		AllowPrivateURLFetch: false,
 		ProxyHost:            "",
 		ProxyPort:            "",
 		ProxyType:            "http",
@@ -136,6 +141,11 @@ func Load() {
 			Current.InsecureSkipVerify = b
 		}
 	}
+	if v := os.Getenv("ALLOW_PRIVATE_URL_FETCH"); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			Current.AllowPrivateURLFetch = b
+		}
+	}
 	if v := os.Getenv("PROXY_HOST"); v != "" {
 		Current.ProxyHost = v
 	}
@@ -198,6 +208,9 @@ func Load() {
 	}
 	log.Printf("Config loaded: compression quality=%d scale=%d (%s)",
 		Current.Compression.Quality, Current.Compression.Scale, mode)
+	if Current.AllowPrivateURLFetch {
+		log.Printf("Warning: allowPrivateURLFetch=true — SSRF protection disabled for URL fetching")
+	}
 }
 
 // parseTrustedProxyValue parses a single TrustedProxy string.
