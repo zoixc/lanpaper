@@ -66,16 +66,19 @@ func main() {
 	))
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/health/ready", readyHandler)
-	
+
 	// Admin panel with CSRF protection
 	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.CSRFProtection(middleware.MaybeBasicAuth(handlers.Admin))))
-	
-	// Read-only API endpoints (no CSRF needed)
-	mux.HandleFunc("/api/wallpapers", middleware.WithSecurity(handlers.Wallpapers))
-	mux.HandleFunc("/api/compression-config", middleware.WithSecurity(handlers.GetCompressionConfig))
+
+	// Read-only API endpoints — guarded by auth when enabled.
+	// /api/wallpapers and /api/compression-config were previously missing
+	// MaybeBasicAuth, which allowed unauthenticated access to link metadata
+	// even when Basic Auth was configured.
+	mux.HandleFunc("/api/wallpapers", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Wallpapers)))
+	mux.HandleFunc("/api/compression-config", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.GetCompressionConfig)))
 	mux.HandleFunc("/api/external-images", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImages)))
 	mux.HandleFunc("/api/external-image-preview", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImagePreview)))
-	
+
 	// State-changing API endpoints with CSRF protection
 	mux.HandleFunc("/api/link/", middleware.WithSecurity(middleware.CSRFProtection(middleware.MaybeBasicAuth(handleLinkRoutes))))
 	mux.HandleFunc("/api/link", middleware.WithSecurity(middleware.CSRFProtection(middleware.MaybeBasicAuth(handlers.Link))))
@@ -89,7 +92,7 @@ func main() {
 	mux.HandleFunc("/api/regenerate-previews",
 		middleware.WithSecurity(middleware.CSRFProtection(middleware.MaybeBasicAuth(handlers.RegeneratePreviews))),
 	)
-	
+
 	// Public page (no auth/CSRF needed)
 	mux.HandleFunc("/", handlers.Public)
 
@@ -129,9 +132,8 @@ func main() {
 	log.Println("Server stopped.")
 }
 
-// handleLinkRoutes routes /api/link/{name}/pin to TogglePin, everything else to Link
+// handleLinkRoutes routes /api/link/{name}/pin to TogglePin, everything else to Link.
 func handleLinkRoutes(w http.ResponseWriter, r *http.Request) {
-	// Check if this is a pin toggle request (must be POST to /pin)
 	if strings.HasSuffix(r.URL.Path, "/pin") && r.Method == http.MethodPost {
 		handlers.TogglePin(w, r)
 	} else {

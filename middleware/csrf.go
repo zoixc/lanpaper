@@ -14,7 +14,6 @@ const (
 	csrfTokenLength = 32
 	csrfCookieName  = "_csrf_token"
 	csrfHeaderName  = "X-CSRF-Token"
-	csrfFormField   = "csrf_token"
 	csrfMaxAge      = 24 * 60 * 60 // 24 hours in seconds
 	// maxCSRFTokens caps in-memory token storage to prevent memory exhaustion.
 	maxCSRFTokens = 50000
@@ -114,9 +113,10 @@ func setCSRFCookie(w http.ResponseWriter, token string, secure bool) {
 
 // CSRFProtection returns middleware that protects against CSRF attacks.
 // Validates token on all state-changing requests (POST, PUT, PATCH, DELETE).
-// Token is read from X-CSRF-Token header only — form field fallback is
-// intentionally removed because r.FormValue on multipart bodies is unreliable
-// before ParseMultipartForm is called in the handler.
+// Token is read exclusively from the X-CSRF-Token header (double-submit cookie
+// pattern). The form field fallback has been removed: r.FormValue() on a
+// multipart body consumes r.Body before the handler can call
+// ParseMultipartForm, silently breaking file uploads.
 func CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, err := getOrCreateCSRFToken(r)
@@ -135,14 +135,7 @@ func CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 		if r.Method == http.MethodPost || r.Method == http.MethodPut ||
 			r.Method == http.MethodPatch || r.Method == http.MethodDelete {
 
-			// Read token from header first, then fall back to form field.
-			// Form field fallback only works for application/x-www-form-urlencoded;
-			// for multipart uploads the JS frontend must use X-CSRF-Token header.
 			providedToken := r.Header.Get(csrfHeaderName)
-			if providedToken == "" {
-				providedToken = r.FormValue(csrfFormField)
-			}
-
 			if !validateCSRFToken(token, providedToken) {
 				log.Printf("[SECURITY] CSRF token validation failed for %s %s from %s",
 					r.Method, r.URL.Path, r.RemoteAddr)
@@ -156,7 +149,7 @@ func CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // CleanExpiredCSRFTokens removes expired CSRF tokens from memory.
-// Runs every 5 minutes (previously 1 hour) to bound memory usage.
+// Runs every 5 minutes to bound memory usage.
 func CleanExpiredCSRFTokens() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()

@@ -402,17 +402,18 @@ func Link(w http.ResponseWriter, r *http.Request) {
 }
 
 // TogglePin handles POST /api/link/{name}/pin to toggle pin status.
+// Uses the shared linkNameFromPath helper after stripping the /pin suffix
+// so validation is consistent with the rest of the Link handler.
 func TogglePin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	path := strings.TrimPrefix(r.URL.Path, "/api/link/")
-	path = strings.TrimSuffix(path, "/pin")
-	linkName := strings.Trim(path, "/")
-
-	if linkName == "" || !isValidLinkName(linkName) {
+	// Strip /pin suffix then delegate to the shared path extractor.
+	rawPath := strings.TrimSuffix(r.URL.Path, "/pin")
+	linkName, ok := linkNameFromPath(rawPath)
+	if !ok {
 		http.Error(w, "Invalid link name", http.StatusBadRequest)
 		return
 	}
