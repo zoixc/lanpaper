@@ -146,8 +146,8 @@ func (s *Store) GetAllCopy() []*Wallpaper {
 	return snap
 }
 
-// atomicWrite marshals data to a temp file and renames it atomically,
-// so a crash mid-write never produces a truncated JSON file.
+// atomicWrite marshals data to a temp file, syncs it to disk, then renames
+// it atomically so a crash mid-write never produces a truncated JSON file.
 func atomicWrite(path string, data map[string]*Wallpaper) error {
 	body, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
@@ -162,6 +162,13 @@ func atomicWrite(path string, data map[string]*Wallpaper) error {
 		tmp.Close()
 		os.Remove(tmpName)
 		return fmt.Errorf("write temp: %w", err)
+	}
+	// Sync to disk before rename so data survives a power loss between
+	// the rename and the next OS page-cache flush.
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return fmt.Errorf("sync temp: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
 		os.Remove(tmpName)

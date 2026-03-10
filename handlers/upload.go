@@ -182,8 +182,8 @@ func storedExt(ext string, lossless bool) string {
 }
 
 // canUseLosslessMode returns true if the file can be copied byte-for-byte
-// without re-encoding (quality=100, scale=100, any supported image format).
-func canUseLosslessMode(ext string) bool {
+// without re-encoding (quality=100, scale=100).
+func canUseLosslessMode() bool {
 	return config.Current.Compression.Quality == 100 && config.Current.Compression.Scale == 100
 }
 
@@ -362,7 +362,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Check lossless mode BEFORE decoding
-			if canUseLosslessMode(ext) {
+			if canUseLosslessMode() {
 				losslessMode = true
 				log.Printf("Lossless mode: %s (quality=%d, scale=%d) — skipping decode",
 					safeFilename, config.Current.Compression.Quality, config.Current.Compression.Scale)
@@ -391,7 +391,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// Check lossless for downloaded/local files
-		if canUseLosslessMode(ext) {
+		if canUseLosslessMode() {
 			losslessMode = true
 			log.Printf("Lossless mode: downloaded %s", linkName)
 		}
@@ -500,9 +500,21 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		previewURL = "/static/images/previews/" + linkName + ".webp"
 	}
 
+	// Carry over immutable/user-set fields from the previous record so that
+	// a re-upload does not silently drop IsPinned, PinnedAt, or Category.
+	var isPinned bool
+	var pinnedAt int64
+	var category string
+	if oldWp != nil {
+		isPinned = oldWp.IsPinned
+		pinnedAt = oldWp.PinnedAt
+		category = oldWp.Category
+	}
+
 	wp := &storage.Wallpaper{
 		ID:          linkName,
 		LinkName:    linkName,
+		Category:    category,
 		ImageURL:    "/static/images/" + linkName + "." + saveExt,
 		Preview:     previewURL,
 		HasImage:    true,
@@ -510,6 +522,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		SizeBytes:   fi.Size(),
 		ModTime:     fi.ModTime().Unix(),
 		CreatedAt:   createdAt,
+		IsPinned:    isPinned,
+		PinnedAt:    pinnedAt,
 		ImagePath:   originalPath,
 		PreviewPath: previewPath,
 	}
@@ -609,7 +623,7 @@ func loadLocalImage(ctx context.Context, path string) (image.Image, string, []by
 		ext = strings.TrimPrefix(strings.ToLower(filepath.Ext(path)), ".")
 	}
 
-	if canUseLosslessMode(ext) {
+	if canUseLosslessMode() {
 		log.Printf("Lossless mode: local file %s", path)
 		return nil, ext, fileData, nil
 	}
@@ -641,9 +655,10 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Lanpaper/1.0)")
 	req.Header.Set("Accept", "image/*,*/*;q=0.8")
 
+	// Transport carries its own ResponseHeaderTimeout; rely on the context
+	// for the overall deadline instead of duplicating it in Client.Timeout.
 	client := &http.Client{
 		Transport: getTransport(),
-		Timeout:   30 * time.Second,
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -682,7 +697,7 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 		return nil, "", nil, errors.New("unsupported format")
 	}
 
-	if canUseLosslessMode(ext) {
+	if canUseLosslessMode() {
 		log.Printf("Lossless mode: downloaded %s", urlStr)
 		return nil, ext, buf, nil
 	}
