@@ -81,7 +81,7 @@ func getTransport() *http.Transport {
 		MaxIdleConns:          20,
 		MaxIdleConnsPerHost:   5,
 		IdleConnTimeout:       90 * time.Second,
-		ResponseHeaderTimeout: 10 * time.Second,
+		ResponseHeaderTimeout: 30 * time.Second,
 	}
 	if proxyHost != "" {
 		proxyURL := &url.URL{
@@ -628,13 +628,8 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 		return nil, "", nil, errors.New("invalid URL")
 	}
 
-	// SSRF protection: validate hostname before making request
-	if !config.Current.AllowPrivateURLFetch {
-		if err := utils.ValidateURLHost(parsed.Host); err != nil {
-			log.Printf("[SECURITY] Blocked SSRF attempt: %s - %v", urlStr, err)
-			return nil, "", nil, errors.New("URL host is not allowed")
-		}
-	}
+	// SSRF protection is handled entirely by ssrfSafeDialer in the transport.
+	// No pre-flight DNS check here to avoid consuming the request context timeout.
 
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -652,7 +647,6 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		// Log full error detail for debugging; client sees generic message
 		log.Printf("downloadImage: network error fetching %s: %v", urlStr, err)
 		return nil, "", nil, errors.New("network error")
 	}
