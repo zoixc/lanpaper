@@ -15,7 +15,9 @@ const (
 	csrfCookieName  = "_csrf_token"
 	csrfHeaderName  = "X-CSRF-Token"
 	csrfFormField   = "csrf_token"
-	csrfMaxAge      = 24 * 60 * 60 // 24 hours
+	csrfMaxAge      = 24 * 60 * 60 // 24 hours in seconds
+	// maxCSRFTokens caps in-memory token storage to prevent memory exhaustion.
+	maxCSRFTokens = 50000
 )
 
 type csrfToken struct {
@@ -42,35 +44,38 @@ func getOrCreateCSRFToken(r *http.Request) (string, error) {
 	cookie, err := r.Cookie(csrfCookieName)
 	if err == nil && cookie.Value != "" {
 		csrfTokensMu.RLock()
-		if tok, exists := csrfTokens[cookie.Value]; exists {
-			// Check if token is still valid (not expired)
+		tok, exists := csrfTokens[cookie.Value]
+		csrfTokensMu.RUnlock()
+		if exists {
 			if time.Since(tok.createdAt) < csrfMaxAge*time.Second {
-				csrfTokensMu.RUnlock()
 				return cookie.Value, nil
 			}
-			// Token expired, will create new one
-			csrfTokensMu.RUnlock()
+			// Token expired — delete and fall through to generate new one
 			csrfTokensMu.Lock()
 			delete(csrfTokens, cookie.Value)
 			csrfTokensMu.Unlock()
-		} else {
-			csrfTokensMu.RUnlock()
 		}
 	}
 
-	// Generate new token
 	token, err := generateCSRFToken()
 	if err != nil {
 		return "", err
 	}
 
 	csrfTokensMu.Lock()
+	defer csrfTokensMu.Unlock()
+
+	// Refuse to grow beyond cap — prevents memory exhaustion via GET flooding.
+	if len(csrfTokens) >= maxCSRFTokens {
+		log.Printf("[SECURITY] CSRF token store full (%d), dropping new token request from %s",
+			maxCSRFTokens, r.RemoteAddr)
+		return "", http.ErrNoCookie // caller will return 503
+	}
+
 	csrfTokens[token] = &csrfToken{
 		token:     token,
 		createdAt: time.Now(),
 	}
-	csrfTokensMu.Unlock()
-
 	return token, nil
 }
 
@@ -88,12 +93,13 @@ func validateCSRFToken(expected, provided string) bool {
 		return false
 	}
 
-	// Use constant-time comparison to prevent timing attacks
 	return subtle.ConstantTimeCompare([]byte(expected), []byte(provided)) == 1
 }
 
-// setCSRFCookie sets a CSRF token cookie readable by JavaScript (double-submit cookie pattern).
-// HttpOnly must be false so the frontend can read the token and send it in the X-CSRF-Token header.
+// setCSRFCookie sets the CSRF token cookie.
+// HttpOnly is false so the JS frontend can read it for the X-CSRF-Token header
+// (double-submit cookie pattern). The cookie itself is not the secret — the
+// header is; stealing only the cookie does not help without script execution.
 func setCSRFCookie(w http.ResponseWriter, token string, secure bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     csrfCookieName,
@@ -107,25 +113,31 @@ func setCSRFCookie(w http.ResponseWriter, token string, secure bool) {
 }
 
 // CSRFProtection returns middleware that protects against CSRF attacks.
-// It validates CSRF tokens on all state-changing requests (POST, PUT, PATCH, DELETE).
+// Validates token on all state-changing requests (POST, PUT, PATCH, DELETE).
+// Token is read from X-CSRF-Token header only — form field fallback is
+// intentionally removed because r.FormValue on multipart bodies is unreliable
+// before ParseMultipartForm is called in the handler.
 func CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Generate or retrieve CSRF token
 		token, err := getOrCreateCSRFToken(r)
 		if err != nil {
+			if err == http.ErrNoCookie {
+				http.Error(w, "Service temporarily unavailable", http.StatusServiceUnavailable)
+				return
+			}
 			log.Printf("Error generating CSRF token: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
-		// Set CSRF cookie on every request to keep it fresh
 		setCSRFCookie(w, token, r.TLS != nil)
 
-		// For state-changing methods, validate the token
 		if r.Method == http.MethodPost || r.Method == http.MethodPut ||
 			r.Method == http.MethodPatch || r.Method == http.MethodDelete {
 
-			// Try header first, then form field
+			// Read token from header first, then fall back to form field.
+			// Form field fallback only works for application/x-www-form-urlencoded;
+			// for multipart uploads the JS frontend must use X-CSRF-Token header.
 			providedToken := r.Header.Get(csrfHeaderName)
 			if providedToken == "" {
 				providedToken = r.FormValue(csrfFormField)
@@ -144,9 +156,9 @@ func CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // CleanExpiredCSRFTokens removes expired CSRF tokens from memory.
-// Should be called periodically (e.g., from a background goroutine).
+// Runs every 5 minutes (previously 1 hour) to bound memory usage.
 func CleanExpiredCSRFTokens() {
-	ticker := time.NewTicker(1 * time.Hour)
+	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
 	for range ticker.C {

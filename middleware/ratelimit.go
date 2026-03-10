@@ -22,7 +22,7 @@ var (
 )
 
 const (
-	// maxTrackedIPs prevents memory exhaustion from bot networks
+	// maxTrackedIPs prevents memory exhaustion from bot networks.
 	maxTrackedIPs = 10000
 )
 
@@ -35,12 +35,20 @@ func StartCleaner() {
 	for range ticker.C {
 		now := time.Now()
 		muCounts.Lock()
-		// Full reset if too many IPs tracked (prevents memory leak)
 		if len(counts) > maxTrackedIPs {
-			log.Printf("[SECURITY] Rate limiter: clearing %d tracked IPs (exceeded max %d)", len(counts), maxTrackedIPs)
-			counts = make(map[string]*counter)
+			// Selective eviction: remove only expired entries first.
+			for key, c := range counts {
+				if now.Sub(c.windowFrom) > time.Minute {
+					delete(counts, key)
+				}
+			}
+			// If still over limit after eviction, full reset is unavoidable.
+			if len(counts) > maxTrackedIPs {
+				log.Printf("[SECURITY] Rate limiter: full reset, %d active IPs after eviction still exceed max %d",
+					len(counts), maxTrackedIPs)
+				counts = make(map[string]*counter)
+			}
 		} else {
-			// Normal cleanup of expired entries
 			for key, c := range counts {
 				if now.Sub(c.windowFrom) > time.Minute {
 					delete(counts, key)
@@ -59,16 +67,18 @@ func isOverLimitNS(ns, ip string, perMin, burst int) bool {
 	now := time.Now()
 	muCounts.Lock()
 	defer muCounts.Unlock()
-	
+
 	c, ok := counts[key]
 	if !ok || now.Sub(c.windowFrom) > time.Minute {
+		// Enforce cap before inserting a new entry.
+		if !ok && len(counts) >= maxTrackedIPs {
+			// Treat unknown IPs as over-limit when the table is full.
+			return true
+		}
 		counts[key] = &counter{count: 1, windowFrom: now}
 		return false
 	}
-	
-	// Check and increment atomically under the same lock to prevent race conditions.
-	// Previously, the check and increment were separate, allowing concurrent requests
-	// to bypass the rate limit.
+
 	if c.count >= perMin+burst {
 		return true
 	}
@@ -83,7 +93,6 @@ func isOverLimit(ip string, perMin, burst int) bool {
 // clientIP returns the real client IP.
 // X-Real-IP and X-Forwarded-For are honoured only when the request originates
 // from the configured TrustedProxy, preventing IP spoofing.
-// Both headers are validated as proper IP addresses before use.
 func clientIP(r *http.Request) string {
 	if config.IsTrustedProxy(r.RemoteAddr) {
 		if xr := r.Header.Get("X-Real-IP"); xr != "" {
@@ -93,7 +102,6 @@ func clientIP(r *http.Request) string {
 			}
 		}
 		if xf := r.Header.Get("X-Forwarded-For"); xf != "" {
-			// XFF is comma-separated; take the leftmost (client) entry.
 			raw := xf
 			if idx := strings.IndexByte(xf, ','); idx >= 0 {
 				raw = xf[:idx]

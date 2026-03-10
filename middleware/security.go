@@ -70,7 +70,6 @@ type nonceKeyType struct{}
 var nonceKey nonceKeyType
 
 // NonceFromRequest retrieves the CSP nonce stored in the request context.
-// Returns an empty string if no nonce is present.
 func NonceFromRequest(r *http.Request) string {
 	if v := r.Context().Value(nonceKey); v != nil {
 		if s, ok := v.(string); ok {
@@ -80,11 +79,11 @@ func NonceFromRequest(r *http.Request) string {
 	return ""
 }
 
-// WithSecurity attaches security headers and applies public-endpoint rate
-// limiting. The CSP nonce is stored in the request context for templates.
+// WithSecurity attaches security headers and applies per-route rate limiting.
+// The CSP nonce is stored in the request context for templates.
 func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		nonce, _ := generateNonce() // If err != nil, nonce is ""
+		nonce, _ := generateNonce()
 
 		h := w.Header()
 		for key, value := range staticSecurityHeaders {
@@ -93,15 +92,29 @@ func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 		if r.TLS != nil {
 			h.Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
 		}
-
 		h.Set("Content-Security-Policy", buildCSP(nonce))
 		if nonce != "" {
 			r = r.WithContext(context.WithValue(r.Context(), nonceKey, nonce))
 		}
 
-		// Apply public rate-limit only to routes that aren't admin or API.
-		if !strings.HasPrefix(r.URL.Path, "/admin") && !strings.HasPrefix(r.URL.Path, "/api/") {
-			if isOverLimit(clientIP(r), config.Current.Rate.PublicPerMin, config.Current.Rate.Burst) {
+		ip := clientIP(r)
+
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/admin"):
+			// Admin endpoints: use upload rate limit as a brute-force guard.
+			if isOverLimitNS("admin", ip, config.Current.Rate.UploadPerMin, config.Current.Rate.Burst) {
+				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+				return
+			}
+		case strings.HasPrefix(r.URL.Path, "/api/"):
+			// API read endpoints: use public rate limit.
+			if isOverLimitNS("api", ip, config.Current.Rate.PublicPerMin, config.Current.Rate.Burst) {
+				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+				return
+			}
+		default:
+			// Public page.
+			if isOverLimit(ip, config.Current.Rate.PublicPerMin, config.Current.Rate.Burst) {
 				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 				return
 			}
