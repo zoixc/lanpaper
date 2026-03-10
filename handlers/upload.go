@@ -69,12 +69,14 @@ func getTransport() *http.Transport {
 		cachedTransport.CloseIdleConnections()
 	}
 
+	dialer := &ssrfSafeDialer{inner: &net.Dialer{
+		Timeout:   10 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}}
+
 	t := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
-		DialContext: (&ssrfSafeDialer{inner: &net.Dialer{
-			Timeout:   10 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}}).DialContext,
+		TLSClientConfig:       &tls.Config{InsecureSkipVerify: insecure},
+		DialContext:           dialer.DialContext,
 		TLSHandshakeTimeout:   10 * time.Second,
 		MaxIdleConns:          20,
 		MaxIdleConnsPerHost:   5,
@@ -106,6 +108,12 @@ func (d *ssrfSafeDialer) DialContext(ctx context.Context, network, addr string) 
 	if err != nil || len(ips) == 0 {
 		return nil, fmt.Errorf("DNS resolution failed for %s", host)
 	}
+
+	// If allowPrivateURLFetch is enabled, connect to first resolved IP directly
+	if config.Current.AllowPrivateURLFetch {
+		return d.inner.DialContext(ctx, network, net.JoinHostPort(ips[0].IP.String(), port))
+	}
+
 	var safeIP string
 	for _, ipAddr := range ips {
 		ip := ipAddr.IP
@@ -621,9 +629,11 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 	}
 
 	// SSRF protection: validate hostname before making request
-	if err := utils.ValidateURLHost(parsed.Host); err != nil {
-		log.Printf("[SECURITY] Blocked SSRF attempt: %s - %v", urlStr, err)
-		return nil, "", nil, errors.New("URL host is not allowed")
+	if !config.Current.AllowPrivateURLFetch {
+		if err := utils.ValidateURLHost(parsed.Host); err != nil {
+			log.Printf("[SECURITY] Blocked SSRF attempt: %s - %v", urlStr, err)
+			return nil, "", nil, errors.New("URL host is not allowed")
+		}
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -642,6 +652,8 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 	}
 	resp, err := client.Do(req)
 	if err != nil {
+		// Log full error detail for debugging; client sees generic message
+		log.Printf("downloadImage: network error fetching %s: %v", urlStr, err)
 		return nil, "", nil, errors.New("network error")
 	}
 	defer resp.Body.Close()
