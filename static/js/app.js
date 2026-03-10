@@ -848,12 +848,24 @@ async function loadExternalImages() {
 }
 
 
+// CSRF
+function getCsrfToken() {
+    const match = document.cookie.match(/(?:^|; )_csrf_token=([^;]*)/);
+    return match ? decodeURIComponent(match[1]) : null;
+}
+
+
 // API
 async function apiCall(url, method = 'GET', body = null, isFormData = false) {
-    const options = {
-        method,
-        headers: isFormData ? {} : { 'Content-Type': 'application/json' }
-    };
+    const headers = isFormData ? {} : { 'Content-Type': 'application/json' };
+
+    // Attach CSRF token for all state-changing requests (double-submit cookie pattern)
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+        const csrfToken = getCsrfToken();
+        if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+    }
+
+    const options = { method, headers };
     if (body) options.body = isFormData ? body : JSON.stringify(body);
     try {
         const res = await fetch(url, options);
