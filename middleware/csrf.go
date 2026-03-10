@@ -92,14 +92,15 @@ func validateCSRFToken(expected, provided string) bool {
 	return subtle.ConstantTimeCompare([]byte(expected), []byte(provided)) == 1
 }
 
-// setCSRFCookie sets a secure CSRF token cookie.
+// setCSRFCookie sets a CSRF token cookie readable by JavaScript (double-submit cookie pattern).
+// HttpOnly must be false so the frontend can read the token and send it in the X-CSRF-Token header.
 func setCSRFCookie(w http.ResponseWriter, token string, secure bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     csrfCookieName,
 		Value:    token,
 		Path:     "/",
 		MaxAge:   csrfMaxAge,
-		HttpOnly: true,
+		HttpOnly: false,
 		Secure:   secure,
 		SameSite: http.SameSiteStrictMode,
 	})
