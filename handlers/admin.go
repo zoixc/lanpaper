@@ -109,10 +109,7 @@ func Wallpapers(w http.ResponseWriter, r *http.Request) {
 
 func clampPageSize(s string) int {
 	if ps, err := strconv.Atoi(s); err == nil && ps > 0 {
-		if ps > MaxPageSize {
-			return MaxPageSize
-		}
-		return ps
+		return min(ps, MaxPageSize)
 	}
 	return DefaultPageSize
 }
@@ -141,7 +138,6 @@ func toResponses(wps []*storage.Wallpaper) []WallpaperResponse {
 // entries at the top, consistent with the default storage ordering.
 func sortWallpapers(wps []*storage.Wallpaper, field string, desc bool) {
 	sort.SliceStable(wps, func(i, j int) bool {
-		// Pinned entries always sort first regardless of the requested field.
 		if wps[i].IsPinned != wps[j].IsPinned {
 			return wps[i].IsPinned
 		}
@@ -162,7 +158,7 @@ func inferCategory(wp *storage.Wallpaper) string {
 	if wp.Category != "" {
 		return wp.Category
 	}
-	if wp.MIMEType == "mp4" || wp.MIMEType == "webm" {
+	if isVideo(wp.MIMEType) {
 		return "video"
 	}
 	if wp.HasImage {
@@ -306,16 +302,16 @@ func Link(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if wpOld.HasImage && wpOld.MIMEType != "" {
-				oldImg := filepath.Join("static", "images", linkName+"."+wpOld.MIMEType)
-				newImg := filepath.Join("static", "images", newName+"."+wpOld.MIMEType)
+				oldImg := imagePath(linkName, wpOld.MIMEType)
+				newImg := imagePath(newName, wpOld.MIMEType)
 				if err := os.Rename(oldImg, newImg); err != nil && !os.IsNotExist(err) {
 					log.Printf("Error renaming image file %s -> %s: %v", oldImg, newImg, err)
 					http.Error(w, "Failed to rename image file", http.StatusInternalServerError)
 					return
 				}
-				if wpOld.MIMEType != "mp4" && wpOld.MIMEType != "webm" {
-					oldPrev := filepath.Join("static", "images", "previews", linkName+".webp")
-					newPrev := filepath.Join("static", "images", "previews", newName+".webp")
+				if !isVideo(wpOld.MIMEType) {
+					oldPrev := previewFilePath(linkName)
+					newPrev := previewFilePath(newName)
 					if err := os.Rename(oldPrev, newPrev); err != nil && !os.IsNotExist(err) {
 						log.Printf("Warning: could not rename preview %s -> %s: %v", oldPrev, newPrev, err)
 					}
@@ -329,13 +325,12 @@ func Link(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Update URLs and runtime paths to reflect the new name.
-			// All URLs must start with a leading slash for correct browser resolution.
 			if wp.HasImage && wp.MIMEType != "" {
-				wp.ImageURL = "/static/images/" + newName + "." + wp.MIMEType
-				wp.ImagePath = filepath.Join("static", "images", newName+"."+wp.MIMEType)
-				if wp.MIMEType != "mp4" && wp.MIMEType != "webm" {
-					wp.Preview = "/static/images/previews/" + newName + ".webp"
-					wp.PreviewPath = filepath.Join("static", "images", "previews", newName+".webp")
+				wp.ImageURL = imageURLPath(newName, wp.MIMEType)
+				wp.ImagePath = imagePath(newName, wp.MIMEType)
+				if !isVideo(wp.MIMEType) {
+					wp.Preview = previewURLPath(newName)
+					wp.PreviewPath = previewFilePath(newName)
 				}
 				storage.Global.Set(newName, wp)
 			}
@@ -402,15 +397,12 @@ func Link(w http.ResponseWriter, r *http.Request) {
 }
 
 // TogglePin handles POST /api/link/{name}/pin to toggle pin status.
-// Uses the shared linkNameFromPath helper after stripping the /pin suffix
-// so validation is consistent with the rest of the Link handler.
 func TogglePin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Strip /pin suffix then delegate to the shared path extractor.
 	rawPath := strings.TrimSuffix(r.URL.Path, "/pin")
 	linkName, ok := linkNameFromPath(rawPath)
 	if !ok {

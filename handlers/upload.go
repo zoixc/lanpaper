@@ -260,12 +260,21 @@ func imagePath(linkName, ext string) string {
 	return filepath.Join("static", "images", linkName+"."+ext)
 }
 
+func imageURLPath(linkName, ext string) string {
+	return "/static/images/" + linkName + "." + ext
+}
+
 func previewFilePath(linkName string) string {
 	return filepath.Join("static", "images", "previews", linkName+".webp")
 }
 
 func previewURLPath(linkName string) string {
 	return "/static/images/previews/" + linkName + ".webp"
+}
+
+// previewDir returns the directory that holds all preview files.
+func previewDir() string {
+	return filepath.Join("static", "images", "previews")
 }
 
 // ---------------------------------------------------------------------------
@@ -382,7 +391,6 @@ func loadLocalImage(ctx context.Context, path string) (image.Image, string, []by
 	}
 	defer f.Close()
 
-	// Dimension check first (requires seek back afterwards).
 	if err := checkImageDimensions(f); err != nil {
 		log.Printf("[SECURITY] Rejected local image %s: %v", path, err)
 		return nil, "", nil, errors.New("image dimensions too large")
@@ -718,7 +726,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Save failed", http.StatusInternalServerError)
 			return
 		}
-		// Decode for thumbnail from already-buffered bytes.
 		var previewSrc image.Image
 		if len(fileData) > 0 {
 			previewSrc, _, err = image.Decode(bytes.NewReader(fileData))
@@ -763,12 +770,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Carry over user-set fields so a re-upload never silently drops them.
-	var isPinned bool
-	var pinnedAt int64
-	var category string
-	if oldWp != nil {
-		isPinned, pinnedAt, category = oldWp.IsPinned, oldWp.PinnedAt, oldWp.Category
-	}
+	isPinned, pinnedAt, category := oldWp.IsPinned, oldWp.PinnedAt, oldWp.Category
 
 	previewURL := ""
 	if prevPath != "" {
@@ -779,7 +781,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		ID:          linkName,
 		LinkName:    linkName,
 		Category:    category,
-		ImageURL:    "/static/images/" + linkName + "." + saveExt,
+		ImageURL:    imageURLPath(linkName, saveExt),
 		Preview:     previewURL,
 		HasImage:    true,
 		MIMEType:    saveExt,

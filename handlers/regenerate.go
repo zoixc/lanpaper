@@ -130,8 +130,8 @@ func regenPreview(ctx context.Context, wp *storage.Wallpaper) error {
 
 // cleanStalePreviewFiles removes .webp files in previews/ with no matching storage entry.
 func cleanStalePreviewFiles() {
-	previewDir := filepath.Join("static", "images", "previews")
-	entries, err := os.ReadDir(previewDir)
+	dir := previewDir()
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return
 	}
@@ -145,7 +145,7 @@ func cleanStalePreviewFiles() {
 		}
 		linkName := e.Name()[:len(e.Name())-len(ext)]
 		if _, exists := storage.Global.Get(linkName); !exists {
-			path := filepath.Join(previewDir, e.Name())
+			path := filepath.Join(dir, e.Name())
 			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 				log.Printf("cleanStalePreviewFiles: remove %s: %v", path, err)
 			}
