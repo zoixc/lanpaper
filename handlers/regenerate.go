@@ -21,7 +21,7 @@ import (
 type RegeneratePreviewsResult struct {
 	Total   int      `json:"total"`
 	OK      int      `json:"ok"`
-	Skipped int      `json:"skipped"` // videos or no-image entries
+	Skipped int      `json:"skipped"`
 	Errors  int      `json:"errors"`
 	Failed  []string `json:"failed,omitempty"`
 }
@@ -37,7 +37,6 @@ func RegeneratePreviews(w http.ResponseWriter, r *http.Request) {
 	}
 
 	wallpapers := storage.Global.GetAllCopy()
-
 	total := len(wallpapers)
 	skipped := 0
 
@@ -60,14 +59,7 @@ func RegeneratePreviews(w http.ResponseWriter, r *http.Request) {
 	)
 
 	ctx := r.Context()
-
-	workers := runtime.NumCPU()
-	if workers < 1 {
-		workers = 1
-	}
-	if workers > 8 {
-		workers = 8
-	}
+	workers := min(max(runtime.NumCPU(), 1), 8)
 
 	var wg sync.WaitGroup
 	for range workers {
@@ -75,7 +67,6 @@ func RegeneratePreviews(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			defer wg.Done()
 			for j := range jobs {
-				// Check context cancellation immediately
 				if ctx.Err() != nil {
 					return
 				}
@@ -83,7 +74,6 @@ func RegeneratePreviews(w http.ResponseWriter, r *http.Request) {
 				if err := regenPreview(ctx, wp); err != nil {
 					log.Printf("RegeneratePreviews: %s: %v", wp.LinkName, err)
 					errCount.Add(1)
-					// Limit failed array to prevent memory exhaustion
 					failedMu.Lock()
 					if len(failed) < maxFailedItems {
 						failed = append(failed, wp.LinkName)
@@ -102,7 +92,6 @@ func RegeneratePreviews(w http.ResponseWriter, r *http.Request) {
 	if err := storage.Global.Save(); err != nil {
 		log.Printf("RegeneratePreviews: save storage: %v", err)
 	}
-
 	cleanStalePreviewFiles()
 
 	w.Header().Set("Content-Type", "application/json")
@@ -116,29 +105,25 @@ func RegeneratePreviews(w http.ResponseWriter, r *http.Request) {
 }
 
 func regenPreview(ctx context.Context, wp *storage.Wallpaper) error {
-	// loadLocalImage returns nil img when canUseLosslessMode is true.
-	// In that case we decode from the returned fileData bytes directly.
 	img, _, fileData, err := loadLocalImage(ctx, wp.ImagePath)
 	if err != nil {
 		return err
 	}
+	// Lossless path: loadLocalImage returns nil img — decode from raw bytes.
 	if img == nil {
-		// Lossless path: fileData holds the raw bytes — decode for thumbnail.
 		if len(fileData) == 0 {
-			return nil // nothing to do
+			return nil
 		}
-		img, _, err = image.Decode(bytes.NewReader(fileData))
-		if err != nil {
+		if img, _, err = image.Decode(bytes.NewReader(fileData)); err != nil {
 			return err
 		}
 	}
-	previewPath := filepath.Join("static", "images", "previews", wp.LinkName+".webp")
-	thumb := thumbnail(img, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight)
-	if err := saveImage(thumb, "webp", previewPath); err != nil {
+	prevPath := previewFilePath(wp.LinkName)
+	if err := atomicSaveImage(thumbnail(img, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight), "webp", prevPath); err != nil {
 		return err
 	}
-	wp.PreviewPath = previewPath
-	wp.Preview = "/static/images/previews/" + wp.LinkName + ".webp"
+	wp.PreviewPath = prevPath
+	wp.Preview = previewURLPath(wp.LinkName)
 	storage.Global.Set(wp.LinkName, wp)
 	return nil
 }
@@ -161,8 +146,8 @@ func cleanStalePreviewFiles() {
 		linkName := e.Name()[:len(e.Name())-len(ext)]
 		if _, exists := storage.Global.Get(linkName); !exists {
 			path := filepath.Join(previewDir, e.Name())
-			if removeErr := os.Remove(path); removeErr != nil && !os.IsNotExist(removeErr) {
-				log.Printf("cleanStalePreviewFiles: remove %s: %v", path, removeErr)
+			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+				log.Printf("cleanStalePreviewFiles: remove %s: %v", path, err)
 			}
 		}
 	}
