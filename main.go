@@ -38,7 +38,7 @@ func main() {
 
 	handlers.InitUploadSemaphore(config.Current.MaxConcurrentUploads)
 
-	for _, d := range []string{"data", "external/images", "static/images/previews"} {
+	for _, d := range []string{"data", "external/images", "static/images", "static/images/previews"} {
 		if err := os.MkdirAll(d, 0755); err != nil {
 			log.Printf("Warning: failed to create %s: %v", d, err)
 		}
@@ -73,9 +73,6 @@ func main() {
 	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.CSRFProtection(middleware.MaybeBasicAuth(handlers.Admin))))
 
 	// Read-only API endpoints — guarded by auth when enabled.
-	// /api/wallpapers and /api/compression-config were previously missing
-	// MaybeBasicAuth, which allowed unauthenticated access to link metadata
-	// even when Basic Auth was configured.
 	mux.HandleFunc("/api/wallpapers", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Wallpapers)))
 	mux.HandleFunc("/api/compression-config", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.GetCompressionConfig)))
 	mux.HandleFunc("/api/external-images", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImages)))
@@ -106,7 +103,6 @@ func main() {
 	srv := &http.Server{
 		Addr:    port,
 		Handler: mux,
-		// ReadTimeout covers headers + body; WriteTimeout must exceed the download context timeout.
 		ReadTimeout:  time.Duration(config.HTTPReadTimeout) * time.Second,
 		WriteTimeout: time.Duration(config.HTTPWriteTimeout) * time.Second,
 		IdleTimeout:  time.Duration(config.HTTPIdleTimeout) * time.Second,
@@ -174,7 +170,6 @@ func readyHandler(w http.ResponseWriter, _ *http.Request) {
 		}
 	}
 
-	// Check disk space
 	if freeGB, err := getDiskFreeGB("."); err != nil {
 		checks["disk"] = check{OK: false, Message: "cannot check disk space"}
 		ready = false

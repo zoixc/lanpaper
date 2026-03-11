@@ -9,6 +9,19 @@ import (
 	"lanpaper/storage"
 )
 
+// mimeType returns the correct Content-Type for the stored MIME extension.
+func mimeType(ext string) string {
+	switch ext {
+	case "mp4", "webm":
+		return "video/" + ext
+	case "jpg":
+		// "image/jpg" is non-standard; the correct type is "image/jpeg".
+		return "image/jpeg"
+	default:
+		return "image/" + ext
+	}
+}
+
 func Public(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 
@@ -55,13 +68,8 @@ func Public(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mime := "image/" + wp.MIMEType
-	if wp.MIMEType == "mp4" || wp.MIMEType == "webm" {
-		mime = "video/" + wp.MIMEType
-	}
-
 	h := w.Header()
-	h.Set("Content-Type", mime)
+	h.Set("Content-Type", mimeType(wp.MIMEType))
 	h.Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s.%s"`, wp.LinkName, wp.MIMEType))
 	// Not immutable: the same URL path can be reassigned to a different image.
 	h.Set("Cache-Control", "public, max-age=60, must-revalidate")

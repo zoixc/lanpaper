@@ -163,8 +163,6 @@ func atomicWrite(path string, data map[string]*Wallpaper) error {
 		os.Remove(tmpName)
 		return fmt.Errorf("write temp: %w", err)
 	}
-	// Sync to disk before rename so data survives a power loss between
-	// the rename and the next OS page-cache flush.
 	if err := tmp.Sync(); err != nil {
 		tmp.Close()
 		os.Remove(tmpName)
@@ -188,14 +186,32 @@ func (s *Store) Save() error {
 	return atomicWrite(dataFile, s.wallpapers)
 }
 
+// isVideoMIME reports whether the MIME extension is a video type.
+// Mirrors the isVideo helper in handlers without creating a package dependency.
+func isVideoMIME(ext string) bool {
+	return ext == "mp4" || ext == "webm"
+}
+
+// imageFilePath returns the on-disk path for a wallpaper image file.
+// Must stay in sync with handlers.imagePath.
+func imageFilePath(linkName, ext string) string {
+	return filepath.Join("static", "images", linkName+"."+ext)
+}
+
+// previewFilePath returns the on-disk path for a wallpaper preview file.
+// Must stay in sync with handlers.previewFilePath.
+func previewFilePathFor(linkName string) string {
+	return filepath.Join("static", "images", "previews", linkName+".webp")
+}
+
 // derivePaths fills runtime-only ImagePath/PreviewPath from persisted fields.
 func derivePaths(wp *Wallpaper) {
 	if !wp.HasImage || wp.MIMEType == "" {
 		return
 	}
-	wp.ImagePath = filepath.Join("static", "images", wp.LinkName+"."+wp.MIMEType)
-	if wp.MIMEType != "mp4" && wp.MIMEType != "webm" {
-		wp.PreviewPath = filepath.Join("static", "images", "previews", wp.LinkName+".webp")
+	wp.ImagePath = imageFilePath(wp.LinkName, wp.MIMEType)
+	if !isVideoMIME(wp.MIMEType) {
+		wp.PreviewPath = previewFilePathFor(wp.LinkName)
 	}
 }
 
@@ -240,7 +256,6 @@ func PruneOldImages(max int) {
 	Global.Lock()
 	var candidates []*Wallpaper
 	for _, wp := range Global.wallpapers {
-		// Skip nil, empty slots, and pinned entries — they are never pruned.
 		if wp != nil && wp.HasImage && !wp.IsPinned {
 			clone := *wp
 			candidates = append(candidates, &clone)
