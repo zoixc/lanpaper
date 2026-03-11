@@ -1,7 +1,7 @@
 package config
 
 const (
-	MaxImageDimension = 16384 // max width/height in pixels; prevents decompression bombs
+	MaxImageDimension  = 16384 // max width/height in pixels; prevents decompression bombs
 	ThumbnailMaxWidth  = 640
 	ThumbnailMaxHeight = 360
 
@@ -26,6 +26,7 @@ const (
 
 const (
 	DefaultPublicRatePerMin  = 120
+	DefaultAdminRatePerMin   = 30  // separate limit for the admin panel (HTML + API reads)
 	DefaultUploadRatePerMin  = 20
 	DefaultRateBurst         = 10
 	RateLimitCleanerInterval = 120 // seconds

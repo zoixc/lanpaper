@@ -75,6 +75,10 @@ func NonceFromRequest(r *http.Request) string {
 
 // WithSecurity attaches security headers and applies per-route rate limiting.
 // The CSP nonce is stored in the request context for templates.
+// Rate limit namespaces:
+//   - /admin  → AdminPerMin  (panel HTML + read-only API calls from the UI)
+//   - /api/*  → PublicPerMin (external API consumers)
+//   - other   → PublicPerMin (public wallpaper pages)
 func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		nonce, _ := generateNonce()
@@ -95,7 +99,9 @@ func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/admin"):
-			if isOverLimitNS("admin", ip, config.Current.Rate.UploadPerMin, config.Current.Rate.Burst) {
+			// Admin panel uses its own quota so that browsing the UI does not
+			// consume the tighter upload-rate allowance.
+			if isOverLimitNS("admin", ip, config.Current.Rate.AdminPerMin, config.Current.Rate.Burst) {
 				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 				return
 			}

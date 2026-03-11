@@ -12,6 +12,7 @@ import (
 
 type RateConfig struct {
 	PublicPerMin int `json:"publicPerMin"`
+	AdminPerMin  int `json:"adminPerMin"`
 	UploadPerMin int `json:"uploadPerMin"`
 	Burst        int `json:"burst"`
 }
@@ -94,6 +95,7 @@ func Load() {
 		ProxyType:            "http",
 		Rate: RateConfig{
 			PublicPerMin: DefaultPublicRatePerMin,
+			AdminPerMin:  DefaultAdminRatePerMin,
 			UploadPerMin: DefaultUploadRatePerMin,
 			Burst:        DefaultRateBurst,
 		},
@@ -170,6 +172,9 @@ func Load() {
 	}
 	if v, ok := envInt("RATE_PUBLIC_PER_MIN"); ok {
 		Current.Rate.PublicPerMin = v
+	}
+	if v, ok := envInt("RATE_ADMIN_PER_MIN"); ok {
+		Current.Rate.AdminPerMin = v
 	}
 	if v, ok := envInt("RATE_UPLOAD_PER_MIN"); ok {
 		Current.Rate.UploadPerMin = v
@@ -257,6 +262,9 @@ func validate() {
 
 	if Current.Rate.PublicPerMin < 0 {
 		Current.Rate.PublicPerMin = DefaultPublicRatePerMin
+	}
+	if Current.Rate.AdminPerMin <= 0 {
+		Current.Rate.AdminPerMin = DefaultAdminRatePerMin
 	}
 	if Current.Rate.UploadPerMin < 0 {
 		Current.Rate.UploadPerMin = DefaultUploadRatePerMin

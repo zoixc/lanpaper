@@ -281,6 +281,22 @@ func Link(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Invalid new link name", http.StatusBadRequest)
 				return
 			}
+
+			// Serialise concurrent renames on the same link name to prevent
+			// a race between the os.Rename file operations and the storage
+			// update. We lock both names (in deterministic order to avoid
+			// deadlock) before touching the filesystem or the store.
+			if newName != linkName {
+				first, second := linkName, newName
+				if first > second {
+					first, second = second, first
+				}
+				unlockFirst := lockLink(first)
+				defer unlockFirst()
+				unlockSecond := lockLink(second)
+				defer unlockSecond()
+			}
+
 			if newName == linkName {
 				wp, exists := storage.Global.Get(linkName)
 				if !exists {
