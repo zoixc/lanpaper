@@ -26,25 +26,19 @@ var staticSecurityHeaders = map[string]string{
 	"Cross-Origin-Embedder-Policy": "credentialless",
 }
 
+// buildCSP constructs a Content-Security-Policy header value.
+// When nonce is non-empty it is injected into script-src and style-src
+// (double-submit cookie pattern used by the admin frontend).
 func buildCSP(nonce string) string {
-	if nonce == "" {
-		return "default-src 'none'; " +
-			"script-src 'self'; " +
-			"style-src 'self'; " +
-			"img-src 'self' https: data: blob:; " +
-			"media-src 'self' https: data: blob:; " +
-			"connect-src 'self'; " +
-			"font-src 'self'; " +
-			"manifest-src 'self'; " +
-			"worker-src 'self' blob:; " +
-			"object-src 'none'; " +
-			"base-uri 'self'; " +
-			"form-action 'self'; " +
-			"frame-ancestors 'none';"
+	scriptSrc := "'self'"
+	styleSrc := "'self'"
+	if nonce != "" {
+		scriptSrc = "'self' 'nonce-" + nonce + "'"
+		styleSrc = "'self' 'nonce-" + nonce + "'"
 	}
 	return "default-src 'none'; " +
-		"script-src 'self' 'nonce-" + nonce + "'; " +
-		"style-src 'self' 'nonce-" + nonce + "'; " +
+		"script-src " + scriptSrc + "; " +
+		"style-src " + styleSrc + "; " +
 		"img-src 'self' https: data: blob:; " +
 		"media-src 'self' https: data: blob:; " +
 		"connect-src 'self'; " +
@@ -101,19 +95,16 @@ func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/admin"):
-			// Admin endpoints: use upload rate limit as a brute-force guard.
 			if isOverLimitNS("admin", ip, config.Current.Rate.UploadPerMin, config.Current.Rate.Burst) {
 				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 				return
 			}
 		case strings.HasPrefix(r.URL.Path, "/api/"):
-			// API read endpoints: use public rate limit.
 			if isOverLimitNS("api", ip, config.Current.Rate.PublicPerMin, config.Current.Rate.Burst) {
 				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 				return
 			}
 		default:
-			// Public page.
 			if isOverLimit(ip, config.Current.Rate.PublicPerMin, config.Current.Rate.Burst) {
 				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 				return

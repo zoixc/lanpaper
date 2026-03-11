@@ -21,39 +21,26 @@ var (
 	counts   = map[string]*counter{}
 )
 
-const (
-	// maxTrackedIPs prevents memory exhaustion from bot networks.
-	maxTrackedIPs = 10000
-)
+const maxTrackedIPs = 10000
 
 // StartCleaner removes stale per-IP counters periodically.
 // Call once from main; runs until the process exits.
 func StartCleaner() {
-	cleanerInterval := time.Duration(config.RateLimitCleanerInterval) * time.Second
-	ticker := time.NewTicker(cleanerInterval)
+	ticker := time.NewTicker(time.Duration(config.RateLimitCleanerInterval) * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
 		now := time.Now()
 		muCounts.Lock()
+		for key, c := range counts {
+			if now.Sub(c.windowFrom) > time.Minute {
+				delete(counts, key)
+			}
+		}
+		// Full reset only when expired-entry eviction was not enough.
 		if len(counts) > maxTrackedIPs {
-			// Selective eviction: remove only expired entries first.
-			for key, c := range counts {
-				if now.Sub(c.windowFrom) > time.Minute {
-					delete(counts, key)
-				}
-			}
-			// If still over limit after eviction, full reset is unavoidable.
-			if len(counts) > maxTrackedIPs {
-				log.Printf("[SECURITY] Rate limiter: full reset, %d active IPs after eviction still exceed max %d",
-					len(counts), maxTrackedIPs)
-				counts = make(map[string]*counter)
-			}
-		} else {
-			for key, c := range counts {
-				if now.Sub(c.windowFrom) > time.Minute {
-					delete(counts, key)
-				}
-			}
+			log.Printf("[SECURITY] Rate limiter: full reset, %d active IPs exceed max %d",
+				len(counts), maxTrackedIPs)
+			counts = make(map[string]*counter)
 		}
 		muCounts.Unlock()
 	}
@@ -72,7 +59,6 @@ func isOverLimitNS(ns, ip string, perMin, burst int) bool {
 	if !ok || now.Sub(c.windowFrom) > time.Minute {
 		// Enforce cap before inserting a new entry.
 		if !ok && len(counts) >= maxTrackedIPs {
-			// Treat unknown IPs as over-limit when the table is full.
 			return true
 		}
 		counts[key] = &counter{count: 1, windowFrom: now}

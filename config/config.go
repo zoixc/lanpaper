@@ -56,27 +56,42 @@ type parsedProxy struct {
 
 var cachedProxyPtr atomic.Pointer[parsedProxy]
 
-// Load loads configuration with priority: env vars > config.json > defaults
+// ---------------------------------------------------------------------------
+// env helpers — read once, return zero value when unset
+// ---------------------------------------------------------------------------
+
+func envStr(key string) (string, bool) {
+	v := os.Getenv(key)
+	return v, v != ""
+}
+
+func envInt(key string) (int, bool) {
+	v := os.Getenv(key)
+	if v == "" {
+		return 0, false
+	}
+	n, err := strconv.Atoi(v)
+	return n, err == nil
+}
+
+func envBool(key string) (bool, bool) {
+	v := os.Getenv(key)
+	if v == "" {
+		return false, false
+	}
+	b, err := strconv.ParseBool(v)
+	return b, err == nil
+}
+
+// Load loads configuration with priority: env vars > config.json > defaults.
 func Load() {
-	// Step 1: Load defaults
 	Current = Config{
 		Port:                 "8080",
 		MaxUploadMB:          DefaultMaxUploadMB,
-		MaxImages:            0,
 		MaxConcurrentUploads: DefaultMaxConcurrentUploads,
 		MaxWalkDepth:         DefaultMaxWalkDepth,
 		ExternalImageDir:     "external/images",
-		AdminUser:            "",
-		AdminPass:            "",
-		DisableAuth:          false,
-		InsecureSkipVerify:   false,
-		AllowPrivateURLFetch: false,
-		ProxyHost:            "",
-		ProxyPort:            "",
 		ProxyType:            "http",
-		ProxyUsername:        "",
-		ProxyPassword:        "",
-		TrustedProxy:         "",
 		Rate: RateConfig{
 			PublicPerMin: DefaultPublicRatePerMin,
 			UploadPerMin: DefaultUploadRatePerMin,
@@ -88,113 +103,85 @@ func Load() {
 		},
 	}
 
-	// Step 2: Override with config.json (if exists)
+	// Override with config.json (if present).
 	if data, err := os.ReadFile("config.json"); err == nil {
 		if err := json.Unmarshal(data, &Current); err != nil {
 			log.Printf("Warning: failed to parse config.json: %v", err)
 		}
 	}
 
-	// Step 3: Override with environment variables (highest priority)
-	if v := os.Getenv("PORT"); v != "" {
+	// Override with environment variables (highest priority).
+	if v, ok := envStr("PORT"); ok {
 		Current.Port = v
 	}
-	if v := os.Getenv("MAX_UPLOAD_MB"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			Current.MaxUploadMB = n
-		}
+	if v, ok := envInt("MAX_UPLOAD_MB"); ok {
+		Current.MaxUploadMB = v
 	}
-	if v := os.Getenv("MAX_IMAGES"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			Current.MaxImages = n
-		}
+	if v, ok := envInt("MAX_IMAGES"); ok {
+		Current.MaxImages = v
 	}
-	if v := os.Getenv("MAX_CONCURRENT_UPLOADS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			Current.MaxConcurrentUploads = n
-		}
+	if v, ok := envInt("MAX_CONCURRENT_UPLOADS"); ok {
+		Current.MaxConcurrentUploads = v
 	}
-	if v := os.Getenv("MAX_WALK_DEPTH"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			Current.MaxWalkDepth = n
-		}
+	if v, ok := envInt("MAX_WALK_DEPTH"); ok {
+		Current.MaxWalkDepth = v
 	}
-	if v := os.Getenv("EXTERNAL_IMAGE_DIR"); v != "" {
+	if v, ok := envStr("EXTERNAL_IMAGE_DIR"); ok {
 		Current.ExternalImageDir = v
 	}
-	if v := os.Getenv("ADMIN_USER"); v != "" {
+	if v, ok := envStr("ADMIN_USER"); ok {
 		Current.AdminUser = v
 	}
-	if v := os.Getenv("ADMIN_PASS"); v != "" {
+	if v, ok := envStr("ADMIN_PASS"); ok {
 		Current.AdminPass = v
 	}
-	if v := os.Getenv("DISABLE_AUTH"); v != "" {
-		if b, err := strconv.ParseBool(v); err == nil {
-			Current.DisableAuth = b
-		}
+	if v, ok := envBool("DISABLE_AUTH"); ok {
+		Current.DisableAuth = v
 	}
-	if v := os.Getenv("INSECURE_SKIP_VERIFY"); v != "" {
-		if b, err := strconv.ParseBool(v); err == nil {
-			Current.InsecureSkipVerify = b
-		}
+	if v, ok := envBool("INSECURE_SKIP_VERIFY"); ok {
+		Current.InsecureSkipVerify = v
 	}
-	if v := os.Getenv("ALLOW_PRIVATE_URL_FETCH"); v != "" {
-		if b, err := strconv.ParseBool(v); err == nil {
-			Current.AllowPrivateURLFetch = b
-		}
+	if v, ok := envBool("ALLOW_PRIVATE_URL_FETCH"); ok {
+		Current.AllowPrivateURLFetch = v
 	}
-	if v := os.Getenv("PROXY_HOST"); v != "" {
+	if v, ok := envStr("PROXY_HOST"); ok {
 		Current.ProxyHost = v
 	}
-	if v := os.Getenv("PROXY_PORT"); v != "" {
+	if v, ok := envStr("PROXY_PORT"); ok {
 		Current.ProxyPort = v
 	}
-	if v := os.Getenv("PROXY_TYPE"); v != "" {
+	if v, ok := envStr("PROXY_TYPE"); ok {
 		Current.ProxyType = v
 	}
-	// Support both PROXY_USERNAME and PROXY_USER
-	if v := os.Getenv("PROXY_USERNAME"); v != "" {
+	// Support both PROXY_USERNAME and PROXY_USER.
+	if v, ok := envStr("PROXY_USERNAME"); ok {
 		Current.ProxyUsername = v
-	} else if v := os.Getenv("PROXY_USER"); v != "" {
+	} else if v, ok := envStr("PROXY_USER"); ok {
 		Current.ProxyUsername = v
 	}
-	// Support both PROXY_PASSWORD and PROXY_PASS
-	if v := os.Getenv("PROXY_PASSWORD"); v != "" {
+	// Support both PROXY_PASSWORD and PROXY_PASS.
+	if v, ok := envStr("PROXY_PASSWORD"); ok {
 		Current.ProxyPassword = v
-	} else if v := os.Getenv("PROXY_PASS"); v != "" {
+	} else if v, ok := envStr("PROXY_PASS"); ok {
 		Current.ProxyPassword = v
 	}
-	if v := os.Getenv("TRUSTED_PROXY"); v != "" {
+	if v, ok := envStr("TRUSTED_PROXY"); ok {
 		Current.TrustedProxy = v
 	}
-
-	// Rate limiting overrides
-	if v := os.Getenv("RATE_PUBLIC_PER_MIN"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			Current.Rate.PublicPerMin = n
-		}
+	if v, ok := envInt("RATE_PUBLIC_PER_MIN"); ok {
+		Current.Rate.PublicPerMin = v
 	}
-	if v := os.Getenv("RATE_UPLOAD_PER_MIN"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			Current.Rate.UploadPerMin = n
-		}
+	if v, ok := envInt("RATE_UPLOAD_PER_MIN"); ok {
+		Current.Rate.UploadPerMin = v
 	}
-	if v := os.Getenv("RATE_BURST"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			Current.Rate.Burst = n
-		}
+	if v, ok := envInt("RATE_BURST"); ok {
+		Current.Rate.Burst = v
 	}
-
-	// Compression overrides
-	if v := os.Getenv("COMPRESSION_QUALITY"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			Current.Compression.Quality = n
-		}
+	if v, ok := envInt("COMPRESSION_QUALITY"); ok {
+		Current.Compression.Quality = v
 	}
-	if v := os.Getenv("COMPRESSION_SCALE"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			Current.Compression.Scale = n
-		}
+	if v, ok := envInt("COMPRESSION_SCALE"); ok {
+		Current.Compression.Scale = v
 	}
 
 	validate()

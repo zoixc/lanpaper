@@ -15,6 +15,7 @@ const (
 	csrfCookieName  = "_csrf_token"
 	csrfHeaderName  = "X-CSRF-Token"
 	csrfMaxAge      = 24 * 60 * 60 // 24 hours in seconds
+	csrfTTL         = csrfMaxAge * time.Second
 	// maxCSRFTokens caps in-memory token storage to prevent memory exhaustion.
 	maxCSRFTokens = 50000
 )
@@ -38,18 +39,17 @@ func generateCSRFToken() (string, error) {
 	return base64.URLEncoding.EncodeToString(b), nil
 }
 
-// getOrCreateCSRFToken retrieves existing token from cookie or creates new one.
+// getOrCreateCSRFToken retrieves an existing token from cookie or creates a new one.
 func getOrCreateCSRFToken(r *http.Request) (string, error) {
-	cookie, err := r.Cookie(csrfCookieName)
-	if err == nil && cookie.Value != "" {
+	if cookie, err := r.Cookie(csrfCookieName); err == nil && cookie.Value != "" {
 		csrfTokensMu.RLock()
 		tok, exists := csrfTokens[cookie.Value]
 		csrfTokensMu.RUnlock()
 		if exists {
-			if time.Since(tok.createdAt) < csrfMaxAge*time.Second {
+			if time.Since(tok.createdAt) < csrfTTL {
 				return cookie.Value, nil
 			}
-			// Token expired — delete and fall through to generate new one
+			// Token expired — delete and fall through to generate a new one.
 			csrfTokensMu.Lock()
 			delete(csrfTokens, cookie.Value)
 			csrfTokensMu.Unlock()
@@ -68,30 +68,24 @@ func getOrCreateCSRFToken(r *http.Request) (string, error) {
 	if len(csrfTokens) >= maxCSRFTokens {
 		log.Printf("[SECURITY] CSRF token store full (%d), dropping new token request from %s",
 			maxCSRFTokens, r.RemoteAddr)
-		return "", http.ErrNoCookie // caller will return 503
+		return "", http.ErrNoCookie
 	}
 
-	csrfTokens[token] = &csrfToken{
-		token:     token,
-		createdAt: time.Now(),
-	}
+	csrfTokens[token] = &csrfToken{token: token, createdAt: time.Now()}
 	return token, nil
 }
 
-// validateCSRFToken checks if the provided token matches the expected token.
+// validateCSRFToken checks whether the provided token matches the stored one.
 func validateCSRFToken(expected, provided string) bool {
 	if expected == "" || provided == "" {
 		return false
 	}
-
 	csrfTokensMu.RLock()
 	_, exists := csrfTokens[expected]
 	csrfTokensMu.RUnlock()
-
 	if !exists {
 		return false
 	}
-
 	return subtle.ConstantTimeCompare([]byte(expected), []byte(provided)) == 1
 }
 
@@ -132,11 +126,9 @@ func CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 
 		setCSRFCookie(w, token, r.TLS != nil)
 
-		if r.Method == http.MethodPost || r.Method == http.MethodPut ||
-			r.Method == http.MethodPatch || r.Method == http.MethodDelete {
-
-			providedToken := r.Header.Get(csrfHeaderName)
-			if !validateCSRFToken(token, providedToken) {
+		switch r.Method {
+		case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+			if !validateCSRFToken(token, r.Header.Get(csrfHeaderName)) {
 				log.Printf("[SECURITY] CSRF token validation failed for %s %s from %s",
 					r.Method, r.URL.Path, r.RemoteAddr)
 				http.Error(w, "CSRF token validation failed", http.StatusForbidden)
@@ -153,12 +145,11 @@ func CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 func CleanExpiredCSRFTokens() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
-
 	for range ticker.C {
 		now := time.Now()
 		csrfTokensMu.Lock()
 		for key, tok := range csrfTokens {
-			if now.Sub(tok.createdAt) > csrfMaxAge*time.Second {
+			if now.Sub(tok.createdAt) > csrfTTL {
 				delete(csrfTokens, key)
 			}
 		}
