@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"log"
 	"net"
@@ -44,6 +46,10 @@ type Config struct {
 	// TrustedProxy is the IP or CIDR of a reverse proxy in front of Lanpaper.
 	// X-Real-IP / X-Forwarded-For are trusted only for requests from this address.
 	TrustedProxy string `json:"trustedProxy,omitempty"`
+	// CSRFSecret is the HMAC signing key for stateless CSRF tokens.
+	// Set via CSRF_SECRET env var. Auto-generated at startup if not provided
+	// (tokens will be invalidated on each restart in that case).
+	CSRFSecret string `json:"csrfSecret,omitempty"`
 }
 
 var Current Config
@@ -170,6 +176,9 @@ func Load() {
 	if v, ok := envStr("TRUSTED_PROXY"); ok {
 		Current.TrustedProxy = v
 	}
+	if v, ok := envStr("CSRF_SECRET"); ok {
+		Current.CSRFSecret = v
+	}
 	if v, ok := envInt("RATE_PUBLIC_PER_MIN"); ok {
 		Current.Rate.PublicPerMin = v
 	}
@@ -239,8 +248,6 @@ func IsTrustedProxy(remoteAddr string) bool {
 
 // validate normalises config values in-place, logging warnings for out-of-range
 // fields and auto-correcting them to safe defaults.
-// It never calls log.Fatal — callers (main, tests) decide what to do with an
-// invalid configuration.
 func validate() {
 	portStr := strings.TrimPrefix(Current.Port, ":")
 	if n, err := strconv.Atoi(portStr); err != nil || n < 1 || n > 65535 {
@@ -300,9 +307,19 @@ func validate() {
 		cachedProxyPtr.Store(&parsedProxy{ip: ip, cidr: cidr})
 	}
 
+	// Auto-generate CSRF secret if not provided. Tokens will be invalidated
+	// on restart in this case — set CSRF_SECRET in env for persistence.
+	if Current.CSRFSecret == "" {
+		b := make([]byte, 32)
+		if _, err := rand.Read(b); err == nil {
+			Current.CSRFSecret = base64.RawURLEncoding.EncodeToString(b)
+			log.Println("Warning: CSRF_SECRET not set — auto-generated ephemeral secret. " +
+				"Tokens will be invalidated on restart. Set CSRF_SECRET env var for persistence.")
+		}
+	}
+
 	// If auth is enabled but credentials are missing, automatically disable
-	// auth rather than crashing — missing credentials at startup is a common
-	// misconfiguration in dev/test environments. main.go logs a clear warning.
+	// auth rather than crashing.
 	if !Current.DisableAuth && (Current.AdminUser == "" || Current.AdminPass == "") {
 		log.Printf("Warning: ADMIN_USER or ADMIN_PASS is empty — authentication disabled automatically. " +
 			"Set both credentials or set DISABLE_AUTH=true to suppress this warning.")

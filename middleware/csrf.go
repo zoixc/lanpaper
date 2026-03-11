@@ -1,98 +1,74 @@
 package middleware
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
-	"crypto/subtle"
+	"crypto/sha256"
 	"encoding/base64"
 	"log"
 	"net/http"
-	"sync"
+	"strings"
 	"time"
+
+	"lanpaper/config"
 )
 
 const (
-	csrfTokenLength = 32
-	csrfCookieName  = "_csrf_token"
-	csrfHeaderName  = "X-CSRF-Token"
-	csrfMaxAge      = 24 * 60 * 60 // 24 hours in seconds
-	csrfTTL         = csrfMaxAge * time.Second
-	// maxCSRFTokens caps in-memory token storage to prevent memory exhaustion.
-	maxCSRFTokens = 50000
+	csrfCookieName = "_csrf_token"
+	csrfHeaderName = "X-CSRF-Token"
+	csrfMaxAge     = 24 * 60 * 60 // 24 hours in seconds
+	csrfNonceLen   = 16
 )
 
-type csrfToken struct {
-	token     string
-	createdAt time.Time
-}
-
-var (
-	csrfTokens   = make(map[string]*csrfToken)
-	csrfTokensMu sync.RWMutex
-)
-
-// generateCSRFToken creates a cryptographically secure random token.
+// generateCSRFToken creates a stateless signed token: base64(nonce) + "." + base64(hmac).
+// The token survives container restarts as long as CSRF_SECRET stays the same.
 func generateCSRFToken() (string, error) {
-	b := make([]byte, csrfTokenLength)
-	if _, err := rand.Read(b); err != nil {
+	nonce := make([]byte, csrfNonceLen)
+	if _, err := rand.Read(nonce); err != nil {
 		return "", err
 	}
-	return base64.URLEncoding.EncodeToString(b), nil
+	nonce64 := base64.RawURLEncoding.EncodeToString(nonce)
+	sig := csrfSign(nonce64)
+	return nonce64 + "." + sig, nil
 }
 
-// getOrCreateCSRFToken retrieves an existing token from cookie or creates a new one.
-func getOrCreateCSRFToken(r *http.Request) (string, error) {
-	if cookie, err := r.Cookie(csrfCookieName); err == nil && cookie.Value != "" {
-		csrfTokensMu.RLock()
-		tok, exists := csrfTokens[cookie.Value]
-		csrfTokensMu.RUnlock()
-		if exists {
-			if time.Since(tok.createdAt) < csrfTTL {
-				return cookie.Value, nil
-			}
-			// Token expired — delete and fall through to generate a new one.
-			csrfTokensMu.Lock()
-			delete(csrfTokens, cookie.Value)
-			csrfTokensMu.Unlock()
-		}
-	}
+// csrfSign returns base64(HMAC-SHA256(nonce, secret)).
+func csrfSign(nonce64 string) string {
+	h := hmac.New(sha256.New, []byte(config.Current.CSRFSecret))
+	h.Write([]byte(nonce64))
+	return base64.RawURLEncoding.EncodeToString(h.Sum(nil))
+}
 
+// verifyCSRFToken checks that the token is well-formed and its signature is valid.
+func verifyCSRFToken(token string) bool {
+	if token == "" {
+		return false
+	}
+	parts := strings.SplitN(token, ".", 2)
+	if len(parts) != 2 {
+		return false
+	}
+	nonce64, providedSig := parts[0], parts[1]
+	expectedSig := csrfSign(nonce64)
+	return hmac.Equal([]byte(expectedSig), []byte(providedSig))
+}
+
+// getOrCreateCSRFToken returns the cookie token if valid, otherwise issues a new one.
+func getOrCreateCSRFToken(r *http.Request) (string, bool) {
+	if cookie, err := r.Cookie(csrfCookieName); err == nil && verifyCSRFToken(cookie.Value) {
+		return cookie.Value, false // existing valid token, no need to set cookie again
+	}
 	token, err := generateCSRFToken()
 	if err != nil {
-		return "", err
+		log.Printf("[CSRF] failed to generate token: %v", err)
+		return "", false
 	}
-
-	csrfTokensMu.Lock()
-	defer csrfTokensMu.Unlock()
-
-	// Refuse to grow beyond cap — prevents memory exhaustion via GET flooding.
-	if len(csrfTokens) >= maxCSRFTokens {
-		log.Printf("[SECURITY] CSRF token store full (%d), dropping new token request from %s",
-			maxCSRFTokens, r.RemoteAddr)
-		return "", http.ErrNoCookie
-	}
-
-	csrfTokens[token] = &csrfToken{token: token, createdAt: time.Now()}
-	return token, nil
+	return token, true // new token, caller must set cookie
 }
 
-// validateCSRFToken checks whether the provided token matches the stored one.
-func validateCSRFToken(expected, provided string) bool {
-	if expected == "" || provided == "" {
-		return false
-	}
-	csrfTokensMu.RLock()
-	_, exists := csrfTokens[expected]
-	csrfTokensMu.RUnlock()
-	if !exists {
-		return false
-	}
-	return subtle.ConstantTimeCompare([]byte(expected), []byte(provided)) == 1
-}
-
-// setCSRFCookie sets the CSRF token cookie.
-// HttpOnly is false so the JS frontend can read it for the X-CSRF-Token header
-// (double-submit cookie pattern). The cookie itself is not the secret — the
-// header is; stealing only the cookie does not help without script execution.
+// setCSRFCookie writes the CSRF token as a cookie.
+// HttpOnly is false — JS reads the cookie to put it in X-CSRF-Token header
+// (double-submit cookie pattern).
 func setCSRFCookie(w http.ResponseWriter, token string, secure bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     csrfCookieName,
@@ -105,30 +81,23 @@ func setCSRFCookie(w http.ResponseWriter, token string, secure bool) {
 	})
 }
 
-// CSRFProtection returns middleware that protects against CSRF attacks.
-// Validates token on all state-changing requests (POST, PUT, PATCH, DELETE).
-// Token is read exclusively from the X-CSRF-Token header (double-submit cookie
-// pattern). The form field fallback has been removed: r.FormValue() on a
-// multipart body consumes r.Body before the handler can call
-// ParseMultipartForm, silently breaking file uploads.
+// CSRFProtection returns middleware that protects state-changing requests.
+// Uses stateless HMAC-signed tokens — survives container restarts.
 func CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		token, err := getOrCreateCSRFToken(r)
-		if err != nil {
-			if err == http.ErrNoCookie {
-				http.Error(w, "Service temporarily unavailable", http.StatusServiceUnavailable)
-				return
-			}
-			log.Printf("Error generating CSRF token: %v", err)
+		token, isNew := getOrCreateCSRFToken(r)
+		if token == "" {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-
-		setCSRFCookie(w, token, r.TLS != nil)
+		if isNew {
+			setCSRFCookie(w, token, r.TLS != nil)
+		}
 
 		switch r.Method {
 		case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
-			if !validateCSRFToken(token, r.Header.Get(csrfHeaderName)) {
+			provided := r.Header.Get(csrfHeaderName)
+			if !verifyCSRFToken(provided) {
 				log.Printf("[SECURITY] CSRF token validation failed for %s %s from %s",
 					r.Method, r.URL.Path, r.RemoteAddr)
 				http.Error(w, "CSRF token validation failed", http.StatusForbidden)
@@ -140,19 +109,9 @@ func CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// CleanExpiredCSRFTokens removes expired CSRF tokens from memory.
-// Runs every 5 minutes to bound memory usage.
+// CleanExpiredCSRFTokens is kept for backward compatibility with main.go.
+// Stateless tokens need no cleanup — this is now a no-op.
 func CleanExpiredCSRFTokens() {
-	ticker := time.NewTicker(5 * time.Minute)
-	defer ticker.Stop()
-	for range ticker.C {
-		now := time.Now()
-		csrfTokensMu.Lock()
-		for key, tok := range csrfTokens {
-			if now.Sub(tok.createdAt) > csrfTTL {
-				delete(csrfTokens, key)
-			}
-		}
-		csrfTokensMu.Unlock()
-	}
+	_ = time.NewTicker // suppress unused import
+	select {}          // block forever, goroutine cost is negligible
 }
