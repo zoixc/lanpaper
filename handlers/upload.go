@@ -542,6 +542,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Link does not exist", http.StatusBadRequest)
 		return
 	}
+	// Defensive nil guard: oldWp should always be non-nil when exists=true,
+	// but guard here to avoid a panic if the store ever returns (nil, true).
+	if oldWp == nil {
+		log.Printf("Warning: store returned nil wallpaper for existing key %q", linkName)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
 
 	var (
 		img          image.Image
@@ -671,7 +678,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if oldWp != nil && oldWp.HasImage {
+	if oldWp.HasImage {
 		removeFiles(oldWp.ImagePath, oldWp.PreviewPath)
 	}
 

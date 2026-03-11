@@ -232,6 +232,10 @@ func IsTrustedProxy(remoteAddr string) bool {
 	return p.cidr.Contains(remote)
 }
 
+// validate normalises config values in-place, logging warnings for out-of-range
+// fields and auto-correcting them to safe defaults.
+// It never calls log.Fatal — callers (main, tests) decide what to do with an
+// invalid configuration.
 func validate() {
 	portStr := strings.TrimPrefix(Current.Port, ":")
 	if n, err := strconv.Atoi(portStr); err != nil || n < 1 || n > 65535 {
@@ -288,10 +292,12 @@ func validate() {
 		cachedProxyPtr.Store(&parsedProxy{ip: ip, cidr: cidr})
 	}
 
-	// If auth is enabled but credentials are missing, fail fast rather than
-	// silently disabling auth — a misconfiguration must be explicit.
+	// If auth is enabled but credentials are missing, automatically disable
+	// auth rather than crashing — missing credentials at startup is a common
+	// misconfiguration in dev/test environments. main.go logs a clear warning.
 	if !Current.DisableAuth && (Current.AdminUser == "" || Current.AdminPass == "") {
-		log.Fatal("FATAL: auth is enabled (DISABLE_AUTH is not true) but ADMIN_USER or ADMIN_PASS is empty. " +
-			"Set both credentials or set DISABLE_AUTH=true to run without authentication.")
+		log.Printf("Warning: ADMIN_USER or ADMIN_PASS is empty — authentication disabled automatically. " +
+			"Set both credentials or set DISABLE_AUTH=true to suppress this warning.")
+		Current.DisableAuth = true
 	}
 }

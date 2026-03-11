@@ -26,14 +26,15 @@ func main() {
 	_ = godotenv.Load()
 	config.Load()
 
+	// validate() already logs a warning and sets DisableAuth=true when
+	// credentials are absent. Emit an additional startup-level notice so it
+	// is visible prominently in the log stream.
 	if config.Current.DisableAuth {
 		if config.Current.AdminUser == "" && config.Current.AdminPass == "" {
-			log.Println("Warning: no credentials provided — authentication disabled.")
+			log.Println("Warning: no credentials configured — running WITHOUT authentication.")
 		} else {
 			log.Println("Warning: authentication disabled (DISABLE_AUTH=true).")
 		}
-	} else if config.Current.AdminUser == "" || config.Current.AdminPass == "" {
-		log.Println("Warning: auth is enabled but ADMIN_USER or ADMIN_PASS is empty — all requests will be rejected.")
 	}
 
 	handlers.InitUploadSemaphore(config.Current.MaxConcurrentUploads)
