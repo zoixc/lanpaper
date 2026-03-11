@@ -206,7 +206,7 @@ func Load() {
 	log.Printf("Config loaded: compression quality=%d scale=%d (%s)",
 		Current.Compression.Quality, Current.Compression.Scale, mode)
 	if Current.AllowPrivateURLFetch {
-		log.Printf("Warning: allowPrivateURLFetch=true — SSRF protection for private IPs is disabled")
+		log.Printf("[SECURITY] Warning: ALLOW_PRIVATE_URL_FETCH=true — SSRF protection for private IPs is DISABLED")
 	}
 }
 
@@ -301,7 +301,10 @@ func validate() {
 		cachedProxyPtr.Store(&parsedProxy{ip: ip, cidr: cidr})
 	}
 
+	// If auth is enabled but credentials are missing, fail fast rather than
+	// silently disabling auth — a misconfiguration must be explicit.
 	if !Current.DisableAuth && (Current.AdminUser == "" || Current.AdminPass == "") {
-		Current.DisableAuth = true
+		log.Fatal("FATAL: auth is enabled (DISABLE_AUTH is not true) but ADMIN_USER or ADMIN_PASS is empty. " +
+			"Set both credentials or set DISABLE_AUTH=true to run without authentication.")
 	}
 }

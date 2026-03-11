@@ -49,6 +49,29 @@ func InitUploadSemaphore(n int) {
 	uploadSem = make(chan struct{}, n)
 }
 
+// uploadLinkMu serialises concurrent uploads to the same link name,
+// preventing races on file deletion and store updates.
+var uploadLinkMu struct {
+	sync.Mutex
+	m map[string]*sync.Mutex
+}
+
+func init() {
+	uploadLinkMu.m = make(map[string]*sync.Mutex)
+}
+
+func lockLink(name string) func() {
+	uploadLinkMu.Lock()
+	mu, ok := uploadLinkMu.m[name]
+	if !ok {
+		mu = &sync.Mutex{}
+		uploadLinkMu.m[name] = mu
+	}
+	uploadLinkMu.Unlock()
+	mu.Lock()
+	return mu.Unlock
+}
+
 var (
 	transportMu     sync.Mutex
 	cachedTransport *http.Transport
@@ -129,6 +152,99 @@ func (d *ssrfSafeDialer) DialContext(ctx context.Context, network, addr string) 
 	return d.inner.DialContext(ctx, network, net.JoinHostPort(safeIP, port))
 }
 
+// ssrfCheckRedirect blocks redirects that resolve to private/loopback IPs.
+// This prevents a redirect-based SSRF where an attacker-controlled server
+// returns a 3xx pointing at an internal address.
+func ssrfCheckRedirect(req *http.Request, via []*http.Request) error {
+	if config.Current.AllowPrivateURLFetch {
+		if len(via) >= 10 {
+			return errors.New("too many redirects")
+		}
+		return nil
+	}
+	if len(via) >= 5 {
+		return errors.New("too many redirects")
+	}
+	host := req.URL.Hostname()
+	ips, err := net.DefaultResolver.LookupIPAddr(req.Context(), host)
+	if err != nil || len(ips) == 0 {
+		return fmt.Errorf("redirect DNS failed for %s", host)
+	}
+	for _, ipAddr := range ips {
+		if utils.IsPrivateOrLocalIP(ipAddr.IP) {
+			log.Printf("[SECURITY] Blocked redirect SSRF to private IP via %s", host)
+			return errors.New("redirect to private address is not allowed")
+		}
+	}
+	return nil
+}
+
+// atomicWriteFile writes data to dst via a temp file + rename so readers
+// never observe a partially-written file.
+func atomicWriteFile(dst string, r io.Reader) error {
+	dir := filepath.Dir(dst)
+	tmp, err := os.CreateTemp(dir, ".upload-*.tmp")
+	if err != nil {
+		return fmt.Errorf("create temp: %w", err)
+	}
+	tmpName := tmp.Name()
+	bw := bufio.NewWriterSize(tmp, config.FileCopyBufferSize)
+	if _, err := io.Copy(bw, r); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return fmt.Errorf("write: %w", err)
+	}
+	if err := bw.Flush(); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return fmt.Errorf("flush: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return fmt.Errorf("sync: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpName)
+		return fmt.Errorf("close: %w", err)
+	}
+	if err := os.Rename(tmpName, dst); err != nil {
+		os.Remove(tmpName)
+		return fmt.Errorf("rename: %w", err)
+	}
+	return nil
+}
+
+// atomicSaveImage encodes img to a temp file then renames it into place.
+func atomicSaveImage(img image.Image, format, dst string) error {
+	dir := filepath.Dir(dst)
+	tmp, err := os.CreateTemp(dir, ".img-*.tmp")
+	if err != nil {
+		return fmt.Errorf("create temp: %w", err)
+	}
+	tmpName := tmp.Name()
+	encodeErr := encodeImage(tmp, img, format)
+	if encodeErr != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return encodeErr
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return fmt.Errorf("sync: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpName)
+		return fmt.Errorf("close: %w", err)
+	}
+	if err := os.Rename(tmpName, dst); err != nil {
+		os.Remove(tmpName)
+		return fmt.Errorf("rename: %w", err)
+	}
+	return nil
+}
+
 func copyFile(srcPath, dst string, r io.Reader) error {
 	if r == nil {
 		f, err := os.Open(srcPath)
@@ -138,16 +254,7 @@ func copyFile(srcPath, dst string, r io.Reader) error {
 		defer f.Close()
 		r = f
 	}
-	out, err := os.Create(dst)
-	if err != nil {
-		return fmt.Errorf("create: %w", err)
-	}
-	defer out.Close()
-	bw := bufio.NewWriterSize(out, config.FileCopyBufferSize)
-	if _, err := io.Copy(bw, r); err != nil {
-		return fmt.Errorf("copy: %w", err)
-	}
-	return bw.Flush()
+	return atomicWriteFile(dst, r)
 }
 
 var mimeToExt = map[string]string{
@@ -261,6 +368,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid link name", http.StatusBadRequest)
 		return
 	}
+
+	// Acquire per-link lock before touching storage or files.
+	unlockLink := lockLink(linkName)
+	defer unlockLink()
+
 	oldWp, exists := storage.Global.Get(linkName)
 	if !exists {
 		http.Error(w, "Link does not exist", http.StatusBadRequest)
@@ -462,7 +574,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Warning: failed to generate preview for %s: %v", linkName, err)
 			previewPath = ""
 		} else {
-			if err := saveImage(thumbnail(previewImg, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight), "webp", previewPath); err != nil {
+			if err := atomicSaveImage(thumbnail(previewImg, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight), "webp", previewPath); err != nil {
 				log.Printf("Error saving preview %s: %v", previewPath, err)
 				previewPath = ""
 			}
@@ -471,12 +583,12 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		// Normal mode: decode, process, and re-encode
 		img = scaleImage(img, config.Current.Compression.Scale)
 
-		if err := saveImage(img, saveExt, originalPath); err != nil {
+		if err := atomicSaveImage(img, saveExt, originalPath); err != nil {
 			log.Printf("Error saving image %s: %v", originalPath, err)
 			http.Error(w, "Save failed", http.StatusInternalServerError)
 			return
 		}
-		if err := saveImage(thumbnail(img, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight), "webp", previewPath); err != nil {
+		if err := atomicSaveImage(thumbnail(img, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight), "webp", previewPath); err != nil {
 			log.Printf("Error saving preview %s: %v", previewPath, err)
 			removeFiles(originalPath, previewPath)
 			http.Error(w, "Preview generation failed", http.StatusInternalServerError)
@@ -553,19 +665,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 }
 
 func saveImage(img image.Image, format, path string) error {
-	out, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("create: %w", err)
-	}
-	encodeErr := encodeImage(out, img, format)
-	closeErr := out.Close()
-	if encodeErr != nil {
-		if removeErr := os.Remove(path); removeErr != nil && !os.IsNotExist(removeErr) {
-			log.Printf("Error removing partial file %s: %v", path, removeErr)
-		}
-		return encodeErr
-	}
-	return closeErr
+	return atomicSaveImage(img, format, path)
 }
 
 func encodeImage(w io.Writer, img image.Image, format string) error {
@@ -653,12 +753,15 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 		return nil, "", nil, err
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Lanpaper/1.0)")
-	req.Header.Set("Accept", "image/*,*/*;q=0.8")
+	req.Header.Set("Accept", "image/*,video/*;q=0.9")
 
 	// Transport carries its own ResponseHeaderTimeout; rely on the context
 	// for the overall deadline instead of duplicating it in Client.Timeout.
+	// CheckRedirect re-validates redirected targets via ssrfSafeDialer logic
+	// to prevent redirect-based SSRF to private IPs.
 	client := &http.Client{
-		Transport: getTransport(),
+		Transport:     getTransport(),
+		CheckRedirect: ssrfCheckRedirect,
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -669,6 +772,17 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, "", nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	// Reject responses whose declared Content-Type is clearly not an image or video
+	// before reading the full body — reduces abuse surface for non-media URLs.
+	if ct := resp.Header.Get("Content-Type"); ct != "" {
+		base := strings.ToLower(strings.SplitN(ct, ";", 2)[0])
+		if !strings.HasPrefix(base, "image/") && !strings.HasPrefix(base, "video/") &&
+			base != "application/octet-stream" {
+			log.Printf("[SECURITY] Rejected download %s — Content-Type %q is not media", urlStr, ct)
+			return nil, "", nil, errors.New("unsupported content type")
+		}
 	}
 
 	maxBytes := int64(config.Current.MaxUploadMB) << 20
