@@ -17,11 +17,12 @@ const (
 )
 
 const (
-	DownloadTimeout  = 90  // seconds
-	HTTPReadTimeout  = 30  // seconds
-	HTTPWriteTimeout = 120 // seconds; must exceed DownloadTimeout
-	HTTPIdleTimeout  = 120 // seconds
-	ShutdownTimeout  = 30  // seconds
+	DownloadTimeout        = 90  // seconds
+	HTTPReadHeaderTimeout  = 10  // seconds; protects against Slowloris attacks
+	HTTPReadTimeout        = 30  // seconds
+	HTTPWriteTimeout       = 120 // seconds; must exceed DownloadTimeout
+	HTTPIdleTimeout        = 120 // seconds
+	ShutdownTimeout        = 30  // seconds
 )
 
 const (

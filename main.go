@@ -55,7 +55,9 @@ func main() {
 
 	// Start background cleaners
 	go middleware.StartCleaner()
-	go middleware.CleanExpiredCSRFTokens()
+	// CleanExpiredCSRFTokens is a no-op for stateless HMAC tokens;
+	// kept for API compatibility, no goroutine needed.
+	middleware.CleanExpiredCSRFTokens()
 
 	// Serve static files with long-lived cache for versioned assets.
 	// The app uses ?t=<timestamp> cache-busting on dynamic resources.
@@ -102,11 +104,12 @@ func main() {
 	}
 
 	srv := &http.Server{
-		Addr:    port,
-		Handler: mux,
-		ReadTimeout:  time.Duration(config.HTTPReadTimeout) * time.Second,
-		WriteTimeout: time.Duration(config.HTTPWriteTimeout) * time.Second,
-		IdleTimeout:  time.Duration(config.HTTPIdleTimeout) * time.Second,
+		Addr:              port,
+		Handler:           mux,
+		ReadHeaderTimeout: time.Duration(config.HTTPReadHeaderTimeout) * time.Second,
+		ReadTimeout:       time.Duration(config.HTTPReadTimeout) * time.Second,
+		WriteTimeout:      time.Duration(config.HTTPWriteTimeout) * time.Second,
+		IdleTimeout:       time.Duration(config.HTTPIdleTimeout) * time.Second,
 	}
 
 	go func() {
