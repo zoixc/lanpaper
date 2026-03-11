@@ -73,6 +73,18 @@ func NonceFromRequest(r *http.Request) string {
 	return ""
 }
 
+// isHTTPS reports whether the request arrived over HTTPS, either directly or
+// via a trusted reverse proxy forwarding X-Forwarded-Proto.
+func isHTTPS(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	if config.IsTrustedProxy(r.RemoteAddr) {
+		return strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+	}
+	return false
+}
+
 // WithSecurity attaches security headers and applies per-route rate limiting.
 // The CSP nonce is stored in the request context for templates.
 // Rate limit namespaces:
@@ -87,7 +99,8 @@ func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 		for key, value := range staticSecurityHeaders {
 			h.Set(key, value)
 		}
-		if r.TLS != nil {
+		// Set HSTS when HTTPS is detected, including behind a trusted proxy.
+		if isHTTPS(r) {
 			h.Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
 		}
 		h.Set("Content-Security-Policy", buildCSP(nonce))

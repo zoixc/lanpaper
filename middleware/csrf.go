@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"time"
 
 	"lanpaper/config"
 )
@@ -66,6 +65,18 @@ func getOrCreateCSRFToken(r *http.Request) (string, bool) {
 	return token, true // new token, caller must set cookie
 }
 
+// isSecureRequest returns true when the connection is HTTPS, either directly
+// or via a trusted reverse proxy that sets X-Forwarded-Proto.
+func isSecureRequest(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	if config.IsTrustedProxy(r.RemoteAddr) {
+		return strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+	}
+	return false
+}
+
 // setCSRFCookie writes the CSRF token as a cookie.
 // HttpOnly is false — JS reads the cookie to put it in X-CSRF-Token header
 // (double-submit cookie pattern).
@@ -91,7 +102,7 @@ func CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		if isNew {
-			setCSRFCookie(w, token, r.TLS != nil)
+			setCSRFCookie(w, token, isSecureRequest(r))
 		}
 
 		switch r.Method {
@@ -99,7 +110,7 @@ func CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 			provided := r.Header.Get(csrfHeaderName)
 			if !verifyCSRFToken(provided) {
 				log.Printf("[SECURITY] CSRF token validation failed for %s %s from %s",
-					r.Method, r.URL.Path, r.RemoteAddr)
+					r.Method, r.URL.Path, clientIP(r))
 				http.Error(w, "CSRF token validation failed", http.StatusForbidden)
 				return
 			}
@@ -109,9 +120,6 @@ func CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// CleanExpiredCSRFTokens is kept for backward compatibility with main.go.
-// Stateless tokens need no cleanup — this is now a no-op.
-func CleanExpiredCSRFTokens() {
-	_ = time.NewTicker // suppress unused import
-	select {}          // block forever, goroutine cost is negligible
-}
+// CleanExpiredCSRFTokens is a no-op kept for backward compatibility.
+// Stateless HMAC tokens require no cleanup.
+func CleanExpiredCSRFTokens() {}
