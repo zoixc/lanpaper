@@ -95,14 +95,16 @@ func TestSameOriginRequest(t *testing.T) {
 			want: true,
 		},
 		{
-			name:   "Origin matched via X-Forwarded-Host (rewritten Host)",
+			name:   "X-Forwarded-Host ignored without trusted proxy (CSRF defence)",
 			method: http.MethodPost,
-			host:   "lanpaper:8080", // internal upstream name set by naive proxy
+			host:   "lanpaper:8080",
 			headers: map[string]string{
 				"Origin":           "https://walls.example.com",
 				"X-Forwarded-Host": "walls.example.com",
 			},
-			want: true,
+			// Without TrustedProxy the XFH header must be ignored, so Origin
+			// does not match Host and the request is rejected.
+			want: false,
 		},
 		{
 			name:   "Origin not in X-Forwarded-Host chain",
@@ -111,6 +113,16 @@ func TestSameOriginRequest(t *testing.T) {
 			headers: map[string]string{
 				"Origin":           "https://evil.example",
 				"X-Forwarded-Host": "walls.example.com",
+			},
+			want: false,
+		},
+		{
+			name:   "spoofed X-Forwarded-Host must not grant CSRF bypass",
+			method: http.MethodPost,
+			host:   "victim.example",
+			headers: map[string]string{
+				"Origin":           "https://evil.example",
+				"X-Forwarded-Host": "evil.example",
 			},
 			want: false,
 		},

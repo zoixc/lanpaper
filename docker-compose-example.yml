@@ -38,8 +38,10 @@ services:
       - RATE_BURST=10
 
       # Trusted reverse proxy IP or CIDR.
-      # Set this ONLY when Lanpaper is behind nginx/Caddy/Traefik so that
-      # X-Real-IP / X-Forwarded-For headers are used for rate limiting.
+      # REQUIRED when Lanpaper is behind nginx/Caddy/Traefik so that
+      # X-Real-IP / X-Forwarded-For are used for rate limiting AND for the
+      # per-link "local" access level (otherwise every request looks local
+      # because it comes from the proxy on 127.0.0.1 / docker bridge).
       # Leave unset for direct / LAN deployments (safe default).
       # Examples:
       #   - TRUSTED_PROXY=172.18.0.1        # specific Docker gateway IP
@@ -62,7 +64,9 @@ services:
       # - INSECURE_SKIP_VERIFY=false
 
     volumes:
-      # Adjust these paths as needed
+      # Adjust these paths as needed.
+      # Media is stored under data/media (NOT under static/) so per-link
+      # access control cannot be bypassed via /static/images/...
       - ./lanpaper/data:/app/data
-      - ./lanpaper/images:/app/static/images
+      # Optional: mount a read-only gallery for "From server" uploads
       - ./homepage/images:/app/gallery:ro

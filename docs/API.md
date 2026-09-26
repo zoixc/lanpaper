@@ -42,6 +42,37 @@ curl -H "Authorization: Basic YWRtaW46cGFzc3dvcmQ=" https://lanpaper.example.com
 
 ---
 
+
+---
+
+## Access levels
+
+Public media endpoint: `GET /{linkName}`
+
+| `accessLevel` | Requirement |
+|---------------|-------------|
+| `public` | None |
+| `local` | Client IP is private/loopback/link-local/CGNAT |
+| `token` | `?token=` query or `X-Access-Token` header (admin Basic Auth also works) |
+| `auth` | Admin Basic Auth |
+
+Admin previews: `GET /api/preview/{linkName}` (always requires admin auth).
+
+Update access via `PATCH /api/link/{name}`:
+
+```json
+{ "accessLevel": "token" }
+```
+
+Rotate token:
+
+```json
+{ "rotateToken": true }
+```
+
+Media files are stored under `data/media/` and `data/previews/`. The path `/api/preview/` is not served over HTTP.
+
+
 ## Endpoints
 
 ### Health Check
@@ -85,13 +116,15 @@ Retrieve all wallpaper links.
   {
     "id": "office-bg",
     "linkName": "office-bg",
-    "imageUrl": "/static/images/office-bg.jpg",
-    "preview": "/static/images/previews/office-bg.webp",
+    "imageUrl": "/office-bg",
+    "preview": "/api/preview/office-bg",
     "hasImage": true,
     "mimeType": "jpg",
     "sizeBytes": 245670,
     "modTime": 1707456000,
-    "createdAt": 1707450000
+    "createdAt": 1707450000,
+    "accessLevel": "public",
+    "pinned": false
   },
   {
     "id": "home-screen",
@@ -248,8 +281,8 @@ Configurable via `MAX_UPLOAD_MB` environment variable or `maxUploadMB` in config
 {
   "id": "office-wall",
   "linkName": "office-wall",
-  "imageUrl": "/static/images/office-wall.jpg",
-  "preview": "/static/images/previews/office-wall.webp",
+  "imageUrl": "/office-wall",
+  "preview": "/api/preview/office-wall",
   "hasImage": true,
   "mimeType": "jpg",
   "sizeBytes": 245670,

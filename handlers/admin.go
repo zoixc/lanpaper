@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -31,18 +32,21 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 }
 
 type WallpaperResponse struct {
-	ID        string `json:"id"`
-	LinkName  string `json:"linkName"`
-	Category  string `json:"category"`
-	HasImage  bool   `json:"hasImage"`
-	ImageURL  string `json:"imageUrl"`
-	Preview   string `json:"preview,omitempty"`
-	MIMEType  string `json:"mimeType"`
-	SizeBytes int64  `json:"sizeBytes"`
-	ModTime   int64  `json:"modTime"`
-	CreatedAt int64  `json:"createdAt"`
-	Pinned    bool   `json:"pinned"`
-	PinnedAt  int64  `json:"pinnedAt,omitempty"`
+	ID          string `json:"id"`
+	LinkName    string `json:"linkName"`
+	Category    string `json:"category"`
+	HasImage    bool   `json:"hasImage"`
+	ImageURL    string `json:"imageUrl"`
+	Preview     string `json:"preview,omitempty"`
+	MIMEType    string `json:"mimeType"`
+	SizeBytes   int64  `json:"sizeBytes"`
+	ModTime     int64  `json:"modTime"`
+	CreatedAt   int64  `json:"createdAt"`
+	Pinned      bool   `json:"pinned"`
+	PinnedAt    int64  `json:"pinnedAt,omitempty"`
+	AccessLevel string `json:"accessLevel"`
+	// AccessToken is only included for token-level links so the admin can copy it.
+	AccessToken string `json:"accessToken,omitempty"`
 }
 
 type PaginatedResponse struct {
@@ -177,20 +181,27 @@ func inferCategory(wp *storage.Wallpaper) string {
 }
 
 func toResponse(wp *storage.Wallpaper) WallpaperResponse {
-	return WallpaperResponse{
-		ID:        wp.ID,
-		LinkName:  wp.LinkName,
-		Category:  inferCategory(wp),
-		HasImage:  wp.HasImage,
-		ImageURL:  wp.ImageURL,
-		Preview:   wp.Preview,
-		MIMEType:  wp.MIMEType,
-		SizeBytes: wp.SizeBytes,
-		ModTime:   wp.ModTime,
-		CreatedAt: wp.CreatedAt,
-		Pinned:    wp.IsPinned,
-		PinnedAt:  wp.PinnedAt,
+	ensureAccessDefaults(wp)
+	resp := WallpaperResponse{
+		ID:          wp.ID,
+		LinkName:    wp.LinkName,
+		Category:    inferCategory(wp),
+		HasImage:    wp.HasImage,
+		ImageURL:    wp.ImageURL,
+		Preview:     wp.Preview,
+		MIMEType:    wp.MIMEType,
+		SizeBytes:   wp.SizeBytes,
+		ModTime:     wp.ModTime,
+		CreatedAt:   wp.CreatedAt,
+		Pinned:      wp.IsPinned,
+		PinnedAt:    wp.PinnedAt,
+		AccessLevel: wp.AccessLevel,
 	}
+	// Only expose the token to the authenticated admin for token-level links.
+	if wp.AccessLevel == config.AccessToken && wp.AccessToken != "" {
+		resp.AccessToken = wp.AccessToken
+	}
+	return resp
 }
 
 var validCategories = config.ValidCategories
@@ -199,8 +210,10 @@ func isValidCategory(cat string) bool { return validCategories[cat] }
 
 // removeFiles deletes image and optional preview files, ignoring not-found errors.
 func removeFiles(imagePath, previewPath string) {
-	if err := os.Remove(imagePath); err != nil && !os.IsNotExist(err) {
-		log.Printf("Error removing image %s: %v", imagePath, err)
+	if imagePath != "" {
+		if err := os.Remove(imagePath); err != nil && !os.IsNotExist(err) {
+			log.Printf("Error removing image %s: %v", imagePath, err)
+		}
 	}
 	if previewPath != "" {
 		if err := os.Remove(previewPath); err != nil && !os.IsNotExist(err) {
@@ -209,7 +222,8 @@ func removeFiles(imagePath, previewPath string) {
 	}
 }
 
-// linkNameFromPath extracts and validates the link name from /api/link/{name}.
+// linkNameFromPath extracts and validates the link name from /api/link/{name}
+// or /api/link/{name}/access etc. The suffix (if any) is returned separately.
 func linkNameFromPath(path string) (string, bool) {
 	name := strings.TrimPrefix(path, "/api/link/")
 	name = strings.Trim(name, "/")
@@ -230,8 +244,9 @@ func Link(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
 		var req struct {
-			LinkName string `json:"linkName"`
-			Category string `json:"category"`
+			LinkName    string `json:"linkName"`
+			Category    string `json:"category"`
+			AccessLevel string `json:"accessLevel"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
@@ -245,6 +260,10 @@ func Link(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid category", http.StatusBadRequest)
 			return
 		}
+		if req.AccessLevel != "" && !isValidAccessLevel(req.AccessLevel) {
+			http.Error(w, "Invalid access level", http.StatusBadRequest)
+			return
+		}
 		if _, exists := storage.Global.Get(req.LinkName); exists {
 			http.Error(w, "Link exists", http.StatusConflict)
 			return
@@ -253,17 +272,27 @@ func Link(w http.ResponseWriter, r *http.Request) {
 		if cat == "" {
 			cat = "other"
 		}
+		level := storage.NormalizeAccessLevel(req.AccessLevel)
 		newWp := &storage.Wallpaper{
-			ID:        req.LinkName,
-			LinkName:  req.LinkName,
-			Category:  cat,
-			CreatedAt: time.Now().Unix(),
+			ID:          req.LinkName,
+			LinkName:    req.LinkName,
+			Category:    cat,
+			CreatedAt:   time.Now().Unix(),
+			AccessLevel: level,
+		}
+		if level == config.AccessToken {
+			tok, err := generateAccessToken()
+			if err != nil {
+				http.Error(w, "Failed to generate access token", http.StatusInternalServerError)
+				return
+			}
+			newWp.AccessToken = tok
 		}
 		storage.Global.Set(req.LinkName, newWp)
 		if err := storage.Global.Save(); err != nil {
 			log.Printf("Error saving after link creation: %v", err)
 		}
-		log.Printf("Created link: %s (category: %s)", req.LinkName, cat)
+		log.Printf("Created link: %s (category: %s, access: %s)", req.LinkName, cat, level)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		if err := json.NewEncoder(w).Encode(toResponse(newWp)); err != nil {
@@ -280,6 +309,8 @@ func Link(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			NewLinkName *string `json:"newLinkName"`
 			Category    *string `json:"category"`
+			AccessLevel *string `json:"accessLevel"`
+			RotateToken bool    `json:"rotateToken"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
@@ -314,19 +345,34 @@ func Link(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if wpOld.HasImage && wpOld.MIMEType != "" {
-				oldImg := filepath.Join("static", "images", linkName+"."+wpOld.MIMEType)
-				newImg := filepath.Join("static", "images", newName+"."+wpOld.MIMEType)
-				if err := os.Rename(oldImg, newImg); err != nil && !os.IsNotExist(err) {
+				oldImg := wpOld.ImagePath
+				if oldImg == "" {
+					oldImg = storage.MediaPath(linkName, wpOld.MIMEType)
+				}
+				newImg := storage.MediaPath(newName, wpOld.MIMEType)
+				if err := renameFile(oldImg, newImg); err != nil {
 					log.Printf("Error renaming image file %s -> %s: %v", oldImg, newImg, err)
 					http.Error(w, "Failed to rename image file", http.StatusInternalServerError)
 					return
 				}
+				// Also try legacy location.
+				_ = renameFile(
+					filepath.Join(config.LegacyMedia, linkName+"."+wpOld.MIMEType),
+					storage.MediaPath(newName, wpOld.MIMEType),
+				)
 				if wpOld.MIMEType != "mp4" && wpOld.MIMEType != "webm" {
-					oldPrev := filepath.Join("static", "images", "previews", linkName+".webp")
-					newPrev := filepath.Join("static", "images", "previews", newName+".webp")
-					if err := os.Rename(oldPrev, newPrev); err != nil && !os.IsNotExist(err) {
+					oldPrev := wpOld.PreviewPath
+					if oldPrev == "" {
+						oldPrev = storage.PreviewFilePath(linkName)
+					}
+					newPrev := storage.PreviewFilePath(newName)
+					if err := renameFile(oldPrev, newPrev); err != nil {
 						log.Printf("Warning: could not rename preview %s -> %s: %v", oldPrev, newPrev, err)
 					}
+					_ = renameFile(
+						filepath.Join(config.LegacyMedia, "previews", linkName+".webp"),
+						storage.PreviewFilePath(newName),
+					)
 				}
 			}
 
@@ -337,13 +383,12 @@ func Link(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Update URLs and runtime paths to reflect the new name.
-			// All URLs must start with a leading slash for correct browser resolution.
 			if wp.HasImage && wp.MIMEType != "" {
-				wp.ImageURL = "/static/images/" + newName + "." + wp.MIMEType
-				wp.ImagePath = filepath.Join("static", "images", newName+"."+wp.MIMEType)
+				wp.ImageURL = "/" + newName
+				wp.ImagePath = storage.MediaPath(newName, wp.MIMEType)
 				if wp.MIMEType != "mp4" && wp.MIMEType != "webm" {
-					wp.Preview = "/static/images/previews/" + newName + ".webp"
-					wp.PreviewPath = filepath.Join("static", "images", "previews", newName+".webp")
+					wp.Preview = "/api/preview/" + newName
+					wp.PreviewPath = storage.PreviewFilePath(newName)
 				}
 				storage.Global.Set(newName, wp)
 			}
@@ -357,7 +402,7 @@ func Link(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// --- Category patch ---
+		// --- Category / access patch ---
 		wp, exists := storage.Global.Get(linkName)
 		if !exists {
 			http.Error(w, "Link not found", http.StatusNotFound)
@@ -374,11 +419,42 @@ func Link(w http.ResponseWriter, r *http.Request) {
 				wp.Category = *req.Category
 			}
 		}
+		if req.AccessLevel != nil {
+			if !isValidAccessLevel(*req.AccessLevel) {
+				http.Error(w, "Invalid access level", http.StatusBadRequest)
+				return
+			}
+			newLevel := storage.NormalizeAccessLevel(*req.AccessLevel)
+			prev := storage.NormalizeAccessLevel(wp.AccessLevel)
+			wp.AccessLevel = newLevel
+			if newLevel == config.AccessToken && (prev != config.AccessToken || wp.AccessToken == "" || req.RotateToken) {
+				tok, err := generateAccessToken()
+				if err != nil {
+					http.Error(w, "Failed to generate access token", http.StatusInternalServerError)
+					return
+				}
+				wp.AccessToken = tok
+			}
+			if newLevel != config.AccessToken {
+				wp.AccessToken = ""
+			}
+		} else if req.RotateToken {
+			if storage.NormalizeAccessLevel(wp.AccessLevel) != config.AccessToken {
+				http.Error(w, "Link is not token-protected", http.StatusBadRequest)
+				return
+			}
+			tok, err := generateAccessToken()
+			if err != nil {
+				http.Error(w, "Failed to generate access token", http.StatusInternalServerError)
+				return
+			}
+			wp.AccessToken = tok
+		}
 		storage.Global.Set(linkName, wp)
 		if err := storage.Global.Save(); err != nil {
 			log.Printf("Error saving after link patch: %v", err)
 		}
-		log.Printf("Patched link: %s (category: %s)", linkName, wp.Category)
+		log.Printf("Patched link: %s (category: %s, access: %s)", linkName, wp.Category, wp.AccessLevel)
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(toResponse(wp)); err != nil {
 			log.Printf("Error encoding patch response: %v", err)
@@ -397,6 +473,13 @@ func Link(w http.ResponseWriter, r *http.Request) {
 		}
 		if wp.HasImage {
 			removeFiles(wp.ImagePath, wp.PreviewPath)
+			// Clean legacy paths too.
+			if wp.MIMEType != "" {
+				removeFiles(
+					filepath.Join(config.LegacyMedia, linkName+"."+wp.MIMEType),
+					filepath.Join(config.LegacyMedia, "previews", linkName+".webp"),
+				)
+			}
 		}
 		storage.Global.Delete(linkName)
 		if err := storage.Global.Save(); err != nil {
@@ -407,6 +490,24 @@ func Link(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// renameFile renames src to dst, creating the destination directory as needed.
+// Missing source is not an error (returns nil).
+func renameFile(src, dst string) error {
+	if src == "" || dst == "" || src == dst {
+		return nil
+	}
+	if _, err := os.Stat(src); os.IsNotExist(err) {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+		return err
+	}
+	if err := os.Rename(src, dst); err != nil {
+		return fmt.Errorf("rename: %w", err)
+	}
+	return nil
 }
 
 // TogglePin handles POST /api/link/{name}/pin to toggle pin status.
@@ -453,6 +554,69 @@ func TogglePin(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(toResponse(wp)); err != nil {
 		log.Printf("Error encoding pin toggle response: %v", err)
 	}
+}
+
+// AdminPreview serves the thumbnail (or full media for videos) for the admin
+// panel. Always requires admin auth (mounted behind MaybeBasicAuth). This is
+// the ONLY way to load previews — they are no longer under /static/.
+func AdminPreview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	name := strings.TrimPrefix(r.URL.Path, "/api/preview/")
+	name = strings.Trim(name, "/")
+	if !isValidLinkName(name) {
+		http.NotFound(w, r)
+		return
+	}
+	wp, exists := storage.Global.Get(name)
+	if !exists || !wp.HasImage {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Prefer the WebP preview; fall back to the full media file (videos).
+	path := wp.PreviewPath
+	contentType := "image/webp"
+	if path == "" || !fileExists(path) {
+		path = wp.ImagePath
+		if path == "" || !fileExists(path) {
+			http.NotFound(w, r)
+			return
+		}
+		contentType = "image/" + wp.MIMEType
+		if wp.MIMEType == "mp4" || wp.MIMEType == "webm" {
+			contentType = "video/" + wp.MIMEType
+		}
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer f.Close()
+	fi, err := f.Stat()
+	if err != nil || fi.IsDir() {
+		http.NotFound(w, r)
+		return
+	}
+
+	h := w.Header()
+	h.Set("Content-Type", contentType)
+	h.Set("Content-Disposition", "inline")
+	h.Set("Cache-Control", "private, max-age=60, must-revalidate")
+	h.Set("X-Content-Type-Options", "nosniff")
+	http.ServeContent(w, r, filepath.Base(path), fi.ModTime(), f)
+}
+
+func fileExists(path string) bool {
+	if path == "" {
+		return false
+	}
+	fi, err := os.Stat(path)
+	return err == nil && !fi.IsDir()
 }
 
 func ExternalImages(w http.ResponseWriter, r *http.Request) {
@@ -516,6 +680,10 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 }
 
 func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	pathParam := r.URL.Query().Get("path")
 	if pathParam == "" {
 		http.NotFound(w, r)
@@ -524,6 +692,12 @@ func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
 	if !utils.IsValidLocalPath(pathParam) {
 		log.Printf("Security: blocked invalid preview path: %s", pathParam)
 		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+	// Reject paths whose extension is not an allowed media type.
+	ext := strings.ToLower(filepath.Ext(pathParam))
+	if !config.AllowedMediaExts[ext] {
+		http.Error(w, "Unsupported file type", http.StatusBadRequest)
 		return
 	}
 	absPath, _, err := utils.ValidateAndResolvePath(utils.ExternalBaseDir(), pathParam)
@@ -535,7 +709,7 @@ func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Content-Disposition", "inline")
-	h.Set("Cache-Control", "public, max-age=300")
+	h.Set("Cache-Control", "private, max-age=300")
 	http.ServeFile(w, r, absPath)
 }
 

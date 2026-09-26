@@ -15,7 +15,7 @@ lanpaper.exe
 # Go workspace file
 go.work
 
-# Application data
+# Application data (media lives under data/media + data/previews)
 data/
 static/images/*
 !static/images/.gitkeep

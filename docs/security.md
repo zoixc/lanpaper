@@ -12,6 +12,21 @@ ADMIN_PASS=your-strong-password
 
 > **Important:** Without credentials, authentication is disabled automatically. Always set both `ADMIN_USER` and `ADMIN_PASS` in any non-isolated environment.
 
+## Per-link access levels
+
+Each wallpaper link has an `accessLevel`:
+
+| Level | Who can open `/{linkName}` |
+|-------|----------------------------|
+| `public` (default) | Anyone on the internet |
+| `local` | Clients whose IP is loopback, RFC1918, link-local, CGNAT, or IPv6 ULA |
+| `token` | Requests with `?token=` or `X-Access-Token` matching the link secret (admin Basic Auth also allowed) |
+| `auth` | Valid admin Basic Auth only |
+
+Media files are stored under `data/media/` and `data/previews/` — **outside** the static web root. Direct URLs like `/static/images/...` are blocked so access control cannot be bypassed.
+
+Admin thumbnails are served only via `/api/preview/{name}` (behind admin auth).
+
 ## HTTPS / TLS
 
 Lanpaper does not terminate TLS itself. **Always place it behind a reverse proxy** that handles TLS:
@@ -38,6 +53,11 @@ server {
 }
 ```
 
+Set `TRUSTED_PROXY` to the proxy's address (or CIDR) so rate limiting and
+the `local` access level see the real client IP. **Do not** set it when
+Lanpaper is exposed directly — forged `X-Forwarded-*` headers would otherwise
+be trusted.
+
 ### Caddy example (automatic HTTPS)
 
 ```
@@ -56,9 +76,15 @@ When users upload images via URL, the server fetches the remote file. Lanpaper b
 - `100.64.0.0/10` — CGNAT
 - IPv6 loopback, ULA, and link-local ranges
 
-Protection is applied at **two layers**:
-1. Pre-request DNS check (`ValidateRemoteURL`)
-2. At TCP dial time via `ssrfSafeDialer` (prevents DNS rebinding attacks)
+Protection is applied at **three layers**:
+
+1. Pre-request DNS / IP check (`ValidateRemoteURL`) — required when an HTTP proxy is configured, because the dialer only sees the proxy address
+2. At TCP dial time via `ssrfSafeDialer` (prevents DNS rebinding)
+3. On every redirect hop (`CheckRedirect` + `ValidateRemoteURL`, max 5 redirects)
+
+## CSRF
+
+State-changing admin requests require same-origin signals (`Sec-Fetch-Site` or matching `Origin`). `X-Forwarded-Host` is only consulted when the peer is the configured `TRUSTED_PROXY`.
 
 ## Docker
 
@@ -69,5 +95,7 @@ Avoid mounting sensitive host directories into the container. The only directori
 ```yaml
 volumes:
   - ./data:/app/data
-  - ./external/images:/app/external/images
+  - ./external/images:/app/external/images   # optional gallery
 ```
+
+Do **not** bind-mount host media into `/app/static/images` for serving — that path is intentionally not exposed over HTTP.

@@ -173,19 +173,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For images and dynamic content: Network first with secure caching
+  // Never cache admin preview API or non-GET (already skipped above).
+  // Public media URLs (/{name}) may be access-controlled — only cache when
+  // the response explicitly allows shared caching.
   event.respondWith(
     fetch(request, {
       credentials: 'same-origin'
     })
       .then(response => {
-        // Cache valid responses
         if (response && response.ok && response.status === 200) {
           const contentType = response.headers.get('content-type') || '';
-          // Only cache images and safe content
-          if (contentType.startsWith('image/') || contentType.startsWith('video/')) {
+          const cacheControl = (response.headers.get('cache-control') || '').toLowerCase();
+          const noStore = cacheControl.includes('no-store') || cacheControl.includes('private');
+          const isMedia = contentType.startsWith('image/') || contentType.startsWith('video/');
+          // Skip /api/* (already returned earlier) and non-cacheable media.
+          if (isMedia && !noStore && !url.pathname.startsWith('/api/')) {
             cacheWithTimestamp(RUNTIME_CACHE, request, response.clone())
-              .then(() => trimRuntimeCache()) // Trim after adding
+              .then(() => trimRuntimeCache())
               .catch(err => console.warn('[SW] Runtime cache failed:', err));
           }
         }

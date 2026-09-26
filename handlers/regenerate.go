@@ -132,37 +132,41 @@ func regenPreview(ctx context.Context, wp *storage.Wallpaper) error {
 			return err
 		}
 	}
-	previewPath := filepath.Join("static", "images", "previews", wp.LinkName+".webp")
+	if err := os.MkdirAll(config.PreviewDir, 0755); err != nil {
+		return err
+	}
+	previewPath := storage.PreviewFilePath(wp.LinkName)
 	thumb := thumbnail(img, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight)
 	if err := saveImage(thumb, "webp", previewPath); err != nil {
 		return err
 	}
 	wp.PreviewPath = previewPath
-	wp.Preview = "/static/images/previews/" + wp.LinkName + ".webp"
+	wp.Preview = "/api/preview/" + wp.LinkName
 	storage.Global.Set(wp.LinkName, wp)
 	return nil
 }
 
-// cleanStalePreviewFiles removes .webp files in previews/ with no matching storage entry.
+// cleanStalePreviewFiles removes .webp files in preview dirs with no matching storage entry.
 func cleanStalePreviewFiles() {
-	previewDir := filepath.Join("static", "images", "previews")
-	entries, err := os.ReadDir(previewDir)
-	if err != nil {
-		return
-	}
-	for _, e := range entries {
-		if e.IsDir() {
+	for _, previewDir := range []string{config.PreviewDir, filepath.Join(config.LegacyMedia, "previews")} {
+		entries, err := os.ReadDir(previewDir)
+		if err != nil {
 			continue
 		}
-		ext := filepath.Ext(e.Name())
-		if ext != ".webp" {
-			continue
-		}
-		linkName := e.Name()[:len(e.Name())-len(ext)]
-		if _, exists := storage.Global.Get(linkName); !exists {
-			path := filepath.Join(previewDir, e.Name())
-			if removeErr := os.Remove(path); removeErr != nil && !os.IsNotExist(removeErr) {
-				log.Printf("cleanStalePreviewFiles: remove %s: %v", path, removeErr)
+		for _, e := range entries {
+			if e.IsDir() {
+				continue
+			}
+			ext := filepath.Ext(e.Name())
+			if ext != ".webp" {
+				continue
+			}
+			linkName := e.Name()[:len(e.Name())-len(ext)]
+			if _, exists := storage.Global.Get(linkName); !exists {
+				path := filepath.Join(previewDir, e.Name())
+				if removeErr := os.Remove(path); removeErr != nil && !os.IsNotExist(removeErr) {
+					log.Printf("cleanStalePreviewFiles: remove %s: %v", path, removeErr)
+				}
 			}
 		}
 	}

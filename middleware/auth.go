@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"crypto/sha256"
 	"crypto/subtle"
 	"log"
 	"net/http"
@@ -49,6 +50,10 @@ func BasicAuth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// secureCompare compares two strings in constant time by hashing first,
+// so differing lengths cannot short-circuit the comparison.
 func secureCompare(a, b string) bool {
-	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
+	ha := sha256.Sum256([]byte(a))
+	hb := sha256.Sum256([]byte(b))
+	return subtle.ConstantTimeCompare(ha[:], hb[:]) == 1
 }
