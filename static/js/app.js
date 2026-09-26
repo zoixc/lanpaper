@@ -101,9 +101,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
 function initPWA() {
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/static/sw.js').catch(() => {});
-    }
+    if (!('serviceWorker' in navigator)) return;
+    // The worker must be served from the root path (/sw.js, with
+    // Service-Worker-Allowed: /) so its scope covers /admin and the public
+    // link URLs. Registered at /static/sw.js the scope would be /static/
+    // and the worker would never control the app.
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+    // Remove the legacy worker from versions that registered it under
+    // /static/ where it never actually controlled the app.
+    navigator.serviceWorker.getRegistrations()
+        .then(regs => regs.forEach(r => {
+            if (new URL(r.scope).pathname.replace(/\/+$/, '') === '/static') {
+                r.unregister();
+            }
+        }))
+        .catch(() => {});
 }
 
 
@@ -1262,6 +1274,31 @@ function buildNoImageSVG() {
 }
 
 
+// A single shared MutationObserver that runs clean-up callbacks for cards
+// removed from the DOM. One observer for all cards is dramatically cheaper
+// than one observer per card, each watching the whole document subtree.
+const cardCleanups = new Map();
+const cardObserver = 'MutationObserver' in window
+    ? new MutationObserver(records => {
+        // Only scan for detached cards when something was actually removed.
+        if (!records.some(r => r.removedNodes.length)) return;
+        for (const [card, cleanup] of cardCleanups) {
+            if (!document.contains(card)) {
+                cardCleanups.delete(card);
+                cleanup();
+            }
+        }
+    })
+    : null;
+if (cardObserver) {
+    cardObserver.observe(document.body, { childList: true, subtree: true });
+}
+
+function registerCardCleanup(card, cleanup) {
+    if (cardObserver) cardCleanups.set(card, cleanup);
+    else setTimeout(cleanup, 5 * 60 * 1000); // very old browsers: best effort
+}
+
 function setupCardEvents(card, link) {
     const fileInput = card.querySelector('.file-input');
     const dropdown = card.querySelector('.upload-dropdown');
@@ -1270,9 +1307,7 @@ function setupCardEvents(card, link) {
     const ac = new AbortController();
     const { signal } = ac;
 
-    new MutationObserver((_, obs) => {
-        if (!document.contains(card)) { ac.abort(); obs.disconnect(); }
-    }).observe(document.body, { childList: true, subtree: true });
+    registerCardCleanup(card, () => ac.abort());
 
     // Inline rename
     setupInlineRename(card, link);

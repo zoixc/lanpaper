@@ -28,7 +28,7 @@
       "name": "Create new link",
       "short_name": "New",
       "description": "Create a new short link",
-      "url": "/admin.html?action=create",
+      "url": "/admin?action=create",
       "icons": [{
         "src": "/static/favicon.svg",
         "sizes": "96x96"

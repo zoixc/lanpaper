@@ -19,9 +19,14 @@ import (
 const (
 	DefaultPageSize = 50
 	MaxPageSize     = 200
+	// maxJSONBody limits request bodies on JSON endpoints (requests carry
+	// nothing larger than a link name and a category).
+	maxJSONBody = 1 << 20 // 1 MB
 )
 
 func Admin(w http.ResponseWriter, r *http.Request) {
+	// Always revalidate: the panel must not run a stale UI after an upgrade.
+	w.Header().Set("Cache-Control", "no-cache")
 	http.ServeFile(w, r, "admin.html")
 }
 
@@ -219,6 +224,9 @@ func linkNameFromPath(path string) (string, bool) {
 
 // Link handles POST /api/link, PATCH /api/link/{name}, DELETE /api/link/{name}.
 func Link(w http.ResponseWriter, r *http.Request) {
+	if r.Body != nil {
+		r.Body = http.MaxBytesReader(w, r.Body, maxJSONBody)
+	}
 	switch r.Method {
 	case http.MethodPost:
 		var req struct {
