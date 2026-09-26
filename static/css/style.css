@@ -145,17 +145,17 @@ body.dark {
    ============================================================ */
 @font-face {
     font-family: 'Disket-Mono-Bold';
-    src: url('/static/fonts/Disket/Disket-Mono-Bold.ttf') format('opentype');
+    src: url('/static/fonts/Disket/Disket-Mono-Bold.ttf') format('truetype');
     font-display: swap;
 }
 @font-face {
     font-family: 'Disket-Mono';
-    src: url('/static/fonts/Disket/Disket-Mono-Regular.ttf') format('opentype');
+    src: url('/static/fonts/Disket/Disket-Mono-Regular.ttf') format('truetype');
     font-display: swap;
 }
 @font-face {
-    font-family: 'Google';
-    src: url('/static/fonts/Rubik.ttf') format('opentype');
+    font-family: 'Rubik';
+    src: url('/static/fonts/Rubik.ttf') format('truetype');
     font-display: swap;
 }
 

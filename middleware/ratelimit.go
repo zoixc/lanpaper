@@ -63,6 +63,21 @@ func isOverLimit(ip string, perMin, burst int) bool {
 	return isOverLimitNS("public", ip, perMin, burst)
 }
 
+// PublicRateLimit enforces the configured public (per-minute) rate limit on
+// the wrapped handler. It is used for the public link endpoints mounted at
+// "/" so that the internet-facing URLs are covered by RATE_PUBLIC_PER_MIN.
+func PublicRateLimit(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if isOverLimit(clientIP(r), config.Current.Rate.PublicPerMin, config.Current.Rate.Burst) {
+			log.Printf("Rate limit exceeded for IP: %s", clientIP(r))
+			w.Header().Set("Retry-After", "60")
+			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+			return
+		}
+		next(w, r)
+	}
+}
+
 // clientIP returns the real client IP.
 // X-Real-IP and X-Forwarded-For are honoured only when the request originates
 // from the configured TrustedProxy, preventing IP spoofing.
@@ -76,10 +91,12 @@ func clientIP(r *http.Request) string {
 			}
 		}
 		if xf := r.Header.Get("X-Forwarded-For"); xf != "" {
-			// XFF is comma-separated; take the leftmost (client) entry.
+			// XFF is comma-separated. Take the rightmost (last) entry: it is
+			// the address the trusted proxy actually saw, whereas leftmost
+			// entries are client-supplied and trivially spoofed.
 			raw := xf
-			if idx := strings.IndexByte(xf, ','); idx >= 0 {
-				raw = xf[:idx]
+			if idx := strings.LastIndexByte(xf, ','); idx >= 0 {
+				raw = xf[idx+1:]
 			}
 			candidate := strings.TrimSpace(raw)
 			if net.ParseIP(candidate) != nil {

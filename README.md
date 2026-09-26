@@ -12,8 +12,6 @@ http://your-server/office    →  change it next week — the link stays the sam
 http://your-server/tv        →  swap video/image from the browser, no reconfiguration
 ```
 
-![Lanpaper Admin Panel](docs/screenshot.png)
-
 ## Features
 
 - **Permanent links with swappable content** — the core idea
@@ -225,32 +223,22 @@ COMPRESSION_QUALITY=85 COMPRESSION_SCALE=100 go run .
 - `GET /admin` — Admin panel
 - `GET /api/wallpapers` — List all links
 - `POST /api/link` — Create new link `{"linkName": "my-wallpaper"}`
+- `PATCH /api/link/{linkName}` — Rename link `{"newLinkName": "..."}` or change `{"category": "..."}`
 - `DELETE /api/link/{linkName}` — Delete link
+- `POST /api/link/{linkName}/pin` — Pin/unpin a link
 - `POST /api/upload` — Upload content (form: `file` or `url`, `linkName`)
 - `GET /api/external-images` — List files from server directory
 - `GET /api/external-image-preview?path=...` — Preview server file
 - `GET /api/compression-config` — Get current compression settings
-- `GET /health` — Health check (`status`, `version`, `uptime`)
+- `POST /api/regenerate-previews` — Re-generate all preview thumbnails
+- `GET /health` — Health check (`status`, `version`)
+- `GET /health/ready` — Readiness check (storage, static dirs, disk space)
 
 ## Behind Reverse Proxy
 
 Recommended setup: run Lanpaper with no credentials and protect `/admin` + `/api/*` via your reverse proxy.
 
-```nginx
-location /admin {
-    auth_request /auth;
-    proxy_pass http://lanpaper:8080;
-}
-
-location /api/ {
-    auth_request /auth;
-    proxy_pass http://lanpaper:8080;
-}
-
-location / {
-    proxy_pass http://lanpaper:8080;
-}
-```
+> **Note:** Lanpaper rejects cross-site `POST`/`PATCH`/`DELETE` requests (CSRF protection). Make sure your proxy passes the original host through (`proxy_set_header Host $host;` in nginx) and, if applicable, sets `X-Forwarded-Host`, so same-origin requests from the admin panel are recognized correctly. Set `TRUSTED_PROXY` to the proxy IP/CIDR so per-client rate limiting uses the real visitor IP.
 
 ## Security
 
@@ -304,10 +292,6 @@ go build -o lanpaper .   # Build
 go test ./...     # Test
 docker build -t lanpaper .  # Docker build
 ```
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

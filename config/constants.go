@@ -1,9 +1,9 @@
 package config
 
 const (
-	MaxImageDimension  = 16384 // max width/height in pixels; prevents decompression bombs
-	ThumbnailMaxWidth  = 640
-	ThumbnailMaxHeight = 360
+	MaxImageDimension         = 16384 // max width/height in pixels; prevents decompression bombs
+	ThumbnailMaxWidth         = 640
+	ThumbnailMaxHeight        = 360
 	DefaultCompressionQuality = 85
 	GIFColors                 = 256
 	DefaultCompressionScale   = 100

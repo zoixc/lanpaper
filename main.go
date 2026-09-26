@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -48,21 +49,42 @@ func main() {
 
 	go middleware.StartCleaner()
 
-	// Serve static files with long-lived cache for versioned assets.
-	// The app uses ?t=<timestamp> cache-busting on dynamic resources.
+	// Serve static files.
+	// Code assets (css/js) are served with "no-cache" so browsers always
+	// revalidate them (via Last-Modified/If-Modified-Since) and never run a
+	// stale admin UI after an upgrade — the files carry no version hash.
+	// Immutable-ish assets (fonts, icons, uploaded media) keep a 1-day cache.
 	staticFS := http.FileServer(http.Dir("static"))
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/",
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Cache-Control", "public, max-age=86400")
+			// Never serve directory listings (/static/, /static/css/, ...).
+			// StripPrefix("/static/") turns "/static/" into "" — catch both.
+			if r.URL.Path == "" || strings.HasSuffix(r.URL.Path, "/") {
+				http.NotFound(w, r)
+				return
+			}
+			switch strings.ToLower(filepath.Ext(r.URL.Path)) {
+			case ".css", ".js":
+				w.Header().Set("Cache-Control", "no-cache")
+			default:
+				w.Header().Set("Cache-Control", "public, max-age=86400")
+			}
 			staticFS.ServeHTTP(w, r)
 		}),
 	))
+	// The service worker must live at the root scope to control /admin and
+	// public link URLs; it is served with Service-Worker-Allowed: /.
+	mux.HandleFunc("/sw.js", serveServiceWorker)
+	// Legacy URL kept working for PWA installs/bookmarks that used /admin.html.
+	mux.HandleFunc("/admin.html", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/admin", http.StatusPermanentRedirect)
+	})
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/health/ready", readyHandler)
 	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Admin)))
-	mux.HandleFunc("/api/wallpapers", middleware.WithSecurity(handlers.Wallpapers))
-	mux.HandleFunc("/api/compression-config", middleware.WithSecurity(handlers.GetCompressionConfig))
+	mux.HandleFunc("/api/wallpapers", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Wallpapers)))
+	mux.HandleFunc("/api/compression-config", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.GetCompressionConfig)))
 	mux.HandleFunc("/api/link/", middleware.WithSecurity(middleware.MaybeBasicAuth(handleLinkRoutes)))
 	mux.HandleFunc("/api/link", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Link)))
 	mux.HandleFunc("/api/upload",
@@ -77,7 +99,7 @@ func main() {
 	mux.HandleFunc("/api/regenerate-previews",
 		middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.RegeneratePreviews)),
 	)
-	mux.HandleFunc("/", handlers.Public)
+	mux.HandleFunc("/", middleware.PublicRateLimit(handlers.Public))
 
 	port := config.Current.Port
 	if !strings.HasPrefix(port, ":") {
@@ -123,6 +145,18 @@ func handleLinkRoutes(w http.ResponseWriter, r *http.Request) {
 	} else {
 		handlers.Link(w, r)
 	}
+}
+
+// serveServiceWorker serves the service worker from the root path so its
+// scope can cover the whole app (Service-Worker-Allowed: /). Registered at
+// /static/sw.js the scope would be limited to /static/ and the SW would
+// never control /admin or the public link URLs.
+func serveServiceWorker(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/javascript")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Service-Worker-Allowed", "/")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	http.ServeFile(w, r, filepath.Join("static", "sw.js"))
 }
 
 func healthHandler(w http.ResponseWriter, _ *http.Request) {

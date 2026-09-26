@@ -10,10 +10,12 @@ const CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours
 const RUNTIME_CACHE_MAX_SIZE = 50; // Max number of runtime cached items
 
 // Static assets to cache on install
+// NOTE: the admin panel lives at /admin (there is no /admin.html route).
 const STATIC_ASSETS = [
-  '/admin.html',
+  '/admin',
   '/static/css/style.css',
   '/static/css/settings-menu.css',
+  '/static/css/skeleton.css',
   '/static/js/app.js',
   '/static/js/export-import.js',
   '/static/js/settings-menu.js',
@@ -165,7 +167,7 @@ self.addEventListener('fetch', (event) => {
             .catch(() => null);
 
           // Return cached if available, otherwise wait for network
-          return cached || fetchPromise || caches.match('/admin.html');
+          return cached || fetchPromise || caches.match('/admin');
         })
     );
     return;
@@ -190,8 +192,13 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch(() => {
-        // Fallback to cache on network error
-        return caches.match(request);
+        // Fallback to cache on network error; for page navigations fall
+        // back to the cached admin shell so the PWA works offline.
+        return caches.match(request).then(matched => {
+          if (matched) return matched;
+          if (request.mode === 'navigate') return caches.match('/admin');
+          return undefined;
+        });
       })
   );
 });
