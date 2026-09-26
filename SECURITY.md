@@ -1,5 +1,22 @@
 # Security Policy
 
+> **Note (implementation):** Admin CSP uses `'self'` without nonces (no inline scripts).
+> COEP is `credentialless` (not `require-corp`) so same-origin static assets load.
+> Media is **not** served from `/static/images` — see per-link access levels below.
+
+## Per-link access levels
+
+| Level | `GET /{name}` allowed for |
+|-------|---------------------------|
+| `public` | Everyone |
+| `local` | Private/LAN/loopback client IPs |
+| `token` | Valid `?token=` / `X-Access-Token` (or admin Basic Auth) |
+| `auth` | Admin Basic Auth only |
+
+Uploaded media is stored under `data/media` + `data/previews`. Direct filesystem URLs are blocked.
+
+---
+
 ## Security Features
 
 Lanpaper implements industry-standard security practices following OWASP, W3C, and modern web security guidelines (2026).

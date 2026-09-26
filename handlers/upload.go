@@ -102,6 +102,13 @@ func (d *ssrfSafeDialer) DialContext(ctx context.Context, network, addr string) 
 	if err != nil {
 		return nil, fmt.Errorf("invalid address: %w", err)
 	}
+	// IP literal — check immediately without DNS.
+	if ip := net.ParseIP(host); ip != nil {
+		if utils.IsBlockedIP(ip) {
+			return nil, errors.New("address is not allowed")
+		}
+		return d.inner.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
+	}
 	ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
 	if err != nil || len(ips) == 0 {
 		return nil, fmt.Errorf("DNS resolution failed for %s", host)
@@ -109,20 +116,11 @@ func (d *ssrfSafeDialer) DialContext(ctx context.Context, network, addr string) 
 	var safeIP string
 	for _, ipAddr := range ips {
 		ip := ipAddr.IP
-		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+		if utils.IsBlockedIP(ip) {
 			continue
 		}
-		isPrivate := false
-		for _, cidr := range utils.PrivateRanges() {
-			if cidr.Contains(ip) {
-				isPrivate = true
-				break
-			}
-		}
-		if !isPrivate {
-			safeIP = ip.String()
-			break
-		}
+		safeIP = ip.String()
+		break
 	}
 	if safeIP == "" {
 		return nil, errors.New("address is not allowed")
@@ -454,8 +452,20 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	// destroy the last working image of a link.
 
 	saveExt := storedExt(ext, losslessMode)
-	originalPath := filepath.Join("static", "images", linkName+"."+saveExt)
-	previewPath := filepath.Join("static", "images", "previews", linkName+".webp")
+	// Media lives under data/ — outside the static web root — so access
+	// control on /{linkName} cannot be bypassed via /static/images/...
+	if err := os.MkdirAll(config.MediaDir, 0755); err != nil {
+		log.Printf("Error creating media dir: %v", err)
+		http.Error(w, "Storage unavailable", http.StatusInternalServerError)
+		return
+	}
+	if err := os.MkdirAll(config.PreviewDir, 0755); err != nil {
+		log.Printf("Error creating preview dir: %v", err)
+		http.Error(w, "Storage unavailable", http.StatusInternalServerError)
+		return
+	}
+	originalPath := storage.MediaPath(linkName, saveExt)
+	previewPath := storage.PreviewFilePath(linkName)
 	if video {
 		previewPath = ""
 	}
@@ -549,25 +559,43 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Preserve metadata across re-uploads (category, pin, access).
 	createdAt := time.Now().Unix()
+	category := "other"
+	isPinned := false
+	var pinnedAt int64
+	accessLevel := config.AccessPublic
+	accessToken := ""
 	if oldWp != nil {
 		createdAt = oldWp.CreatedAt
+		if oldWp.Category != "" {
+			category = oldWp.Category
+		}
+		isPinned = oldWp.IsPinned
+		pinnedAt = oldWp.PinnedAt
+		accessLevel = storage.NormalizeAccessLevel(oldWp.AccessLevel)
+		accessToken = oldWp.AccessToken
 	}
 	previewURL := ""
 	if previewPath != "" {
-		previewURL = "/static/images/previews/" + linkName + ".webp"
+		previewURL = "/api/preview/" + linkName
 	}
 
 	wp := &storage.Wallpaper{
 		ID:          linkName,
 		LinkName:    linkName,
-		ImageURL:    "/static/images/" + linkName + "." + saveExt,
+		Category:    category,
+		ImageURL:    "/" + linkName,
 		Preview:     previewURL,
 		HasImage:    true,
 		MIMEType:    saveExt,
 		SizeBytes:   fi.Size(),
 		ModTime:     fi.ModTime().Unix(),
 		CreatedAt:   createdAt,
+		IsPinned:    isPinned,
+		PinnedAt:    pinnedAt,
+		AccessLevel: accessLevel,
+		AccessToken: accessToken,
 		ImagePath:   originalPath,
 		PreviewPath: previewPath,
 	}
@@ -623,7 +651,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("Uploaded: %s (%s, %d KB, %s)", linkName, saveExt, fi.Size()/1024, mode)
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(wp); err != nil {
+	if err := json.NewEncoder(w).Encode(toResponse(wp)); err != nil {
 		log.Printf("Error encoding upload response: %v", err)
 	}
 }
@@ -730,6 +758,14 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 		return nil, "", nil, errors.New("invalid URL")
 	}
 
+	// Pre-flight SSRF check: required when an HTTP proxy is configured,
+	// because the dialer only sees the proxy address, not the target.
+	// Also blocks obvious local hostnames before any network I/O.
+	if err := utils.ValidateRemoteURL(urlStr); err != nil {
+		log.Printf("Security: blocked remote URL %s: %v", urlStr, err)
+		return nil, "", nil, errors.New("address is not allowed")
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(config.DownloadTimeout)*time.Second)
 	defer cancel()
 
@@ -740,7 +776,21 @@ func downloadImage(ctx context.Context, urlStr string) (image.Image, string, []b
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Lanpaper/1.0)")
 	req.Header.Set("Accept", "image/*,*/*;q=0.8")
 
-	resp, err := (&http.Client{Transport: getTransport()}).Do(req)
+	client := &http.Client{
+		Transport: getTransport(),
+		// Re-validate every redirect target so a public host cannot bounce
+		// us into the metadata service or an internal network.
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= config.MaxRedirects {
+				return errors.New("too many redirects")
+			}
+			if err := utils.ValidateRemoteURL(req.URL.String()); err != nil {
+				return fmt.Errorf("redirect blocked: %w", err)
+			}
+			return nil
+		},
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, "", nil, errors.New("network error")
 	}

@@ -10,23 +10,19 @@
   "paste_url": "Depuis URL",
   "select_server": "Depuis galerie",
   "remove": "Supprimer",
-
   "upload_file": "Fichier",
   "upload_url": "URL",
   "upload_server": "Serveur",
-
   "pin": "Épingler",
   "unpin": "Désépingler",
   "pinned": "Épinglé en haut",
   "unpinned": "Désépinglé",
   "aria_pin": "Épingler ce lien en haut",
   "aria_unpin": "Désépingler ce lien",
-
   "drop_files_here": "Déposez les fichiers ici",
   "drop_hint": "Les liens seront créés automatiquement",
   "link_created_uploaded": "\"{{name}}\" créé et téléversé",
   "dragdrop_hint": "Glissez-déposez des fichiers n'importe où pour téléverser",
-
   "settings_language": "Langue",
   "settings_data": "Données",
   "settings_maintenance": "Maintenance",
@@ -38,16 +34,13 @@
   "import_error": "Échec de l'importation: Fichier invalide",
   "import_confirm": "Importer {{count}} liens? Cela remplacera les données actuelles.",
   "sync_in_progress": "Synchronisation des données avec le serveur...",
-
   "regen_previews": "Régénérer les aperçus",
   "regen_previews_running": "Régénération...",
   "regen_previews_done": "Terminé: {{ok}} ok, {{errors}} erreurs, {{skipped}} ignorés",
-
   "enter_image_url_title": "Coller depuis URL",
   "select_server_title": "Sélectionner depuis galerie",
   "enter_image_url": "URL de l'image:",
   "url_placeholder": "https://...",
-
   "invalid_id": "ID requis",
   "invalid_id_chars": "Utilisez a-z, 0-9, - ou _",
   "invalid_image": "Format de fichier invalide",
@@ -55,7 +48,6 @@
   "link_not_found": "Lien introuvable",
   "invalid_json": "Format de données invalide",
   "network_error": "Erreur réseau - vérifiez votre connexion",
-
   "upload_success": "Téléversé!",
   "created_success": "Lien créé",
   "renamed_success": "Renommé en \"{{name}}\"",
@@ -64,37 +56,30 @@
   "confirm_delete_title": "Supprimer le lien?",
   "confirm_delete_msg": "Supprimer \"{{name}}\"? Ceci ne peut pas être annulé.",
   "delete_btn": "Supprimer",
-
   "loading": "Chargement...",
   "server_empty": "Dossier vide",
   "server_error": "Erreur d'accès",
   "copied": "Copié!",
   "copy_error": "Échec de la copie de l'URL",
-
   "modal_cancel": "Annuler",
   "modal_ok": "OK",
   "modal_default_title": "Saisie",
-
   "search_placeholder": "Rechercher par nom de lien ou fichier...",
   "search_total": "Total: {{total}}",
   "search_found": "Trouvé {{shown}} sur {{total}}",
   "search_reset": "Recherche effacée",
   "click_to_reset": "Cliquer pour réinitialiser la recherche",
-
   "sort_by": "Trier par:",
-  "name_asc": "Nom (A\u2013Z)",
-  "name_desc": "Nom (Z\u2013A)",
+  "name_asc": "Nom (A–Z)",
+  "name_desc": "Nom (Z–A)",
   "date_new": "Plus récents d'abord",
   "date_old": "Plus anciens d'abord",
-
   "load_error": "Échec du chargement des liens",
   "preview_unavailable": "Aperçu indisponible",
   "image_unavailable": "Image indisponible",
-
-  "compression_saved": "\ud83d\udddc\ufe0f Compressé: {{percent}}% plus petit ({{saved}} économisés)",
+  "compression_saved": "🗜️ Compressé: {{percent}}% plus petit ({{saved}} économisés)",
   "rename_hint": "Double-cliquer pour renommer",
   "rename_input_label": "Nouveau nom de lien",
-
   "aria_open_image": "Ouvrir l'image",
   "aria_link_id": "ID du lien",
   "aria_file_info": "Info fichier",
@@ -103,6 +88,15 @@
   "aria_toggle_theme": "Basculer le mode sombre",
   "aria_search": "Rechercher des fonds d'écran",
   "aria_link_input": "ID du lien",
-
-  "shortcuts_hint": "Raccourcis: Ctrl+N (nouveau), Ctrl+F (recherche), Ctrl+G (vue), T (thème)"
+  "shortcuts_hint": "Raccourcis: Ctrl+N (nouveau), Ctrl+F (recherche), Ctrl+G (vue), T (thème)",
+  "access_label": "Accès",
+  "access_public": "Public",
+  "access_local": "Réseau local",
+  "access_token": "Jeton",
+  "access_auth": "Admin seul",
+  "access_updated": "Niveau d'accès mis à jour",
+  "access_token_field": "Jeton d'accès",
+  "copy_token": "Copier l'URL avec jeton",
+  "rotate_token": "Régénérer",
+  "token_rotated": "Jeton régénéré"
 }

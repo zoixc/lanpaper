@@ -10,23 +10,19 @@
   "paste_url": "From URL",
   "select_server": "From gallery",
   "remove": "Remove",
-
   "upload_file": "File",
   "upload_url": "URL",
   "upload_server": "Server",
-
   "pin": "Pin",
   "unpin": "Unpin",
   "pinned": "Pinned to top",
   "unpinned": "Unpinned",
   "aria_pin": "Pin this link to top",
   "aria_unpin": "Unpin this link",
-
   "drop_files_here": "Drop files here",
   "drop_hint": "Links will be created automatically",
   "link_created_uploaded": "Created \"{{name}}\" and uploaded",
   "dragdrop_hint": "Drag & drop files anywhere to upload",
-
   "settings_language": "Language",
   "settings_data": "Data",
   "settings_maintenance": "Maintenance",
@@ -38,16 +34,13 @@
   "import_error": "Import failed: Invalid file",
   "import_confirm": "Import {{count}} links? This will replace current data.",
   "sync_in_progress": "Syncing data with server...",
-
   "regen_previews": "Regenerate Previews",
   "regen_previews_running": "Regenerating...",
   "regen_previews_done": "Done: {{ok}} ok, {{errors}} errors, {{skipped}} skipped",
-
   "enter_image_url_title": "Paste from URL",
   "select_server_title": "Select from gallery",
   "enter_image_url": "Image URL:",
   "url_placeholder": "https://...",
-
   "invalid_id": "ID is required",
   "invalid_id_chars": "Use a-z, 0-9, - or _",
   "invalid_image": "Invalid file format",
@@ -55,7 +48,6 @@
   "link_not_found": "Link not found",
   "invalid_json": "Invalid data format",
   "network_error": "Network error - check your connection",
-
   "upload_success": "Uploaded!",
   "created_success": "Link created",
   "renamed_success": "Renamed to \"{{name}}\"",
@@ -64,37 +56,30 @@
   "confirm_delete_title": "Delete link?",
   "confirm_delete_msg": "Delete \"{{name}}\"? This cannot be undone.",
   "delete_btn": "Delete",
-
   "loading": "Loading...",
   "server_empty": "Folder is empty",
   "server_error": "Access error",
   "copied": "Copied!",
   "copy_error": "Failed to copy URL",
-
   "modal_cancel": "Cancel",
   "modal_ok": "OK",
   "modal_default_title": "Input",
-
   "search_placeholder": "Search by link name or file...",
   "search_total": "Total: {{total}}",
   "search_found": "Found {{shown}} of {{total}}",
   "search_reset": "Search cleared",
   "click_to_reset": "Click to reset search",
-
   "sort_by": "Sort by:",
-  "name_asc": "Name (A\u2013Z)",
-  "name_desc": "Name (Z\u2013A)",
+  "name_asc": "Name (A–Z)",
+  "name_desc": "Name (Z–A)",
   "date_new": "Newest first",
   "date_old": "Oldest first",
-
   "load_error": "Failed to load links",
   "preview_unavailable": "Preview unavailable",
   "image_unavailable": "Image unavailable",
-
-  "compression_saved": "\ud83d\udddc\ufe0f Compressed: {{percent}}% smaller ({{saved}} saved)",
+  "compression_saved": "🗜️ Compressed: {{percent}}% smaller ({{saved}} saved)",
   "rename_hint": "Double-click to rename",
   "rename_input_label": "New link name",
-
   "aria_open_image": "Open image",
   "aria_link_id": "Link ID",
   "aria_file_info": "File info",
@@ -103,6 +88,15 @@
   "aria_toggle_theme": "Toggle dark mode",
   "aria_search": "Search wallpapers",
   "aria_link_input": "Link ID",
-
-  "shortcuts_hint": "Shortcuts: Ctrl+N (new), Ctrl+F (search), Ctrl+G (view), T (theme)"
+  "shortcuts_hint": "Shortcuts: Ctrl+N (new), Ctrl+F (search), Ctrl+G (view), T (theme)",
+  "access_label": "Access",
+  "access_public": "Public",
+  "access_local": "Local network",
+  "access_token": "Token",
+  "access_auth": "Admin only",
+  "access_updated": "Access level updated",
+  "access_token_field": "Access token",
+  "copy_token": "Copy token URL",
+  "rotate_token": "Rotate",
+  "token_rotated": "Token rotated"
 }

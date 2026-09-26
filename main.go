@@ -37,7 +37,14 @@ func main() {
 
 	handlers.InitUploadSemaphore(config.Current.MaxConcurrentUploads)
 
-	for _, d := range []string{"data", "external/images", "static/images/previews"} {
+	for _, d := range []string{
+		"data",
+		config.MediaDir,
+		config.PreviewDir,
+		"external/images",
+		// Legacy dirs kept so old volume mounts still work during migration.
+		"static/images/previews",
+	} {
 		if err := os.MkdirAll(d, 0755); err != nil {
 			log.Printf("Warning: failed to create %s: %v", d, err)
 		}
@@ -46,6 +53,8 @@ func main() {
 	if err := storage.Global.Load(); err != nil {
 		log.Printf("Warning: failed to load wallpapers: %v", err)
 	}
+	// Move any leftover files from static/images into data/media.
+	storage.MigrateMediaToDataDir()
 
 	go middleware.StartCleaner()
 
@@ -53,14 +62,24 @@ func main() {
 	// Code assets (css/js) are served with "no-cache" so browsers always
 	// revalidate them (via Last-Modified/If-Modified-Since) and never run a
 	// stale admin UI after an upgrade — the files carry no version hash.
-	// Immutable-ish assets (fonts, icons, uploaded media) keep a 1-day cache.
+	// Immutable-ish assets (fonts, icons) keep a 1-day cache.
+	//
+	// CRITICAL: /static/images/ is intentionally NOT served. Media lives in
+	// data/media and is only reachable via /{linkName} (access-controlled) or
+	// /api/preview/{name} (admin-auth). Serving the raw files would bypass
+	// every per-link access level.
 	staticFS := http.FileServer(http.Dir("static"))
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/",
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Never serve directory listings (/static/, /static/css/, ...).
-			// StripPrefix("/static/") turns "/static/" into "" — catch both.
 			if r.URL.Path == "" || strings.HasSuffix(r.URL.Path, "/") {
+				http.NotFound(w, r)
+				return
+			}
+			// Block direct access to uploaded media and previews.
+			cleaned := pathClean(r.URL.Path)
+			if cleaned == "images" || strings.HasPrefix(cleaned, "images/") {
 				http.NotFound(w, r)
 				return
 			}
@@ -70,6 +89,7 @@ func main() {
 			default:
 				w.Header().Set("Cache-Control", "public, max-age=86400")
 			}
+			w.Header().Set("X-Content-Type-Options", "nosniff")
 			staticFS.ServeHTTP(w, r)
 		}),
 	))
@@ -85,6 +105,7 @@ func main() {
 	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Admin)))
 	mux.HandleFunc("/api/wallpapers", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Wallpapers)))
 	mux.HandleFunc("/api/compression-config", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.GetCompressionConfig)))
+	mux.HandleFunc("/api/preview/", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.AdminPreview)))
 	mux.HandleFunc("/api/link/", middleware.WithSecurity(middleware.MaybeBasicAuth(handleLinkRoutes)))
 	mux.HandleFunc("/api/link", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Link)))
 	mux.HandleFunc("/api/upload",
@@ -97,9 +118,14 @@ func main() {
 	mux.HandleFunc("/api/external-images", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImages)))
 	mux.HandleFunc("/api/external-image-preview", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImagePreview)))
 	mux.HandleFunc("/api/regenerate-previews",
-		middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.RegeneratePreviews)),
+		middleware.WithSecurity(middleware.MaybeBasicAuth(
+			middleware.RateLimit(func() (int, int) {
+				// Regen is CPU-heavy — reuse the upload budget.
+				return config.Current.Rate.UploadPerMin, config.Current.Rate.Burst
+			})(handlers.RegeneratePreviews),
+		)),
 	)
-	mux.HandleFunc("/", middleware.PublicRateLimit(handlers.Public))
+	mux.HandleFunc("/", middleware.WithPublicSecurity(middleware.PublicRateLimit(handlers.Public)))
 
 	port := config.Current.Port
 	if !strings.HasPrefix(port, ":") {
@@ -113,6 +139,8 @@ func main() {
 		ReadTimeout:  time.Duration(config.HTTPReadTimeout) * time.Second,
 		WriteTimeout: time.Duration(config.HTTPWriteTimeout) * time.Second,
 		IdleTimeout:  time.Duration(config.HTTPIdleTimeout) * time.Second,
+		// Cap request header size against slowloris / oversized header DoS.
+		MaxHeaderBytes: 1 << 20, // 1 MB
 	}
 
 	go func() {
@@ -135,6 +163,16 @@ func main() {
 		log.Fatalf("Server error: %v", err)
 	}
 	log.Println("Server stopped.")
+}
+
+// pathClean normalizes a URL path for prefix checks (no leading slash).
+func pathClean(p string) string {
+	p = strings.TrimPrefix(p, "/")
+	return pathCleanSlash(p)
+}
+
+func pathCleanSlash(p string) string {
+	return filepath.ToSlash(filepath.Clean("/"+p))[1:]
 }
 
 // handleLinkRoutes routes /api/link/{name}/pin to TogglePin, everything else to Link
@@ -162,6 +200,7 @@ func serveServiceWorker(w http.ResponseWriter, r *http.Request) {
 func healthHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	_ = json.NewEncoder(w).Encode(map[string]string{
 		"status":  "ok",
 		"service": "lanpaper",
@@ -180,7 +219,7 @@ func readyHandler(w http.ResponseWriter, _ *http.Request) {
 
 	for _, entry := range []struct{ key, dir string }{
 		{"storage", "data"},
-		{"static", "static/images"},
+		{"media", config.MediaDir},
 	} {
 		if _, err := os.Stat(entry.dir); err != nil {
 			checks[entry.key] = check{OK: false, Message: entry.dir + " not accessible"}
@@ -210,6 +249,7 @@ func readyHandler(w http.ResponseWriter, _ *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(code)
 	_ = json.NewEncoder(w).Encode(map[string]any{"status": status, "checks": checks})
 }

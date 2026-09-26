@@ -21,6 +21,8 @@ http://your-server/tv        →  swap video/image from the browser, no reconfig
 - Load content from URL or a local server directory
 - Automatic thumbnail generation
 - Basic Auth for admin panel (auto-disabled if no credentials set)
+- **Per-link access levels** — public, local network, token, or admin-only
+- Media stored outside the static web root (no `/static/images` bypass)
 - Security: CSP, magic bytes validation, path traversal protection, rate limiting
 - Docker with multi-arch images (amd64, arm64) — works on Raspberry Pi and TV boxes
 - Proxy support for external image downloads
@@ -53,7 +55,6 @@ docker run -d \
   -e ADMIN_USER=admin \
   -e ADMIN_PASS=secret \
   -v $(pwd)/data:/app/data \
-  -v $(pwd)/static:/app/static \
   ptabi/lanpaper:latest
 ```
 
@@ -62,7 +63,6 @@ docker run -d \
 docker run -d \
   -p 8080:8080 \
   -v $(pwd)/data:/app/data \
-  -v $(pwd)/static:/app/static \
   ptabi/lanpaper:latest
 ```
 
@@ -216,7 +216,31 @@ COMPRESSION_QUALITY=85 COMPRESSION_SCALE=100 go run .
 
 ### Public
 
-- `GET /{linkName}` — Serve image/video by link name (always public, no auth required)
+- `GET /{linkName}` — Serve image/video by link name (access level: public / local / token / auth)
+
+
+### Access levels
+
+Each link has an `accessLevel` (default `public`):
+
+| Level | Behaviour |
+|-------|-----------|
+| `public` | Anyone can open `https://app.example/{name}` |
+| `local` | Only clients on loopback / RFC1918 / link-local / CGNAT |
+| `token` | Requires `?token=` (or `X-Access-Token`); admin can always open |
+| `auth` | Requires admin Basic Auth |
+
+Change via the admin UI dropdown, or:
+
+```bash
+curl -u admin:pass -X PATCH /api/link/bedroom \
+  -H 'Content-Type: application/json' \
+  -d '{"accessLevel":"local"}'
+```
+
+Token-protected links expose `accessToken` only to the admin API. Copy the full URL (with token) from the card, or rotate the token anytime.
+
+Media files live in `data/media/` and `data/previews/`. Paths under `/static/images/` are not served.
 
 ### Admin (requires Basic Auth if credentials are set)
 
@@ -255,7 +279,7 @@ Recommended setup: run Lanpaper with no credentials and protect `/admin` + `/api
 - Run behind a reverse proxy (Nginx / Caddy / Traefik) with HTTPS
 - Use external auth (Tinyauth, Authelia) for stronger protection
 - Use strong passwords (minimum 16 characters)
-- Mount `./data` and `./static/images` as Docker volumes
+- Mount `./data` as a Docker volume (media lives under `data/media`)
 
 ## Project Structure
 
@@ -274,7 +298,7 @@ lanpaper/
 | Volume | Purpose |
 |---|---|
 | `./data` | Link metadata (JSON) |
-| `./static/images` | Uploaded files and previews |
+| `./data` | DB + uploaded media (`data/media`, `data/previews`) |
 | `./external/images` | Optional: server-side image directory |
 
 ## Technologies

@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"lanpaper/config"
 )
 
 // staticSecurityHeaders are headers that don't change per-request.
@@ -42,15 +44,22 @@ const contentSecurityPolicy = "default-src 'none'; " +
 	"form-action 'self'; " +
 	"frame-ancestors 'none';"
 
+// publicMediaCSP is a relaxed CSP for public media responses so that
+// consumers (digital frames, <img>/<video> embeds) are not broken.
+const publicMediaCSP = "default-src 'none'; style-src 'none'; script-src 'none'; sandbox;"
+
 // sameOriginRequest reports whether a state-changing request originates
 // from this application and not from another website (CSRF protection).
 //
 // Sec-Fetch-Site (set by all modern browsers) is authoritative: it is
 // unaffected by reverse proxies that rewrite the Host header. The Origin
 // header is used as a fallback for older browsers; it is compared against
-// the request Host and X-Forwarded-Host entries. Non-browser clients
-// (curl, scripts) send neither header and are allowed through — they are
-// protected by Basic Auth instead.
+// the request Host. X-Forwarded-Host is honoured ONLY when the immediate
+// peer is the configured TrustedProxy — otherwise an attacker could spoof
+// it to bypass CSRF checks.
+//
+// Non-browser clients (curl, scripts) send neither header and are allowed
+// through — they are protected by Basic Auth instead.
 func sameOriginRequest(r *http.Request) bool {
 	switch r.Header.Get("Sec-Fetch-Site") {
 	case "same-origin", "none":
@@ -79,7 +88,7 @@ func sameOriginRequest(r *http.Request) bool {
 }
 
 // knownHosts returns the hostnames the app is reachable under: the request
-// Host plus every X-Forwarded-Host entry (first entry = original host).
+// Host plus, when the peer is a trusted proxy, every X-Forwarded-Host entry.
 func knownHosts(r *http.Request) []string {
 	hosts := make([]string, 0, 2)
 	addHost := func(hostport string) {
@@ -92,9 +101,14 @@ func knownHosts(r *http.Request) []string {
 		hosts = append(hosts, strings.ToLower(hostport))
 	}
 	addHost(r.Host)
-	for _, v := range r.Header.Values("X-Forwarded-Host") {
-		for _, h := range strings.Split(v, ",") {
-			addHost(strings.TrimSpace(h))
+	// Only trust X-Forwarded-Host from a configured reverse proxy.
+	// Without this gate an attacker sets X-Forwarded-Host: evil.com together
+	// with Origin: https://evil.com and bypasses CSRF on older browsers.
+	if config.IsTrustedProxy(r.RemoteAddr) {
+		for _, v := range r.Header.Values("X-Forwarded-Host") {
+			for _, h := range strings.Split(v, ",") {
+				addHost(strings.TrimSpace(h))
+			}
 		}
 	}
 	return hosts
@@ -118,11 +132,27 @@ func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 		for _, hh := range staticSecurityHeaders {
 			h.Set(hh.key, hh.value)
 		}
-		if r.TLS != nil {
+		if r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
 			h.Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
 		}
 		h.Set("Content-Security-Policy", contentSecurityPolicy)
 
+		next(w, r)
+	}
+}
+
+// WithPublicSecurity attaches a minimal set of security headers suitable for
+// public media responses (no CSRF check — GET only).
+func WithPublicSecurity(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		h.Set("Content-Security-Policy", publicMediaCSP)
+		h.Set("X-Download-Options", "noopen")
+		// Public media may be embedded cross-origin (smart TVs, frames).
+		h.Set("Cross-Origin-Resource-Policy", "cross-origin")
 		next(w, r)
 	}
 }

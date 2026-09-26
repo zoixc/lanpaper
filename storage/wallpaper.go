@@ -7,23 +7,28 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
+
+	"lanpaper/config"
 )
 
 // Wallpaper represents a named wallpaper slot.
 type Wallpaper struct {
-	ID        string `json:"id"`
-	LinkName  string `json:"linkName"`
-	Category  string `json:"category"`
-	ImageURL  string `json:"imageUrl"`
-	Preview   string `json:"preview"`
-	HasImage  bool   `json:"hasImage"`
-	MIMEType  string `json:"mimeType"`
-	SizeBytes int64  `json:"sizeBytes"`
-	ModTime   int64  `json:"modTime"`
-	CreatedAt int64  `json:"createdAt"`
-	IsPinned  bool   `json:"isPinned"`
-	PinnedAt  int64  `json:"pinnedAt,omitempty"`
+	ID          string `json:"id"`
+	LinkName    string `json:"linkName"`
+	Category    string `json:"category"`
+	ImageURL    string `json:"imageUrl"`
+	Preview     string `json:"preview"`
+	HasImage    bool   `json:"hasImage"`
+	MIMEType    string `json:"mimeType"`
+	SizeBytes   int64  `json:"sizeBytes"`
+	ModTime     int64  `json:"modTime"`
+	CreatedAt   int64  `json:"createdAt"`
+	IsPinned    bool   `json:"isPinned"`
+	PinnedAt    int64  `json:"pinnedAt,omitempty"`
+	AccessLevel string `json:"accessLevel,omitempty"` // public|local|token|auth
+	AccessToken string `json:"accessToken,omitempty"` // secret for token level
 
 	// Not persisted; derived from MIMEType on Load.
 	ImagePath   string `json:"-"`
@@ -181,15 +186,189 @@ func (s *Store) Save() error {
 	return atomicWrite(dataFile, s.wallpapers)
 }
 
-// derivePaths fills runtime-only ImagePath/PreviewPath from persisted fields.
+// MediaPath returns the canonical on-disk path for a link's media file.
+func MediaPath(linkName, mimeExt string) string {
+	return filepath.Join(config.MediaDir, linkName+"."+mimeExt)
+}
+
+// PreviewFilePath returns the canonical on-disk path for a link's WebP preview.
+func PreviewFilePath(linkName string) string {
+	return filepath.Join(config.PreviewDir, linkName+".webp")
+}
+
+// NormalizeAccessLevel returns a valid access level, defaulting to public.
+func NormalizeAccessLevel(level string) string {
+	level = strings.ToLower(strings.TrimSpace(level))
+	if config.ValidAccessLevels[level] {
+		return level
+	}
+	return config.AccessPublic
+}
+
+// derivePaths fills runtime-only ImagePath/PreviewPath and public URLs.
+// Prefers the new data/ layout; falls back to legacy static/images/ if the
+// new file is missing but the old one still exists (pre-migration installs).
 func derivePaths(wp *Wallpaper) {
+	if wp.AccessLevel == "" {
+		wp.AccessLevel = config.AccessPublic
+	} else {
+		wp.AccessLevel = NormalizeAccessLevel(wp.AccessLevel)
+	}
+	// Public URL is always the stable link path — never a direct filesystem URL.
+	wp.ImageURL = "/" + wp.LinkName
+	// Admin preview endpoint (auth-protected); empty when no image.
 	if !wp.HasImage || wp.MIMEType == "" {
+		wp.ImagePath = ""
+		wp.PreviewPath = ""
+		wp.Preview = ""
 		return
 	}
-	wp.ImagePath = filepath.Join("static", "images", wp.LinkName+"."+wp.MIMEType)
-	if wp.MIMEType != "mp4" && wp.MIMEType != "webm" {
-		wp.PreviewPath = filepath.Join("static", "images", "previews", wp.LinkName+".webp")
+
+	newImg := MediaPath(wp.LinkName, wp.MIMEType)
+	legacyImg := filepath.Join(config.LegacyMedia, wp.LinkName+"."+wp.MIMEType)
+	wp.ImagePath = pickExisting(newImg, legacyImg)
+
+	if wp.MIMEType == "mp4" || wp.MIMEType == "webm" {
+		wp.PreviewPath = ""
+		wp.Preview = ""
+		return
 	}
+
+	newPrev := PreviewFilePath(wp.LinkName)
+	legacyPrev := filepath.Join(config.LegacyMedia, "previews", wp.LinkName+".webp")
+	wp.PreviewPath = pickExisting(newPrev, legacyPrev)
+	if wp.PreviewPath != "" {
+		// Auth-protected admin preview route — never expose via /static/.
+		wp.Preview = "/api/preview/" + wp.LinkName
+	} else {
+		wp.Preview = ""
+	}
+}
+
+// pickExisting returns primary if it exists, otherwise fallback if it exists,
+// otherwise primary (so new uploads write to the canonical location).
+func pickExisting(primary, fallback string) string {
+	if _, err := os.Stat(primary); err == nil {
+		return primary
+	}
+	if fallback != "" {
+		if _, err := os.Stat(fallback); err == nil {
+			return fallback
+		}
+	}
+	return primary
+}
+
+// MigrateMediaToDataDir moves legacy static/images files into data/media and
+// data/previews. Safe to call repeatedly; skips missing sources.
+func MigrateMediaToDataDir() {
+	if err := os.MkdirAll(config.MediaDir, 0755); err != nil {
+		log.Printf("Warning: cannot create %s: %v", config.MediaDir, err)
+		return
+	}
+	if err := os.MkdirAll(config.PreviewDir, 0755); err != nil {
+		log.Printf("Warning: cannot create %s: %v", config.PreviewDir, err)
+		return
+	}
+
+	Global.RLock()
+	ids := make([]string, 0, len(Global.wallpapers))
+	for id := range Global.wallpapers {
+		ids = append(ids, id)
+	}
+	Global.RUnlock()
+
+	moved := 0
+	for _, id := range ids {
+		wp, ok := Global.Get(id)
+		if !ok || wp == nil || !wp.HasImage || wp.MIMEType == "" {
+			continue
+		}
+		changed := false
+
+		dstImg := MediaPath(wp.LinkName, wp.MIMEType)
+		srcImg := filepath.Join(config.LegacyMedia, wp.LinkName+"."+wp.MIMEType)
+		if moveIfNeeded(srcImg, dstImg) {
+			wp.ImagePath = dstImg
+			changed = true
+			moved++
+		}
+
+		if wp.MIMEType != "mp4" && wp.MIMEType != "webm" {
+			dstPrev := PreviewFilePath(wp.LinkName)
+			srcPrev := filepath.Join(config.LegacyMedia, "previews", wp.LinkName+".webp")
+			if moveIfNeeded(srcPrev, dstPrev) {
+				wp.PreviewPath = dstPrev
+				changed = true
+			}
+		}
+
+		if changed {
+			derivePaths(wp)
+			Global.Set(id, wp)
+		}
+	}
+	if moved > 0 {
+		if err := Global.Save(); err != nil {
+			log.Printf("Warning: save after media migration: %v", err)
+		}
+		log.Printf("Migrated %d media file(s) from static/images to data/media", moved)
+	}
+}
+
+func moveIfNeeded(src, dst string) bool {
+	if src == dst {
+		return false
+	}
+	if _, err := os.Stat(src); err != nil {
+		return false
+	}
+	if _, err := os.Stat(dst); err == nil {
+		// Destination already present — drop the legacy copy.
+		_ = os.Remove(src)
+		return true
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+		log.Printf("Warning: mkdir for %s: %v", dst, err)
+		return false
+	}
+	if err := os.Rename(src, dst); err != nil {
+		// Cross-device rename may fail; fall back to copy+remove.
+		if copyErr := copyFileContents(src, dst); copyErr != nil {
+			log.Printf("Warning: migrate %s -> %s: %v", src, dst, copyErr)
+			return false
+		}
+		_ = os.Remove(src)
+	}
+	return true
+}
+
+func copyFileContents(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.CreateTemp(filepath.Dir(dst), ".mig-*")
+	if err != nil {
+		return err
+	}
+	tmp := out.Name()
+	_, copyErr := out.ReadFrom(in)
+	closeErr := out.Close()
+	if copyErr != nil {
+		os.Remove(tmp)
+		return copyErr
+	}
+	if closeErr != nil {
+		os.Remove(tmp)
+		return closeErr
+	}
+	if err := os.Rename(tmp, dst); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 // Load reads wallpapers from disk. A missing file is treated as first run.
@@ -260,12 +439,14 @@ func PruneOldImages(max int) {
 			}
 		}
 		Global.Set(wp.ID, &Wallpaper{
-			ID:        wp.ID,
-			LinkName:  wp.LinkName,
-			Category:  wp.Category,
-			CreatedAt: wp.CreatedAt,
-			IsPinned:  wp.IsPinned,
-			PinnedAt:  wp.PinnedAt,
+			ID:          wp.ID,
+			LinkName:    wp.LinkName,
+			Category:    wp.Category,
+			CreatedAt:   wp.CreatedAt,
+			IsPinned:    wp.IsPinned,
+			PinnedAt:    wp.PinnedAt,
+			AccessLevel: NormalizeAccessLevel(wp.AccessLevel),
+			AccessToken: wp.AccessToken,
 		})
 	}
 

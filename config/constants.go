@@ -21,6 +21,7 @@ const (
 	HTTPWriteTimeout = 120 // seconds; must exceed DownloadTimeout
 	HTTPIdleTimeout  = 120 // seconds
 	ShutdownTimeout  = 30  // seconds
+	MaxRedirects     = 5   // outbound download redirect cap (SSRF defence)
 )
 
 const (
@@ -34,6 +35,30 @@ const (
 	DefaultMaxWalkDepth = 3
 	FileCopyBufferSize  = 1024 * 1024 // 1 MB
 )
+
+// Media storage lives outside the static web root so access-control on
+// public links cannot be bypassed via /static/images/...
+const (
+	MediaDir    = "data/media"
+	PreviewDir  = "data/previews"
+	LegacyMedia = "static/images" // pre-migration location
+)
+
+// Access level values for per-link visibility.
+const (
+	AccessPublic = "public" // anyone on the internet
+	AccessLocal  = "local"  // only private/LAN/loopback clients
+	AccessToken  = "token"  // requires secret token in query/header
+	AccessAuth   = "auth"   // requires admin Basic Auth
+)
+
+// ValidAccessLevels is the allow-list for AccessLevel values.
+var ValidAccessLevels = map[string]bool{
+	AccessPublic: true,
+	AccessLocal:  true,
+	AccessToken:  true,
+	AccessAuth:   true,
+}
 
 // ValidCategories is the canonical set of user-assignable category names.
 // Add new categories here — handler validation picks them up automatically.

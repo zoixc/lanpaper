@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"lanpaper/middleware"
 	"lanpaper/storage"
 )
 
@@ -41,6 +42,11 @@ func Public(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Enforce per-link access level BEFORE opening the file.
+	if !middleware.AuthorizeLinkAccess(w, r, wp) {
+		return
+	}
+
 	// Open once for both Stat and ServeContent to avoid a TOCTOU race.
 	f, err := os.Open(wp.ImagePath)
 	if err != nil {
@@ -62,9 +68,16 @@ func Public(w http.ResponseWriter, r *http.Request) {
 
 	h := w.Header()
 	h.Set("Content-Type", mime)
+	// Link names are restricted to [A-Za-z0-9_-] so this is safe.
 	h.Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s.%s"`, wp.LinkName, wp.MIMEType))
 	// Not immutable: the same URL path can be reassigned to a different image.
-	h.Set("Cache-Control", "public, max-age=60, must-revalidate")
+	// Private links must not be stored by shared caches.
+	switch storage.NormalizeAccessLevel(wp.AccessLevel) {
+	case "public":
+		h.Set("Cache-Control", "public, max-age=60, must-revalidate")
+	default:
+		h.Set("Cache-Control", "private, no-store")
+	}
 	h.Set("X-Content-Type-Options", "nosniff")
 
 	http.ServeContent(w, r, wp.LinkName+"."+wp.MIMEType, fi.ModTime(), f)

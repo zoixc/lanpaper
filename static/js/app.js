@@ -723,10 +723,15 @@ function showToast(message, type = 'success') {
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     const icon = TOAST_ICONS[type] || TOAST_ICONS.info;
-    toast.innerHTML = `
-        <div class="toast-icon">${icon}</div>
-        <div class="toast-content">${message}</div>
-    `;
+    // Build DOM nodes instead of innerHTML so server/user text cannot inject HTML.
+    const iconEl = document.createElement('div');
+    iconEl.className = 'toast-icon';
+    iconEl.innerHTML = icon; // icons are static trusted SVG constants only
+    const contentEl = document.createElement('div');
+    contentEl.className = 'toast-content';
+    contentEl.textContent = message;
+    toast.appendChild(iconEl);
+    toast.appendChild(contentEl);
     DOM.toastContainer.appendChild(toast);
     setTimeout(() => {
         toast.classList.add('hiding');
@@ -1007,7 +1012,15 @@ function createLazyImage(src, alt = 'Image', className = 'preview', errorMsg) {
     img.className = className;
     img.loading = 'lazy';
     if (errorMsg) {
-        img.onerror = () => { img.parentElement.innerHTML = `<div class="no-image">${errorMsg}</div>`; };
+        img.onerror = () => {
+            const parent = img.parentElement;
+            if (!parent) return;
+            parent.textContent = '';
+            const d = document.createElement('div');
+            d.className = 'no-image';
+            d.textContent = errorMsg || '';
+            parent.appendChild(d);
+        };
     }
     return img;
 }
@@ -1124,6 +1137,160 @@ function setupInlineRename(card, link) {
 }
 
 
+
+const ACCESS_LEVELS = ['public', 'local', 'token', 'auth'];
+
+function accessLabel(level) {
+    const key = 'access_' + level;
+    const defaults = {
+        public: 'Public',
+        local: 'Local network',
+        token: 'Token',
+        auth: 'Admin only',
+    };
+    return t(key, defaults[level] || level);
+}
+
+function publicLinkURL(link) {
+    const name = link.linkName || link.id;
+    let url = `${window.location.origin}/${name}`;
+    if (link.accessLevel === 'token' && link.accessToken) {
+        url += `?token=${encodeURIComponent(link.accessToken)}`;
+    }
+    return url;
+}
+
+function setupAccessControl(card, link) {
+    let row = card.querySelector('.access-row');
+    if (!row) {
+        row = document.createElement('div');
+        row.className = 'access-row';
+        const info = card.querySelector('.link-info');
+        if (info) info.appendChild(row);
+        else return;
+    }
+    row.innerHTML = '';
+
+    const label = document.createElement('label');
+    label.className = 'access-label';
+    label.textContent = t('access_label', 'Access');
+    label.setAttribute('for', `access-${CSS.escape(link.linkName || link.id)}`);
+
+    const select = document.createElement('select');
+    select.className = 'access-select';
+    select.id = `access-${link.linkName || link.id}`;
+    select.setAttribute('aria-label', t('access_label', 'Access'));
+    const current = link.accessLevel || 'public';
+    ACCESS_LEVELS.forEach(level => {
+        const opt = document.createElement('option');
+        opt.value = level;
+        opt.textContent = accessLabel(level);
+        if (level === current) opt.selected = true;
+        select.appendChild(opt);
+    });
+
+    select.addEventListener('change', async () => {
+        const newLevel = select.value;
+        select.disabled = true;
+        try {
+            const updated = await apiCall(
+                `/api/link/${encodeURIComponent(link.linkName)}`,
+                'PATCH',
+                { accessLevel: newLevel }
+            );
+            if (!updated) {
+                select.value = current;
+                return;
+            }
+            Object.assign(link, {
+                accessLevel: updated.accessLevel,
+                accessToken: updated.accessToken || '',
+            });
+            const idx = STATE.wallpapers.findIndex(wp => wp.linkName === link.linkName);
+            if (idx !== -1) {
+                STATE.wallpapers[idx].accessLevel = link.accessLevel;
+                STATE.wallpapers[idx].accessToken = link.accessToken;
+            }
+            // Refresh copy URL + token display
+            setupAccessControl(card, link);
+            updateCopyURL(card, link);
+            showToast(t('access_updated', 'Access level updated'), 'success');
+        } catch (_) {
+            select.value = current;
+        } finally {
+            select.disabled = false;
+        }
+    });
+
+    row.appendChild(label);
+    row.appendChild(select);
+
+    // Token display + rotate for token level
+    if ((link.accessLevel || 'public') === 'token') {
+        const tokenBox = document.createElement('div');
+        tokenBox.className = 'access-token-box';
+
+        const tokenInput = document.createElement('input');
+        tokenInput.type = 'text';
+        tokenInput.readOnly = true;
+        tokenInput.className = 'access-token-input';
+        tokenInput.value = link.accessToken || '';
+        tokenInput.setAttribute('aria-label', t('access_token', 'Access token'));
+
+        const copyTok = document.createElement('button');
+        copyTok.type = 'button';
+        copyTok.className = 'btn access-token-btn';
+        copyTok.textContent = t('copy_token', 'Copy token URL');
+        copyTok.addEventListener('click', (e) => {
+            e.preventDefault();
+            const url = publicLinkURL(link);
+            navigator.clipboard.writeText(url).then(() => {
+                showToast(t('copied', 'Copied!'), 'success');
+            }).catch(() => showToast(t('copy_error', 'Failed to copy URL'), 'error'));
+        });
+
+        const rotateBtn = document.createElement('button');
+        rotateBtn.type = 'button';
+        rotateBtn.className = 'btn access-token-btn';
+        rotateBtn.textContent = t('rotate_token', 'Rotate');
+        rotateBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            rotateBtn.disabled = true;
+            try {
+                const updated = await apiCall(
+                    `/api/link/${encodeURIComponent(link.linkName)}`,
+                    'PATCH',
+                    { rotateToken: true }
+                );
+                if (!updated) return;
+                link.accessToken = updated.accessToken || '';
+                const idx = STATE.wallpapers.findIndex(wp => wp.linkName === link.linkName);
+                if (idx !== -1) STATE.wallpapers[idx].accessToken = link.accessToken;
+                setupAccessControl(card, link);
+                updateCopyURL(card, link);
+                showToast(t('token_rotated', 'Token rotated'), 'success');
+            } catch (_) {}
+            finally { rotateBtn.disabled = false; }
+        });
+
+        tokenBox.appendChild(tokenInput);
+        tokenBox.appendChild(copyTok);
+        tokenBox.appendChild(rotateBtn);
+        row.appendChild(tokenBox);
+    }
+}
+
+function updateCopyURL(card, link) {
+    const fullUrl = publicLinkURL(link);
+    const previewLink = card.querySelector('.preview-link');
+    if (previewLink) previewLink.href = fullUrl;
+    const copyBtn = card.querySelector('.copy-url-btn');
+    if (!copyBtn) return;
+    // Re-bind is handled in updateCard; just ensure dataset for fallbacks
+    card.dataset.publicUrl = fullUrl;
+}
+
+
 function updateCard(card, link) {
     const linkName = link.linkName || link.id;
     const linkIdEl = card.querySelector('.link-id');
@@ -1134,7 +1301,7 @@ function updateCard(card, link) {
     }
     card.dataset.linkName = linkName;
 
-    const fullUrl = `${window.location.origin}/${linkName}`;
+    const fullUrl = publicLinkURL(link);
 
     const previewLink = card.querySelector('.preview-link');
     previewLink.href = fullUrl;
@@ -1160,6 +1327,8 @@ function updateCard(card, link) {
     linkMeta.textContent = `${category} · ${fileType}${sizeStr} · ${dateStr}`;
     linkMeta.setAttribute('aria-label', t('aria_file_info', 'File info'));
 
+    setupAccessControl(card, link);
+
     const previewWrapper = card.querySelector('.preview-wrapper');
 
     // Only re-build preview when it has actually changed (avoid video flicker)
@@ -1184,7 +1353,9 @@ function updateCard(card, link) {
         if (link.hasImage) {
             const isVid = (category === 'video');
             if (isVid) {
-                const videoSrc = '/' + (link.imageUrl || '').replace(/^\//, '') + `?t=${link.modTime || Date.now()}`;
+                // Admin preview route is auth-protected and works for all access levels.
+                const videoSrc = (link.preview || ('/api/preview/' + encodeURIComponent(linkName)))
+                    + `?t=${link.modTime || Date.now()}`;
                 const video = document.createElement('video');
                 video.src = videoSrc;
                 video.className = 'preview';
@@ -1203,10 +1374,8 @@ function updateCard(card, link) {
                 };
                 previewWrapper.appendChild(video);
             } else {
-                const resolvedPreview = link.preview || '';
-                const imgSrc = resolvedPreview
-                    ? '/' + resolvedPreview.replace(/^\//, '') + `?t=${link.modTime || Date.now()}`
-                    : '/' + (link.imageUrl || '').replace(/^\//, '');
+                const resolvedPreview = link.preview || ('/api/preview/' + encodeURIComponent(linkName));
+                const imgSrc = (resolvedPreview.startsWith('/') ? resolvedPreview : '/' + resolvedPreview) + `?t=${link.modTime || Date.now()}`;
                 const img = createLazyImage(
                     imgSrc,
                     resolvedPreview ? 'Preview' : 'Image',
@@ -1473,6 +1642,8 @@ function setupGlobalListeners() {
                 imageUrl: '',
                 preview: '',
                 pinned: false,
+                accessLevel: 'public',
+                accessToken: '',
             };
             STATE.wallpapers.push(newLinkObj);
             filterAndSort();

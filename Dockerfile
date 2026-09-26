@@ -51,7 +51,7 @@ RUN echo "Verifying static files..." && \
     echo "✓ All critical static files present" && \
     ls -lh static/css/ static/js/ static/*.svg
 
-RUN mkdir -p data static/images/previews external/images \
+RUN mkdir -p data/media data/previews static/images/previews external/images \
     && chown -R lanpaper:lanpaper /app
 
 USER lanpaper
