@@ -42,10 +42,10 @@ function exportData() {
         URL.revokeObjectURL(url);
         
         log('[Export] Exported', exportData.wallpapers.length, 'wallpapers');
-        showToast(`✅ ${t('export_success', 'Data exported successfully')}`, 'success');
+        showToast(t('export_success', 'Data exported successfully'), 'success');
     } catch (error) {
         console.error('[Export] Error:', error);
-        showToast(`❌ ${t('export_error', 'Export failed')}`, 'error');
+        showToast(t('export_error', 'Export failed'), 'error');
     }
 }
 
@@ -117,10 +117,14 @@ async function importData(file) {
         const confirmMsg = t('import_confirm', `Import ${count} links? Existing links and media will not be replaced.`)
             .replace('{{count}}', count);
         
-        if (!confirm(confirmMsg)) return;
+        // Use the app's styled confirm dialog (fallback for exotic loads).
+        const confirmed = (typeof showConfirm === 'function')
+            ? await showConfirm(confirmMsg)
+            : globalThis.confirm(confirmMsg);
+        if (!confirmed) return;
 
         // Show loading toast
-        showToast(`⏳ ${t('sync_in_progress', 'Syncing data with server...')}`, 'info');
+        showToast(t('sync_in_progress', 'Syncing data with server...'), 'info');
 
         // Restore settings if available
         if (data.settings) {
@@ -150,10 +154,10 @@ async function importData(file) {
         // Reload from server to ensure consistency
         await loadLinks();
         
-        showToast(`✅ ${t('import_success', 'Data imported successfully')}`, 'success');
+        showToast(t('import_success', 'Data imported successfully'), 'success');
     } catch (error) {
         console.error('[Import] Error:', error);
-        showToast(`❌ ${t('import_error', 'Import failed: Invalid file')}`, 'error');
+        showToast(t('import_error', 'Import failed: Invalid file'), 'error');
     }
 }
 

@@ -76,7 +76,7 @@
   "load_error_hint": "Impossible de charger les liens — vérifiez la connexion et actualisez la page.",
   "auth_required": "Authentification requise — reconnectez-vous",
   "forbidden": "Accès refusé",
-  "compression_saved": "🗜️ Compressé: {{percent}}% plus petit ({{saved}} économisés)",
+  "compression_saved": "Compressé: {{percent}}% plus petit ({{saved}} économisés)",
   "rename_hint": "Double-cliquer pour renommer",
   "rename_input_label": "Nouveau nom de lien",
   "aria_open_image": "Ouvrir l'image",
@@ -96,5 +96,7 @@
   "access_updated": "Niveau d'accès mis à jour",
   "copy_token": "Copier l'URL avec jeton",
   "rotate_token": "Régénérer",
-  "token_rotated": "Jeton régénéré"
+  "token_rotated": "Jeton régénéré",
+  "install_app": "Installer l’app",
+  "installed": "Application installée"
 }

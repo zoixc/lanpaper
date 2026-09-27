@@ -76,7 +76,7 @@
   "load_error_hint": "Links konnten nicht geladen werden — Verbindung prüfen und Seite aktualisieren.",
   "auth_required": "Authentifizierung erforderlich — bitte erneut anmelden",
   "forbidden": "Zugriff verweigert",
-  "compression_saved": "🗜️ Komprimiert: {{percent}}% kleiner ({{saved}} gespart)",
+  "compression_saved": "Komprimiert: {{percent}}% kleiner ({{saved}} gespart)",
   "rename_hint": "Doppelklick zum Umbenennen",
   "rename_input_label": "Neuer Linkname",
   "aria_open_image": "Bild öffnen",
@@ -96,5 +96,7 @@
   "access_updated": "Zugriffsstufe aktualisiert",
   "copy_token": "Token-URL kopieren",
   "rotate_token": "Erneuern",
-  "token_rotated": "Token erneuert"
+  "token_rotated": "Token erneuert",
+  "install_app": "App installieren",
+  "installed": "App installiert"
 }

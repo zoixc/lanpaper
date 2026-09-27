@@ -3,11 +3,9 @@
  * In particular, an image that was public yesterday must not be replayed
  * offline after its link is changed to token-only or admin-only.
  */
-const STATIC_CACHE = 'lanpaper-static-v2';
+const STATIC_CACHE = 'lanpaper-static-v3';
 const STATIC_ASSETS = [
   '/static/css/style.css',
-  '/static/css/settings-menu.css',
-  '/static/css/skeleton.css',
   '/static/js/app.js',
   '/static/js/export-import.js',
   '/static/js/settings-menu.js',
@@ -15,7 +13,20 @@ const STATIC_ASSETS = [
   '/static/logo.svg',
   '/static/logo-dark.svg',
   '/static/favicon.svg',
-  '/static/manifest.json'
+  '/static/manifest.json',
+  '/static/icons/apple-touch-icon.png',
+  '/static/icons/icon-192.png',
+  '/static/icons/icon-512.png',
+  '/static/icons/icon-maskable-512.png',
+  '/static/fonts/Rubik.ttf',
+  '/static/fonts/Disket/Disket-Mono-Regular.ttf',
+  '/static/fonts/Disket/Disket-Mono-Bold.ttf',
+  '/static/i18n/en.json',
+  '/static/i18n/ru.json',
+  '/static/i18n/de.json',
+  '/static/i18n/fr.json',
+  '/static/i18n/it.json',
+  '/static/i18n/es.json'
 ];
 
 function cacheable(response) {
