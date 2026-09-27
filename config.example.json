@@ -5,6 +5,7 @@
   "maxUploadMB": 200,
   "maxImages": 20,
   "maxConcurrentUploads": 2,
+  "maxWalkDepth": 3,
   "disableAuth": false,
   "externalImageDir": "external/images",
   "rate": {

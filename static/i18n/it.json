@@ -1,5 +1,4 @@
 {
-  "create_new_link": "Crea nuovo collegamento",
   "input_placeholder": "ID collegamento (lettere, numeri, - o _)",
   "create_btn": "Crea",
   "existing_links": "Collegamenti",
@@ -7,7 +6,6 @@
   "no_image": "Nessuna immagine",
   "copy_url": "Copia URL",
   "set_image": "Carica",
-  "paste_url": "Da URL",
   "select_server": "Da galleria",
   "remove": "Rimuovi",
   "upload_file": "File",
@@ -78,8 +76,6 @@
   "load_error_hint": "Impossibile caricare i collegamenti — controlla la connessione e aggiorna la pagina.",
   "auth_required": "Autenticazione necessaria — effettua di nuovo l'accesso",
   "forbidden": "Accesso negato",
-  "preview_unavailable": "Anteprima non disponibile",
-  "image_unavailable": "Immagine non disponibile",
   "compression_saved": "🗜️ Compresso: {{percent}}% più piccolo ({{saved}} risparmiati)",
   "rename_hint": "Doppio clic per rinominare",
   "rename_input_label": "Nuovo nome collegamento",
@@ -98,7 +94,6 @@
   "access_token": "Token",
   "access_auth": "Solo admin",
   "access_updated": "Livello di accesso aggiornato",
-  "access_token_field": "Token di accesso",
   "copy_token": "Copia URL con token",
   "rotate_token": "Rigenera",
   "token_rotated": "Token rigenerato"

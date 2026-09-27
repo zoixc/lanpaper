@@ -1,5 +1,4 @@
 {
-  "create_new_link": "Créer un nouveau lien",
   "input_placeholder": "ID du lien (lettres, chiffres, - ou _)",
   "create_btn": "Créer",
   "existing_links": "Liens",
@@ -7,7 +6,6 @@
   "no_image": "Pas d'image",
   "copy_url": "Copier l'URL",
   "set_image": "Téléverser",
-  "paste_url": "Depuis URL",
   "select_server": "Depuis galerie",
   "remove": "Supprimer",
   "upload_file": "Fichier",
@@ -78,8 +76,6 @@
   "load_error_hint": "Impossible de charger les liens — vérifiez la connexion et actualisez la page.",
   "auth_required": "Authentification requise — reconnectez-vous",
   "forbidden": "Accès refusé",
-  "preview_unavailable": "Aperçu indisponible",
-  "image_unavailable": "Image indisponible",
   "compression_saved": "🗜️ Compressé: {{percent}}% plus petit ({{saved}} économisés)",
   "rename_hint": "Double-cliquer pour renommer",
   "rename_input_label": "Nouveau nom de lien",
@@ -98,7 +94,6 @@
   "access_token": "Jeton",
   "access_auth": "Admin seul",
   "access_updated": "Niveau d'accès mis à jour",
-  "access_token_field": "Jeton d'accès",
   "copy_token": "Copier l'URL avec jeton",
   "rotate_token": "Régénérer",
   "token_rotated": "Jeton régénéré"

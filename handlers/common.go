@@ -3,6 +3,9 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
+	"net/http"
+	"os"
 	"strings"
 
 	"lanpaper/config"
@@ -11,6 +14,16 @@ import (
 )
 
 func isValidLinkName(name string) bool { return utils.IsValidLinkName(name) }
+
+// Report a missing gallery file as 404, while keeping path and permission
+// failures indistinguishable to callers as 403.
+func writeExternalFileError(w http.ResponseWriter, err error) {
+	if errors.Is(err, os.ErrNotExist) {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+	http.Error(w, "Path outside allowed directory or file unavailable", http.StatusForbidden)
+}
 
 func isValidAccessLevel(level string) bool {
 	return config.ValidAccessLevels[strings.ToLower(strings.TrimSpace(level))]

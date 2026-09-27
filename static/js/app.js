@@ -1054,25 +1054,52 @@ function setupPinButton(card, link) {
 }
 
 
+function createLinkCard(link) {
+    const clone = DOM.template.content.cloneNode(true);
+    const card = clone.querySelector('article');
+    card._link = link;
+    updateCard(card, link);
+    setupCardEvents(card, link);
+    setupPinButton(card, link);
+    return card;
+}
+
 function renderLinks(wallpapers) {
-    DOM.linksList.innerHTML = '';
-    if (!wallpapers?.length) {
+    const links = wallpapers || [];
+    if (!links.length) {
+        while (DOM.linksList.firstChild) DOM.linksList.removeChild(DOM.linksList.firstChild);
         setEmptyStateError(false);
         DOM.emptyState.classList.remove('d-none');
         return;
     }
     DOM.emptyState.classList.add('d-none');
 
-    const fragment = document.createDocumentFragment();
-    wallpapers.forEach(link => {
-        const clone = DOM.template.content.cloneNode(true);
-        const article = clone.querySelector('article');
-        updateCard(article, link);
-        setupCardEvents(article, link);
-        setupPinButton(article, link);
-        fragment.appendChild(article);
-    });
-    DOM.linksList.appendChild(fragment);
+    // Reconcile by stable link ID. Search and sort only move existing cards;
+    // they do not rebuild previews, copy handlers, or document listeners.
+    const existing = new Map(
+        Array.from(DOM.linksList.children, card => [card.dataset.linkName, card])
+    );
+    const wanted = new Set(links.map(link => link.linkName || link.id));
+    for (const [name, card] of existing) {
+        if (!wanted.has(name)) card.remove();
+    }
+
+    let cursor = DOM.linksList.firstElementChild;
+    for (const link of links) {
+        const name = link.linkName || link.id;
+        let card = existing.get(name);
+        if (!card || card._link !== link) {
+            if (card) {
+                if (card === cursor) cursor = card.nextElementSibling;
+                card.remove();
+            }
+            card = createLinkCard(link);
+        }
+
+        if (card !== cursor) DOM.linksList.insertBefore(card, cursor);
+        cursor = card.nextElementSibling;
+    }
+
     applyTranslations(DOM.linksList);
     updateAriaLabels();
 }

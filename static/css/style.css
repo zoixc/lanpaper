@@ -563,6 +563,8 @@ body.dark .view-icon.light-theme-icon {
 .input-field,
 .search-input {
     height: 40px;
+    flex: 1;
+    min-width: 0;
     padding: 0 14px;
     font-family: var(--font-ui);
     font-size: max(var(--text-base), 16px);
@@ -591,8 +593,7 @@ body.dark .view-icon.light-theme-icon {
     color: var(--text-muted);
 }
 
-.input-field  { flex: 1; min-width: 0; width: 100%; }
-.search-input { flex: 1; min-width: 0; }
+.input-field { width: 100%; }
 
 
 /* ============================================================
@@ -652,11 +653,14 @@ body.dark .view-icon.light-theme-icon {
     grid-template-columns: 120px 1fr auto;
     align-items: center;
     min-height: 96px;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
 }
 
 .link-card:hover {
     background: var(--card-hover);
     border-color: var(--border-hover);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
 }
 
 .link-card.drag-over {
@@ -1035,9 +1039,14 @@ body.dark .view-icon.light-theme-icon {
     opacity: 1;
 }
 
-.upload-dropdown,
+.upload-dropdown {
+    position: relative;
+}
+
 .custom-select {
     position: relative;
+    display: inline-flex;
+    align-items: center;
 }
 
 .upload-menu,
@@ -1139,11 +1148,6 @@ body.dark .custom-select-option.selected {
 /* ============================================================
    CUSTOM SELECT
    ============================================================ */
-.custom-select {
-    display: inline-flex;
-    align-items: center;
-}
-
 .custom-select-btn {
     justify-content: space-between;
     min-width: 150px;
@@ -1793,6 +1797,18 @@ body.dark .toast {
 .access-select:disabled {
     opacity: 0.6;
     cursor: wait;
+}
+
+/* Clear keyboard focus without adding noise to pointer interactions. */
+.btn:focus-visible,
+.search-input:focus-visible,
+.custom-select-btn:focus-visible,
+.link-id:focus-visible,
+.copy-url-btn:focus-visible,
+.pin-btn:focus-visible,
+.access-select:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }
 .access-token-box {
     display: flex;

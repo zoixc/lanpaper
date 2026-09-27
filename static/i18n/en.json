@@ -1,5 +1,4 @@
 {
-  "create_new_link": "Create new link",
   "input_placeholder": "Link ID (letters, numbers, - or _)",
   "create_btn": "Create",
   "existing_links": "Links",
@@ -7,7 +6,6 @@
   "no_image": "No image",
   "copy_url": "Copy URL",
   "set_image": "Upload",
-  "paste_url": "From URL",
   "select_server": "From gallery",
   "remove": "Remove",
   "upload_file": "File",
@@ -78,8 +76,6 @@
   "load_error_hint": "Failed to load links — check the connection and refresh the page.",
   "auth_required": "Authentication required — sign in again",
   "forbidden": "Access denied",
-  "preview_unavailable": "Preview unavailable",
-  "image_unavailable": "Image unavailable",
   "compression_saved": "🗜️ Compressed: {{percent}}% smaller ({{saved}} saved)",
   "rename_hint": "Double-click to rename",
   "rename_input_label": "New link name",
@@ -98,7 +94,6 @@
   "access_token": "Token",
   "access_auth": "Admin only",
   "access_updated": "Access level updated",
-  "access_token_field": "Access token",
   "copy_token": "Copy token URL",
   "rotate_token": "Rotate",
   "token_rotated": "Token rotated"

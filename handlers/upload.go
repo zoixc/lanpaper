@@ -390,7 +390,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 			f, err := utils.OpenExternalFile(config.Current.ExternalImageDir, urlStr)
 			if err != nil {
-				http.Error(w, "Path outside allowed directory or file unavailable", http.StatusForbidden)
+				writeExternalFileError(w, err)
 				return
 			}
 			defer f.Close()

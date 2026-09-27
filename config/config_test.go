@@ -1,6 +1,24 @@
 package config
 
-import "testing"
+import (
+	"encoding/json"
+	"os"
+	"testing"
+)
+
+func TestExampleConfigIncludesWalkDepth(t *testing.T) {
+	data, err := os.ReadFile("../config.example.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.MaxWalkDepth != DefaultMaxWalkDepth {
+		t.Fatalf("example maxWalkDepth = %d, want %d", cfg.MaxWalkDepth, DefaultMaxWalkDepth)
+	}
+}
 
 func TestValidatePort(t *testing.T) {
 	tests := []struct {
