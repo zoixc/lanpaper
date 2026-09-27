@@ -357,7 +357,7 @@ func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
 	}
 	f, err := utils.OpenExternalFile(config.Current.ExternalImageDir, name)
 	if err != nil {
-		http.Error(w, "File not available", http.StatusForbidden)
+		writeExternalFileError(w, err)
 		return
 	}
 	defer f.Close()

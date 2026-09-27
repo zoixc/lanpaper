@@ -232,3 +232,37 @@ func TestInspectMediaFileAcceptsAllMP4Brands(t *testing.T) {
 		t.Error("garbage with .mp4 name must be rejected")
 	}
 }
+
+func TestMissingGalleryFilesReturnNotFound(t *testing.T) {
+	setupRemoteTest(t)
+	originalStore := storage.Global
+	storage.Global = &storage.Store{}
+	t.Cleanup(func() { storage.Global = originalStore })
+
+	config.Current.ExternalImageDir = t.TempDir()
+	if err := storage.Global.Create(&storage.Wallpaper{ID: "missing", LinkName: "missing", AccessLevel: config.AccessPublic}); err != nil {
+		t.Fatal(err)
+	}
+
+	var body bytes.Buffer
+	form := multipart.NewWriter(&body)
+	_ = form.WriteField("linkName", "missing")
+	_ = form.WriteField("url", "missing.png")
+	if err := form.Close(); err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/upload", &body)
+	req.Header.Set("Content-Type", form.FormDataContentType())
+	response := httptest.NewRecorder()
+	Upload(response, req)
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("upload of a missing gallery file: got %d, want 404; body=%q", response.Code, response.Body.String())
+	}
+
+	previewReq := httptest.NewRequest(http.MethodGet, "/api/external-image-preview?path=missing.png", nil)
+	previewResponse := httptest.NewRecorder()
+	ExternalImagePreview(previewResponse, previewReq)
+	if previewResponse.Code != http.StatusNotFound {
+		t.Fatalf("preview of a missing gallery file: got %d, want 404; body=%q", previewResponse.Code, previewResponse.Body.String())
+	}
+}

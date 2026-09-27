@@ -1,5 +1,4 @@
 {
-  "create_new_link": "Создать новую ссылку",
   "input_placeholder": "ID ссылки (буквы, цифры, - или _)",
   "create_btn": "Создать",
   "existing_links": "Ссылки",
@@ -7,7 +6,6 @@
   "no_image": "Нет изображения",
   "copy_url": "Скопировать URL",
   "set_image": "Загрузить",
-  "paste_url": "По URL",
   "select_server": "Из галереи",
   "remove": "Удалить",
   "upload_file": "Файл",
@@ -78,8 +76,6 @@
   "load_error_hint": "Не удалось загрузить ссылки — проверьте соединение и обновите страницу.",
   "auth_required": "Требуется авторизация — войдите снова",
   "forbidden": "Доступ запрещён",
-  "preview_unavailable": "Превью недоступно",
-  "image_unavailable": "Изображение недоступно",
   "compression_saved": "🗜️ Сжато: на {{percent}}% меньше (сэкономлено {{saved}})",
   "rename_hint": "Двойной клик для переименования",
   "rename_input_label": "Новое имя ссылки",
@@ -98,7 +94,6 @@
   "access_token": "Токен",
   "access_auth": "Только админ",
   "access_updated": "Уровень доступа обновлён",
-  "access_token_field": "Токен доступа",
   "copy_token": "Копировать URL с токеном",
   "rotate_token": "Сменить",
   "token_rotated": "Токен обновлён"
