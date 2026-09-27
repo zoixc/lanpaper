@@ -1,9 +1,6 @@
 package config
 
-import (
-	"os"
-	"testing"
-)
+import "testing"
 
 func TestValidatePort(t *testing.T) {
 	tests := []struct {
@@ -74,7 +71,8 @@ func TestValidateMaxConcurrentUploads(t *testing.T) {
 		expectedValue int
 	}{
 		{"valid 3", 3, 3},
-		{"valid 10", 10, 10},
+		{"valid 8", 8, 8},
+		{"too many", 10, DefaultMaxConcurrentUploads},
 		{"invalid - zero", 0, 2},
 		{"invalid - negative", -1, 2},
 	}
@@ -196,39 +194,30 @@ func TestValidateProxyConfig(t *testing.T) {
 	}
 }
 
-func TestAutoDisableAuth(t *testing.T) {
-	origUser := os.Getenv("ADMIN_USER")
-	origPass := os.Getenv("ADMIN_PASS")
-	defer func() {
-		os.Setenv("ADMIN_USER", origUser)
-		os.Setenv("ADMIN_PASS", origPass)
-	}()
+func TestAuthRequiresExplicitDisable(t *testing.T) {
 
 	tests := []struct {
-		name               string
-		adminUser          string
-		adminPass          string
-		expectAuthDisabled bool
+		name            string
+		adminUser       string
+		adminPass       string
+		explicitDisable bool
 	}{
 		{"both provided - auth enabled", "admin", "password123", false},
-		{"no username - auth disabled", "", "password123", true},
-		{"no password - auth disabled", "admin", "", true},
-		{"both empty - auth disabled", "", "", true},
+		{"no username - still enabled", "", "password123", false},
+		{"no password - still enabled", "admin", "", false},
+		{"both empty - still enabled", "", "", false},
+		{"explicitly disabled", "", "", true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Unsetenv("ADMIN_USER")
-			os.Unsetenv("ADMIN_PASS")
-			os.Unsetenv("DISABLE_AUTH")
-
 			Current = Config{
 				Port:                 "8080",
 				AdminUser:            tt.adminUser,
 				AdminPass:            tt.adminPass,
 				MaxUploadMB:          10,
 				MaxConcurrentUploads: 3,
-				DisableAuth:          false,
+				DisableAuth:          tt.explicitDisable,
 				Rate: RateConfig{
 					PublicPerMin: 50,
 					UploadPerMin: 20,
@@ -237,8 +226,8 @@ func TestAutoDisableAuth(t *testing.T) {
 			}
 			validate()
 
-			if Current.DisableAuth != tt.expectAuthDisabled {
-				t.Errorf("Expected DisableAuth=%v, got %v", tt.expectAuthDisabled, Current.DisableAuth)
+			if Current.DisableAuth != tt.explicitDisable {
+				t.Errorf("Expected DisableAuth=%v, got %v", tt.explicitDisable, Current.DisableAuth)
 			}
 		})
 	}

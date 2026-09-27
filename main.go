@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -28,104 +27,32 @@ func main() {
 	config.Load()
 
 	if config.Current.DisableAuth {
-		if config.Current.AdminUser == "" && config.Current.AdminPass == "" {
-			log.Println("Warning: no credentials provided — authentication disabled.")
-		} else {
-			log.Println("Warning: authentication disabled (DISABLE_AUTH=true).")
-		}
+		log.Println("Warning: admin authentication explicitly disabled — protect /admin and /api/* at the reverse proxy.")
+	} else if config.Current.AdminUser == "" || config.Current.AdminPass == "" {
+		log.Println("Warning: admin credentials missing; admin endpoints will return 503. Set ADMIN_USER and ADMIN_PASS or explicitly set DISABLE_AUTH=true behind an auth proxy.")
 	}
 
 	handlers.InitUploadSemaphore(config.Current.MaxConcurrentUploads)
 
-	for _, d := range []string{
-		"data",
-		config.MediaDir,
-		config.PreviewDir,
-		"external/images",
-		// Legacy dirs kept so old volume mounts still work during migration.
-		"static/images/previews",
-	} {
-		if err := os.MkdirAll(d, 0755); err != nil {
-			log.Printf("Warning: failed to create %s: %v", d, err)
+	for _, d := range []string{"data", config.MediaDir, config.PreviewDir} {
+		if err := os.MkdirAll(d, 0700); err != nil {
+			log.Fatalf("Cannot create data directory %s: %v", d, err)
 		}
 	}
-
+	// External images are optional; legacy directories should not be created
+	// just because an old deployment might have mounted them read-only.
+	if err := os.MkdirAll("external/images", 0755); err != nil {
+		log.Printf("Warning: external gallery unavailable: %v", err)
+	}
 	if err := storage.Global.Load(); err != nil {
-		log.Printf("Warning: failed to load wallpapers: %v", err)
+		log.Fatalf("Cannot load wallpapers (refusing to overwrite metadata): %v", err)
 	}
 	// Move any leftover files from static/images into data/media.
 	storage.MigrateMediaToDataDir()
 
 	go middleware.StartCleaner()
 
-	// Serve static files.
-	// Code assets (css/js) are served with "no-cache" so browsers always
-	// revalidate them (via Last-Modified/If-Modified-Since) and never run a
-	// stale admin UI after an upgrade — the files carry no version hash.
-	// Immutable-ish assets (fonts, icons) keep a 1-day cache.
-	//
-	// CRITICAL: /static/images/ is intentionally NOT served. Media lives in
-	// data/media and is only reachable via /{linkName} (access-controlled) or
-	// /api/preview/{name} (admin-auth). Serving the raw files would bypass
-	// every per-link access level.
-	staticFS := http.FileServer(http.Dir("static"))
-	mux := http.NewServeMux()
-	mux.Handle("/static/", http.StripPrefix("/static/",
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Never serve directory listings (/static/, /static/css/, ...).
-			if r.URL.Path == "" || strings.HasSuffix(r.URL.Path, "/") {
-				http.NotFound(w, r)
-				return
-			}
-			// Block direct access to uploaded media and previews.
-			cleaned := pathClean(r.URL.Path)
-			if cleaned == "images" || strings.HasPrefix(cleaned, "images/") {
-				http.NotFound(w, r)
-				return
-			}
-			switch strings.ToLower(filepath.Ext(r.URL.Path)) {
-			case ".css", ".js":
-				w.Header().Set("Cache-Control", "no-cache")
-			default:
-				w.Header().Set("Cache-Control", "public, max-age=86400")
-			}
-			w.Header().Set("X-Content-Type-Options", "nosniff")
-			staticFS.ServeHTTP(w, r)
-		}),
-	))
-	// The service worker must live at the root scope to control /admin and
-	// public link URLs; it is served with Service-Worker-Allowed: /.
-	mux.HandleFunc("/sw.js", serveServiceWorker)
-	// Legacy URL kept working for PWA installs/bookmarks that used /admin.html.
-	mux.HandleFunc("/admin.html", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/admin", http.StatusPermanentRedirect)
-	})
-	mux.HandleFunc("/health", healthHandler)
-	mux.HandleFunc("/health/ready", readyHandler)
-	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Admin)))
-	mux.HandleFunc("/api/wallpapers", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Wallpapers)))
-	mux.HandleFunc("/api/compression-config", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.GetCompressionConfig)))
-	mux.HandleFunc("/api/preview/", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.AdminPreview)))
-	mux.HandleFunc("/api/link/", middleware.WithSecurity(middleware.MaybeBasicAuth(handleLinkRoutes)))
-	mux.HandleFunc("/api/link", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Link)))
-	mux.HandleFunc("/api/upload",
-		middleware.WithSecurity(middleware.MaybeBasicAuth(
-			middleware.RateLimit(func() (int, int) {
-				return config.Current.Rate.UploadPerMin, config.Current.Rate.Burst
-			})(handlers.Upload),
-		)),
-	)
-	mux.HandleFunc("/api/external-images", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImages)))
-	mux.HandleFunc("/api/external-image-preview", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImagePreview)))
-	mux.HandleFunc("/api/regenerate-previews",
-		middleware.WithSecurity(middleware.MaybeBasicAuth(
-			middleware.RateLimit(func() (int, int) {
-				// Regen is CPU-heavy — reuse the upload budget.
-				return config.Current.Rate.UploadPerMin, config.Current.Rate.Burst
-			})(handlers.RegeneratePreviews),
-		)),
-	)
-	mux.HandleFunc("/", middleware.WithPublicSecurity(middleware.PublicRateLimit(handlers.Public)))
+	mux := newMux()
 
 	port := config.Current.Port
 	if !strings.HasPrefix(port, ":") {
@@ -165,14 +92,46 @@ func main() {
 	log.Println("Server stopped.")
 }
 
-// pathClean normalizes a URL path for prefix checks (no leading slash).
-func pathClean(p string) string {
-	p = strings.TrimPrefix(p, "/")
-	return pathCleanSlash(p)
-}
+// newMux is shared with the end-to-end HTTP tests, so tests exercise the
+// real authentication, CSRF and routing stack, not just bare handlers.
+func newMux() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/static/", serveStaticAsset)
+	// The service worker must live at the root scope to control /admin and
+	// public link URLs; it is served with Service-Worker-Allowed: /.
+	mux.HandleFunc("/sw.js", serveServiceWorker)
+	// Legacy URL kept working for PWA installs/bookmarks that used /admin.html.
+	mux.HandleFunc("/admin.html", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/admin", http.StatusPermanentRedirect)
+	})
+	mux.HandleFunc("/health", healthHandler)
+	mux.HandleFunc("/health/ready", readyHandler)
+	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Admin)))
+	mux.HandleFunc("/api/wallpapers", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Wallpapers)))
+	mux.HandleFunc("/api/compression-config", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.GetCompressionConfig)))
+	mux.HandleFunc("/api/preview/", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.AdminPreview)))
+	mux.HandleFunc("/api/link/", middleware.WithSecurity(middleware.MaybeBasicAuth(handleLinkRoutes)))
+	mux.HandleFunc("/api/link", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Link)))
+	mux.HandleFunc("/api/upload",
+		middleware.WithSecurity(middleware.MaybeBasicAuth(
+			middleware.RateLimit(func() (int, int) {
+				return config.Current.Rate.UploadPerMin, config.Current.Rate.Burst
+			})(handlers.Upload),
+		)),
+	)
+	mux.HandleFunc("/api/external-images", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImages)))
+	mux.HandleFunc("/api/external-image-preview", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImagePreview)))
+	mux.HandleFunc("/api/regenerate-previews",
+		middleware.WithSecurity(middleware.MaybeBasicAuth(
+			middleware.RateLimit(func() (int, int) {
+				// Regen is CPU-heavy — reuse the upload budget.
+				return config.Current.Rate.UploadPerMin, config.Current.Rate.Burst
+			})(handlers.RegeneratePreviews),
+		)),
+	)
+	mux.HandleFunc("/", middleware.WithPublicSecurity(middleware.PublicRateLimit(handlers.Public)))
 
-func pathCleanSlash(p string) string {
-	return filepath.ToSlash(filepath.Clean("/"+p))[1:]
+	return mux
 }
 
 // handleLinkRoutes routes /api/link/{name}/pin to TogglePin, everything else to Link
@@ -190,11 +149,33 @@ func handleLinkRoutes(w http.ResponseWriter, r *http.Request) {
 // /static/sw.js the scope would be limited to /static/ and the SW would
 // never control /admin or the public link URLs.
 func serveServiceWorker(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	root, err := os.OpenRoot("static")
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer root.Close()
+	fi, err := root.Lstat("sw.js")
+	if err != nil || !fi.Mode().IsRegular() {
+		http.NotFound(w, r)
+		return
+	}
+	f, err := root.Open("sw.js")
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer f.Close()
 	w.Header().Set("Content-Type", "application/javascript")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Service-Worker-Allowed", "/")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	http.ServeFile(w, r, filepath.Join("static", "sw.js"))
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	http.ServeContent(w, r, "sw.js", fi.ModTime(), f)
 }
 
 func healthHandler(w http.ResponseWriter, _ *http.Request) {

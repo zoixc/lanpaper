@@ -2,8 +2,10 @@ package storage
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -11,6 +13,7 @@ import (
 	"sync"
 
 	"lanpaper/config"
+	"lanpaper/utils"
 )
 
 // Wallpaper represents a named wallpaper slot.
@@ -33,6 +36,7 @@ type Wallpaper struct {
 	// Not persisted; derived from MIMEType on Load.
 	ImagePath   string `json:"-"`
 	PreviewPath string `json:"-"`
+	Version     uint64 `json:"-"` // runtime generation for pruning stale snapshots
 }
 
 // Store is a thread-safe in-memory store backed by a JSON file.
@@ -41,6 +45,7 @@ type Store struct {
 	sync.RWMutex
 	wallpapers map[string]*Wallpaper
 	sortedSnap []*Wallpaper
+	generation uint64
 }
 
 const dataFile = "data/wallpapers.json"
@@ -48,45 +53,133 @@ const dataFile = "data/wallpapers.json"
 // Global is the application-wide wallpaper store.
 var Global = &Store{wallpapers: make(map[string]*Wallpaper)}
 
+var (
+	ErrNotFound = errors.New("link not found")
+	ErrExists   = errors.New("link already exists")
+)
+
+// Get returns a copy. Callers can never mutate a stored record outside the
+// store lock, nor see a partially updated record.
 func (s *Store) Get(id string) (*Wallpaper, bool) {
 	s.RLock()
 	defer s.RUnlock()
 	wp, ok := s.wallpapers[id]
-	return wp, ok
+	if !ok || wp == nil {
+		return nil, false
+	}
+	clone := *wp
+	return &clone, true
 }
 
+// Set is for the one-time startup media migration. Request handlers must use
+// the persistent Create/Update/Rename/DeleteEntry operations below.
 func (s *Store) Set(id string, wp *Wallpaper) {
 	s.Lock()
 	defer s.Unlock()
-	s.wallpapers[id] = wp
+	clone := *wp
+	s.generation++
+	clone.Version = s.generation
+	s.wallpapers[id] = &clone
 	s.sortedSnap = nil
 }
 
-func (s *Store) Delete(id string) {
+// commitLocked atomically persists a new map BEFORE publishing it to readers.
+// No handler may report success or change access levels in memory if saving
+// fails. File I/O under the write lock also serializes concurrent writers.
+func (s *Store) commitLocked(next map[string]*Wallpaper) error {
+	if err := atomicWrite(dataFile, next); err != nil {
+		return err
+	}
+	s.wallpapers = next
+	s.generation++
+	s.sortedSnap = nil
+	return nil
+}
+
+func (s *Store) Create(wp *Wallpaper) error {
 	s.Lock()
 	defer s.Unlock()
-	delete(s.wallpapers, id)
-	s.sortedSnap = nil
+	if _, ok := s.wallpapers[wp.LinkName]; ok {
+		return ErrExists
+	}
+	next := maps.Clone(s.wallpapers)
+	if next == nil {
+		next = make(map[string]*Wallpaper)
+	}
+	clone := *wp
+	clone.Version = s.generation + 1
+	next[wp.LinkName] = &clone
+	return s.commitLocked(next)
 }
 
-// Rename atomically renames oldName -> newName in the store.
-// Returns false if oldName not found or newName already exists.
-func (s *Store) Rename(oldName, newName string) (*Wallpaper, bool) {
+// Update applies edit to a copy and publishes it only after successful save.
+// The returned record is also a copy; never mutate a record from the map.
+func (s *Store) Update(id string, edit func(*Wallpaper) error) (*Wallpaper, error) {
+	s.Lock()
+	defer s.Unlock()
+	old, ok := s.wallpapers[id]
+	if !ok || old == nil {
+		return nil, ErrNotFound
+	}
+	clone := *old
+	if err := edit(&clone); err != nil {
+		return nil, err
+	}
+	clone.Version = s.generation + 1
+	next := maps.Clone(s.wallpapers)
+	next[id] = &clone
+	if err := s.commitLocked(next); err != nil {
+		return nil, err
+	}
+	out := clone
+	return &out, nil
+}
+
+func (s *Store) Rename(oldName, newName string) (*Wallpaper, error) {
 	s.Lock()
 	defer s.Unlock()
 	wp, ok := s.wallpapers[oldName]
-	if !ok {
-		return nil, false
+	if !ok || wp == nil {
+		return nil, ErrNotFound
 	}
 	if _, exists := s.wallpapers[newName]; exists {
-		return nil, false
+		return nil, ErrExists
 	}
-	wp.ID = newName
-	wp.LinkName = newName
-	s.wallpapers[newName] = wp
-	delete(s.wallpapers, oldName)
-	s.sortedSnap = nil
-	return wp, true
+	clone := *wp
+	clone.ID, clone.LinkName = newName, newName
+	clone.Version = s.generation + 1
+	clone.ImageURL = "/" + newName
+	if clone.HasImage && clone.MIMEType != "" {
+		clone.ImagePath = MediaPath(newName, clone.MIMEType)
+		if clone.MIMEType != "mp4" && clone.MIMEType != "webm" {
+			clone.PreviewPath = PreviewFilePath(newName)
+			clone.Preview = "/api/preview/" + newName
+		}
+	}
+	next := maps.Clone(s.wallpapers)
+	delete(next, oldName)
+	next[newName] = &clone
+	if err := s.commitLocked(next); err != nil {
+		return nil, err
+	}
+	out := clone
+	return &out, nil
+}
+
+func (s *Store) DeleteEntry(id string) (*Wallpaper, error) {
+	s.Lock()
+	defer s.Unlock()
+	wp, ok := s.wallpapers[id]
+	if !ok || wp == nil {
+		return nil, ErrNotFound
+	}
+	next := maps.Clone(s.wallpapers)
+	delete(next, id)
+	if err := s.commitLocked(next); err != nil {
+		return nil, err
+	}
+	clone := *wp
+	return &clone, nil
 }
 
 func sortSnap(snap []*Wallpaper) {
@@ -111,38 +204,33 @@ func sortSnap(snap []*Wallpaper) {
 	})
 }
 
-// GetAll returns a sorted snapshot: pinned first, then images (newest ModTime),
-// then empty slots (newest CreatedAt). Callers must not modify the returned pointers.
-// The result is cached until the store is mutated.
+// GetAll returns a sorted, independent snapshot of the records. Sorting is
+// cached, but neither the cache nor any record in the store is exposed.
 func (s *Store) GetAll() []*Wallpaper {
 	s.RLock()
 	if s.sortedSnap != nil {
-		snap := s.sortedSnap
+		snap := cloneSnap(s.sortedSnap)
 		s.RUnlock()
 		return snap
 	}
 	s.RUnlock()
 
-	// Cache miss: build under write lock to prevent duplicate work.
 	s.Lock()
 	defer s.Unlock()
-	if s.sortedSnap != nil {
-		return s.sortedSnap
-	}
-	snap := make([]*Wallpaper, 0, len(s.wallpapers))
-	for _, wp := range s.wallpapers {
-		if wp != nil {
-			snap = append(snap, wp)
+	if s.sortedSnap == nil {
+		snap := make([]*Wallpaper, 0, len(s.wallpapers))
+		for _, wp := range s.wallpapers {
+			if wp != nil {
+				snap = append(snap, wp)
+			}
 		}
+		sortSnap(snap)
+		s.sortedSnap = snap
 	}
-	sortSnap(snap)
-	s.sortedSnap = snap
-	return snap
+	return cloneSnap(s.sortedSnap)
 }
 
-// GetAllCopy returns a deep copy for cases where mutation is needed.
-func (s *Store) GetAllCopy() []*Wallpaper {
-	original := s.GetAll()
+func cloneSnap(original []*Wallpaper) []*Wallpaper {
 	snap := make([]*Wallpaper, len(original))
 	for i, wp := range original {
 		clone := *wp
@@ -179,13 +267,6 @@ func atomicWrite(path string, data map[string]*Wallpaper) error {
 	return nil
 }
 
-// Save persists the current state to disk atomically.
-func (s *Store) Save() error {
-	s.RLock()
-	defer s.RUnlock()
-	return atomicWrite(dataFile, s.wallpapers)
-}
-
 // MediaPath returns the canonical on-disk path for a link's media file.
 func MediaPath(linkName, mimeExt string) string {
 	return filepath.Join(config.MediaDir, linkName+"."+mimeExt)
@@ -196,13 +277,17 @@ func PreviewFilePath(linkName string) string {
 	return filepath.Join(config.PreviewDir, linkName+".webp")
 }
 
-// NormalizeAccessLevel returns a valid access level, defaulting to public.
+// NormalizeAccessLevel defaults missing (legacy) levels to public; unknown
+// non-empty values fail closed instead of exposing formerly private media.
 func NormalizeAccessLevel(level string) string {
 	level = strings.ToLower(strings.TrimSpace(level))
+	if level == "" {
+		return config.AccessPublic
+	}
 	if config.ValidAccessLevels[level] {
 		return level
 	}
-	return config.AccessPublic
+	return config.AccessAuth
 }
 
 // derivePaths fills runtime-only ImagePath/PreviewPath and public URLs.
@@ -309,9 +394,7 @@ func MigrateMediaToDataDir() {
 		}
 	}
 	if moved > 0 {
-		if err := Global.Save(); err != nil {
-			log.Printf("Warning: save after media migration: %v", err)
-		}
+		// Paths are runtime-only (json:"-"); no metadata save is needed.
 		log.Printf("Migrated %d media file(s) from static/images to data/media", moved)
 	}
 }
@@ -320,13 +403,21 @@ func moveIfNeeded(src, dst string) bool {
 	if src == dst {
 		return false
 	}
-	if _, err := os.Stat(src); err != nil {
+	srcInfo, err := os.Lstat(src)
+	if err != nil || !srcInfo.Mode().IsRegular() {
+		// Never migrate a planted symlink or device from a legacy mount.
 		return false
 	}
-	if _, err := os.Stat(dst); err == nil {
+	if dstInfo, err := os.Lstat(dst); err == nil {
+		if !dstInfo.Mode().IsRegular() {
+			log.Printf("Warning: cannot migrate to non-regular file %s", dst)
+			return false
+		}
 		// Destination already present — drop the legacy copy.
 		_ = os.Remove(src)
 		return true
+	} else if !os.IsNotExist(err) {
+		return false
 	}
 	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
 		log.Printf("Warning: mkdir for %s: %v", dst, err)
@@ -344,7 +435,7 @@ func moveIfNeeded(src, dst string) bool {
 }
 
 func copyFileContents(src, dst string) error {
-	in, err := os.Open(src)
+	in, err := OpenMedia(src)
 	if err != nil {
 		return err
 	}
@@ -371,6 +462,10 @@ func copyFileContents(src, dst string) error {
 	return nil
 }
 
+func validStoredMediaExt(ext string) bool {
+	return config.AllowedMediaExts["."+ext]
+}
+
 // Load reads wallpapers from disk. A missing file is treated as first run.
 func (s *Store) Load() error {
 	data, err := os.ReadFile(dataFile)
@@ -384,73 +479,105 @@ func (s *Store) Load() error {
 	if err := json.Unmarshal(data, &m); err != nil {
 		return err
 	}
+	if m == nil {
+		return fmt.Errorf("invalid wallpaper object in %s", dataFile)
+	}
 	for key, wp := range m {
-		if wp == nil {
-			log.Printf("Warning: skipping nil wallpaper entry for key %q in storage", key)
-			delete(m, key)
-			continue
+		if wp == nil || !utils.IsValidLinkName(key) || (wp.HasImage && !validStoredMediaExt(wp.MIMEType)) {
+			// Silently dropping a bad entry would permanently erase it on the
+			// next save. Stop startup so an operator can repair the file.
+			return fmt.Errorf("invalid wallpaper entry for key %q in %s", key, dataFile)
 		}
-		if wp.LinkName == "" {
-			wp.LinkName = key
-		}
-		if wp.ID == "" {
-			wp.ID = key
-		}
+		// Never build file paths from untrusted persisted ID/LinkName fields.
+		// The validated map key is the canonical identifier.
+		wp.ID, wp.LinkName = key, key
 		derivePaths(wp)
 	}
 	s.Lock()
+	s.generation++
+	for _, wp := range m {
+		wp.Version = s.generation
+	}
 	s.wallpapers = m
 	s.sortedSnap = nil
 	s.Unlock()
 	return nil
 }
 
-// PruneOldImages removes the oldest non-pinned images when count exceeds max,
-// preserving empty slots and pinned entries.
-// File I/O is performed outside the lock to avoid blocking Get/Set during disk operations.
+// SchedulePrune coalesces concurrent requests into at most one pending pass.
+// A stream of uploads cannot spawn an unbounded number of prune goroutines.
+var (
+	pruneOnce     sync.Once
+	pruneRequests = make(chan int, 1)
+	errStale      = errors.New("record changed while pruning")
+)
+
+func SchedulePrune(max int) {
+	if max <= 0 {
+		return
+	}
+	pruneOnce.Do(func() {
+		go func() {
+			for limit := range pruneRequests {
+				PruneOldImages(limit)
+			}
+		}()
+	})
+	select {
+	case pruneRequests <- max:
+	default:
+	}
+}
+
+// PruneOldImages removes the oldest non-pinned images above max. The candidate
+// snapshot is rechecked under the per-link lock before changing metadata;
+// neither an upload nor an access change can be overwritten by a stale pass.
 func PruneOldImages(max int) {
-	Global.Lock()
+	if max <= 0 {
+		return
+	}
 	var candidates []*Wallpaper
-	for _, wp := range Global.wallpapers {
-		// Skip nil, empty slots, and pinned entries — they are never pruned.
-		if wp != nil && wp.HasImage && !wp.IsPinned {
-			clone := *wp
-			candidates = append(candidates, &clone)
+	for _, wp := range Global.GetAll() {
+		if wp.HasImage && !wp.IsPinned {
+			candidates = append(candidates, wp)
 		}
 	}
-	Global.Unlock()
-
 	if len(candidates) <= max {
 		return
 	}
-
 	sort.Slice(candidates, func(i, j int) bool {
 		return candidates[i].ModTime < candidates[j].ModTime
 	})
-
-	for _, wp := range candidates[:len(candidates)-max] {
-		log.Printf("Pruning old image: %s", wp.ID)
-		if err := os.Remove(wp.ImagePath); err != nil && !os.IsNotExist(err) {
-			log.Printf("Error pruning image %s: %v", wp.ImagePath, err)
-		}
-		if wp.PreviewPath != "" {
-			if err := os.Remove(wp.PreviewPath); err != nil && !os.IsNotExist(err) {
-				log.Printf("Error pruning preview %s: %v", wp.PreviewPath, err)
+	for _, candidate := range candidates[:len(candidates)-max] {
+		func() {
+			unlock := LockLinks(candidate.ID)
+			defer unlock()
+			_, err := Global.Update(candidate.ID, func(wp *Wallpaper) error {
+				if !wp.HasImage || wp.IsPinned || wp.Version != candidate.Version {
+					return errStale
+				}
+				*wp = Wallpaper{
+					ID: wp.ID, LinkName: wp.LinkName, Category: wp.Category,
+					CreatedAt: wp.CreatedAt, AccessLevel: wp.AccessLevel,
+					AccessToken: wp.AccessToken,
+				}
+				return nil
+			})
+			if err != nil {
+				if !errors.Is(err, errStale) && !errors.Is(err, ErrNotFound) {
+					log.Printf("Error persisting prune of %s: %v", candidate.ID, err)
+				}
+				return
 			}
-		}
-		Global.Set(wp.ID, &Wallpaper{
-			ID:          wp.ID,
-			LinkName:    wp.LinkName,
-			Category:    wp.Category,
-			CreatedAt:   wp.CreatedAt,
-			IsPinned:    wp.IsPinned,
-			PinnedAt:    wp.PinnedAt,
-			AccessLevel: NormalizeAccessLevel(wp.AccessLevel),
-			AccessToken: wp.AccessToken,
-		})
-	}
-
-	if err := Global.Save(); err != nil {
-		log.Printf("Error saving after pruning: %v", err)
+			log.Printf("Pruning old image: %s", candidate.ID)
+			for _, path := range []string{candidate.ImagePath, candidate.PreviewPath} {
+				if path == "" {
+					continue
+				}
+				if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+					log.Printf("Error removing pruned media %s: %v", path, err)
+				}
+			}
+		}()
 	}
 }

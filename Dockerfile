@@ -1,5 +1,5 @@
 # --- Stage 1: Builder ---
-FROM golang:1.25-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 RUN apk add --no-cache git gcc musl-dev
 
@@ -23,7 +23,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     -o lanpaper .
 
 # --- Stage 2: Runner ---
-FROM alpine:3.21
+FROM alpine:3.24
 
 # ca-certificates for HTTPS; wget is provided by busybox (already in Alpine)
 # and is used only for the HEALTHCHECK — no extra packages needed.

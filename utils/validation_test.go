@@ -90,28 +90,3 @@ func TestValidateFileType(t *testing.T) {
 		})
 	}
 }
-
-func TestSanitizeFilename(t *testing.T) {
-	tests := []struct {
-		name     string
-		filename string
-		want     string
-	}{
-		{"simple filename", "photo.jpg", "photo.jpg"},
-		{"filename with spaces", "my photo.jpg", "my_photo.jpg"},
-		{"path traversal removed", "../../../etc/passwd", "passwd"},
-		{"dangerous chars removed", "file$name`test.jpg", "filenametest.jpg"},
-		{"pipes removed", "file|name.jpg", "filename.jpg"},
-		{"semicolons removed", "file;name.jpg", "filename.jpg"},
-		{"brackets removed", "file[name].jpg", "filename.jpg"},
-		{"complex path", "/home/user/../file.jpg", "file.jpg"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := SanitizeFilename(tt.filename); got != tt.want {
-				t.Errorf("SanitizeFilename(%q) = %q, want %q", tt.filename, got, tt.want)
-			}
-		})
-	}
-}

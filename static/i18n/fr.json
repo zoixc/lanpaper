@@ -32,7 +32,7 @@
   "export_error": "Échec de l'exportation",
   "import_success": "Données importées avec succès",
   "import_error": "Échec de l'importation: Fichier invalide",
-  "import_confirm": "Importer {{count}} liens? Cela remplacera les données actuelles.",
+  "import_confirm": "Importer {{count}} liens ? Les liens et médias existants ne seront pas remplacés.",
   "sync_in_progress": "Synchronisation des données avec le serveur...",
   "regen_previews": "Régénérer les aperçus",
   "regen_previews_running": "Régénération...",

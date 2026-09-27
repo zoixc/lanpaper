@@ -9,6 +9,7 @@ class ImageCompressor {
     this.maxHeight = options.maxHeight || 1080;
     this.quality = options.quality || 0.85;
     this.mimeType = options.mimeType || 'image/jpeg';
+    this.preserveOriginal = !!options.preserveOriginal;
   }
 
   /**
@@ -17,18 +18,13 @@ class ImageCompressor {
    * @returns {Promise<File>} Compressed image file
    */
   async compress(file) {
-    // Skip if not an image
-    if (!file.type.startsWith('image/')) {
-      return file;
-    }
-
-    // Skip if already compressed format
-    if (file.type === 'image/webp' || file.type === 'image/avif') {
-      return file;
-    }
+    // Preserve lossless mode, transparency, animation and uncommon formats.
+    // The server validates and optimizes every supported image format.
+    if (this.preserveOriginal || file.type !== 'image/jpeg') return file;
 
     const img = await this._loadImage(file);
-    return this._compressImage(img, file.name);
+    const compressed = await this._compressImage(img, file.name);
+    return compressed.size < file.size ? compressed : file;
   }
 
   /**
@@ -37,15 +33,11 @@ class ImageCompressor {
    */
   _loadImage(file) {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
+      const url = URL.createObjectURL(file);
       const img = new Image();
-      
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error('Failed to load image'));
-      
-      reader.onload = (e) => img.src = e.target.result;
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsDataURL(file);
+      img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Failed to load image')); };
+      img.src = url;
     });
   }
 
@@ -99,7 +91,7 @@ class ImageCompressor {
    */
   static getCompressionInfo(originalSize, compressedSize) {
     const saved = originalSize - compressedSize;
-    const percent = Math.round((saved / originalSize) * 100);
+    const percent = originalSize > 0 ? Math.round((saved / originalSize) * 100) : 0;
     
     return {
       original: originalSize,

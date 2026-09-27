@@ -30,13 +30,27 @@ func TestSameOriginRequest(t *testing.T) {
 			want: true,
 		},
 		{
-			name:   "same-origin Origin without port",
+			name:   "same-origin default HTTP port",
 			method: http.MethodPost,
 			host:   "lanpaper.local",
 			headers: map[string]string{
-				"Origin": "https://lanpaper.local",
+				"Origin": "http://lanpaper.local",
 			},
 			want: true,
+		},
+		{
+			name:    "same hostname but different port",
+			method:  http.MethodPost,
+			host:    "lanpaper.local:8080",
+			headers: map[string]string{"Origin": "http://lanpaper.local:9090"},
+			want:    false,
+		},
+		{
+			name:    "same hostname but HTTPS instead of HTTP",
+			method:  http.MethodPost,
+			host:    "lanpaper.local",
+			headers: map[string]string{"Origin": "https://lanpaper.local"},
+			want:    false,
 		},
 		{
 			name:   "cross-origin Origin header",

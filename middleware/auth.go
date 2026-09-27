@@ -26,6 +26,10 @@ func MaybeBasicAuth(next http.HandlerFunc) http.HandlerFunc {
 			next(w, r)
 			return
 		}
+		if config.Current.AdminUser == "" || config.Current.AdminPass == "" {
+			http.Error(w, "Admin credentials not configured", http.StatusServiceUnavailable)
+			return
+		}
 		BasicAuth(next)(w, r)
 	}
 }
@@ -33,7 +37,8 @@ func MaybeBasicAuth(next http.HandlerFunc) http.HandlerFunc {
 func BasicAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user, pass, ok := r.BasicAuth()
-		if ok && secureCompare(user, config.Current.AdminUser) && secureCompare(pass, config.Current.AdminPass) {
+		if ok && config.Current.AdminUser != "" && config.Current.AdminPass != "" &&
+			secureCompare(user, config.Current.AdminUser) && secureCompare(pass, config.Current.AdminPass) {
 			next(w, r)
 			return
 		}

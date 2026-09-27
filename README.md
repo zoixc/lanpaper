@@ -2,321 +2,153 @@
 
 > **One permanent link. Any content. Change it anytime.**
 
-Create a static URL like `http://your-server/tv` and assign any image or video to it from the admin panel — without ever changing the address. Whatever device has that link embedded will always get the latest content you set.
-
-**Perfect for:** digital photo frames, smart TVs, wallpaper engines, corporate displays, kiosks — anywhere the URL is fixed but the content needs to change.
-
-```
-http://your-server/bedroom   →  points to whatever image you set today
-http://your-server/office    →  change it next week — the link stays the same
-http://your-server/tv        →  swap video/image from the browser, no reconfiguration
-```
+Create a link such as `https://your-server/tv`, assign an image or video in the admin panel, and change its content without changing the link. Useful for digital frames, smart TVs, kiosks and displays.
 
 ## Features
 
-- **Permanent links with swappable content** — the core idea
-- Upload images (JPEG, PNG, GIF, WebP, BMP, TIFF) and videos (MP4, WebM)
-- **True lossless mode** — copy files directly without re-encoding when `quality=100` and `scale=100`
-- Configurable compression quality and image scaling
-- Load content from URL or a local server directory
-- Automatic thumbnail generation
-- Basic Auth for admin panel (auto-disabled if no credentials set)
-- **Per-link access levels** — public, local network, token, or admin-only
-- Media stored outside the static web root (no `/static/images` bypass)
-- Security: CSP, magic bytes validation, path traversal protection, rate limiting
-- Docker with multi-arch images (amd64, arm64) — works on Raspberry Pi and TV boxes
-- Proxy support for external image downloads
-- i18n: EN, RU, DE, FR, IT, ES
+- Stable named links with swappable JPEG, PNG, GIF, WebP, BMP, TIFF, MP4 or WebM content.
+- Upload a file, fetch a public HTTP(S) URL, or choose from a configured server-side directory.
+- Thumbnail generation, optional image compression/scaling and an original-byte preservation mode.
+- Per-link `public`, `local`, `token` and `auth` access levels; media and previews are outside the static web root.
+- Admin panel with Basic Auth, search, sorting, pinning, import/export of link names, dark mode and six languages (EN, RU, DE, FR, IT, ES).
+- Docker deployment, outbound HTTP/HTTPS/SOCKS5 proxy support and rate limits.
 
-## Quick Start
+## Quick start
 
-### Docker Compose (Recommended)
+### Docker Compose
 
-1. Copy example configuration:
-```bash
+```sh
 cp docker-compose-example.yml docker-compose.yml
+printf 'ADMIN_PASS=%s\n' "$(openssl rand -hex 24)" > .env
+chmod 600 .env
+docker compose up -d
 ```
 
-2. Edit `docker-compose.yml` and set your credentials.
+Open <http://localhost:8080/admin> and log in as `admin` using the generated password in `.env`. The example publishes port 8080 on all interfaces: use HTTPS at your reverse proxy before exposing it to the internet. To expose only to a local reverse proxy, change the Compose port binding to `127.0.0.1:8080:8080`. Keep `.env` private; it is ignored by Git.
 
-3. Start:
-```bash
-docker-compose up -d
+### Docker run
+
+```sh
+: "${ADMIN_PASS:?Set a unique, long ADMIN_PASS in your shell first}"
+docker run -d -p 8080:8080 \
+  -e ADMIN_USER=admin -e ADMIN_PASS="$ADMIN_PASS" \
+  -v "$(pwd)/data:/app/data" ptabi/lanpaper:latest
 ```
 
-4. Open http://localhost:8080/admin
+### Build locally
 
-### Docker (Simple Run)
+Requires Go 1.25.3+ and a C compiler (for WebP **encoding**). Go 1.26 is used for the Docker build.
 
-**With authentication:**
-```bash
-docker run -d \
-  -p 8080:8080 \
-  -e ADMIN_USER=admin \
-  -e ADMIN_PASS=secret \
-  -v $(pwd)/data:/app/data \
-  ptabi/lanpaper:latest
-```
-
-**Without authentication (behind external auth like Tinyauth/Authelia):**
-```bash
-docker run -d \
-  -p 8080:8080 \
-  -v $(pwd)/data:/app/data \
-  ptabi/lanpaper:latest
-```
-
-### Local Build
-
-```bash
+```sh
 go mod download
+go test ./...
 go build -o lanpaper .
-./lanpaper
+ADMIN_USER=admin ADMIN_PASS='set-a-unique-long-password' ./lanpaper
 ```
 
-## How It Works
+If credentials are missing, **admin routes return HTTP 503**; they are *not* made public. To use an external authentication proxy instead, explicitly set `DISABLE_AUTH=true`, restrict direct access to the backend and enforce authentication on `/admin` **and** `/api/*` at that proxy. Public links and `/health` remain accessible without admin credentials.
 
-1. **Create a link** — give it a name, e.g. `bedroom`
-2. **Assign content** — upload a file, paste a URL, or pick from server storage
-3. **Use the link** — `http://your-server/bedroom` now serves that file directly
-4. **Change anytime** — upload a new file to the same link from the admin panel; the URL never changes
+## Usage and access control
+
+1. Create a name, e.g. `bedroom`, in `/admin`.
+2. Upload content, enter a public URL, or choose a file from `EXTERNAL_IMAGE_DIR`.
+3. Open `https://your-server/bedroom` on the display. Subsequent uploads keep the same URL.
+
+Link names must start with an ASCII letter or digit and contain only letters, digits, `_` or `-` (maximum 64 characters). A newly created link has no media until the first upload.
+
+| Access level | Who can open `GET /{name}` |
+| --- | --- |
+| `public` (default) | Anyone who knows the URL |
+| `local` | Clients on loopback, private/LAN, link-local or CGNAT networks |
+| `token` | A valid `?token=` or `X-Access-Token` header; admin Basic Auth also works |
+| `auth` | Admin Basic Auth only |
+
+A token is generated on selection and can be rotated from the UI or API; the previous token immediately stops working. Token URLs are secrets: avoid sharing them in logs or analytics. The admin preview endpoint is always admin-protected. With `DISABLE_AUTH=true`, an `auth`-level public link is not available via `/{name}` (the authenticated external proxy can still serve the admin preview).
+
+**Behind a reverse proxy:** Set `TRUSTED_PROXY` to *only* the proxy's IP/CIDR, and configure that proxy to overwrite incoming `X-Real-IP`, `X-Forwarded-For`, `X-Forwarded-Proto` and `X-Forwarded-Host`. Otherwise a `local` link can appear local to *every* visitor because the proxy itself is on a private network. Preserve the original Host/scheme for same-origin admin requests. Do not trust an entire client-accessible subnet.
 
 ## Configuration
 
-### Configuration Priority
+Defaults are overridden by optional `config.json`, then environment variables. See [config.example.json](config.example.json) for JSON field names. Never leave its empty `adminPass` unchanged if you need the admin panel. Changes require a restart.
 
-Settings are loaded in this order (later sources override earlier ones):
+| Environment variable | Default | Notes |
+| --- | --- | --- |
+| `PORT` | `8080` | Listening port |
+| `ADMIN_USER`, `ADMIN_PASS` | unset | Both required for Basic Auth; missing credentials deny admin access |
+| `DISABLE_AUTH` | `false` | Explicit, potentially dangerous opt-out for an external auth proxy |
+| `MAX_UPLOAD_MB` | `50` | Per file, 1–512 MiB; request/download limits also apply |
+| `MAX_IMAGES` | `0` | `0` = unlimited; prunes the oldest non-pinned media when set |
+| `MAX_CONCURRENT_UPLOADS` | `2` | Concurrent upload limit, 1–8 |
+| `MAX_WALK_DEPTH` | `3` | External directory recursion limit, 1–10 |
+| `EXTERNAL_IMAGE_DIR` | `external/images` | Directory for server-side imports; mount read-only if possible |
+| `RATE_PUBLIC_PER_MIN` | `120` | Public link requests per client/minute |
+| `RATE_UPLOAD_PER_MIN` | `20` | Upload and regeneration request limit per client/minute |
+| `RATE_BURST` | `10` | Additional requests permitted per window |
+| `COMPRESSION_QUALITY` | `85` | JPEG/WebP quality, 1–100 |
+| `COMPRESSION_SCALE` | `100` | Image size percentage, 1–100 |
+| `PROXY_TYPE` | `http` | Outbound `http`, `https` or `socks5` |
+| `PROXY_HOST`, `PROXY_PORT` | unset | Optional outbound proxy |
+| `PROXY_USERNAME`, `PROXY_PASSWORD` | unset | Proxy credentials |
+| `INSECURE_SKIP_VERIFY` | `false` | Skips outbound TLS verification; development only |
+| `TRUSTED_PROXY` | unset | Incoming reverse proxy IP or CIDR; forwarded headers trusted only from it |
 
-1. **Built-in defaults** — sensible defaults for all settings
-2. **config.json** — file-based configuration (optional)
-3. **Environment variables** — highest priority, always override config.json
+### Image formats and compression
 
-This means you can mix approaches: set base config in `config.json` and override specific values via env vars.
+- At `COMPRESSION_QUALITY=100` **and** `COMPRESSION_SCALE=100`, supported image files are fully decoded/validated, then their original bytes are saved unchanged. This preserves format and animation where the decoder accepts it. It does **not** skip validation or preview generation. BMP/TIFF files are also preserved in this mode.
+- At other values, the server decodes, optionally scales and re-encodes. BMP/TIFF become JPEG; a re-encoded GIF contains its first frame. MP4/WebM are copied without image re-encoding.
+- The browser pre-processes only JPEGs, and sends the original if the transformed file is larger; PNG, GIF, WebP and other formats are left to the server. Animated WebP is **not currently supported** by the image decoders; static WebP works.
+- Images are capped at 16,384 pixels per dimension, 36 million pixels per image and 48 million decoded pixels in flight. Large or malformed media may be rejected even below `MAX_UPLOAD_MB`.
 
-### Authentication Behavior
+### Remote URLs
 
-Authentication is automatically disabled if credentials are not provided:
-- Both `ADMIN_USER` and `ADMIN_PASS` must be set for auth to work
-- If either is missing, auth is auto-disabled with a warning in logs
+Only HTTP(S) URLs resolving exclusively to public IPs are permitted. Each redirect is checked again; connections use a vetted IP to reduce DNS-rebinding risk, including through a configured proxy. A configured **HTTP proxy must respect the IP authority in the absolute request URI**, rather than re-resolving the separate virtual-host header. Use a trusted proxy and keep its access controls up to date. Downloads are streamed to bounded temporary files; local-gallery URLs never leave `EXTERNAL_IMAGE_DIR`.
 
-Useful when running behind external authentication (Tinyauth, Nginx Proxy Manager, Authelia, etc.)
+## API
 
-### Via Environment Variables
+Admin endpoints require Basic Auth unless `DISABLE_AUTH=true` (which requires external protection). State-changing browser requests also require a matching origin.
 
-| Variable | Default | Description |
-|---|---|---|
-| `PORT` | `8080` | Server port |
-| `ADMIN_USER` | `` | Admin username (omit to disable auth) |
-| `ADMIN_PASS` | `` | Admin password (omit to disable auth) |
-| `DISABLE_AUTH` | `false` | Force-disable auth regardless of credentials |
-| `MAX_UPLOAD_MB` | `50` | Max upload file size in MB |
-| `MAX_IMAGES` | `0` | Max stored images (0 = unlimited) |
-| `MAX_CONCURRENT_UPLOADS` | `2` | Max parallel uploads |
-| `EXTERNAL_IMAGE_DIR` | `external/images` | Path to external image directory |
-| `RATE_PUBLIC_PER_MIN` | `120` | Public endpoint rate limit (req/min) |
-| `RATE_UPLOAD_PER_MIN` | `20` | Upload rate limit (req/min) |
-| `RATE_BURST` | `10` | Rate limit burst size |
-| `COMPRESSION_QUALITY` | `85` | JPEG/WebP quality (1-100, 100 = lossless mode) |
-| `COMPRESSION_SCALE` | `100` | Image scale percentage (1-100, 100 = no resize) |
-| `PROXY_TYPE` | `http` | Proxy type: `http`, `socks5` |
-| `PROXY_HOST` | `` | Proxy host |
-| `PROXY_PORT` | `` | Proxy port |
-| `PROXY_USERNAME` | `` | Proxy username |
-| `PROXY_PASSWORD` | `` | Proxy password |
-| `INSECURE_SKIP_VERIFY` | `false` | Skip TLS verification for external requests |
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/admin` | Admin panel |
+| `GET` | `/api/wallpapers` | All links; optional `page=1&page_size=50` (max 200), filters/sort |
+| `POST` | `/api/link` | Create a link (`{"linkName":"bedroom"}`) |
+| `PATCH` | `/api/link/{name}` | Rename (`newLinkName`), set `category`/`accessLevel`, or `rotateToken` |
+| `DELETE` | `/api/link/{name}` | Remove a link and its media |
+| `POST` | `/api/link/{name}/pin` | Toggle pin |
+| `POST` | `/api/upload` | Multipart `linkName` + `file` or `url` |
+| `GET` | `/api/preview/{name}` | Protected thumbnail |
+| `GET` | `/api/external-images` | Browse external files |
+| `GET` | `/api/external-image-preview?path=...` | Preview an external image |
+| `GET` | `/api/compression-config` | Current compression settings |
+| `POST` | `/api/regenerate-previews` | Rebuild thumbnails |
+| `GET` | `/health`, `/health/ready` | Public health and readiness checks |
+| `GET` | `/{name}` | Media; subject to the link's access level |
 
-### Compression Settings
+Without `page`, `/api/wallpapers` returns an array as before. With `page`, it returns `{data, total, page, pageSize, totalPages}`. For example:
 
-**Quality** (`COMPRESSION_QUALITY` or `compression.quality`):
-- Range: 1-100
-- Default: 85
-- Higher values = better quality, larger files
-- **100 = lossless mode** (see below)
-
-**Scale** (`COMPRESSION_SCALE` or `compression.scale`):
-- Range: 1-100 (percentage)
-- Default: 100 (no resize)
-- Scales image dimensions (e.g., 50 = half size)
-- **100 = no scaling** (original resolution)
-
-### Lossless Mode
-
-When **both** `quality=100` **and** `scale=100` are set, Lanpaper enters **true lossless mode**:
-
-- Files are **copied directly** without any decoding/re-encoding
-- **Zero quality loss** - original file is preserved bit-for-bit
-- Works for: JPEG, PNG, GIF, WebP (not BMP/TIFF - they're always converted to JPEG)
-- Logs show `lossless` mode indicator
-
-**Why lossless matters:**
-- JPEG at quality=100 is **not** truly lossless - it still applies lossy compression
-- Re-encoding (decode → encode) **always** loses quality, even at quality=100
-- Lossless mode bypasses re-encoding entirely - original file is saved as-is
-
-**Examples:**
-
-```bash
-# Lossless mode via environment variables
-COMPRESSION_QUALITY=100 COMPRESSION_SCALE=100 go run .
+```sh
+curl -u admin:"$ADMIN_PASS" 'http://localhost:8080/api/wallpapers?page=1&page_size=50'
+curl -u admin:"$ADMIN_PASS" -X PATCH 'http://localhost:8080/api/link/bedroom' \
+  -H 'Content-Type: application/json' -d '{"accessLevel":"token"}'
 ```
 
-```json
-// Lossless mode via config.json
-{
-  "compression": {
-    "quality": 100,
-    "scale": 100
-  }
-}
+The browser's JSON export/import is **not** a full media backup: import creates missing link names and restores local UI preferences but does not import images, settings of existing links or access tokens. Exports can contain token secrets; protect them. Back up the entire persistent `data/` directory (including `wallpapers.json`, `media/` and `previews/`) for disaster recovery.
+
+### Upgrading old installations
+
+Existing `static/images/` media is moved to `data/media/` and `data/previews/` at startup. If old media was on a separate volume, make it available under `static/images/` for the first migration; then back up the new `data/` directory. Static URLs to old files are intentionally blocked to prevent bypassing link access rules. Corrupt or unsafe link metadata causes startup to fail instead of silently wiping it. Keep a backup before upgrading.
+
+## Security and development
+
+Run behind HTTPS, use strong credentials, restrict access to the backend when using an external auth proxy and monitor disk/memory. See [SECURITY.md](SECURITY.md) for actual security controls, their limits and how to report an issue; see [IMPROVEMENTS.md](IMPROVEMENTS.md) for this audit's changes and follow-ups.
+
+```sh
+go test ./...
+go test -race ./...
+go vet ./...
+go mod verify
+node --test tests/*.test.cjs
+docker build -t lanpaper .
 ```
 
-**Log output:**
-```
-Lossless mode enabled for image.jpg (quality=100, scale=100)
-Uploaded: mylink (jpg, 1024 KB, lossless)
-```
-
-**Compression mode:**
-```bash
-COMPRESSION_QUALITY=85 COMPRESSION_SCALE=100 go run .
-# Uploaded: mylink (jpg, 256 KB, compressed)
-```
-
-### Via config.json
-
-```json
-{
-  "port": "8080",
-  "adminUser": "admin",
-  "adminPass": "secret",
-  "maxUploadMB": 50,
-  "maxImages": 100,
-  "maxConcurrentUploads": 2,
-  "disableAuth": false,
-  "externalImageDir": "external/images",
-  "rate": {
-    "publicPerMin": 120,
-    "uploadPerMin": 20,
-    "burst": 10
-  },
-  "compression": {
-    "quality": 100,
-    "scale": 100
-  },
-  "proxyType": "http",
-  "proxyHost": "",
-  "proxyPort": "",
-  "proxyUsername": "",
-  "proxyPassword": "",
-  "insecureSkipVerify": false
-}
-```
-
-## API Endpoints
-
-### Public
-
-- `GET /{linkName}` — Serve image/video by link name (access level: public / local / token / auth)
-
-
-### Access levels
-
-Each link has an `accessLevel` (default `public`):
-
-| Level | Behaviour |
-|-------|-----------|
-| `public` | Anyone can open `https://app.example/{name}` |
-| `local` | Only clients on loopback / RFC1918 / link-local / CGNAT |
-| `token` | Requires `?token=` (or `X-Access-Token`); admin can always open |
-| `auth` | Requires admin Basic Auth |
-
-Change via the admin UI dropdown, or:
-
-```bash
-curl -u admin:pass -X PATCH /api/link/bedroom \
-  -H 'Content-Type: application/json' \
-  -d '{"accessLevel":"local"}'
-```
-
-Token-protected links expose `accessToken` only to the admin API. Copy the full URL (with token) from the card, or rotate the token anytime.
-
-Media files live in `data/media/` and `data/previews/`. Paths under `/static/images/` are not served.
-
-### Admin (requires Basic Auth if credentials are set)
-
-- `GET /admin` — Admin panel
-- `GET /api/wallpapers` — List all links
-- `POST /api/link` — Create new link `{"linkName": "my-wallpaper"}`
-- `PATCH /api/link/{linkName}` — Rename link `{"newLinkName": "..."}` or change `{"category": "..."}`
-- `DELETE /api/link/{linkName}` — Delete link
-- `POST /api/link/{linkName}/pin` — Pin/unpin a link
-- `POST /api/upload` — Upload content (form: `file` or `url`, `linkName`)
-- `GET /api/external-images` — List files from server directory
-- `GET /api/external-image-preview?path=...` — Preview server file
-- `GET /api/compression-config` — Get current compression settings
-- `POST /api/regenerate-previews` — Re-generate all preview thumbnails
-- `GET /health` — Health check (`status`, `version`)
-- `GET /health/ready` — Readiness check (storage, static dirs, disk space)
-
-## Behind Reverse Proxy
-
-Recommended setup: run Lanpaper with no credentials and protect `/admin` + `/api/*` via your reverse proxy.
-
-> **Note:** Lanpaper rejects cross-site `POST`/`PATCH`/`DELETE` requests (CSRF protection). Make sure your proxy passes the original host through (`proxy_set_header Host $host;` in nginx) and, if applicable, sets `X-Forwarded-Host`, so same-origin requests from the admin panel are recognized correctly. Set `TRUSTED_PROXY` to the proxy IP/CIDR so per-client rate limiting uses the real visitor IP.
-
-## Security
-
-- Content Security Policy (no `unsafe-inline`)
-- Magic bytes validation for all uploaded files
-- Path traversal protection
-- Rate limiting per endpoint group
-- X-Frame-Options, X-Content-Type-Options headers
-- HTTP timeouts
-- Atomic file writes (temp file + rename)
-
-### Production Recommendations
-
-- Run behind a reverse proxy (Nginx / Caddy / Traefik) with HTTPS
-- Use external auth (Tinyauth, Authelia) for stronger protection
-- Use strong passwords (minimum 16 characters)
-- Mount `./data` as a Docker volume (media lives under `data/media`)
-
-## Project Structure
-
-```
-lanpaper/
-├── main.go              # Entry point and routing
-├── config/              # Config loading and validation
-├── handlers/            # HTTP handlers (admin, upload, public)
-├── middleware/          # Auth, security headers, rate limiting
-├── storage/             # In-memory store + atomic JSON persistence
-└── utils/               # Validation helpers
-```
-
-## Docker Volumes
-
-| Volume | Purpose |
-|---|---|
-| `./data` | Link metadata (JSON) |
-| `./data` | DB + uploaded media (`data/media`, `data/previews`) |
-| `./external/images` | Optional: server-side image directory |
-
-## Technologies
-
-- Go 1.25+
-- [golang.org/x/image](https://pkg.go.dev/golang.org/x/image) — image processing
-- [github.com/chai2010/webp](https://github.com/chai2010/webp) — WebP encoding
-- [github.com/joho/godotenv](https://github.com/joho/godotenv) — `.env` support
-
-## Development
-
-```bash
-go run .          # Run
-go build -o lanpaper .   # Build
-go test ./...     # Test
-docker build -t lanpaper .  # Docker build
-```
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+Docker builds and browser smoke checks require Docker/a browser respectively; neither is part of `go test`. The Docker image uses a non-root user. Go 1.25.3+ and CGO are required to build the WebP encoder. License: MIT (see [LICENSE](LICENSE)).

@@ -1,173 +1,161 @@
 package handlers
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
-	"image"
+	"errors"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
-	"sync"
+	"strings"
 	"sync/atomic"
 
 	"lanpaper/config"
 	"lanpaper/storage"
+	"lanpaper/utils"
 )
 
 // RegeneratePreviewsResult is the JSON response for /api/regenerate-previews.
 type RegeneratePreviewsResult struct {
 	Total   int      `json:"total"`
 	OK      int      `json:"ok"`
-	Skipped int      `json:"skipped"` // videos or no-image entries
+	Skipped int      `json:"skipped"`
 	Errors  int      `json:"errors"`
 	Failed  []string `json:"failed,omitempty"`
 }
 
 const maxFailedItems = 100
 
-// RegeneratePreviews re-generates WebP thumbnails for every stored image entry.
-// Only POST is accepted. Worker count scales with available CPUs (capped at 8).
+var regenerating atomic.Bool
+
+// Regeneration is intentionally serialized: decoding several huge images at
+// once (or starting several concurrent requests) can exhaust server memory.
 func RegeneratePreviews(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if !regenerating.CompareAndSwap(false, true) {
+		http.Error(w, "Preview regeneration already running", http.StatusTooManyRequests)
+		return
+	}
+	defer regenerating.Store(false)
 
-	wallpapers := storage.Global.GetAllCopy()
-
-	total := len(wallpapers)
-	skipped := 0
-
-	type job struct{ wp *storage.Wallpaper }
-	jobs := make(chan job, total)
-	for _, wp := range wallpapers {
-		if wp == nil || !wp.HasImage || isVideo(wp.MIMEType) {
-			skipped++
+	wallpapers := storage.Global.GetAll()
+	result := RegeneratePreviewsResult{Total: len(wallpapers)}
+	for _, snap := range wallpapers {
+		if r.Context().Err() != nil {
+			return
+		}
+		if !snap.HasImage || isVideo(snap.MIMEType) {
+			result.Skipped++
 			continue
 		}
-		jobs <- job{wp: wp}
-	}
-	close(jobs)
-
-	var (
-		okCount  atomic.Int32
-		errCount atomic.Int32
-		failedMu sync.Mutex
-		failed   []string
-	)
-
-	ctx := r.Context()
-
-	workers := runtime.NumCPU()
-	if workers < 1 {
-		workers = 1
-	}
-	if workers > 8 {
-		workers = 8
-	}
-
-	var wg sync.WaitGroup
-	for range workers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := range jobs {
-				// Check context cancellation immediately
-				if ctx.Err() != nil {
-					return
-				}
-				wp := j.wp
-				if err := regenPreview(ctx, wp); err != nil {
-					log.Printf("RegeneratePreviews: %s: %v", wp.LinkName, err)
-					errCount.Add(1)
-					// Limit failed array to prevent memory exhaustion
-					failedMu.Lock()
-					if len(failed) < maxFailedItems {
-						failed = append(failed, wp.LinkName)
-					} else if len(failed) == maxFailedItems {
-						failed = append(failed, "...and more")
-					}
-					failedMu.Unlock()
-				} else {
-					okCount.Add(1)
-				}
+		// Use the same per-link lock as upload/rename/delete. The snapshot
+		// may be stale by the time this job starts; read the current record.
+		unlock := storage.LockLinks(snap.LinkName)
+		wp, exists := storage.Global.Get(snap.LinkName)
+		if !exists || !wp.HasImage || isVideo(wp.MIMEType) {
+			result.Skipped++
+			unlock()
+			continue
+		}
+		err := regenPreview(wp)
+		unlock()
+		if err != nil {
+			log.Printf("RegeneratePreviews: %s: %v", snap.LinkName, err)
+			result.Errors++
+			if len(result.Failed) < maxFailedItems {
+				result.Failed = append(result.Failed, snap.LinkName)
+			} else if len(result.Failed) == maxFailedItems {
+				result.Failed = append(result.Failed, "...and more")
 			}
-		}()
+		} else {
+			result.OK++
+		}
 	}
-	wg.Wait()
-
-	if err := storage.Global.Save(); err != nil {
-		log.Printf("RegeneratePreviews: save storage: %v", err)
-	}
-
 	cleanStalePreviewFiles()
-
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(RegeneratePreviewsResult{
-		Total:   total,
-		OK:      int(okCount.Load()),
-		Skipped: skipped,
-		Errors:  int(errCount.Load()),
-		Failed:  failed,
-	})
+	_ = json.NewEncoder(w).Encode(result)
 }
 
-func regenPreview(ctx context.Context, wp *storage.Wallpaper) error {
-	// loadLocalImage returns nil img when canUseLosslessMode is true.
-	// In that case we decode from the returned fileData bytes directly.
-	img, _, fileData, err := loadLocalImage(ctx, wp.ImagePath)
+func regenPreview(wp *storage.Wallpaper) error {
+	f, err := storage.OpenMedia(wp.ImagePath)
 	if err != nil {
 		return err
 	}
-	if img == nil {
-		// Lossless path: fileData holds the raw bytes — decode for thumbnail.
-		if len(fileData) == 0 {
-			return nil // nothing to do
-		}
-		img, _, err = image.Decode(bytes.NewReader(fileData))
-		if err != nil {
-			return err
-		}
+	defer f.Close()
+	fi, err := f.Stat()
+	if err != nil {
+		return err
 	}
+	ext, err := inspectMediaFile(f, wp.ImagePath, fi.Size(), int64(config.Current.MaxUploadMB)<<20)
+	if err != nil {
+		return err
+	}
+	img, release, err := decodeImage(f, ext)
+	if err != nil {
+		return err
+	}
+	defer release()
 	if err := os.MkdirAll(config.PreviewDir, 0755); err != nil {
 		return err
 	}
-	previewPath := storage.PreviewFilePath(wp.LinkName)
-	thumb := thumbnail(img, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight)
-	if err := saveImage(thumb, "webp", previewPath); err != nil {
+	stage, err := stagePath(config.PreviewDir, "webp")
+	if err != nil {
 		return err
 	}
-	wp.PreviewPath = previewPath
-	wp.Preview = "/api/preview/" + wp.LinkName
-	storage.Global.Set(wp.LinkName, wp)
+	defer os.Remove(stage)
+	if err := saveImage(thumbnail(img, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight), "webp", stage); err != nil {
+		return err
+	}
+	previewPath := storage.PreviewFilePath(wp.LinkName)
+	pub, err := publishStaged(stage, previewPath, int64(config.Current.MaxUploadMB)<<20)
+	if err != nil {
+		return err
+	}
+	_, err = storage.Global.Update(wp.LinkName, func(current *storage.Wallpaper) error {
+		if !current.HasImage || current.Version != wp.Version {
+			return errors.New("media changed during preview generation")
+		}
+		current.PreviewPath = previewPath
+		current.Preview = "/api/preview/" + wp.LinkName
+		return nil
+	})
+	if err != nil {
+		pub.rollback()
+		return err
+	}
+	pub.finish()
+	if wp.PreviewPath != "" && wp.PreviewPath != previewPath {
+		removeFiles("", wp.PreviewPath)
+	}
 	return nil
 }
 
-// cleanStalePreviewFiles removes .webp files in preview dirs with no matching storage entry.
+// Remove orphan previews only for valid link names. Staging/backup files are
+// owned by active uploads and must never be deleted by maintenance.
 func cleanStalePreviewFiles() {
-	for _, previewDir := range []string{config.PreviewDir, filepath.Join(config.LegacyMedia, "previews")} {
-		entries, err := os.ReadDir(previewDir)
+	for _, dir := range []string{config.PreviewDir, filepath.Join(config.LegacyMedia, "previews")} {
+		entries, err := os.ReadDir(dir)
 		if err != nil {
 			continue
 		}
-		for _, e := range entries {
-			if e.IsDir() {
+		for _, entry := range entries {
+			if entry.IsDir() || filepath.Ext(entry.Name()) != ".webp" {
 				continue
 			}
-			ext := filepath.Ext(e.Name())
-			if ext != ".webp" {
+			name := strings.TrimSuffix(entry.Name(), ".webp")
+			if !utils.IsValidLinkName(name) {
 				continue
 			}
-			linkName := e.Name()[:len(e.Name())-len(ext)]
-			if _, exists := storage.Global.Get(linkName); !exists {
-				path := filepath.Join(previewDir, e.Name())
-				if removeErr := os.Remove(path); removeErr != nil && !os.IsNotExist(removeErr) {
-					log.Printf("cleanStalePreviewFiles: remove %s: %v", path, removeErr)
+			unlock := storage.LockLinks(name)
+			if _, exists := storage.Global.Get(name); !exists {
+				if err := os.Remove(filepath.Join(dir, entry.Name())); err != nil && !os.IsNotExist(err) {
+					log.Printf("Could not remove orphan preview %s: %v", entry.Name(), err)
 				}
 			}
+			unlock()
 		}
 	}
 }
