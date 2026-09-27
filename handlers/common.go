@@ -3,33 +3,30 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"regexp"
 	"strings"
 
 	"lanpaper/config"
 	"lanpaper/storage"
+	"lanpaper/utils"
 )
 
-// reservedNames cannot be used as link names — they clash with existing routes.
-var reservedNames = map[string]bool{
-	"api": true, "admin": true, "static": true,
-	"external": true, "data": true, "health": true,
-	"sw.js": true, "favicon.ico": true, "robots.txt": true, "sitemap.xml": true,
-	"manifest.json": true, "manifest.webmanifest": true,
-}
-
-// linkNameRe allows letters, digits, hyphens, underscores.
-// The first character must be alphanumeric to avoid names like "-x".
-var linkNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
-
-func isValidLinkName(name string) bool {
-	return len(name) >= 1 && len(name) <= 64 &&
-		!reservedNames[strings.ToLower(name)] &&
-		linkNameRe.MatchString(name)
-}
+func isValidLinkName(name string) bool { return utils.IsValidLinkName(name) }
 
 func isValidAccessLevel(level string) bool {
 	return config.ValidAccessLevels[strings.ToLower(strings.TrimSpace(level))]
+}
+
+func mediaContentType(ext string) string {
+	switch ext {
+	case "jpg", "jpeg":
+		return "image/jpeg"
+	case "tif", "tiff":
+		return "image/tiff"
+	case "mp4", "webm":
+		return "video/" + ext
+	default:
+		return "image/" + ext
+	}
 }
 
 // generateAccessToken returns a cryptographically random URL-safe token.

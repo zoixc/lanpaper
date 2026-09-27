@@ -86,19 +86,3 @@ func ValidateFileType(data []byte, expectedExt string) error {
 	}
 	return nil
 }
-
-// dangerousRune drops shell-special characters and replaces spaces with '_'.
-func dangerousRune(r rune) rune {
-	switch r {
-	case '$', '`', '|', ';', '[', ']', '(', ')', '&', '<', '>', '"', '\'':
-		return -1
-	case ' ':
-		return '_'
-	}
-	return r
-}
-
-// SanitizeFilename strips path components and removes dangerous characters.
-func SanitizeFilename(name string) string {
-	return strings.Map(dangerousRune, filepath.Base(name))
-}

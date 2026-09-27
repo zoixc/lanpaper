@@ -1,72 +1,36 @@
+# Copy to docker-compose.yml. Set ADMIN_PASS in your shell or an untracked
+# .env file before starting; the example must never deploy with a known password.
 services:
   lanpaper:
     image: ptabi/lanpaper:latest
     container_name: lanpaper
     restart: unless-stopped
     ports:
-      - "9350:8080"
-
+      # Change to "127.0.0.1:8080:8080" when only a local reverse proxy needs it.
+      - "8080:8080"
     environment:
-      - PORT=8080
-
-      # Admin credentials - omit both to auto-disable auth (useful behind Tinyauth/Authelia/etc.)
-      - ADMIN_USER=admin
-      - ADMIN_PASS=password
-
-      # Set to true to disable built-in auth entirely (e.g. behind external auth proxy)
-      # - DISABLE_AUTH=true
-
-      - MAX_UPLOAD_MB=200
-      - MAX_IMAGES=100
-      - MAX_CONCURRENT_UPLOADS=2
-
-      # Client-side image compression settings
-      # COMPRESSION_QUALITY: 1-100 (default: 85)
-      #   - 100 = maximum quality, minimal compression
-      #   - 85 = balanced quality/size (recommended)
-      #   - 70 = smaller files, some quality loss
-      - COMPRESSION_QUALITY=85
-      
-      # COMPRESSION_SCALE: 1-100 (default: 100)
-      #   - 100 = full resolution (1920x1080 max)
-      #   - 50 = half resolution (960x540 max)
-      - COMPRESSION_SCALE=100
-
-      # Rate limiting
-      - RATE_PUBLIC_PER_MIN=120
-      - RATE_UPLOAD_PER_MIN=20
-      - RATE_BURST=10
-
-      # Trusted reverse proxy IP or CIDR.
-      # REQUIRED when Lanpaper is behind nginx/Caddy/Traefik so that
-      # X-Real-IP / X-Forwarded-For are used for rate limiting AND for the
-      # per-link "local" access level (otherwise every request looks local
-      # because it comes from the proxy on 127.0.0.1 / docker bridge).
-      # Leave unset for direct / LAN deployments (safe default).
-      # Examples:
-      #   - TRUSTED_PROXY=172.18.0.1        # specific Docker gateway IP
-      #   - TRUSTED_PROXY=172.18.0.0/16     # entire Docker bridge subnet
-      # - TRUSTED_PROXY=
-
-      # Path inside the container where your external images will be mounted
-      - EXTERNAL_IMAGE_DIR=/app/gallery
-
-      # Go runtime tuning (optional)
-      - GOMEMLIMIT=150MiB
-      - GOGC=50
-
-      # Proxy settings (optional)
-      # - PROXY_TYPE=socks5
-      # - PROXY_HOST=123.45.67.89
-      # - PROXY_PORT=33186
-      # - PROXY_USERNAME=proxy_username
-      # - PROXY_PASSWORD=proxy_password
-      # - INSECURE_SKIP_VERIFY=false
-
+      PORT: "8080"
+      ADMIN_USER: "${ADMIN_USER:-admin}"
+      ADMIN_PASS: "${ADMIN_PASS:?Set a strong ADMIN_PASS in your shell or private .env file}"
+      MAX_UPLOAD_MB: "200"
+      MAX_IMAGES: "100"
+      MAX_CONCURRENT_UPLOADS: "2"
+      COMPRESSION_QUALITY: "85"
+      COMPRESSION_SCALE: "100"
+      RATE_PUBLIC_PER_MIN: "120"
+      RATE_UPLOAD_PER_MIN: "20"
+      RATE_BURST: "10"
+      # Set only to the IP/CIDR of the reverse proxy; also configure it to
+      # overwrite client-supplied X-Real-IP and X-Forwarded-* headers.
+      # TRUSTED_PROXY: "172.18.0.1"
+      # With external authentication and a network-restricted backend ONLY:
+      # DISABLE_AUTH: "true"
+      # EXTERNAL_IMAGE_DIR: "/app/gallery"
+      # PROXY_TYPE: "socks5"
+      # PROXY_HOST: "your-proxy-host"
+      # PROXY_PORT: "1080"
     volumes:
-      # Adjust these paths as needed.
-      # Media is stored under data/media (NOT under static/) so per-link
-      # access control cannot be bypassed via /static/images/...
-      - ./lanpaper/data:/app/data
-      # Optional: mount a read-only gallery for "From server" uploads
-      - ./homepage/images:/app/gallery:ro
+      # Persist BOTH link metadata and all media; back up this whole directory.
+      - ./data:/app/data
+      # To browse a host gallery, uncomment this AND EXTERNAL_IMAGE_DIR above:
+      # - ./external/images:/app/gallery:ro

@@ -2,7 +2,7 @@
   "name": "Lanpaper",
   "short_name": "Lanpaper",
   "description": "Simple image sharing and URL shortening service",
-  "start_url": "/admin.html",
+  "start_url": "/admin",
   "display": "standalone",
   "background_color": "#f4f2ed",
   "theme_color": "#ffffff",

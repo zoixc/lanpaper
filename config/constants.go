@@ -1,7 +1,9 @@
 package config
 
 const (
-	MaxImageDimension         = 16384 // max width/height in pixels; prevents decompression bombs
+	MaxImageDimension         = 16384      // max width/height in pixels
+	MaxImagePixels            = 36_000_000 // per image (~8K UHD)
+	MaxDecodedPixelsInFlight  = 48_000_000 // across uploads + regeneration, bounds concurrent decoding
 	ThumbnailMaxWidth         = 640
 	ThumbnailMaxHeight        = 360
 	DefaultCompressionQuality = 85
@@ -11,8 +13,10 @@ const (
 
 const (
 	MinUploadMB                 = 1
+	MaxUploadMBLimit            = 512 // bound memory/disk use even with an erroneous config
 	DefaultMaxUploadMB          = 50
 	DefaultMaxConcurrentUploads = 2
+	MaxConcurrentUploadsLimit   = 8
 )
 
 const (
@@ -33,7 +37,6 @@ const (
 
 const (
 	DefaultMaxWalkDepth = 3
-	FileCopyBufferSize  = 1024 * 1024 // 1 MB
 )
 
 // Media storage lives outside the static web root so access-control on

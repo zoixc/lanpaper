@@ -242,11 +242,14 @@ func validate() {
 		Current.Port = "8080"
 	}
 
-	if Current.MaxUploadMB < MinUploadMB {
-		log.Printf("Warning: MaxUploadMB %d is below minimum %d, using %d", Current.MaxUploadMB, MinUploadMB, DefaultMaxUploadMB)
+	if Current.MaxUploadMB < MinUploadMB || Current.MaxUploadMB > MaxUploadMBLimit {
+		log.Printf("Warning: MaxUploadMB %d out of range (%d-%d), using %d", Current.MaxUploadMB, MinUploadMB, MaxUploadMBLimit, DefaultMaxUploadMB)
 		Current.MaxUploadMB = DefaultMaxUploadMB
 	}
-	if Current.MaxConcurrentUploads <= 0 {
+	if Current.MaxImages < 0 {
+		Current.MaxImages = 0
+	}
+	if Current.MaxConcurrentUploads <= 0 || Current.MaxConcurrentUploads > MaxConcurrentUploadsLimit {
 		Current.MaxConcurrentUploads = DefaultMaxConcurrentUploads
 	}
 	if Current.MaxWalkDepth <= 0 || Current.MaxWalkDepth > 10 {
@@ -291,7 +294,8 @@ func validate() {
 		cachedProxyPtr.Store(&parsedProxy{ip: ip, cidr: cidr})
 	}
 
-	if !Current.DisableAuth && (Current.AdminUser == "" || Current.AdminPass == "") {
-		Current.DisableAuth = true
-	}
+	// Missing credentials must never silently turn the admin API into an
+	// unauthenticated API. DISABLE_AUTH=true is the explicit opt-in for an
+	// external authentication proxy. With no credentials the admin endpoints
+	// fail closed (503) while public links and health checks remain available.
 }

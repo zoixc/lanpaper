@@ -73,7 +73,7 @@ func AuthorizeLinkAccess(w http.ResponseWriter, r *http.Request, wp *storage.Wal
 
 // adminAuthenticated reports whether the request carries valid admin credentials.
 func adminAuthenticated(r *http.Request) bool {
-	if config.Current.DisableAuth {
+	if config.Current.DisableAuth || config.Current.AdminUser == "" || config.Current.AdminPass == "" {
 		return false
 	}
 	user, pass, ok := r.BasicAuth()

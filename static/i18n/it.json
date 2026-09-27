@@ -32,7 +32,7 @@
   "export_error": "Esportazione fallita",
   "import_success": "Dati importati con successo",
   "import_error": "Importazione fallita: File non valido",
-  "import_confirm": "Importare {{count}} collegamenti? Questo sostituirà i dati attuali.",
+  "import_confirm": "Importare {{count}} collegamenti? I collegamenti e i file esistenti non verranno sostituiti.",
   "sync_in_progress": "Sincronizzazione dati con server...",
   "regen_previews": "Rigenera anteprime",
   "regen_previews_running": "Rigenerazione...",

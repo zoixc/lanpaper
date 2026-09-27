@@ -5,6 +5,7 @@
 
 
 // STATE & CONFIG
+const SUPPORTED_LANGS = new Set(['en', 'ru', 'de', 'fr', 'it', 'es']);
 const STATE = {
     translations: {},
     lang: localStorage.getItem('lang') || navigator.language.slice(0, 2) || 'en',
@@ -102,10 +103,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function initPWA() {
     if (!('serviceWorker' in navigator)) return;
-    // The worker must be served from the root path (/sw.js, with
-    // Service-Worker-Allowed: /) so its scope covers /admin and the public
-    // link URLs. Registered at /static/sw.js the scope would be /static/
-    // and the worker would never control the app.
+    // Keep the root-scoped worker to replace older versions that cached
+    // admin pages and public media. The current worker only caches /static/
+    // assets; admin, API and media requests always go to the network.
     navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
     // Remove the legacy worker from versions that registered it under
     // /static/ where it never actually controlled the app.
@@ -136,7 +136,10 @@ function initCompression() {
     const maxWidth = Math.floor((1920 * scale) / 100);
     const maxHeight = Math.floor((1080 * scale) / 100);
 
-    STATE.compressor = new ImageCompressor({ maxWidth, maxHeight, quality: quality / 100 });
+    STATE.compressor = new ImageCompressor({
+        maxWidth, maxHeight, quality: quality / 100,
+        preserveOriginal: quality === 100 && scale === 100
+    });
     log(`[Compression] ${quality}% quality, ${scale}% scale (${maxWidth}x${maxHeight})`);
 }
 
@@ -350,6 +353,9 @@ async function initLanguage() {
 window.setLanguage = setLanguage;
 
 async function setLanguage(lang) {
+    // Language can come from localStorage or an imported backup. Never use an
+    // arbitrary value as a same-origin URL path.
+    lang = SUPPORTED_LANGS.has(lang) ? lang : 'en';
     STATE.lang = lang;
     localStorage.setItem('lang', lang);
     document.documentElement.lang = lang;
@@ -537,33 +543,17 @@ function filterWallpapers() {
 
 
 function sortWallpapers(list) {
-    const sorted = [...list];
-    
-    // Primary sort: pinned items always first
-    sorted.sort((a, b) => {
-        const aPin = a.pinned ? 1 : 0;
-        const bPin = b.pinned ? 1 : 0;
-        if (aPin !== bPin) return bPin - aPin;
-        return 0;
-    });
-    
-    // Secondary sort: user-selected sorting within pinned/unpinned groups
     const sortFns = {
         name_asc:  (a, b) => (a.linkName || '').localeCompare(b.linkName || ''),
         name_desc: (a, b) => (b.linkName || '').localeCompare(a.linkName || ''),
         date_desc: (a, b) => (b.createdAt || 0) - (a.createdAt || 0),
         date_asc:  (a, b) => (a.createdAt || 0) - (b.createdAt || 0),
     };
-    const sortFn = sortFns[STATE.sortBy];
-    if (sortFn) {
-        // Separate pinned and unpinned, sort each group
-        const pinned = sorted.filter(x => x.pinned);
-        const unpinned = sorted.filter(x => !x.pinned);
-        pinned.sort(sortFn);
-        unpinned.sort(sortFn);
-        return [...pinned, ...unpinned];
-    }
-    return sorted;
+    const sortFn = sortFns[STATE.sortBy] || sortFns.date_desc;
+    return [...list].sort((a, b) => {
+        if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+        return sortFn(a, b);
+    });
 }
 
 
@@ -816,15 +806,22 @@ function confirmModal() {
 }
 
 
+function showModalListMessage(text, variant = '') {
+    const message = document.createElement('div');
+    message.className = `modal-list-msg ${variant}`.trim();
+    message.textContent = text;
+    DOM.modalList.replaceChildren(message);
+}
+
 async function loadExternalImages() {
-    DOM.modalList.innerHTML = `<div class="modal-list-msg">${t('loading', 'Loading...')}</div>`;
+    showModalListMessage(t('loading', 'Loading...'));
     try {
         const res = await fetch('/api/external-images');
         if (!res.ok) throw new Error('Failed');
         const files = await res.json();
 
         if (!files?.length) {
-            DOM.modalList.innerHTML = `<div class="modal-list-msg muted">${t('server_empty', 'No images found')}</div>`;
+            showModalListMessage(t('server_empty', 'No images found'), 'muted');
             return;
         }
 
@@ -860,7 +857,7 @@ async function loadExternalImages() {
         });
         DOM.modalList.appendChild(frag);
     } catch (_) {
-        DOM.modalList.innerHTML = `<div class="modal-list-msg error">${t('server_error', 'Error loading images')}</div>`;
+        showModalListMessage(t('server_error', 'Error loading images'), 'error');
     }
 }
 

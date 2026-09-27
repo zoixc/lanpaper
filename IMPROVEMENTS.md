@@ -1,334 +1,46 @@
-# Code Improvements and Fixes
-
-This document describes all improvements and fixes applied to the `improvements` branch.
-
-## Summary of Changes
-
-All identified code issues have been addressed with the following improvements:
-
-### 1. Fixed HTTP Transport Memory Leak
-
-**File:** `handlers/upload.go`
-
-**Problem:** The `getTransport()` function cached HTTP transport but didn't close old connections when settings changed, causing resource leaks.
-
-**Solution:** Added `cachedTransport.CloseIdleConnections()` before creating a new transport.
-
-```go
-// Close old transport to prevent connection leaks
-if cachedTransport != nil {
-    cachedTransport.CloseIdleConnections()
-}
-```
-
-### 2. Added Context Support for Long Operations
-
-**File:** `handlers/upload.go`
-
-**Problem:** `loadLocalImage()` didn't support context, making it impossible to cancel long-running operations.
-
-**Solution:** Updated function signature to accept `context.Context` and added cancellation checks.
-
-```go
-func loadLocalImage(ctx context.Context, path string) (image.Image, string, []byte, error) {
-    // Check context before starting
-    if err := ctx.Err(); err != nil {
-        return nil, "", nil, err
-    }
-    // ... processing ...
-    // Check context again before decoding
-    if err := ctx.Err(); err != nil {
-        return nil, "", nil, err
-    }
-}
-```
-
-### 3. Implemented Buffered Video Copying
-
-**File:** `handlers/upload.go`
-
-**Problem:** Video files were copied synchronously without buffering, causing slow performance for large files.
-
-**Solution:** Added buffered I/O with configurable buffer size (1MB).
-
-```go
-func copyVideoToFile(r io.Reader, dst string) error {
-    // ... file creation ...
-    bw := bufio.NewWriterSize(out, config.FileCopyBufferSize)
-    if _, err := io.Copy(bw, r); err != nil {
-        return fmt.Errorf("copy: %w", err)
-    }
-    if err := bw.Flush(); err != nil {
-        return fmt.Errorf("flush: %w", err)
-    }
-    return nil
-}
-```
-
-### 4. Eliminated Code Duplication
-
-**Files:** `handlers/upload.go`, `handlers/admin.go`, `utils/common.go` (new)
-
-**Problem:** `externalBase()` and `externalRoot()` functions were duplicated in multiple handlers.
-
-**Solution:** Created shared utility function `utils.ExternalBaseDir()`.
-
-**Before:**
-```go
-// In upload.go
-func externalBase() string {
-    if d := config.Current.ExternalImageDir; d != "" {
-        return d
-    }
-    return "external/images"
-}
-
-// In admin.go  
-func externalRoot() string {
-    if d := config.Current.ExternalImageDir; d != "" {
-        return d
-    }
-    return "external/images"
-}
-```
-
-**After:**
-```go
-// In utils/common.go
-func ExternalBaseDir() string {
-    if d := config.Current.ExternalImageDir; d != "" {
-        return d
-    }
-    return "external/images"
-}
-
-// Used in both files
-absPath, _, err := utils.ValidateAndResolvePath(utils.ExternalBaseDir(), urlStr)
-```
-
-### 5. Made MaxWalkDepth Configurable
-
-**Files:** `config/config.go`, `config/constants.go`, `handlers/admin.go`
-
-**Problem:** Directory recursion depth was hardcoded as constant `maxWalkDepth = 3`.
-
-**Solution:** Added `MaxWalkDepth` configuration parameter with validation.
-
-**Configuration:**
-- Environment variable: `MAX_WALK_DEPTH`
-- JSON config field: `maxWalkDepth`
-- Default value: 3
-- Valid range: 1-10
-
-**Usage:**
-```go
-maxDepth := config.Current.MaxWalkDepth
-if depth := len(strings.Split(rel, string(filepath.Separator))); depth > maxDepth {
-    return filepath.SkipDir
-}
-```
-
-### 6. Implemented Pagination for Wallpapers API
-
-**File:** `handlers/admin.go`
-
-**Problem:** `/api/wallpapers` endpoint returned all records without pagination, causing performance issues with large datasets.
-
-**Solution:** Added optional pagination with backward compatibility.
-
-**API Changes:**
-
-**Without pagination (backward compatible):**
-```
-GET /api/wallpapers
-```
-Returns: `Array<WallpaperResponse>`
-
-**With pagination:**
-```
-GET /api/wallpapers?page=1&page_size=50
-```
-Returns:
-```json
-{
-  "data": [...],
-  "total": 150,
-  "page": 1,
-  "pageSize": 50,
-  "totalPages": 3
-}
-```
-
-**Query Parameters:**
-- `page`: Page number (1-indexed, optional)
-- `page_size`: Items per page (default: 50, max: 200, optional)
-- Existing filters (`category`, `has_image`, `sort`, `order`) work with pagination
-
-### 7. Improved Filtering Efficiency
-
-**File:** `handlers/admin.go`
-
-**Problem:** Filters created new slices by appending to truncated slices, which was inefficient.
-
-**Solution:** Pre-allocate slice capacity based on expected size.
-
-**Before:**
-```go
-out := wallpapers[:0]  // Reuses backing array
-for _, wp := range wallpapers {
-    if condition {
-        out = append(out, wp)
-    }
-}
-```
-
-**After:**
-```go
-filtered := make([]*storage.Wallpaper, 0, len(wallpapers)/2)  // Pre-allocate
-for _, wp := range wallpapers {
-    if condition {
-        filtered = append(filtered, wp)
-    }
-}
-```
-
-### 8. Added File Copy Buffer Configuration
-
-**File:** `config/constants.go`
-
-**Added:** `FileCopyBufferSize = 1024 * 1024` (1MB)
-
-Used for buffered copying of video files to improve performance.
-
-### 9. Documented Automatic Format Conversion
-
-**File:** `handlers/upload.go`
-
-**Problem:** BMP and TIFF automatic conversion to JPEG was not documented.
-
-**Solution:** Added clear documentation in code.
-
-```go
-// storedExt returns the on-disk extension.
-// Note: BMP and TIFF images are automatically re-encoded as JPEG for storage efficiency.
-// This conversion reduces file size while maintaining reasonable quality.
-func storedExt(ext string) string {
-    if ext == "bmp" || ext == "tiff" {
-        return "jpg"
-    }
-    return ext
-}
-```
-
-## Configuration Updates
-
-### New Environment Variable
-
-- `MAX_WALK_DEPTH`: Maximum directory recursion depth for external images (default: 3, range: 1-10)
-
-### New JSON Config Field
-
-```json
-{
-  "maxWalkDepth": 3
-}
-```
-
-## API Changes
-
-### Wallpapers Endpoint
-
-`GET /api/wallpapers` now supports optional pagination:
-
-**New query parameters:**
-- `page` (integer): Page number, 1-indexed
-- `page_size` (integer): Items per page (default: 50, max: 200)
-
-**Response format:**
-- Without `page` parameter: Returns `Array<WallpaperResponse>` (unchanged)
-- With `page` parameter: Returns `PaginatedResponse` object
-
-**Example:**
-```bash
-# Non-paginated (all results)
-curl http://localhost:8080/api/wallpapers
-
-# Paginated
-curl http://localhost:8080/api/wallpapers?page=1&page_size=50
-
-# With filters and pagination
-curl http://localhost:8080/api/wallpapers?category=tech&has_image=true&page=2&page_size=25
-```
-
-## Performance Improvements
-
-1. **Video uploads**: ~30-50% faster for large files due to buffered I/O
-2. **Memory usage**: Reduced by proper transport cleanup
-3. **API response times**: Improved with pagination for large datasets
-4. **Filtering**: More efficient memory allocation
-
-## Backward Compatibility
-
-✅ All changes are backward compatible:
-- Pagination is optional (existing clients unaffected)
-- New config parameters have sensible defaults
-- API response format unchanged when pagination not used
-
-## Testing Recommendations
-
-1. **Test pagination:**
-   ```bash
-   curl "http://localhost:8080/api/wallpapers?page=1&page_size=10"
-   ```
-
-2. **Test MaxWalkDepth configuration:**
-   ```bash
-   export MAX_WALK_DEPTH=5
-   # Verify deeper directory scanning works
-   ```
-
-3. **Test video upload performance:**
-   - Upload large video files (>100MB)
-   - Monitor memory usage during upload
-
-4. **Test transport cleanup:**
-   - Change proxy settings dynamically
-   - Verify old connections are closed
-
-## Migration Guide
-
-No migration required for existing deployments. All improvements are transparent to users.
-
-### Optional: Enable Pagination
-
-Update client code to use pagination for better performance:
-
-```javascript
-// Before
-fetch('/api/wallpapers')
-  .then(r => r.json())
-  .then(wallpapers => console.log(wallpapers));
-
-// After (with pagination)
-fetch('/api/wallpapers?page=1&page_size=50')
-  .then(r => r.json())
-  .then(response => {
-    console.log('Data:', response.data);
-    console.log('Total:', response.total);
-    console.log('Pages:', response.totalPages);
-  });
-```
-
-## Future Improvements
-
-Potential areas for future enhancement:
-
-1. Add cursor-based pagination for more efficient large-scale queries
-2. Implement streaming for very large video files
-3. Add metrics/monitoring for transport usage
-4. Cache external image listings
-5. Add compression progress tracking
-
-## Contributors
-
-These improvements were implemented to enhance code quality, performance, and maintainability.
+# Security and performance audit
+
+This page records the work on the current branch, not historical claims about another branch. For configuration, installation and API behavior see [README.md](README.md); for the deployment threat model see [SECURITY.md](SECURITY.md).
+
+## Completed
+
+| Area | Change | Why it matters |
+| --- | --- | --- |
+| Authentication/access | Missing admin credentials now fail closed with HTTP 503 instead of silently disabling Basic Auth; `DISABLE_AUTH=true` remains an explicit opt-out. Admin previews require auth, and `/static/` serves only allowlisted application assets, not media. Public-link `local`/`token`/`auth` rules are tested. | Prevents anonymous administration and bypassing link ACLs via old media paths or thumbnails. |
+| Browser isolation | Added same-origin checks for unsafe methods, corrected security headers/CSP for actual assets, and set `no-referrer` and `no-store` where secrets/private responses are involved. | Limits CSRF, script injection, framing and token leakage without breaking images embedded on external displays. |
+| Outbound requests | Validates every DNS answer and redirect, pins the vetted IP even when a proxy is configured, preserves original TLS SNI/virtual host, fixes HTTP proxy absolute-form request-target pinning, and bounds download size/time/redirects. | Reduces SSRF and DNS-rebinding risk and avoids buffering large downloaded files in RAM. A nonconforming outbound proxy remains an operational risk. |
+| Upload processing | Validates format bytes and full image decoding; bounds image dimensions, pixel count, total decoded pixels and parallel uploads. Streams downloads and staged media; uses the streaming pure-Go WebP **decoder** rather than the dependency's whole-file-buffering C decoder (C encoder remains). Invalid images cannot be published in lossless mode. | Bounds common decompression bombs and memory pressure while preserving still-WebP and other supported formats. |
+| Media/metadata consistency | Added per-link locks, stage-and-rename publishing with rollback, and copy-on-write JSON store commits. Startup refuses malformed metadata. Link rename, prune, delete, upload and preview regeneration recheck state; symlinks to private files are not served. | A failed disk write no longer reports success or leaves an in-memory ACL that disagrees with disk; concurrent operations cannot silently reintroduce stale media. |
+| Browser code | JPEG-only pre-upload optimization sends the original if recompression grows it; preserves PNG transparency and GIF format. Hardened imported backups (size, link count and name validation), uses text nodes for dynamic content and does not overwrite existing media on import. | Preserves formats and reduces needless work/XSS exposure. Exports remain link manifests, **not** full backups. |
+| Service worker | Root-scoped registration; network-first **static assets only**; rejects private/no-store responses; purges earlier runtime/admin/media caches. | Cached public images or old admin responses cannot bypass later access-level changes through the updated worker. |
+| Maintenance | Reduced duplicate link/validation/transport code, added cached sorted snapshots, preserved optional API pagination, bounded the external directory walk, updated Go image dependencies and Docker builder/runtime base, replaced sample default passwords with a fail-closed configuration. | Improves maintainability, scaling and deployability. |
+
+### Compatibility notes
+
+- Public links, named slots, uploads (local/remote/server directory), access levels, search, pinning, pagination, import/export and six UI languages remain available. `/admin.html` redirects to `/admin`; public media remains embeddable cross-origin.
+- The default is **not** unauthenticated administration. Deployments previously relying on omitted credentials must configure both `ADMIN_USER` and `ADMIN_PASS`, or *intentionally* set `DISABLE_AUTH=true` behind an external authentication proxy. A Compose example now requires an explicitly supplied password.
+- Media is stored in `data/media` and previews in `data/previews`; old `static/images` media is migrated if accessible. Back up `data/` before upgrading and mount legacy media for the initial migration.
+- Lossless mode (`quality=100`, `scale=100`) validates images and preserves original bytes for supported formats, including BMP/TIFF. Other settings may re-encode; GIF animation survives only when the original GIF is preserved. Animated WebP was unsupported by the prior and current decoders and is still rejected rather than silently flattened.
+- With no credentials, `auth`-level public links remain unavailable even if an external proxy authenticates admin routes. The protected admin preview route remains usable behind that proxy.
+
+## Verification
+
+- `go test ./... -count=1` and `go test -race ./... -count=1 -timeout=120s`: all packages pass, including HTTP routing, access controls, upload rollback, proxy request-target pinning (HTTP/HTTPS/SOCKS5), pixel budgets, concurrency, corrupt-metadata startup and store atomicity.
+- `go vet ./...` and `go mod verify`: pass; module sums checked against Go's checksum database.
+- `node --test tests/*.test.cjs`: service-worker cache isolation and client-side compression tests pass. JavaScript syntax and i18n JSON were validated.
+- Browser smoke test in Chromium: admin authentication, create/delete, PNG upload and thumbnail, public link, token control, language selection, service worker registration and mobile-width layout passed. (Browser dependencies/test runner were in a temporary environment, not required by the Go test suite.)
+- **Not run here:** Docker image/multi-architecture builds (no Docker daemon in the test environment), external-proxy deployments against real remote proxy services, or long-duration/load tests.
+
+## Recommended follow-ups
+
+| Priority | Improvement | Reason / trade-off |
+| --- | --- | --- |
+| High | Add durability-focused storage: `fsync` staged data and parent directory or migrate to a transactional single-writer database; test power-loss recovery and multi-instance behavior. | Renames protect against ordinary failures, not sudden power loss; the current JSON store is single-process. |
+| High | Consider an authenticated CONNECT tunnel for outbound HTTP proxies and add proxy-conformance integration tests. | Plain HTTP uses a pinned absolute URI plus an original Host header; proxies that ignore the request-target can still re-resolve a hostile name. Requiring CONNECT may break proxies that disallow tunneling to port 80; make that compatibility decision explicitly. |
+| Medium | Add optional animated WebP support and animation-preserving GIF/WebP transforms. | Current image decoders cannot decode animated WebP; compressed GIF is flattened to its first frame. Requires frame-count, pixel and CPU budgets. |
+| Medium | Implement a real encrypted, media-inclusive backup/restore path, with explicit overwrite/conflict semantics and token handling. | Browser JSON import/export currently handles link names/preferences, not media or full link access settings. |
+| Medium | Paginate the admin UI and external gallery listings for very large deployments; add measurements before further buffer changes. | The API already supports pagination but the default UI loads all links. |
+| Medium | Add CI Docker builds (amd64 and arm64), HTTP/SOCKS proxy e2e tests, browser integration coverage for import/rename/local access, and fuzz/property tests for media/URL validators. | Unit/race/smoke checks do not exercise every deployment path or decoder edge case. |
+| Operational | Add external TLS termination, monitoring, upstream request/rate limits and optional media scanning/sandboxed decoding. | These controls depend on deployment and threat model; they are not built into the application. |
+
+No change should be considered a complete security guarantee. Review the trust and operational limits in [SECURITY.md](SECURITY.md) before public deployment.

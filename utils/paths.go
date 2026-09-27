@@ -2,35 +2,30 @@ package utils
 
 import (
 	"fmt"
-	"path/filepath"
-	"strings"
+	"os"
 )
 
-// ValidateAndResolvePath ensures targetPath is within baseDir, resolving
-// symlinks to prevent escapes. Returns absolute and real paths, or an error.
-func ValidateAndResolvePath(baseDir, targetPath string) (absPath, realPath string, err error) {
-	absBase, err := filepath.Abs(baseDir)
+// OpenExternalFile opens a gallery file relative to a filesystem root.
+// os.Root resolves every symlink while keeping the opened descriptor inside
+// baseDir, even if a symlink is replaced between validation and open. Never
+// resolve a name with EvalSymlinks and then reopen the resulting absolute path.
+func OpenExternalFile(baseDir, name string) (*os.File, error) {
+	if name == "" || !IsValidLocalPath(name) {
+		return nil, fmt.Errorf("invalid relative path")
+	}
+	root, err := os.OpenRoot(baseDir)
 	if err != nil {
-		return "", "", fmt.Errorf("resolving base dir: %w", err)
+		return nil, err
 	}
-	absPath, err = filepath.Abs(filepath.Join(absBase, filepath.Clean(targetPath)))
+	defer root.Close()
+	f, err := root.Open(name)
 	if err != nil {
-		return "", "", fmt.Errorf("resolving target path: %w", err)
+		return nil, err
 	}
-	if !strings.HasPrefix(absPath, absBase+string(filepath.Separator)) && absPath != absBase {
-		return "", "", fmt.Errorf("path traversal detected: %s escapes %s", targetPath, baseDir)
+	fi, err := f.Stat()
+	if err != nil || !fi.Mode().IsRegular() {
+		f.Close()
+		return nil, fmt.Errorf("not a regular file")
 	}
-	realPath, err = filepath.EvalSymlinks(absPath)
-	if err != nil {
-		return "", "", fmt.Errorf("resolving symlinks: %w", err)
-	}
-	realBase, err := filepath.EvalSymlinks(absBase)
-	if err != nil {
-		// Base doesn't exist yet — absPath containment already checked above.
-		return absPath, "", nil
-	}
-	if !strings.HasPrefix(realPath, realBase+string(filepath.Separator)) && realPath != realBase {
-		return "", "", fmt.Errorf("symlink escape detected: %s -> %s escapes %s", absPath, realPath, baseDir)
-	}
-	return absPath, realPath, nil
+	return f, nil
 }

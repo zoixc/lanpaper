@@ -32,7 +32,7 @@
   "export_error": "Export fehlgeschlagen",
   "import_success": "Daten erfolgreich importiert",
   "import_error": "Import fehlgeschlagen: Ungültige Datei",
-  "import_confirm": "{{count}} Links importieren? Dies ersetzt aktuelle Daten.",
+  "import_confirm": "{{count}} Links importieren? Vorhandene Links und Medien werden nicht ersetzt.",
   "sync_in_progress": "Synchronisiere mit Server...",
   "regen_previews": "Vorschauen neu generieren",
   "regen_previews_running": "Regeneriere...",

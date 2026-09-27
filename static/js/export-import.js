@@ -95,17 +95,25 @@ async function triggerImport() {
  */
 async function importData(file) {
     try {
+        if (file.size > 10 * 1024 * 1024) throw new Error('Backup too large');
         const text = await file.text();
         const data = JSON.parse(text);
-        
-        // Validate data structure
-        if (!data.wallpapers || !Array.isArray(data.wallpapers)) {
-            throw new Error('Invalid data format: missing wallpapers array');
+
+        if (!Array.isArray(data.wallpapers) || data.wallpapers.length > 5000) {
+            throw new Error('Invalid backup: too many or missing links');
+        }
+        const names = new Set();
+        for (const link of data.wallpapers) {
+            const name = link && (link.linkName || link.id);
+            if (typeof name !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(name)) {
+                throw new Error('Invalid link name in backup');
+            }
+            names.add(name);
         }
 
-        // Confirm import
-        const count = data.wallpapers.length;
-        const confirmMsg = t('import_confirm', `Import ${count} links? This will replace current data.`)
+        // Import only creates missing links; it does not replace their media.
+        const count = names.size;
+        const confirmMsg = t('import_confirm', `Import ${count} links? Existing links and media will not be replaced.`)
             .replace('{{count}}', count);
         
         if (!confirm(confirmMsg)) return;
@@ -116,17 +124,17 @@ async function importData(file) {
         // Restore settings if available
         if (data.settings) {
             if (data.settings.lang) await setLanguage(data.settings.lang);
-            if (data.settings.theme) {
+            if (data.settings.theme === 'dark' || data.settings.theme === 'light') {
                 STATE.isDark = data.settings.theme === 'dark';
                 localStorage.setItem('theme', data.settings.theme);
                 applyTheme();
             }
-            if (data.settings.viewMode) {
+            if (['list', 'grid'].includes(data.settings.viewMode)) {
                 STATE.viewMode = data.settings.viewMode;
                 localStorage.setItem('viewMode', data.settings.viewMode);
                 applyViewMode(data.settings.viewMode);
             }
-            if (data.settings.sortBy) {
+            if (['name_asc', 'name_desc', 'date_asc', 'date_desc'].includes(data.settings.sortBy)) {
                 STATE.sortBy = data.settings.sortBy;
                 localStorage.setItem('sortBy', data.settings.sortBy);
                 if (DOM.sortSelect) DOM.sortSelect.value = data.settings.sortBy;
@@ -134,7 +142,8 @@ async function importData(file) {
         }
 
         // Sync imported links with server
-        await syncImportedLinksWithServer(data.wallpapers);
+        const result = await syncImportedLinksWithServer([...names]);
+        if (result.failed) throw new Error(`${result.failed} links could not be imported`);
         
         // Reload from server to ensure consistency
         await loadLinks();
@@ -151,16 +160,13 @@ async function importData(file) {
  * Sync imported wallpapers with server
  * Creates missing links on server (without images)
  */
-async function syncImportedLinksWithServer(importedWallpapers) {
+async function syncImportedLinksWithServer(importedNames) {
     try {
         // Get current server links
         const serverLinks = await apiCall('/api/wallpapers');
         const serverLinkNames = new Set(serverLinks.map(link => link.linkName || link.id));
-        
-        // Find links that exist in import but not on server
-        const missingLinks = importedWallpapers.filter(
-            wp => !serverLinkNames.has(wp.linkName || wp.id)
-        );
+
+        const missingLinks = importedNames.filter(name => !serverLinkNames.has(name));
         
         if (missingLinks.length === 0) return { total: 0, success: 0, failed: 0 };
         
@@ -168,9 +174,7 @@ async function syncImportedLinksWithServer(importedWallpapers) {
         
         // Create missing links on server sequentially
         const results = [];
-        for (const link of missingLinks) {
-            const linkName = link.linkName || link.id;
-            
+        for (const linkName of missingLinks) {
             try {
                 await apiCall('/api/link', 'POST', { linkName });
                 results.push({ success: true, linkName });

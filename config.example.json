@@ -1,7 +1,7 @@
 {
   "port": "8080",
   "adminUser": "admin",
-  "adminPass": "password",
+  "adminPass": "",
   "maxUploadMB": 200,
   "maxImages": 20,
   "maxConcurrentUploads": 2,

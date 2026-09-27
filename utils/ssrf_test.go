@@ -1,26 +1,10 @@
 package utils
 
 import (
+	"context"
 	"net"
 	"testing"
 )
-
-// TestPrivateRanges verifies that PrivateRanges initialises without error
-// and contains entries for the expected RFC blocks.
-func TestPrivateRanges(t *testing.T) {
-	ranges := PrivateRanges()
-	if len(ranges) == 0 {
-		t.Fatal("PrivateRanges() returned empty slice")
-	}
-	// Spot-check: 10.0.0.1 must be covered.
-	ip := net.ParseIP("10.0.0.1")
-	for _, r := range ranges {
-		if r.Contains(ip) {
-			return
-		}
-	}
-	t.Error("PrivateRanges() does not contain 10.0.0.0/8")
-}
 
 func TestIsBlockedIP(t *testing.T) {
 	tests := []struct {
@@ -67,7 +51,7 @@ func TestIsPrivateOrLocalIP(t *testing.T) {
 	}
 }
 
-func TestValidateRemoteURL(t *testing.T) {
+func TestResolvePublicURL(t *testing.T) {
 	tests := []struct {
 		raw     string
 		wantErr bool
@@ -78,12 +62,12 @@ func TestValidateRemoteURL(t *testing.T) {
 		{"http://10.0.0.1/x", true},
 		{"ftp://example.com/x", true},
 		{"not-a-url", true},
-		{"https://example.com/img.png", false},
+		{"https://8.8.8.8/img.png", false},
 	}
 	for _, tt := range tests {
-		err := ValidateRemoteURL(tt.raw)
+		_, err := ResolvePublicURL(context.Background(), tt.raw)
 		if (err != nil) != tt.wantErr {
-			t.Errorf("ValidateRemoteURL(%q) err=%v, wantErr=%v", tt.raw, err, tt.wantErr)
+			t.Errorf("ResolvePublicURL(%q) err=%v, wantErr=%v", tt.raw, err, tt.wantErr)
 		}
 	}
 }

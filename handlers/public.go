@@ -3,7 +3,6 @@ package handlers
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 
 	"lanpaper/middleware"
@@ -11,6 +10,10 @@ import (
 )
 
 func Public(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	path := r.URL.Path
 
 	switch {
@@ -48,7 +51,7 @@ func Public(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Open once for both Stat and ServeContent to avoid a TOCTOU race.
-	f, err := os.Open(wp.ImagePath)
+	f, err := storage.OpenMedia(wp.ImagePath)
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -61,23 +64,15 @@ func Public(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mime := "image/" + wp.MIMEType
-	if wp.MIMEType == "mp4" || wp.MIMEType == "webm" {
-		mime = "video/" + wp.MIMEType
-	}
+	mime := mediaContentType(wp.MIMEType)
 
 	h := w.Header()
 	h.Set("Content-Type", mime)
 	// Link names are restricted to [A-Za-z0-9_-] so this is safe.
 	h.Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s.%s"`, wp.LinkName, wp.MIMEType))
-	// Not immutable: the same URL path can be reassigned to a different image.
-	// Private links must not be stored by shared caches.
-	switch storage.NormalizeAccessLevel(wp.AccessLevel) {
-	case "public":
-		h.Set("Cache-Control", "public, max-age=60, must-revalidate")
-	default:
-		h.Set("Cache-Control", "private, no-store")
-	}
+	// Permissions and content can change at any time. A shared cache (or a
+	// service worker) must not replay an old public image after access changes.
+	h.Set("Cache-Control", "no-store")
 	h.Set("X-Content-Type-Options", "nosniff")
 
 	http.ServeContent(w, r, wp.LinkName+"."+wp.MIMEType, fi.ModTime(), f)

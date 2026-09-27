@@ -32,7 +32,7 @@
   "export_error": "Export failed",
   "import_success": "Data imported successfully",
   "import_error": "Import failed: Invalid file",
-  "import_confirm": "Import {{count}} links? This will replace current data.",
+  "import_confirm": "Import {{count}} links? Existing links and media will not be replaced.",
   "sync_in_progress": "Syncing data with server...",
   "regen_previews": "Regenerate Previews",
   "regen_previews_running": "Regenerating...",
