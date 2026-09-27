@@ -1338,6 +1338,16 @@ function setupInlineRename(card, link) {
 
 const ACCESS_LEVELS = ['public', 'local', 'token', 'auth'];
 
+// Static, trusted SVG icons for the token action buttons.
+const TOKEN_COPY_SVG = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <rect x="9" y="9" width="13" height="13" rx="2"/>
+  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+</svg>`;
+const TOKEN_ROTATE_SVG = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <polyline points="1 4 1 10 7 10"/>
+  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+</svg>`;
+
 function accessLabel(level) {
     const key = 'access_' + level;
     const defaults = {
@@ -1423,34 +1433,38 @@ function setupAccessControl(card, link) {
     row.appendChild(label);
     row.appendChild(select);
 
-    // Token display + rotate for token level
+    // Token chip with inline copy/rotate actions for token level
     if ((link.accessLevel || 'public') === 'token') {
         const tokenBox = document.createElement('div');
         tokenBox.className = 'access-token-box';
 
-        const tokenInput = document.createElement('input');
-        tokenInput.type = 'text';
-        tokenInput.readOnly = true;
-        tokenInput.className = 'access-token-input';
-        tokenInput.value = link.accessToken || '';
-        tokenInput.setAttribute('aria-label', t('access_token', 'Access token'));
+        const tokenEl = document.createElement('code');
+        tokenEl.className = 'access-token-value';
+        tokenEl.textContent = link.accessToken || '—';
+        tokenEl.title = link.accessToken || '';
+        tokenEl.setAttribute('aria-label', t('access_token', 'Access token'));
 
         const copyTok = document.createElement('button');
         copyTok.type = 'button';
-        copyTok.className = 'btn access-token-btn';
-        copyTok.textContent = t('copy_token', 'Copy token URL');
+        copyTok.className = 'token-icon-btn';
+        copyTok.innerHTML = TOKEN_COPY_SVG; // static trusted markup
+        const copyLabel = t('copy_token', 'Copy token URL');
+        copyTok.setAttribute('aria-label', copyLabel);
+        copyTok.title = copyLabel;
         copyTok.addEventListener('click', (e) => {
             e.preventDefault();
-            const url = publicLinkURL(link);
-            copyToClipboard(url).then(() => {
+            copyToClipboard(publicLinkURL(link)).then(() => {
                 showToast(t('copied', 'Copied!'), 'success');
             }).catch(() => showToast(t('copy_error', 'Failed to copy URL'), 'error'));
         });
 
         const rotateBtn = document.createElement('button');
         rotateBtn.type = 'button';
-        rotateBtn.className = 'btn access-token-btn';
-        rotateBtn.textContent = t('rotate_token', 'Rotate');
+        rotateBtn.className = 'token-icon-btn';
+        rotateBtn.innerHTML = TOKEN_ROTATE_SVG; // static trusted markup
+        const rotateLabel = t('rotate_token', 'Rotate');
+        rotateBtn.setAttribute('aria-label', rotateLabel);
+        rotateBtn.title = rotateLabel;
         rotateBtn.addEventListener('click', async (e) => {
             e.preventDefault();
             rotateBtn.disabled = true;
@@ -1471,7 +1485,7 @@ function setupAccessControl(card, link) {
             finally { rotateBtn.disabled = false; }
         });
 
-        tokenBox.appendChild(tokenInput);
+        tokenBox.appendChild(tokenEl);
         tokenBox.appendChild(copyTok);
         tokenBox.appendChild(rotateBtn);
         row.appendChild(tokenBox);

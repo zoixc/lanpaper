@@ -548,7 +548,11 @@ img, svg, video { vertical-align: middle; }
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+    /* No hover transform: a transformed card becomes a stacking context and
+       would trap the dropdown menu's z-index, letting the footer and later
+       cards paint above the open menu. Border, background and shadow are the
+       hover feedback. */
+    transition: box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease;
     animation: cardEnter 0.25s cubic-bezier(0.4, 0, 0.2, 1) backwards;
 }
 
@@ -556,7 +560,6 @@ img, svg, video { vertical-align: middle; }
     background: var(--card-hover);
     border-color: var(--border-hover);
     box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
 }
 
 .link-card.drag-over {
@@ -859,43 +862,60 @@ body.dark .access-select {
     cursor: wait;
 }
 
+/* Token chip: truncated token + inline copy/rotate icon buttons */
 .access-token-box {
-    display: flex;
-    flex-wrap: wrap;
+    display: inline-flex;
     align-items: center;
-    gap: 6px;
-    width: 100%;
+    gap: 1px;
+    max-width: 100%;
     margin-top: 2px;
-}
-
-.access-token-input {
-    flex: 1 1 140px;
-    min-width: 0;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: var(--text-sm);
-    padding: 5px 9px;
+    padding: 3px 4px 3px 10px;
+    background: var(--bg);
     border: 1px solid var(--border);
     border-radius: var(--radius-xs);
-    background: var(--bg);
+}
+
+.access-token-value {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: var(--text-sm);
+    line-height: 20px;
     color: var(--text-secondary);
 }
 
-.access-token-btn {
-    font-size: var(--text-sm);
-    padding: 5px 10px;
-    border-radius: var(--radius-xs);
-    border: 1px solid var(--border);
-    background: var(--btn-secondary);
-    color: var(--text);
+.token-icon-btn {
+    flex: none;
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    color: var(--text-muted);
     cursor: pointer;
-    white-space: nowrap;
-    transition: border-color 0.15s ease, background 0.15s ease;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.access-token-btn:hover {
-    border-color: var(--border-hover);
+.token-icon-btn:hover {
     background: var(--btn-secondary-hover);
+    border-color: var(--border-hover);
+    color: var(--text);
 }
+
+.token-icon-btn:active { transform: scale(0.94); }
+
+.token-icon-btn:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
+.token-icon-btn svg { display: block; }
 
 
 /* ============================================================
@@ -1565,13 +1585,7 @@ body.dark .access-select {
 
 .links-list.grid-view .access-row { margin-top: 2px; width: 100%; }
 
-.links-list.grid-view .access-token-box {
-    flex-direction: column;
-    align-items: stretch;
-}
-
-/* Column direction turns flex-basis into height — keep the input compact. */
-.links-list.grid-view .access-token-input { flex: 0 0 auto; }
+.links-list.grid-view .access-token-box { max-width: 100%; }
 
 
 /* ============================================================
@@ -1834,7 +1848,7 @@ body.dark .access-select {
 }
 
 @media (prefers-contrast: more) {
-    .access-select, .access-token-input, .access-token-btn, .lang-option {
+    .access-select, .access-token-box, .lang-option {
         border-color: var(--border-focus);
     }
 }
