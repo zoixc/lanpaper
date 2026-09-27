@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -140,7 +141,12 @@ func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 		case http.MethodGet, http.MethodHead, http.MethodOptions:
 		default:
 			if !sameOriginRequest(r) {
-				http.Error(w, "Cross-origin request rejected", http.StatusForbidden)
+				// Log rejections: a sudden wave of CSRF 403s means either an
+				// attack or a misconfigured reverse proxy — both need a trail.
+				log.Printf("Security: rejected cross-origin %s %s (Origin=%q Sec-Fetch-Site=%q Host=%q RemoteAddr=%s) — if this is a reverse proxy, set TRUSTED_PROXY",
+					r.Method, r.URL.Path, r.Header.Get("Origin"), r.Header.Get("Sec-Fetch-Site"),
+					r.Host, r.RemoteAddr)
+				http.Error(w, "Cross-origin request rejected (if you are behind a reverse proxy, configure TRUSTED_PROXY)", http.StatusForbidden)
 				return
 			}
 		}

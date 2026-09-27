@@ -131,6 +131,14 @@ func inspectMediaFile(r io.ReadSeeker, name string, size, maxBytes int64) (strin
 		return "", err
 	}
 	head = head[:n]
+	// ISO-BMFF/MP4: accept ANY ftyp brand before consulting DetectContentType.
+	// The WHATWG sniffer in net/http only matches ftyp boxes containing an
+	// "mp4*" brand, so real-world camera/phone videos (isom/iso2/avc1/M4V...)
+	// were rejected — especially URL downloads, which land in a nameless
+	// temp file with no extension to fall back to.
+	if len(head) >= 12 && string(head[4:8]) == "ftyp" {
+		return "mp4", utils.ValidateFileType(head, "mp4")
+	}
 	ext, ok := mimeToExt[http.DetectContentType(head)]
 	if !ok {
 		// TIFF/BMP/WebM are not detected on some Go versions. Fall back to
