@@ -1002,6 +1002,10 @@ body.dark .view-icon.light-theme-icon {
     color: var(--text-secondary);
 }
 
+.empty-state-text.error {
+    color: var(--error);
+}
+
 @keyframes fadeIn {
     from { opacity: 0; }
     to   { opacity: 1; }

@@ -4,9 +4,10 @@
  * No hidden input elements - uses modern File System Access API with fallback
  */
 
-// DOM Elements for export/import
-DOM.exportBtn = document.getElementById('exportBtn');
-DOM.importBtn = document.getElementById('importBtn');
+// DOM Elements for export/import. Local refs only: this file must keep
+// working even if app.js failed to initialize (no cross-file DOM coupling).
+const exportBtnEl = document.getElementById('exportBtn');
+const importBtnEl = document.getElementById('importBtn');
 
 
 /**
@@ -137,7 +138,8 @@ async function importData(file) {
             if (['name_asc', 'name_desc', 'date_asc', 'date_desc'].includes(data.settings.sortBy)) {
                 STATE.sortBy = data.settings.sortBy;
                 localStorage.setItem('sortBy', data.settings.sortBy);
-                if (DOM.sortSelect) DOM.sortSelect.value = data.settings.sortBy;
+                const sortSelectEl = document.getElementById('sortSelect');
+                if (sortSelectEl) sortSelectEl.value = data.settings.sortBy;
             }
         }
 
@@ -207,15 +209,15 @@ async function syncImportedLinksWithServer(importedNames) {
 
 
 // Event listeners
-if (DOM.exportBtn) {
-    DOM.exportBtn.addEventListener('click', (e) => {
+if (exportBtnEl) {
+    exportBtnEl.addEventListener('click', (e) => {
         e.stopPropagation();
         exportData();
     });
 }
 
-if (DOM.importBtn) {
-    DOM.importBtn.addEventListener('click', (e) => {
+if (importBtnEl) {
+    importBtnEl.addEventListener('click', (e) => {
         e.stopPropagation();
         triggerImport();
     });

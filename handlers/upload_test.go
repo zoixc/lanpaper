@@ -189,3 +189,46 @@ func TestUploadSemaphoreBoundsConcurrentRemoteDownloads(t *testing.T) {
 		t.Fatalf("rate-limited upload changed second link: %+v", wp)
 	}
 }
+
+// mp4WithBrand builds a minimal ftyp box with the given major brand, as real
+// cameras/phones produce (often WITHOUT any "mp4*" brand).
+func mp4WithBrand(major string, compat ...string) []byte {
+	brands := major + "\x00\x00\x00\x00" + strings.Join(compat, "")
+	box := make([]byte, 0, 8+len(brands)+64)
+	size := len(brands) + 8
+	box = append(box, byte(size>>24), byte(size>>16), byte(size>>8), byte(size))
+	box = append(box, []byte("ftyp")...)
+	box = append(box, []byte(brands)...)
+	return append(box, make([]byte, 64)...)
+}
+
+// TestInspectMediaFileAcceptsAllMP4Brands guards against the WHATWG sniffer
+// gap in net/http: it only matches ftyp boxes containing an "mp4*" brand, so
+// isom/iso2/avc1/M4V videos (typical camera/phone output) were rejected —
+// especially URL downloads, whose temp files carry no extension fallback.
+func TestInspectMediaFileAcceptsAllMP4Brands(t *testing.T) {
+	tests := []struct {
+		name string
+		data []byte
+		want string
+	}{
+		{"isom only (camera files)", mp4WithBrand("isom", "iso2", "avc1"), "mp4"},
+		{"mp42 brand", mp4WithBrand("mp42", "isom", "iso2", "mp41"), "mp4"},
+		{"M4V brand", mp4WithBrand("M4V ", "M4V "), "mp4"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Nameless temp file: no extension to fall back to.
+			ext, err := inspectMediaFile(bytes.NewReader(tt.data), ".download-123", int64(len(tt.data)), 1<<20)
+			if err != nil || ext != tt.want {
+				t.Errorf("inspectMediaFile() = (%q, %v), want (%q, nil)", ext, err, tt.want)
+			}
+		})
+	}
+
+	// Garbage must still be rejected, even named like a video.
+	garbage := []byte("<html>definitely not a video file at all, padding padding</html>")
+	if _, err := inspectMediaFile(bytes.NewReader(garbage), "evil.mp4", int64(len(garbage)), 1<<20); err == nil {
+		t.Error("garbage with .mp4 name must be rejected")
+	}
+}

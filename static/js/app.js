@@ -57,6 +57,43 @@ const DOM = {
 
 const log = (...args) => STATE.isDebug && console.log(...args);
 
+// --- Compatibility shims ----------------------------------------------------
+// Small fallbacks for older browsers (Smart-TV WebViews, older Safari) and
+// plain-HTTP LAN deployments. A missing API must never break the whole UI.
+if (typeof window.CSS !== 'object') window.CSS = {};
+if (typeof window.CSS.escape !== 'function') {
+    window.CSS.escape = (s) => String(s).replace(/[^a-zA-Z0-9_-]/g, (c) => '\\' + c);
+}
+
+// navigator.clipboard only exists in secure contexts (HTTPS or localhost).
+// On plain-HTTP LAN deployments (the typical Lanpaper setup) fall back to the
+// legacy execCommand path so "Copy URL" keeps working.
+function copyToClipboard(text) {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        return navigator.clipboard.writeText(text);
+    }
+    return new Promise((resolve, reject) => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '-1000px';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);
+        let ok = false;
+        try { ok = document.execCommand('copy'); } catch (_) { ok = false; }
+        ta.remove();
+        ok ? resolve() : reject(new Error('copy failed'));
+    });
+}
+
+function onMediaChange(mql, handler) {
+    if (typeof mql.addEventListener === 'function') mql.addEventListener('change', handler);
+    else if (typeof mql.addListener === 'function') mql.addListener(handler);
+}
+
 window.closeAllDropdowns = function(exceptElement) {
     const settingsDropdown = document.getElementById('settingsDropdown');
     const settingsBtn = document.getElementById('settingsBtn');
@@ -82,22 +119,52 @@ window.closeAllDropdowns = function(exceptElement) {
 
 
 // INITIALIZATION
-document.addEventListener('DOMContentLoaded', async () => {
-    initTheme();
-    await initLanguage();
-    initView();
-    initSearchSort();
-    initLazyLoading();
-    initKeyboardShortcuts();
-    initPWA();
-    await loadCompressionConfig();
-    initCompression();
-    loadAppVersion();
-    showSkeletons();
-    await loadLinks();
-    setupGlobalListeners();
-    setupGlobalDropZone();
-    showDragDropHint();
+// Every step is isolated: one broken API/feature in an exotic browser must
+// never take the rest of the app down with it (in particular the create-link
+// form, which is bound first).
+function safeStep(name, fn) {
+    try {
+        return fn();
+    } catch (e) {
+        console.warn(`[init] ${name} failed:`, e);
+        return undefined;
+    }
+}
+
+async function safeStepAsync(name, fn) {
+    try {
+        return await fn();
+    } catch (e) {
+        console.warn(`[init] ${name} failed:`, e);
+        return undefined;
+    }
+}
+
+function initApp() {
+    // Bind all interactive controls BEFORE anything async so the create form,
+    // modals and dialogs work even if loading data or translations fails.
+    safeStep('listeners', setupGlobalListeners);
+    safeStep('theme', initTheme);
+    safeStep('view', initView);
+    safeStep('search-sort', initSearchSort);
+    safeStep('lazy', initLazyLoading);
+    safeStep('shortcuts', initKeyboardShortcuts);
+    safeStep('pwa', initPWA);
+    safeStep('drop-zone', setupGlobalDropZone);
+    safeStep('drag-hint', showDragDropHint);
+    safeStep('skeletons', showSkeletons);
+
+    return (async () => {
+        await safeStepAsync('language', initLanguage);
+        await safeStepAsync('compression-config', loadCompressionConfig);
+        safeStep('compression', initCompression);
+        safeStep('app-version', loadAppVersion);
+        await safeStepAsync('links', loadLinks);
+    })();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initApp();
 });
 
 
@@ -165,7 +232,9 @@ function initLazyLoading() {
 
 function initKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
-        if (e.target.matches('input, textarea')) return;
+        // e.target is usually an Element, but can be document in exotic cases
+        // where .matches does not exist.
+        if (e.target && typeof e.target.matches === 'function' && e.target.matches('input, textarea')) return;
 
         const keyMap = {
             'n': () => (e.ctrlKey || e.metaKey) && DOM.createInput.focus(),
@@ -264,7 +333,7 @@ function initTheme() {
     STATE.isDark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
     applyTheme();
 
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+    onMediaChange(window.matchMedia('(prefers-color-scheme: dark)'), e => {
         if (!localStorage.getItem('theme')) {
             STATE.isDark = e.matches;
             applyTheme();
@@ -866,6 +935,9 @@ async function loadExternalImages() {
 async function apiCall(url, method = 'GET', body = null, isFormData = false) {
     const options = {
         method,
+        // Explicit credentials: WebKit historically omits HTTP-auth on fetch
+        // without this, which would surface as spurious 401s.
+        credentials: 'same-origin',
         headers: isFormData ? {} : { 'Content-Type': 'application/json' }
     };
     if (body) options.body = isFormData ? body : JSON.stringify(body);
@@ -873,7 +945,9 @@ async function apiCall(url, method = 'GET', body = null, isFormData = false) {
         const res = await fetch(url, options);
         if (!res.ok) {
             const text = await res.text();
-            throw new Error(text || `HTTP ${res.status}`);
+            const err = new Error(text || `HTTP ${res.status}`);
+            err.status = res.status;
+            throw err;
         }
         const contentType = res.headers.get('content-type');
         return contentType?.includes('application/json') ? res.json() : null;
@@ -881,6 +955,10 @@ async function apiCall(url, method = 'GET', body = null, isFormData = false) {
         // Better network error handling
         if (e.name === 'TypeError' || e.message === 'Failed to fetch') {
             showToast(t('network_error', 'Network error - check your connection'), 'error');
+        } else if (e.status === 401) {
+            showToast(t('auth_required', 'Authentication required — sign in again'), 'error');
+        } else if (e.status === 403) {
+            showToast(t('forbidden', 'Access denied'), 'error');
         } else {
             const translatedMsg = translateServerError(e.message);
             showToast(translatedMsg, 'error');
@@ -890,14 +968,28 @@ async function apiCall(url, method = 'GET', body = null, isFormData = false) {
 }
 
 
+// Toggle the empty-state text between "no links" and a load-error hint.
+function setEmptyStateError(isError) {
+    const el = DOM.emptyState && DOM.emptyState.querySelector('.empty-state-text');
+    if (!el) return;
+    el.classList.toggle('error', !!isError);
+    el.textContent = isError
+        ? t('load_error_hint', 'Failed to load links — check the connection and refresh the page.')
+        : t('no_links', 'No links yet. Create one above!');
+}
+
 async function loadLinks() {
     try {
-        STATE.wallpapers = await apiCall('/api/wallpapers') || [];
+        const res = await apiCall('/api/wallpapers');
+        // The endpoint returns a bare array; tolerate a wrapped/paginated
+        // shape defensively so a response change can never blank the list.
+        STATE.wallpapers = Array.isArray(res) ? res : (res && Array.isArray(res.data) ? res.data : []);
         filterAndSort();
     } catch (_) {
         showToast(t('load_error', 'Failed to load links'), 'error');
         STATE.wallpapers = [];
         renderLinks([]);
+        setEmptyStateError(true);
     }
 }
 
@@ -965,6 +1057,7 @@ function setupPinButton(card, link) {
 function renderLinks(wallpapers) {
     DOM.linksList.innerHTML = '';
     if (!wallpapers?.length) {
+        setEmptyStateError(false);
         DOM.emptyState.classList.remove('d-none');
         return;
     }
@@ -1241,7 +1334,7 @@ function setupAccessControl(card, link) {
         copyTok.addEventListener('click', (e) => {
             e.preventDefault();
             const url = publicLinkURL(link);
-            navigator.clipboard.writeText(url).then(() => {
+            copyToClipboard(url).then(() => {
                 showToast(t('copied', 'Copied!'), 'success');
             }).catch(() => showToast(t('copy_error', 'Failed to copy URL'), 'error'));
         });
@@ -1405,7 +1498,7 @@ function updateCard(card, link) {
 
     newCopyBtn.onclick = (e) => {
         e.preventDefault();
-        navigator.clipboard.writeText(fullUrl).then(() => {
+        copyToClipboard(fullUrl).then(() => {
             if (copyResetTimer) clearTimeout(copyResetTimer);
 
             newCopyBtn.classList.add('copied');
@@ -1470,10 +1563,25 @@ function setupCardEvents(card, link) {
     const dropdown = card.querySelector('.upload-dropdown');
     const toggleBtn = card.querySelector('.upload-toggle-btn');
 
-    const ac = new AbortController();
-    const { signal } = ac;
+    // AbortController is missing on older engines. Listeners must never be
+    // the reason card rendering dies: fall back to manual removal on cleanup.
+    const hasAC = typeof AbortController === 'function';
+    const ac = hasAC ? new AbortController() : null;
+    const signal = ac ? ac.signal : undefined;
 
-    registerCardCleanup(card, () => ac.abort());
+    const onDocClick = (e) => {
+        if (!dropdown.contains(e.target)) {
+            dropdown.classList.remove('open');
+            toggleBtn.setAttribute('aria-expanded', 'false');
+        }
+    };
+    if (ac) document.addEventListener('click', onDocClick, { signal });
+    else document.addEventListener('click', onDocClick);
+
+    registerCardCleanup(card, () => {
+        if (ac) ac.abort();
+        else document.removeEventListener('click', onDocClick);
+    });
 
     // Inline rename
     setupInlineRename(card, link);
@@ -1485,13 +1593,6 @@ function setupCardEvents(card, link) {
         dropdown.classList.toggle('open', !isOpen);
         toggleBtn.setAttribute('aria-expanded', String(!isOpen));
     });
-
-    document.addEventListener('click', (e) => {
-        if (!dropdown.contains(e.target)) {
-            dropdown.classList.remove('open');
-            toggleBtn.setAttribute('aria-expanded', 'false');
-        }
-    }, { signal });
 
     card.querySelector('.upload-file-btn').addEventListener('click', () => {
         dropdown.classList.remove('open');
@@ -1646,7 +1747,7 @@ function setupGlobalListeners() {
             filterAndSort();
             const newCard = DOM.linksList.querySelector(`[data-link-name="${CSS.escape(id)}"]`)
                 ?? DOM.linksList.lastElementChild;
-            if (newCard) {
+            if (newCard && typeof newCard.animate === 'function') {
                 newCard.animate([
                     { opacity: 0, transform: 'translateY(10px)' },
                     { opacity: 1, transform: 'translateY(0)' }
