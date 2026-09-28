@@ -21,6 +21,25 @@ func TestIsBlockedIP(t *testing.T) {
 		{"100.64.0.1", true},
 		{"::1", true},
 		{"2001:4860:4860::8888", false},
+		{"::ffff:127.0.0.1", true},      // IPv4-mapped loopback
+		{"::ffff:8.8.8.8", false},       // IPv4-mapped public
+		{"::127.0.0.1", true},           // deprecated IPv4-compatible
+		{"64:ff9b::a00:1", true},        // NAT64 of 10.0.0.1
+		{"2001:0:4136:e378::1", true},   // Teredo
+		{"2002:c0a8:101::1", true},      // 6to4 of 192.168.1.1
+		{"100::1", true},                // discard-only
+		{"fec0::1", true},               // site-local
+		{"fd00::1", true},               // unique local
+		{"192.88.99.1", true},           // 6to4 relay anycast
+		{"255.255.255.255", true},       // broadcast
+		{"0.0.0.0", true},               // unspecified
+		{"2606:4700:4700::1111", false}, // public IPv6
+		{"198.51.100.20", true},         // documentation
+		{"100.127.255.254", true},       // CGNAT upper bound
+		{"100.128.0.1", false},          // just outside CGNAT
+	}
+	if !IsBlockedIP(nil) {
+		t.Error("nil IP must be blocked")
 	}
 	for _, tt := range tests {
 		got := IsBlockedIP(net.ParseIP(tt.ip))
@@ -42,6 +61,15 @@ func TestIsPrivateOrLocalIP(t *testing.T) {
 		{"172.18.0.1", true},
 		{"100.64.1.1", true},
 		{"::1", true},
+		{"fd12:3456::1", true},
+		{"fe80::1", true},
+		{"169.254.10.1", true},
+		{"::ffff:192.168.1.5", true},
+		{"2001:4860:4860::8888", false},
+		{"100.128.0.1", false},
+	}
+	if IsPrivateOrLocalIP(nil) {
+		t.Error("nil IP must not count as local")
 	}
 	for _, tt := range tests {
 		got := IsPrivateOrLocalIP(net.ParseIP(tt.ip))

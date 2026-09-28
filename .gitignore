@@ -1,5 +1,4 @@
 # Binaries
-lanpaper
 lanpaper.exe
 *.exe
 *.dll
@@ -44,10 +43,5 @@ config.json
 docker-compose.yml
 !docker-compose-example.yml
 
-# Local dev dirs
-lanpaper/
-homepage/
-docs/
-
-# Misc
-style-old.css
+# Local build output
+/lanpaper

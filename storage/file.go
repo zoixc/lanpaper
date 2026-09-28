@@ -14,14 +14,9 @@ func OpenMedia(path string) (*os.File, error) {
 	if path == "" {
 		return nil, os.ErrNotExist
 	}
-	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_CLOEXEC, 0)
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
 	if err != nil {
 		return nil, err
-	}
-	f := os.NewFile(uintptr(fd), path)
-	if f == nil {
-		syscall.Close(fd)
-		return nil, errors.New("failed to open media")
 	}
 	info, err := f.Stat()
 	if err != nil || !info.Mode().IsRegular() {

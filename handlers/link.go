@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -80,12 +81,7 @@ func Link(w http.ResponseWriter, r *http.Request) {
 			CreatedAt: time.Now().Unix(), AccessLevel: level,
 		}
 		if level == config.AccessToken {
-			token, err := generateAccessToken()
-			if err != nil {
-				http.Error(w, "Failed to generate access token", http.StatusInternalServerError)
-				return
-			}
-			wp.AccessToken = token
+			wp.AccessToken = generateAccessToken()
 		}
 		unlock := storage.LockLinks(req.LinkName)
 		defer unlock()
@@ -157,11 +153,7 @@ func Link(w http.ResponseWriter, r *http.Request) {
 				newLevel := storage.NormalizeAccessLevel(*req.AccessLevel)
 				oldLevel := storage.NormalizeAccessLevel(wp.AccessLevel)
 				if newLevel == config.AccessToken && (oldLevel != config.AccessToken || wp.AccessToken == "" || req.RotateToken) {
-					token, err := generateAccessToken()
-					if err != nil {
-						return err
-					}
-					wp.AccessToken = token
+					wp.AccessToken = generateAccessToken()
 				} else if newLevel != config.AccessToken {
 					wp.AccessToken = ""
 				}
@@ -170,11 +162,7 @@ func Link(w http.ResponseWriter, r *http.Request) {
 				if storage.NormalizeAccessLevel(wp.AccessLevel) != config.AccessToken {
 					return errNotTokenLink
 				}
-				token, err := generateAccessToken()
-				if err != nil {
-					return err
-				}
-				wp.AccessToken = token
+				wp.AccessToken = generateAccessToken()
 			}
 			return nil
 		})
@@ -235,9 +223,9 @@ func renameLink(oldName, newName string) (*storage.Wallpaper, error) {
 	type movedFile struct{ from, to string }
 	var moved []movedFile
 	rollback := func() {
-		for i := len(moved) - 1; i >= 0; i-- {
-			if err := os.Rename(moved[i].to, moved[i].from); err != nil {
-				log.Printf("Error rolling back rename of %s: %v", moved[i].from, err)
+		for _, m := range slices.Backward(moved) {
+			if err := os.Rename(m.to, m.from); err != nil {
+				log.Printf("Error rolling back rename of %s: %v", m.from, err)
 			}
 		}
 	}
@@ -258,7 +246,7 @@ func renameLink(oldName, newName string) (*storage.Wallpaper, error) {
 		if _, err := os.Lstat(to); !os.IsNotExist(err) {
 			return fmt.Errorf("destination file unavailable: %v", err)
 		}
-		if err := os.MkdirAll(filepath.Dir(to), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(to), config.DataDirPerm); err != nil {
 			return err
 		}
 		if err := os.Rename(from, to); err != nil {

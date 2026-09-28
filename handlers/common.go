@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"lanpaper/config"
-	"lanpaper/storage"
 	"lanpaper/utils"
 )
 
@@ -42,20 +41,10 @@ func mediaContentType(ext string) string {
 	}
 }
 
-// generateAccessToken returns a cryptographically random URL-safe token.
-func generateAccessToken() (string, error) {
+// generateAccessToken returns a random URL-safe token with 256 bits of
+// entropy. crypto/rand.Read never fails (Go 1.24+).
+func generateAccessToken() string {
 	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(b), nil
-}
-
-// ensureAccessDefaults fills missing access fields on a wallpaper.
-func ensureAccessDefaults(wp *storage.Wallpaper) {
-	if wp.AccessLevel == "" {
-		wp.AccessLevel = config.AccessPublic
-	} else {
-		wp.AccessLevel = storage.NormalizeAccessLevel(wp.AccessLevel)
-	}
+	_, _ = rand.Read(b)
+	return base64.RawURLEncoding.EncodeToString(b)
 }

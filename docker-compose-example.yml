@@ -1,5 +1,9 @@
 # Copy to docker-compose.yml. Set ADMIN_PASS in your shell or an untracked
 # .env file before starting; the example must never deploy with a known password.
+#
+# The container runs as the unprivileged user uid 100 / gid 101. Create the
+# data directory with that owner before the first start (Linux):
+#   mkdir -p data && sudo chown 100:101 data
 services:
   lanpaper:
     image: ptabi/lanpaper:latest
@@ -34,3 +38,9 @@ services:
       - ./data:/app/data
       # To browse a host gallery, uncomment this AND EXTERNAL_IMAGE_DIR above:
       # - ./external/images:/app/gallery:ro
+    # Hardening: the service needs no Linux capabilities and never escalates.
+    cap_drop: [ ALL ]
+    security_opt: [ "no-new-privileges:true" ]
+    # Lets in-flight uploads finish on "docker compose down" (the server
+    # waits up to 30 s for active requests).
+    stop_grace_period: 35s

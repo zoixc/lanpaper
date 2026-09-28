@@ -4,6 +4,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -11,27 +12,28 @@ import (
 	"lanpaper/config"
 )
 
-type counter struct {
-	count      int
-	windowFrom time.Time
+// window is a fixed-window event counter for one client in one namespace.
+type window struct {
+	count int
+	start time.Time
+	span  time.Duration
 }
 
 var (
 	muCounts sync.Mutex
-	counts   = map[string]*counter{}
+	counts   = map[string]*window{}
 )
 
-// StartCleaner removes stale per-IP counters periodically.
+// StartCleaner removes expired counters periodically.
 // Call once from main; runs until the process exits.
 func StartCleaner() {
-	cleanerInterval := time.Duration(config.RateLimitCleanerInterval) * time.Second
-	ticker := time.NewTicker(cleanerInterval)
+	ticker := time.NewTicker(time.Duration(config.RateLimitCleanerInterval) * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
 		now := time.Now()
 		muCounts.Lock()
 		for key, c := range counts {
-			if now.Sub(c.windowFrom) > time.Minute {
+			if now.Sub(c.start) >= c.span {
 				delete(counts, key)
 			}
 		}
@@ -39,28 +41,63 @@ func StartCleaner() {
 	}
 }
 
-func isOverLimitNS(ns, ip string, perMin, burst int) bool {
-	if perMin <= 0 {
-		return false
+// currentWindow returns the live window for key, starting a new one if the
+// previous window has expired. The caller must hold muCounts.
+func currentWindow(key string, span time.Duration, now time.Time) *window {
+	c, ok := counts[key]
+	if !ok || now.Sub(c.start) >= span {
+		c = &window{start: now, span: span}
+		counts[key] = c
 	}
-	key := ns + ":" + ip
+	return c
+}
+
+func retryAfter(c *window, now time.Time) time.Duration {
+	return max(c.start.Add(c.span).Sub(now), time.Second)
+}
+
+// allowEvent counts one event and reports whether it fits into the budget of
+// limit events per span. When the budget is exhausted, the returned duration
+// tells the client when the window resets.
+func allowEvent(ns, key string, limit int, span time.Duration) (bool, time.Duration) {
 	now := time.Now()
 	muCounts.Lock()
 	defer muCounts.Unlock()
-	c, ok := counts[key]
-	if !ok || now.Sub(c.windowFrom) > time.Minute {
-		counts[key] = &counter{count: 1, windowFrom: now}
-		return false
-	}
-	if c.count >= perMin+burst {
-		return true
+	c := currentWindow(ns+":"+key, span, now)
+	if c.count >= limit {
+		return false, retryAfter(c, now)
 	}
 	c.count++
-	return false
+	return true, 0
 }
 
-func isOverLimit(ip string, perMin, burst int) bool {
-	return isOverLimitNS("public", ip, perMin, burst)
+// budgetExhausted reports, without counting an event, whether key has used up
+// its budget in the current window.
+func budgetExhausted(ns, key string, limit int, span time.Duration) (bool, time.Duration) {
+	now := time.Now()
+	muCounts.Lock()
+	defer muCounts.Unlock()
+	c, ok := counts[ns+":"+key]
+	if !ok || now.Sub(c.start) >= span || c.count < limit {
+		return false, 0
+	}
+	return true, retryAfter(c, now)
+}
+
+// recordEvent counts one event and returns the new total for the window.
+func recordEvent(ns, key string, span time.Duration) int {
+	now := time.Now()
+	muCounts.Lock()
+	defer muCounts.Unlock()
+	c := currentWindow(ns+":"+key, span, now)
+	c.count++
+	return c.count
+}
+
+func writeTooManyRequests(w http.ResponseWriter, retry time.Duration, msg string) {
+	secs := int((retry + time.Second - 1) / time.Second)
+	w.Header().Set("Retry-After", strconv.Itoa(max(secs, 1)))
+	http.Error(w, msg, http.StatusTooManyRequests)
 }
 
 // PublicRateLimit enforces the configured public (per-minute) rate limit on
@@ -68,13 +105,36 @@ func isOverLimit(ip string, perMin, burst int) bool {
 // "/" so that the internet-facing URLs are covered by RATE_PUBLIC_PER_MIN.
 func PublicRateLimit(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if isOverLimit(clientIP(r), config.Current.Rate.PublicPerMin, config.Current.Rate.Burst) {
-			log.Printf("Rate limit exceeded for IP: %s", clientIP(r))
-			w.Header().Set("Retry-After", "60")
-			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
-			return
+		if perMin := config.Current.Rate.PublicPerMin; perMin > 0 {
+			key := rateKey(r)
+			if ok, retry := allowEvent("public", key, perMin+config.Current.Rate.Burst, time.Minute); !ok {
+				log.Printf("Rate limit exceeded for %s", key)
+				writeTooManyRequests(w, retry, "Too Many Requests")
+				return
+			}
 		}
 		next(w, r)
+	}
+}
+
+// RateLimitFunc returns the current (perMin, burst) pair on every call.
+type RateLimitFunc func() (perMin, burst int)
+
+// RateLimit returns middleware that enforces a per-client rate limit in the
+// "upload" namespace using limits provided by fn. A perMin of 0 disables it.
+func RateLimit(fn RateLimitFunc) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if perMin, burst := fn(); perMin > 0 {
+				key := rateKey(r)
+				if ok, retry := allowEvent("upload", key, perMin+burst, time.Minute); !ok {
+					log.Printf("Upload rate limit exceeded for %s", key)
+					writeTooManyRequests(w, retry, "Rate limit exceeded")
+					return
+				}
+			}
+			next(w, r)
+		}
 	}
 }
 
@@ -94,11 +154,7 @@ func clientIP(r *http.Request) string {
 			// XFF is comma-separated. Take the rightmost (last) entry: it is
 			// the address the trusted proxy actually saw, whereas leftmost
 			// entries are client-supplied and trivially spoofed.
-			raw := xf
-			if idx := strings.LastIndexByte(xf, ','); idx >= 0 {
-				raw = xf[idx+1:]
-			}
-			candidate := strings.TrimSpace(raw)
+			candidate := rightmostHeader(xf)
 			if net.ParseIP(candidate) != nil {
 				return candidate
 			}
@@ -111,23 +167,17 @@ func clientIP(r *http.Request) string {
 	return host
 }
 
-// RateLimitFunc returns the current (perMin, burst) pair on every call so that
-// live config changes take effect without a server restart.
-type RateLimitFunc func() (perMin, burst int)
-
-// RateLimit returns middleware that enforces a per-IP rate limit in the
-// "upload" namespace using limits provided by fn.
-func RateLimit(fn RateLimitFunc) func(http.HandlerFunc) http.HandlerFunc {
-	return func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			perMin, burst := fn()
-			ip := clientIP(r)
-			if isOverLimitNS("upload", ip, perMin, burst) {
-				log.Printf("Rate limit exceeded for IP: %s", ip)
-				http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
-				return
-			}
-			next(w, r)
-		}
+// rateKey identifies a client for rate limiting and brute-force protection.
+// IPv6 clients are grouped by their /64 prefix: a single host usually
+// controls a whole /64 and could otherwise rotate addresses to evade limits.
+func rateKey(r *http.Request) string {
+	ipStr := clientIP(r)
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return ipStr
 	}
+	if ip4 := ip.To4(); ip4 != nil {
+		return ip4.String()
+	}
+	return ip.Mask(net.CIDRMask(64, 128)).String() + "/64"
 }

@@ -1,15 +1,19 @@
 /**
- * Simple Image Compressor
- * Client-side image compression before upload
+ * Client-side JPEG re-encoding before upload, used only to reduce upload
+ * size. By default dimensions are preserved: the server applies
+ * COMPRESSION_SCALE to every upload path, so resizing here would scale twice.
  */
 
 class ImageCompressor {
   constructor(options = {}) {
-    this.maxWidth = options.maxWidth || 1920;
-    this.maxHeight = options.maxHeight || 1080;
+    this.maxWidth = options.maxWidth || Infinity;
+    this.maxHeight = options.maxHeight || Infinity;
     this.quality = options.quality || 0.85;
     this.mimeType = options.mimeType || 'image/jpeg';
     this.preserveOriginal = !!options.preserveOriginal;
+    // Mobile browsers (notably iOS Safari) silently produce a blank canvas
+    // above ~16.7 MP. Larger images are uploaded unchanged instead.
+    this.maxCanvasPixels = options.maxCanvasPixels || 16777216;
   }
 
   /**
@@ -23,6 +27,9 @@ class ImageCompressor {
     if (this.preserveOriginal || file.type !== 'image/jpeg') return file;
 
     const img = await this._loadImage(file);
+    const ratio = Math.min(this.maxWidth / img.width, this.maxHeight / img.height, 1);
+    const pixels = Math.floor(img.width * ratio) * Math.floor(img.height * ratio);
+    if (!(pixels > 0) || pixels > this.maxCanvasPixels) return file;
     const compressed = await this._compressImage(img, file.name);
     return compressed.size < file.size ? compressed : file;
   }

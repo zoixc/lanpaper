@@ -4,102 +4,94 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"net/url"
 	"strings"
 )
 
-// privateRanges holds all IP networks that must never be contacted via
-// user-supplied URLs (SSRF prevention).
-var privateRanges []*net.IPNet
+func mustPrefixes(cidrs ...string) []netip.Prefix {
+	out := make([]netip.Prefix, len(cidrs))
+	for i, c := range cidrs {
+		out[i] = netip.MustParsePrefix(c)
+	}
+	return out
+}
 
-func init() {
-	for _, cidr := range []string{
-		"127.0.0.0/8",     // loopback
-		"10.0.0.0/8",      // RFC 1918
-		"172.16.0.0/12",   // RFC 1918
-		"192.168.0.0/16",  // RFC 1918
-		"169.254.0.0/16",  // link-local / AWS metadata
-		"100.64.0.0/10",   // CGNAT
-		"0.0.0.0/8",       // "this" network
-		"192.0.0.0/24",    // IETF protocol assignments
-		"198.18.0.0/15",   // benchmarking
-		"224.0.0.0/4",     // IPv4 multicast
-		"240.0.0.0/4",     // reserved / future use
-		"::1/128",         // IPv6 loopback
-		"fc00::/7",        // IPv6 ULA
-		"fe80::/10",       // IPv6 link-local
-		"ff00::/8",        // IPv6 multicast
-		"::/128",          // unspecified
-		"192.0.2.0/24",    // documentation
-		"198.51.100.0/24", // documentation
-		"203.0.113.0/24",  // documentation
-		"64:ff9b::/96",    // NAT64 (can encode private IPv4 destinations)
-		"64:ff9b:1::/48",  // local-use NAT64
-		"2001::/32",       // Teredo (encapsulated IPv4)
-		"2002::/16",       // 6to4 (encapsulated IPv4)
-		"2001:db8::/32",   // documentation
-	} {
-		if _, network, err := net.ParseCIDR(cidr); err == nil {
-			privateRanges = append(privateRanges, network)
+// blockedPrefixes lists networks that must never be contacted via
+// user-supplied URLs (SSRF prevention): private, internal and special-purpose
+// ranges, plus transition mechanisms that can embed such IPv4 addresses.
+// Loopback, link-local, multicast and unspecified addresses are additionally
+// rejected by IsBlockedIP.
+var blockedPrefixes = mustPrefixes(
+	"0.0.0.0/8",       // "this" network
+	"10.0.0.0/8",      // RFC 1918
+	"100.64.0.0/10",   // CGNAT
+	"127.0.0.0/8",     // loopback
+	"169.254.0.0/16",  // link-local / cloud metadata
+	"172.16.0.0/12",   // RFC 1918
+	"192.0.0.0/24",    // IETF protocol assignments
+	"192.0.2.0/24",    // documentation
+	"192.88.99.0/24",  // deprecated 6to4 relay anycast
+	"192.168.0.0/16",  // RFC 1918
+	"198.18.0.0/15",   // benchmarking
+	"198.51.100.0/24", // documentation
+	"203.0.113.0/24",  // documentation
+	"224.0.0.0/4",     // IPv4 multicast
+	"240.0.0.0/4",     // reserved / broadcast
+	"::/96",           // unspecified, loopback, deprecated IPv4-compatible
+	"64:ff9b::/96",    // NAT64 (can encode private IPv4 destinations)
+	"64:ff9b:1::/48",  // local-use NAT64
+	"100::/64",        // discard-only
+	"2001::/23",       // IETF protocol assignments, incl. Teredo
+	"2001:db8::/32",   // documentation
+	"2002::/16",       // 6to4 (encapsulated IPv4)
+	"fc00::/7",        // IPv6 unique local
+	"fe80::/10",       // IPv6 link-local
+	"fec0::/10",       // deprecated IPv6 site-local
+	"ff00::/8",        // IPv6 multicast
+)
+
+// localPrefixes complements netip's loopback, link-local and private checks
+// for the "local" access level.
+var localPrefixes = mustPrefixes(
+	"100.64.0.0/10", // CGNAT (also used by overlay VPNs such as Tailscale)
+)
+
+// toAddr converts a net.IP to its canonical netip form (IPv4-mapped IPv6
+// addresses become plain IPv4).
+func toAddr(ip net.IP) (netip.Addr, bool) {
+	addr, ok := netip.AddrFromSlice(ip)
+	return addr.Unmap(), ok
+}
+
+func inPrefixes(addr netip.Addr, prefixes []netip.Prefix) bool {
+	for _, p := range prefixes {
+		if p.Contains(addr) {
+			return true
 		}
 	}
+	return false
 }
 
 // IsBlockedIP reports whether ip is in a range that must not be contacted
 // via user-supplied URLs (loopback, RFC1918, link-local, metadata, etc.).
 func IsBlockedIP(ip net.IP) bool {
-	if ip == nil {
+	addr, ok := toAddr(ip)
+	if !ok || !addr.IsGlobalUnicast() {
 		return true
 	}
-	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
-		ip.IsUnspecified() || ip.IsMulticast() || ip.IsPrivate() {
-		return true
-	}
-	for _, cidr := range privateRanges {
-		if cidr.Contains(ip) {
-			return true
-		}
-	}
-	return false
+	return inPrefixes(addr, blockedPrefixes)
 }
 
-// localAccessCIDRs are networks that count as "local" for the local access level.
-// Subset of privateRanges: RFC1918, loopback, link-local, CGNAT, IPv6 ULA/link-local.
-var localAccessCIDRs []*net.IPNet
-
-func init() {
-	for _, cidr := range []string{
-		"127.0.0.0/8",
-		"10.0.0.0/8",
-		"172.16.0.0/12",
-		"192.168.0.0/16",
-		"169.254.0.0/16",
-		"100.64.0.0/10",
-		"::1/128",
-		"fc00::/7",
-		"fe80::/10",
-	} {
-		if _, network, err := net.ParseCIDR(cidr); err == nil {
-			localAccessCIDRs = append(localAccessCIDRs, network)
-		}
-	}
-}
-
-// IsPrivateOrLocalIP reports whether ip belongs to a private, loopback, or
-// link-local network. Used for the "local" access level on public links.
+// IsPrivateOrLocalIP reports whether ip belongs to a private, loopback,
+// link-local or CGNAT network. Used for the "local" access level.
 func IsPrivateOrLocalIP(ip net.IP) bool {
-	if ip == nil {
+	addr, ok := toAddr(ip)
+	if !ok {
 		return false
 	}
-	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsPrivate() {
-		return true
-	}
-	for _, cidr := range localAccessCIDRs {
-		if cidr.Contains(ip) {
-			return true
-		}
-	}
-	return false
+	return addr.IsLoopback() || addr.IsLinkLocalUnicast() || addr.IsPrivate() ||
+		inPrefixes(addr, localPrefixes)
 }
 
 // ResolvePublicURL checks the scheme, host and *all* DNS answers, then

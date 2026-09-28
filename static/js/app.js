@@ -166,6 +166,8 @@ function initApp() {
     safeStep('drag-hint', showDragDropHint);
     safeStep('skeletons', showSkeletons);
 
+    safeStep('launch-action', handleLaunchAction);
+
     return (async () => {
         await safeStepAsync('language', initLanguage);
         await safeStepAsync('compression-config', loadCompressionConfig);
@@ -173,6 +175,14 @@ function initApp() {
         safeStep('app-version', loadAppVersion);
         await safeStepAsync('links', loadLinks);
     })();
+}
+
+// PWA shortcut from manifest.json ("Create new link" -> /admin?action=create).
+function handleLaunchAction() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('action') !== 'create') return;
+    history.replaceState(null, '', window.location.pathname);
+    focusAfterPaint(DOM.createInput);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -237,20 +247,21 @@ async function loadCompressionConfig() {
 }
 
 
+// Browser-side JPEG re-encoding only reduces upload size. Dimensions are left
+// to the server, which applies COMPRESSION_SCALE to every upload path (file,
+// URL, server gallery) exactly once. Without the server settings the browser
+// cannot know whether lossless mode is active, so originals are sent as-is.
 function initCompression() {
-    if (typeof ImageCompressor === 'undefined') return;
+    if (typeof ImageCompressor === 'undefined' || !STATE.compressionConfig) return;
 
-    const quality = STATE.compressionConfig?.quality ?? 85;
-    const scale = STATE.compressionConfig?.scale ?? 100;
-
-    const maxWidth = Math.floor((1920 * scale) / 100);
-    const maxHeight = Math.floor((1080 * scale) / 100);
+    const { quality, scale } = STATE.compressionConfig;
+    if (!Number.isFinite(quality) || !Number.isFinite(scale)) return;
 
     STATE.compressor = new ImageCompressor({
-        maxWidth, maxHeight, quality: quality / 100,
+        quality: quality / 100,
         preserveOriginal: quality === 100 && scale === 100
     });
-    log(`[Compression] ${quality}% quality, ${scale}% scale (${maxWidth}x${maxHeight})`);
+    log(`[Compression] ${quality}% quality, ${scale}% scale (applied by the server)`);
 }
 
 
@@ -282,7 +293,7 @@ function initKeyboardShortcuts() {
         const mod = e.ctrlKey || e.metaKey;
 
         if (mod && !e.altKey && !e.shiftKey) {
-            switch (e.key.toLowerCase()) {
+            switch ((e.key || '').toLowerCase()) {
                 case 'n': e.preventDefault(); DOM.createInput.focus(); return;
                 case 'f':
                     e.preventDefault();
@@ -635,11 +646,12 @@ function filterWallpapers() {
         return;
     }
     const query = STATE.searchQuery;
+    const typeQuery = query.replace(/^\./, '');
     STATE.filteredWallpapers = STATE.wallpapers.filter(wp => {
         const name = (wp.linkName || wp.id || '').toLowerCase();
-        // Also match the stored file name so "search by file" works.
-        const file = (wp.imageUrl || '').toLowerCase();
-        return name.includes(query) || file.includes(query);
+        // "Search by file": a file type such as "png" or ".mp4" also matches.
+        const type = (wp.mimeType || '').toLowerCase();
+        return name.includes(query) || (type !== '' && type === typeQuery);
     });
 }
 
@@ -943,7 +955,7 @@ function confirmModal() {
         : DOM.modalList.querySelector('.selected')?.dataset.value;
 
     if (result) {
-        DOM.modalOverlay.classList.add('hidden');
+        closeDialog(DOM.modalOverlay);
         if (modalResolve) modalResolve(result);
         modalResolve = null;
     } else {
@@ -982,19 +994,31 @@ async function loadExternalImages() {
             const nameEl = document.createElement('div');
             nameEl.className = 'image-name';
             nameEl.textContent = file;
-            const img = document.createElement('img');
-            img.alt = file;
-            img.className = 'lazy-image-fade';
-            if (STATE.lazyObserver) {
-                img.dataset.src = previewUrl;
-                img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"%3E%3C/svg%3E';
-                STATE.lazyObserver.observe(img);
-                img.addEventListener('load', () => img.classList.add('loaded'));
+            const isVid = /\.(mp4|webm)$/i.test(file);
+            let media;
+            if (isVid) {
+                // Metadata only: shows the first frame without downloading the video.
+                media = document.createElement('video');
+                media.muted = true;
+                media.playsInline = true;
+                media.preload = 'metadata';
+                media.setAttribute('aria-label', file);
             } else {
-                img.src = previewUrl;
-                img.classList.add('loaded');
+                media = document.createElement('img');
+                media.alt = file;
             }
-            div.appendChild(img);
+            media.className = 'lazy-image-fade';
+            const markLoaded = () => media.classList.add('loaded');
+            media.addEventListener(isVid ? 'loadeddata' : 'load', markLoaded);
+            if (STATE.lazyObserver) {
+                media.dataset.src = previewUrl;
+                if (!isVid) media.src = LAZY_PLACEHOLDER;
+                STATE.lazyObserver.observe(media);
+            } else {
+                media.src = previewUrl;
+                markLoaded();
+            }
+            div.appendChild(media);
             div.appendChild(nameEl);
             div.onclick = () => {
                 DOM.modalList.querySelectorAll('.image-option').forEach(el => el.classList.remove('selected'));
@@ -1022,7 +1046,8 @@ async function apiCall(url, method = 'GET', body = null, isFormData = false) {
     try {
         const res = await fetch(url, options);
         if (!res.ok) {
-            const text = await res.text();
+            // Server errors are plain text with a trailing newline.
+            const text = (await res.text()).trim();
             const err = new Error(text || `HTTP ${res.status}`);
             err.status = res.status;
             throw err;
@@ -1075,7 +1100,7 @@ async function loadLinks() {
 // ============================================================
 // PIN / UNPIN
 // ============================================================
-async function togglePin(link, card) {
+async function togglePin(link) {
     try {
         const updatedLink = await apiCall(
             `/api/link/${encodeURIComponent(link.linkName)}/pin`,
@@ -1083,22 +1108,12 @@ async function togglePin(link, card) {
         );
         if (!updatedLink) return;
 
-        // Update state
+        // Update state; filterAndSort() below re-renders the card.
         const idx = STATE.wallpapers.findIndex(wp => wp.linkName === link.linkName);
         if (idx !== -1) {
             STATE.wallpapers[idx] = updatedLink;
         }
         link.pinned = updatedLink.pinned;
-
-        // Update UI
-        const pinBtn = card.querySelector('.pin-btn');
-        if (pinBtn) {
-            pinBtn.classList.toggle('pinned', updatedLink.pinned);
-            const ariaKey = updatedLink.pinned ? 'aria_unpin' : 'aria_pin';
-            const ariaLabel = t(ariaKey, updatedLink.pinned ? 'Unpin this link' : 'Pin this link to top');
-            pinBtn.setAttribute('aria-label', ariaLabel);
-            pinBtn.title = ariaLabel;
-        }
 
         // Show toast
         const msgKey = updatedLink.pinned ? 'pinned' : 'unpinned';
@@ -1127,7 +1142,7 @@ function setupPinButton(card, link) {
     pinBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        togglePin(link, card);
+        togglePin(link);
     });
 }
 
@@ -1189,19 +1204,17 @@ function renderLinks(wallpapers) {
 function detectCategory(link) {
     const mime = link.mimeType || '';
     if (mime === 'mp4' || mime === 'webm') return 'video';
-    if (mime) return 'image';
-    const ext = (link.imageUrl || '').split('.').pop().toLowerCase();
-    if (ext === 'mp4' || ext === 'webm') return 'video';
-    if (ext) return 'image';
-    return 'other';
+    return mime || link.hasImage ? 'image' : 'other';
 }
 
 
-function createLazyImage(src, alt = 'Image', className = 'preview', errorMsg) {
+const LAZY_PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"%3E%3C/svg%3E';
+
+function createLazyImage(src, alt = 'Image', className = 'preview') {
     const img = document.createElement('img');
     if (STATE.lazyObserver) {
         img.dataset.src = src;
-        img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"%3E%3C/svg%3E';
+        img.src = LAZY_PLACEHOLDER;
         STATE.lazyObserver.observe(img);
     } else {
         img.src = src;
@@ -1209,17 +1222,6 @@ function createLazyImage(src, alt = 'Image', className = 'preview', errorMsg) {
     img.alt = alt;
     img.className = className;
     img.loading = 'lazy';
-    if (errorMsg) {
-        img.onerror = () => {
-            const parent = img.parentElement;
-            if (!parent) return;
-            parent.textContent = '';
-            const d = document.createElement('div');
-            d.className = 'no-image';
-            d.textContent = errorMsg || '';
-            parent.appendChild(d);
-        };
-    }
     return img;
 }
 
@@ -1293,15 +1295,10 @@ function setupInlineRename(card, link) {
                 );
                 if (!updated) throw new Error('Empty response');
 
-                // Sync state
+                // Sync state; filterAndSort() below re-renders the card.
                 const idx = STATE.wallpapers.findIndex(wp => wp.linkName === currentName);
                 if (idx !== -1) STATE.wallpapers[idx] = updated;
                 link.linkName = updated.linkName;
-
-                // Re-render copy button URL
-                updateCard(card, updated);
-                setupInlineRename(card, updated);
-                setupPinButton(card, updated);
 
                 const msg = t('renamed_success', 'Renamed to "{{name}}"').replace('{{name}}', updated.linkName);
                 showToast(msg, 'success');
@@ -1382,7 +1379,8 @@ function setupAccessControl(card, link) {
     const label = document.createElement('label');
     label.className = 'access-label';
     label.textContent = t('access_label', 'Access');
-    label.setAttribute('for', `access-${CSS.escape(link.linkName || link.id)}`);
+    // htmlFor takes a plain id (CSS.escape is only for selectors).
+    label.htmlFor = `access-${link.linkName || link.id}`;
 
     const select = document.createElement('select');
     select.className = 'access-select';
@@ -1492,13 +1490,11 @@ function setupAccessControl(card, link) {
     }
 }
 
+// Keep the "open" link and the Copy URL button in sync with access changes.
 function updateCopyURL(card, link) {
     const fullUrl = publicLinkURL(link);
     const previewLink = card.querySelector('.preview-link');
     if (previewLink) previewLink.href = fullUrl;
-    const copyBtn = card.querySelector('.copy-url-btn');
-    if (!copyBtn) return;
-    // Re-bind is handled in updateCard; just ensure dataset for fallbacks
     card.dataset.publicUrl = fullUrl;
 }
 
@@ -1514,6 +1510,7 @@ function updateCard(card, link) {
     card.dataset.linkName = linkName;
 
     const fullUrl = publicLinkURL(link);
+    card.dataset.publicUrl = fullUrl;
 
     const previewLink = card.querySelector('.preview-link');
     previewLink.href = fullUrl;
@@ -1526,8 +1523,7 @@ function updateCard(card, link) {
     if (link.mimeType) {
         fileType = link.mimeType.toUpperCase();
     } else if (link.hasImage) {
-        const ext = (link.imageUrl || '').split('.').pop();
-        fileType = ext ? ext.toUpperCase() : 'IMAGE';
+        fileType = 'IMAGE';
     } else {
         fileType = t('no_image', 'No image');
     }
@@ -1621,7 +1617,9 @@ function updateCard(card, link) {
 
     newCopyBtn.onclick = (e) => {
         e.preventDefault();
-        copyToClipboard(fullUrl).then(() => {
+        // Read the URL at click time: access level changes and token
+        // rotation update it after this handler was bound.
+        copyToClipboard(card.dataset.publicUrl || fullUrl).then(() => {
             if (copyResetTimer) clearTimeout(copyResetTimer);
 
             newCopyBtn.classList.add('copied');
@@ -1682,7 +1680,7 @@ function setupCardEvents(card, link) {
 
     fileInput.onchange = async () => {
         if (!fileInput.files.length) return;
-        await handleUpload(link, fileInput.files[0], card);
+        await handleUpload(link, fileInput.files[0]);
         fileInput.value = '';
     };
 
@@ -1690,14 +1688,14 @@ function setupCardEvents(card, link) {
         dropdown.classList.remove('open');
         toggleBtn.setAttribute('aria-expanded', 'false');
         const url = await showModal('input', 'enter_image_url_title', 'url_placeholder');
-        if (url) await handleUpload(link, url, card, true);
+        if (url) await handleUpload(link, url, true);
     });
 
     card.querySelector('.select-server-btn').addEventListener('click', async () => {
         dropdown.classList.remove('open');
         toggleBtn.setAttribute('aria-expanded', 'false');
         const filename = await showModal('grid', 'select_server_title');
-        if (filename) await handleUpload(link, filename, card, true);
+        if (filename) await handleUpload(link, filename, true);
     });
 
     card.ondragover = e => { e.preventDefault(); card.classList.add('drag-over'); };
@@ -1705,7 +1703,7 @@ function setupCardEvents(card, link) {
     card.ondrop = async e => {
         e.preventDefault();
         card.classList.remove('drag-over');
-        if (e.dataTransfer.files.length) await handleUpload(link, e.dataTransfer.files[0], card);
+        if (e.dataTransfer.files.length) await handleUpload(link, e.dataTransfer.files[0]);
     };
 
     card.querySelector('.delete-btn').onclick = async () => {
@@ -1747,7 +1745,7 @@ function setupCardEvents(card, link) {
 }
 
 
-async function handleUpload(link, fileOrUrl, card, isUrl = false) {
+async function handleUpload(link, fileOrUrl, isUrl = false) {
     const formData = new FormData();
     formData.append('linkName', link.linkName);
 
@@ -1784,8 +1782,7 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
         const idx = STATE.wallpapers.findIndex(wp => wp.linkName === updatedLink.linkName);
         if (idx !== -1) STATE.wallpapers[idx] = updatedLink;
         else STATE.wallpapers.push(updatedLink);
-        updateCard(card, updatedLink);
-        setupPinButton(card, updatedLink);
+        // Re-rendering replaces the card with one built from the new data.
         filterAndSort();
         showToast(t('upload_success', 'Uploaded!'), 'success');
     } catch (_) {}
@@ -1806,23 +1803,17 @@ function setupGlobalListeners() {
         const btn = DOM.createForm.querySelector('[type="submit"]');
         if (btn) btn.disabled = true;
         try {
-            await apiCall('/api/link', 'POST', { linkName: id });
+            const created = await apiCall('/api/link', 'POST', { linkName: id });
             DOM.createInput.value = '';
             // Return focus to input so user can create next link immediately
             DOM.createInput.focus();
-            const newLinkObj = {
+            STATE.wallpapers.push(created || {
                 linkName: id,
                 hasImage: false,
-                mimeType: '',
-                sizeBytes: 0,
                 createdAt: Math.floor(Date.now() / 1000),
-                imageUrl: '',
-                preview: '',
                 pinned: false,
                 accessLevel: 'public',
-                accessToken: '',
-            };
-            STATE.wallpapers.push(newLinkObj);
+            });
             filterAndSort();
             const newCard = DOM.linksList.querySelector(`[data-link-name="${CSS.escape(id)}"]`)
                 ?? DOM.linksList.lastElementChild;

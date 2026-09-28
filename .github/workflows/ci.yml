@@ -5,72 +5,115 @@ on:
     branches: [ improvements, main ]
   pull_request:
 
+# Least privilege: the workflow only reads the repository. Docker Hub
+# credentials come from repository secrets and are used on main only.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The two supported Go releases; go.mod declares the minimum (1.26).
+        go: [ oldstable, stable ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          persist-credentials: false
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.25'
+          go-version: ${{ matrix.go }}
 
-      - name: Download dependencies
-        run: go mod download
+      - name: Verify dependencies
+        run: |
+          go mod download
+          go mod verify
+
+      - name: Check formatting
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "Run gofmt -w on:"; echo "$unformatted"; exit 1
+          fi
 
       - name: Vet
         run: go vet ./...
 
       - name: Test
-        run: go test -v -race ./...
+        run: go test -race -count=1 ./...
 
       - name: Build
-        run: |
-          VERSION=$(cat VERSION)
-          go build -ldflags="-X main.Version=${VERSION}" ./...
+        run: go build -trimpath -ldflags="-X main.Version=$(cat VERSION)" -o /dev/null .
 
-  docker:
-    needs: test
+      - name: Vulnerability check
+        if: matrix.go == 'stable'
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+
+  frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          persist-credentials: false
 
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: lts/*
+
+      - name: Syntax check
+        run: for f in static/js/*.js static/sw.js; do node --check "$f"; done
+
+      - name: Unit tests
+        run: node --test tests/*.test.cjs
+
+  docker:
+    needs: [ test, frontend ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Read version
         id: version
-        run: echo "VERSION=$(cat VERSION)" >> $GITHUB_OUTPUT
+        run: echo "VERSION=$(cat VERSION)" >> "$GITHUB_OUTPUT"
 
       - name: Login to Docker Hub
-        if: github.ref == 'refs/heads/main'
-        uses: docker/login-action@v3
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Build once for amd64, load into local Docker daemon for smoke-test.
-      # Cache layers are stored in /tmp/.buildx-cache and reused by the push step.
+      # Build once for amd64, load into the local Docker daemon for a smoke
+      # test. Cache layers are stored in /tmp/.buildx-cache and reused below.
       - name: Build (amd64) & smoke-test
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
           docker buildx build \
             --platform linux/amd64 \
-            --build-arg VERSION="${{ steps.version.outputs.VERSION }}" \
+            --build-arg VERSION="${VERSION}" \
             --cache-to   type=local,dest=/tmp/.buildx-cache,mode=max \
             --cache-from type=local,src=/tmp/.buildx-cache \
             -t lanpaper:test --load .
 
           docker run -d --name lp_test -p 8080:8080 lanpaper:test
 
-          # Wait up to 30 s for /health instead of a fixed sleep
           echo "Waiting for container to be ready..."
           for i in $(seq 1 15); do
-            if curl -sf http://localhost:8080/health > /dev/null 2>&1; then
-              echo "Container is healthy after ${i}s"
+            if curl -sf http://localhost:8080/health | grep -q "\"version\":\"${VERSION}\""; then
+              echo "Container is healthy after $((i * 2))s"
               break
             fi
             if [ "$i" -eq 15 ]; then
@@ -81,14 +124,17 @@ jobs:
             fi
             sleep 2
           done
+          # Without credentials the admin API must fail closed.
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/wallpapers)" = "503"
 
           docker rm -f lp_test
 
       # On main: rebuild for amd64+arm64 and push, reusing the cache from above.
       - name: Push to Docker Hub
-        if: github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
-          VERSION="${{ steps.version.outputs.VERSION }}"
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             --build-arg VERSION="${VERSION}" \

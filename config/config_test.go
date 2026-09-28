@@ -250,3 +250,32 @@ func TestAuthRequiresExplicitDisable(t *testing.T) {
 		})
 	}
 }
+
+func TestEnvParsingKeepsPreviousValueOnTypos(t *testing.T) {
+	t.Setenv("LANPAPER_TEST_INT", "not-a-number")
+	t.Setenv("LANPAPER_TEST_BOOL", "yes please")
+	n, b := 42, true
+	envInt("LANPAPER_TEST_INT", &n)
+	envBool("LANPAPER_TEST_BOOL", &b)
+	if n != 42 || !b {
+		t.Fatalf("invalid values must be ignored, got %d %v", n, b)
+	}
+	t.Setenv("LANPAPER_TEST_INT", " 7 ")
+	t.Setenv("LANPAPER_TEST_BOOL", "false")
+	envInt("LANPAPER_TEST_INT", &n)
+	envBool("LANPAPER_TEST_BOOL", &b)
+	if n != 7 || b {
+		t.Fatalf("valid values not applied, got %d %v", n, b)
+	}
+}
+
+func TestProxyCredentialAliasesPreferLongNames(t *testing.T) {
+	t.Chdir(t.TempDir()) // no config.json
+	t.Setenv("PROXY_USER", "short-user")
+	t.Setenv("PROXY_USERNAME", "long-user")
+	t.Setenv("PROXY_PASS", "short-pass")
+	Load()
+	if Current.ProxyUsername != "long-user" || Current.ProxyPassword != "short-pass" {
+		t.Fatalf("proxy credentials = %q/%q", Current.ProxyUsername, Current.ProxyPassword)
+	}
+}

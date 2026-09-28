@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"encoding/json"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -131,10 +133,7 @@ func pageWindow(page, pageSize, total int) (start, end int) {
 		return total, total
 	}
 	start = (page - 1) * pageSize
-	end = start + pageSize
-	if end > total {
-		end = total
-	}
+	end = min(start+pageSize, total)
 	return
 }
 
@@ -171,7 +170,7 @@ func inferCategory(wp *storage.Wallpaper) string {
 	if wp.Category != "" {
 		return wp.Category
 	}
-	if wp.MIMEType == "mp4" || wp.MIMEType == "webm" {
+	if config.IsVideoExt(wp.MIMEType) {
 		return "video"
 	}
 	if wp.HasImage {
@@ -181,7 +180,7 @@ func inferCategory(wp *storage.Wallpaper) string {
 }
 
 func toResponse(wp *storage.Wallpaper) WallpaperResponse {
-	ensureAccessDefaults(wp)
+	wp.AccessLevel = storage.NormalizeAccessLevel(wp.AccessLevel)
 	resp := WallpaperResponse{
 		ID:          wp.ID,
 		LinkName:    wp.LinkName,
@@ -279,66 +278,52 @@ func AdminPreview(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, filepath.Base(f.Name()), fi.ModTime(), f)
 }
 
-// ExternalImages enumerates gallery files without following directory symlinks.
-// Hard caps bound disk walk time and JSON memory when a mounted gallery is huge.
+// ExternalImages enumerates gallery files. The walk runs inside an os.Root,
+// so symlinked files are listed only if they resolve inside the gallery, and
+// symlinked directories are never descended into. Hard caps bound disk walk
+// time and JSON memory when a mounted gallery is huge.
 func ExternalImages(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	root, err := filepath.EvalSymlinks(config.Current.ExternalImageDir)
+	root, err := os.OpenRoot(config.Current.ExternalImageDir)
 	if err != nil {
 		jsonEmpty(w)
 		return
 	}
-	root, err = filepath.Abs(root)
-	if err != nil {
-		jsonEmpty(w)
-		return
-	}
+	defer root.Close()
+	gallery := root.FS()
 
 	const maxEntries = 20000
 	const maxFiles = 5000
 	visited := 0
 	maxDepth := config.Current.MaxWalkDepth
+	maxSize := int64(config.Current.MaxUploadMB) << 20
 	files := make([]string, 0)
-	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+	_ = fs.WalkDir(gallery, ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
 		visited++
 		if visited > maxEntries || len(files) >= maxFiles {
-			return filepath.SkipAll
+			return fs.SkipAll
 		}
 		if d.IsDir() {
-			if path != root {
-				if strings.HasPrefix(d.Name(), ".") {
-					return filepath.SkipDir
-				}
-				rel, err := filepath.Rel(root, path)
-				if err != nil || len(strings.Split(rel, string(filepath.Separator))) > maxDepth {
-					return filepath.SkipDir
-				}
+			if p != "." && (strings.HasPrefix(d.Name(), ".") || strings.Count(p, "/")+1 > maxDepth) {
+				return fs.SkipDir
 			}
 			return nil
 		}
-		if strings.HasPrefix(d.Name(), ".") || !config.AllowedMediaExts[strings.ToLower(filepath.Ext(d.Name()))] {
+		if strings.HasPrefix(d.Name(), ".") || !config.AllowedMediaExts[strings.ToLower(path.Ext(p))] {
 			return nil
 		}
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
+		// Stat follows a symlink only within the root and reports the target.
+		fi, err := fs.Stat(gallery, p)
+		if err != nil || !fi.Mode().IsRegular() || fi.Size() > maxSize {
 			return nil
 		}
-		f, err := utils.OpenExternalFile(root, rel)
-		if err != nil {
-			return nil
-		}
-		fi, statErr := f.Stat()
-		f.Close()
-		if statErr != nil || fi.Size() > int64(config.Current.MaxUploadMB)<<20 {
-			return nil
-		}
-		files = append(files, filepath.ToSlash(rel))
+		files = append(files, p)
 		return nil
 	})
 	w.Header().Set("Content-Type", "application/json")

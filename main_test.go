@@ -475,3 +475,57 @@ func TestStaticAllowlistCoversApplicationAssets(t *testing.T) {
 		}
 	}
 }
+
+func TestAppExternalGalleryListing(t *testing.T) {
+	a := setupApp(t)
+	pngBytes := makePNG(t, color.RGBA{B: 255, A: 255})
+	files := map[string][]byte{
+		"a.png":                      pngBytes,
+		".hidden.png":                pngBytes,
+		".hiddendir/b.png":           pngBytes,
+		"d1/d2/d3/deep.png":          pngBytes, // depth 3: allowed with MaxWalkDepth 3
+		"d1/d2/d3/d4/too-deep.png":   pngBytes,
+		"notes.txt":                  []byte("not media"),
+		"clips/holiday.mp4":          []byte("\x00\x00\x00\x18ftypisom\x00\x00\x02\x00isomiso2"),
+		"clips/.partial/unused.webm": pngBytes,
+	}
+	for name, data := range files {
+		path := filepath.Join("external/images", name)
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, data, 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	big, err := os.Create("external/images/big.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := big.Truncate(int64(config.Current.MaxUploadMB)<<20 + 1); err != nil {
+		t.Fatal(err)
+	}
+	big.Close()
+	for link, target := range map[string]string{
+		"external/images/escape.png":      "../../data/wallpapers.json", // leaves the gallery
+		"external/images/inside-link.png": "a.png",                      // stays inside
+		"external/images/dirlink":         "d1",                         // directory symlink: not descended
+	} {
+		if err := os.Symlink(target, link); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var listed []string
+	if err := json.Unmarshal(a.expect(http.StatusOK, "GET", "/api/external-images", nil, true, nil), &listed); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"a.png", "clips/holiday.mp4", "d1/d2/d3/deep.png", "inside-link.png"}
+	if strings.Join(listed, ",") != strings.Join(want, ",") {
+		t.Fatalf("gallery listing = %q, want %q", listed, want)
+	}
+	// A missing gallery directory yields an empty list, not an error.
+	config.Current.ExternalImageDir = "does-not-exist"
+	if got := strings.TrimSpace(string(a.expect(http.StatusOK, "GET", "/api/external-images", nil, true, nil))); got != "[]" {
+		t.Fatalf("missing gallery = %s, want []", got)
+	}
+}

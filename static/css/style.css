@@ -1277,7 +1277,8 @@ body.dark .access-select {
 
 .image-option:hover { border-color: var(--border-hover); }
 
-.image-option img {
+.image-option img,
+.image-option video {
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -1772,9 +1773,13 @@ body.dark .access-select {
         border-bottom: 1px solid var(--border);
     }
 
+    /* Full card width for the info block and its rows: shrink-wrapped rows
+       would grow with a long token or link name and overflow the card
+       instead of truncating with an ellipsis. */
     .link-card .link-info {
         padding: 2px 14px 0;
-        align-items: flex-start;
+        align-self: stretch;
+        align-items: stretch;
     }
 
     .link-card .actions-row {

@@ -1,69 +1,68 @@
 # --- Stage 1: Builder ---
-FROM golang:1.26-alpine AS builder
+FROM golang:1.27-alpine AS builder
 
-RUN apk add --no-cache git gcc musl-dev
+# gcc/musl-dev: CGO is required by the WebP encoder (github.com/chai2010/webp).
+RUN apk add --no-cache gcc musl-dev
 
-WORKDIR /app
+WORKDIR /src
 
 COPY go.mod go.sum ./
-
-# Use cache mount for faster dependency downloads
 RUN --mount=type=cache,target=/go/pkg/mod \
-    go mod download
+    go mod download && go mod verify
 
 COPY . .
 
 ARG VERSION=dev
 
-# Use cache mounts for faster builds
+# Static binary: no shared libraries are needed at runtime.
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=1 GOOS=linux go build \
+    CGO_ENABLED=1 GOOS=linux go build -trimpath -buildvcs=false \
     -ldflags="-s -w -X main.Version=${VERSION} -extldflags '-static'" \
-    -o lanpaper .
+    -o /out/lanpaper .
 
 # --- Stage 2: Runner ---
 FROM alpine:3.24
 
-# ca-certificates for HTTPS; wget is provided by busybox (already in Alpine)
-# and is used only for the HEALTHCHECK — no extra packages needed.
-RUN apk --no-cache add ca-certificates
+ARG VERSION=dev
+LABEL org.opencontainers.image.title="Lanpaper" \
+      org.opencontainers.image.description="Self-hosted wallpaper and media link server" \
+      org.opencontainers.image.source="https://github.com/zoixc/lanpaper" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.version="${VERSION}"
 
-# Run as non-root user for security
-RUN addgroup -S lanpaper && adduser -S lanpaper -G lanpaper
+# ca-certificates for outbound HTTPS downloads. wget (used by HEALTHCHECK)
+# is part of busybox in the base image. The fixed IDs (uid 100, gid 101) match
+# earlier images; bind-mounted data directories must be writable by them.
+RUN apk add --no-cache ca-certificates \
+    && addgroup -S -g 101 lanpaper && adduser -S -u 100 -G lanpaper lanpaper
 
 WORKDIR /app
 
-COPY --from=builder /app/lanpaper .
+COPY --from=builder /out/lanpaper .
 COPY admin.html .
 COPY static ./static
 
-# Verify critical static files exist
-RUN echo "Verifying static files..." && \
-    for f in \
-      static/css/style.css \
-      static/js/app.js \
-      static/js/compressor.js \
-      static/js/settings-menu.js \
-      static/js/export-import.js \
-      static/sw.js \
-      static/manifest.json \
-      static/logo.svg \
-      static/favicon.svg \
-      static/i18n/en.json \
-      static/icons/icon-512.png \
-    ; do test -f "$f" || (echo "ERROR: $f missing!" && exit 1) || exit 1; done && \
-    echo "✓ All critical static files present" && \
-    ls -lh static/css/ static/js/ static/*.svg
+# Fail the build early if an application asset is missing.
+RUN for f in \
+      static/css/style.css static/js/app.js static/js/compressor.js \
+      static/js/settings-menu.js static/js/export-import.js static/sw.js \
+      static/manifest.json static/logo.svg static/favicon.svg \
+      static/i18n/en.json static/icons/icon-512.png ; \
+    do test -f "$f" || { echo "ERROR: $f missing" >&2; exit 1; }; done
 
-RUN mkdir -p data/media data/previews static/images/previews external/images \
-    && chown -R lanpaper:lanpaper /app
+# Application code and assets stay root-owned (read-only for the service);
+# only the runtime directories are writable by the unprivileged user.
+RUN mkdir -p data/media data/previews external/images static/images/previews \
+    && chown -R lanpaper:lanpaper data external static/images \
+    && chmod 700 data
 
 USER lanpaper
 
 EXPOSE 8080
 
+# Honours a custom PORT (with or without a leading colon).
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget -qO- http://localhost:8080/health || exit 1
+  CMD p="${PORT:-8080}"; wget -qO- "http://127.0.0.1:${p#:}/health" || exit 1
 
 CMD ["./lanpaper"]
