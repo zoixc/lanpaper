@@ -1,12 +1,12 @@
 /**
  * Settings Menu Control
- * Manages dropdown menu with language selection and export/import
+ * Manages the dropdown with language selection, data tools and app actions.
+ * Outside clicks and Escape are handled centrally in app.js.
  */
 
 (function() {
     'use strict';
 
-    // Initialize after DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initSettingsMenu);
     } else {
@@ -20,31 +20,16 @@
 
         if (!settingsDropdown || !settingsBtn || !langOptions) return;
 
-        // Toggle dropdown with proper open/close behavior
         settingsBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             const isOpen = settingsDropdown.classList.contains('open');
-            
-            // Close ALL dropdowns first (using global function from app.js)
+            // Close ALL dropdowns first (global helper from app.js), then
+            // re-open this one unless the click was meant to close it.
             if (typeof window.closeAllDropdowns === 'function') {
                 window.closeAllDropdowns(isOpen ? null : settingsDropdown);
             }
-            
-            // If it was closed, open it now
-            if (!isOpen) {
-                settingsDropdown.classList.add('open');
-                settingsBtn.setAttribute('aria-expanded', 'true');
-            } else {
-                // If it was open, keep it closed (already closed by closeAllDropdowns)
-                settingsBtn.setAttribute('aria-expanded', 'false');
-            }
-        });
-
-        // Close dropdown when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!settingsDropdown.contains(e.target) && e.target !== settingsBtn) {
-                closeSettingsDropdown();
-            }
+            settingsDropdown.classList.toggle('open', !isOpen);
+            settingsBtn.setAttribute('aria-expanded', String(!isOpen));
         });
 
         populateLanguageOptions();
@@ -54,51 +39,36 @@
         const langOptions = document.getElementById('langOptions');
         if (!langOptions) return;
 
-        const LANGS = {
-            'en': 'EN',
-            'ru': 'RU',
-            'de': 'DE',
-            'fr': 'FR',
-            'it': 'IT',
-            'es': 'ES'
-        };
-        
+        const LANGS = ['en', 'ru', 'de', 'fr', 'it', 'es'];
         const currentLang = localStorage.getItem('lang') || 'en';
-        
-        Object.entries(LANGS).forEach(([code, label]) => {
+
+        LANGS.forEach((code) => {
             const btn = document.createElement('button');
             btn.className = 'lang-option';
-            btn.textContent = label;
+            btn.textContent = code.toUpperCase();
             btn.dataset.lang = code;
             btn.type = 'button';
-            
+            btn.setAttribute('aria-label', code.toUpperCase());
+
             if (code === currentLang) btn.classList.add('active');
-            
+
             btn.addEventListener('click', async (e) => {
                 e.stopPropagation();
-                
+
                 document.querySelectorAll('.lang-option').forEach(opt => opt.classList.remove('active'));
                 btn.classList.add('active');
-                
+
                 if (typeof window.setLanguage === 'function') {
                     await window.setLanguage(code);
                 } else {
                     localStorage.setItem('lang', code);
                     location.reload();
                 }
-                
-                closeSettingsDropdown();
+
+                if (typeof window.closeAllDropdowns === 'function') window.closeAllDropdowns();
             });
-            
+
             langOptions.appendChild(btn);
         });
-    }
-
-    function closeSettingsDropdown() {
-        const settingsDropdown = document.getElementById('settingsDropdown');
-        const settingsBtn = document.getElementById('settingsBtn');
-        
-        settingsDropdown?.classList.remove('open');
-        settingsBtn?.setAttribute('aria-expanded', 'false');
     }
 })();

@@ -3,25 +3,29 @@
 <head>
   <meta charset="utf-8">
   <title>Lanpaper</title>
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <meta name="description" content="Self-hosted wallpaper, image sharing and URL shortening for your network.">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <link rel="stylesheet" href="/static/css/style.css">
-  <link rel="stylesheet" href="/static/css/skeleton.css">
-  <link rel="stylesheet" href="/static/css/settings-menu.css">
-  <link rel="manifest" href="/static/manifest.json">
-  <!-- theme-color: respects system preference before JS loads -->
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#1c1c20" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Lanpaper">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <!-- theme-color: respects system preference before JS loads -->
+  <meta name="theme-color" content="#f4f1ec" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#131315" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="preload" href="/static/fonts/Rubik.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-  <div class="network-bg"></div>
+  <div class="network-bg" aria-hidden="true"></div>
 
   <!-- Drop Overlay -->
-  <div id="dropOverlay" class="drop-overlay hidden">
+  <div id="dropOverlay" class="drop-overlay hidden" aria-hidden="true">
     <div class="drop-overlay-content">
-      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
         <polyline points="17 8 12 3 7 8"/>
         <line x1="12" y1="3" x2="12" y2="15"/>
@@ -36,13 +40,15 @@
     <!-- Header -->
     <header class="header-row">
       <div class="logo-wrapper">
-        <img src="/static/logo.svg" alt="Lanpaper" class="logo" width="120" height="40">
+        <img src="/static/logo.svg" alt="Lanpaper" class="logo" width="160" height="34">
       </div>
       <div class="controls">
         <div id="settingsDropdown" class="settings-dropdown">
-          <button id="settingsBtn" class="theme-switcher" aria-label="Settings" data-i18n-aria="aria_settings" aria-expanded="false" aria-haspopup="true">
-            <img src="/static/icons/settings.webp" class="settings-icon dark-theme-icon" alt="Settings" width="18" height="18">
-            <img src="/static/icons/settings-dark.webp" class="settings-icon light-theme-icon" alt="Settings" width="18" height="18">
+          <button id="settingsBtn" class="icon-btn" aria-label="Settings" data-i18n-aria="aria_settings" aria-expanded="false" aria-haspopup="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
           </button>
           <div class="settings-menu">
             <div class="settings-section">
@@ -52,18 +58,18 @@
             <div class="settings-section">
               <div class="settings-section-title" data-i18n="settings_data">Data</div>
               <button class="settings-menu-item" id="exportBtn" type="button">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="7 10 12 15 17 10"></polyline>
-                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
                 <span data-i18n="export_json">Export</span>
               </button>
               <button class="settings-menu-item" id="importBtn" type="button">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="17 8 12 3 7 8"></polyline>
-                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
                 </svg>
                 <span data-i18n="import_json">Import</span>
               </button>
@@ -71,37 +77,70 @@
             <div class="settings-section">
               <div class="settings-section-title" data-i18n="settings_maintenance">Maintenance</div>
               <button class="settings-menu-item" id="regenPreviewsBtn" type="button">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <polyline points="23 4 23 10 17 10"/>
                   <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
                 </svg>
                 <span data-i18n="regen_previews">Regenerate Previews</span>
               </button>
+              <button class="settings-menu-item" id="installBtn" type="button" hidden>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="3" y="3" width="18" height="18" rx="4"/>
+                  <line x1="12" y1="8" x2="12" y2="14"/>
+                  <polyline points="9 11 12 14 15 11"/>
+                  <line x1="8" y1="17" x2="16" y2="17"/>
+                </svg>
+                <span data-i18n="install_app">Install app</span>
+              </button>
             </div>
           </div>
         </div>
 
-        <button id="viewToggle" class="theme-switcher" aria-label="Toggle view" data-i18n-aria="aria_toggle_view">
-          <img src="/static/icons/grid-dark.png" class="view-icon list-icon light-theme-icon" alt="List">
-          <img src="/static/icons/grid-light.png" class="view-icon list-icon dark-theme-icon" alt="List">
-          <img src="/static/icons/list-dark.png" class="view-icon grid-icon light-theme-icon active" alt="Grid">
-          <img src="/static/icons/list-light.png" class="view-icon grid-icon dark-theme-icon active" alt="Grid">
+        <button id="viewToggle" class="icon-btn" aria-label="Toggle view" data-i18n-aria="aria_toggle_view">
+          <svg class="view-icon list-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1.5"/>
+            <rect x="14" y="3" width="7" height="7" rx="1.5"/>
+            <rect x="14" y="14" width="7" height="7" rx="1.5"/>
+            <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+          </svg>
+          <svg class="view-icon grid-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="8" y1="6" x2="21" y2="6"/>
+            <line x1="8" y1="12" x2="21" y2="12"/>
+            <line x1="8" y1="18" x2="21" y2="18"/>
+            <line x1="3" y1="6" x2="3.01" y2="6"/>
+            <line x1="3" y1="12" x2="3.01" y2="12"/>
+            <line x1="3" y1="18" x2="3.01" y2="18"/>
+          </svg>
         </button>
 
-        <button id="themeToggle" class="theme-switcher" aria-label="Toggle dark mode" data-i18n-aria="aria_toggle_theme">
-          <img src="/static/icons/sun.png" alt="Dark" class="theme-icon active">
-          <img src="/static/icons/moon.png" alt="Light" class="theme-icon">
+        <button id="themeToggle" class="icon-btn" aria-label="Toggle dark mode" data-i18n-aria="aria_toggle_theme">
+          <svg class="theme-icon" data-icon="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4.5"/>
+            <line x1="12" y1="1.5" x2="12" y2="3.5"/>
+            <line x1="12" y1="20.5" x2="12" y2="22.5"/>
+            <line x1="4.6" y1="4.6" x2="6" y2="6"/>
+            <line x1="18" y1="18" x2="19.4" y2="19.4"/>
+            <line x1="1.5" y1="12" x2="3.5" y2="12"/>
+            <line x1="20.5" y1="12" x2="22.5" y2="12"/>
+            <line x1="4.6" y1="19.4" x2="6" y2="18"/>
+            <line x1="18" y1="6" x2="19.4" y2="4.6"/>
+          </svg>
+          <svg class="theme-icon" data-icon="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
         </button>
       </div>
     </header>
 
-    <!-- Create + Search/Sort merged toolbar -->
+    <!-- Create + Search/Sort toolbar -->
     <div class="toolbar-section">
       <form class="create-row" id="createForm">
         <input type="text" id="newLinkId" class="input-field"
                data-i18n-placeholder="input_placeholder"
                placeholder="Link ID (letters, numbers, - or _)"
                autocomplete="off"
+               autocapitalize="off"
+               spellcheck="false"
                pattern="[a-zA-Z0-9_\-]+"
                maxlength="64"
                aria-label="Link ID"
@@ -125,6 +164,7 @@
             class="search-input"
             data-i18n-placeholder="search_placeholder"
             placeholder="Search by link name or file..."
+            autocomplete="off"
             aria-label="Search wallpapers"
             data-i18n-aria="aria_search"
           >
@@ -135,7 +175,7 @@
           <div class="custom-select" id="customSortSelect">
             <button class="custom-select-btn" aria-haspopup="listbox" aria-expanded="false">
               <span id="customSortLabel" data-i18n="date_new">Newest first</span>
-              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M1 1l4 4 4-4"/>
               </svg>
             </button>
@@ -146,7 +186,7 @@
               <div class="custom-select-option" data-value="date_asc" data-i18n="date_old">Oldest first</div>
             </div>
           </div>
-          <select id="sortSelect" class="sort-select" aria-hidden="true">
+          <select id="sortSelect" class="sort-select" aria-hidden="true" tabindex="-1">
             <option value="name_asc" data-i18n="name_asc">Name (A-Z)</option>
             <option value="name_desc" data-i18n="name_desc">Name (Z-A)</option>
             <option value="date_desc" selected data-i18n="date_new">Newest first</option>
@@ -175,7 +215,7 @@
 
     <footer class="footer">
       <a href="https://github.com/zoixc/lanpaper" target="_blank" rel="noopener noreferrer" class="github-link">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
         </svg>
         GitHub | <span id="appVersion">v...</span>
@@ -187,7 +227,7 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- Modal -->
-  <div id="modalOverlay" class="modal-overlay hidden" aria-modal="true" role="dialog">
+  <div id="modalOverlay" class="modal-overlay hidden" aria-modal="true" role="dialog" aria-hidden="true">
     <div class="modal">
       <h3 id="modalTitle" data-i18n="modal_default_title">Input</h3>
       <div class="modal-body" id="modalBody">
@@ -202,7 +242,7 @@
   </div>
 
   <!-- Confirm Delete Modal -->
-  <div id="confirmOverlay" class="modal-overlay hidden" aria-modal="true" role="alertdialog">
+  <div id="confirmOverlay" class="modal-overlay hidden" aria-modal="true" role="alertdialog" aria-hidden="true">
     <div class="modal">
       <h3 id="confirmTitle" data-i18n="confirm_delete_title">Delete link?</h3>
       <div class="modal-body">
@@ -221,20 +261,17 @@
 
       <a class="preview-link" target="_blank" rel="noopener noreferrer" aria-label="Open image">
         <div class="preview-wrapper">
-          <!-- Pin button - Bookmark icon -->
+          <!-- Pin button -->
           <button class="pin-btn" aria-label="Pin this link" data-i18n-aria="aria_pin" title="Pin">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
             </svg>
           </button>
           <!-- Shown only when no image is set -->
           <div class="no-image">
             <svg class="no-image-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <!-- mountains -->
               <path d="M8 48 L24 24 L36 38 L44 28 L56 48 Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
-              <!-- sun -->
               <circle cx="46" cy="18" r="5" stroke="currentColor" stroke-width="2" fill="none"/>
-              <!-- frame -->
               <rect x="6" y="8" width="52" height="44" rx="4" stroke="currentColor" stroke-width="2" fill="none"/>
             </svg>
           </div>
@@ -246,7 +283,7 @@
           <div class="link-id" aria-label="Link ID"></div>
           <button class="copy-url-btn" aria-label="Copy URL" title="Copy URL">
             <span class="copy-icon">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <rect x="9" y="9" width="13" height="13" rx="2"/>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
               </svg>
@@ -261,13 +298,13 @@
         <div class="upload-dropdown">
           <button class="btn btn--upload upload-toggle-btn" aria-haspopup="true" aria-expanded="false">
             <span data-i18n="set_image">Upload</span>
-            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M1 1l4 4 4-4"/>
             </svg>
           </button>
           <div class="upload-menu">
             <button class="upload-menu-item upload-file-btn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="17 8 12 3 7 8"/>
                 <line x1="12" y1="3" x2="12" y2="15"/>
@@ -276,14 +313,14 @@
             </button>
             <input type="file" class="file-input d-none" accept="image/*,video/mp4,video/webm">
             <button class="upload-menu-item paste-url-btn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
               </svg>
               <span data-i18n="upload_url">URL</span>
             </button>
             <button class="upload-menu-item select-server-btn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <rect x="2" y="2" width="20" height="8" rx="2"/>
                 <rect x="2" y="14" width="20" height="8" rx="2"/>
                 <line x1="6" y1="6" x2="6.01" y2="6"/>
@@ -294,8 +331,8 @@
           </div>
         </div>
 
-        <button class="btn btn--danger delete-btn" aria-label="Delete" title="Delete">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <button class="btn btn--danger delete-btn" aria-label="Delete" title="Delete" data-i18n-aria="delete_btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <polyline points="3 6 5 6 21 6"/>
             <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
             <path d="M10 11v6"/>

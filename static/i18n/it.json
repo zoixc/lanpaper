@@ -76,7 +76,7 @@
   "load_error_hint": "Impossibile caricare i collegamenti — controlla la connessione e aggiorna la pagina.",
   "auth_required": "Autenticazione necessaria — effettua di nuovo l'accesso",
   "forbidden": "Accesso negato",
-  "compression_saved": "🗜️ Compresso: {{percent}}% più piccolo ({{saved}} risparmiati)",
+  "compression_saved": "Compresso: {{percent}}% più piccolo ({{saved}} risparmiati)",
   "rename_hint": "Doppio clic per rinominare",
   "rename_input_label": "Nuovo nome collegamento",
   "aria_open_image": "Apri immagine",
@@ -96,5 +96,7 @@
   "access_updated": "Livello di accesso aggiornato",
   "copy_token": "Copia URL con token",
   "rotate_token": "Rigenera",
-  "token_rotated": "Token rigenerato"
+  "token_rotated": "Token rigenerato",
+  "install_app": "Installa app",
+  "installed": "App installata"
 }

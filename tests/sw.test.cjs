@@ -73,7 +73,10 @@ test('old admin/media caches are purged, only public application assets remain c
   assert.equal(worker.claimed(), true);
 
   await worker.lifecycle('install');
-  const assetCache = worker.stores.get('lanpaper-static-v2');
+  // The cache generation bumps with the precache list — resolve it dynamically.
+  const cacheName = [...worker.stores.keys()].find(name => /^lanpaper-static-v\d+$/.test(name));
+  assert.ok(cacheName, 'install must create a versioned lanpaper-static cache');
+  const assetCache = worker.stores.get(cacheName);
   assert.ok(assetCache.has(worker.origin + '/static/css/style.css'));
   assert.ok(!assetCache.has(worker.origin + '/admin'));
 

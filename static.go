@@ -10,7 +10,7 @@ import (
 // Serve only application assets, never arbitrary files/symlinks placed in
 // static/ (particularly legacy static/images and files on mounted volumes).
 var staticAssets = map[string]bool{
-	"css/style.css": true, "css/skeleton.css": true, "css/settings-menu.css": true,
+	"css/style.css": true,
 	"js/app.js": true, "js/compressor.js": true, "js/export-import.js": true, "js/settings-menu.js": true,
 	"sw.js": true, "manifest.json": true,
 	"favicon.svg": true, "logo.svg": true, "logo-dark.svg": true,
@@ -18,10 +18,8 @@ var staticAssets = map[string]bool{
 	"fonts/Disket/Disket-Mono-Bold.ttf": true, "fonts/Disket/Disket-Mono-Regular.ttf": true,
 	"i18n/en.json": true, "i18n/ru.json": true, "i18n/de.json": true,
 	"i18n/fr.json": true, "i18n/it.json": true, "i18n/es.json": true,
-	"icons/favicon.svg": true, "icons/grid-dark.png": true, "icons/grid-light.png": true,
-	"icons/list-dark.png": true, "icons/list-light.png": true,
-	"icons/moon.png": true, "icons/sun.png": true,
-	"icons/settings.webp": true, "icons/settings-dark.webp": true,
+	"icons/apple-touch-icon.png": true, "icons/icon-192.png": true,
+	"icons/icon-512.png": true, "icons/icon-maskable-512.png": true,
 }
 
 func serveStaticAsset(w http.ResponseWriter, r *http.Request) {

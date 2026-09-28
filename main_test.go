@@ -201,7 +201,9 @@ func TestAppAuthenticationStaticAssetsAndCSRF(t *testing.T) {
 	}
 	a.expect(http.StatusNotFound, "GET", "/static/css/style.css", nil, false, nil)
 	_, h, sw := a.request("GET", "/sw.js", nil, false, nil)
-	if !bytes.Contains(sw, []byte("lanpaper-static-v2")) || h.Get("Service-Worker-Allowed") != "/" {
+	// Match any cache generation: the version bumps whenever the precache
+	// list changes, and the tests must not track that number by hand.
+	if !bytes.Contains(sw, []byte("lanpaper-static-v")) || h.Get("Service-Worker-Allowed") != "/" {
 		t.Fatalf("service worker missing or wrong scope: %v", h)
 	}
 	a.expect(http.StatusMethodNotAllowed, "POST", "/static/sw.js", nil, false, nil)

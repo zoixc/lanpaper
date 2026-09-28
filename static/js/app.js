@@ -118,6 +118,17 @@ window.closeAllDropdowns = function(exceptElement) {
 };
 
 
+// A single delegated listener closes every open dropdown when the user
+// clicks anywhere else. Toggle buttons call stopPropagation(), so opening
+// clicks never reach this; menu item clicks close their own menu.
+function initDropdownCloser() {
+    document.addEventListener('click', (e) => {
+        if (e.target.closest('.upload-dropdown, .custom-select, .settings-dropdown')) return;
+        closeAllDropdowns();
+    });
+}
+
+
 // INITIALIZATION
 // Every step is isolated: one broken API/feature in an exotic browser must
 // never take the rest of the app down with it (in particular the create-link
@@ -149,6 +160,7 @@ function initApp() {
     safeStep('search-sort', initSearchSort);
     safeStep('lazy', initLazyLoading);
     safeStep('shortcuts', initKeyboardShortcuts);
+    safeStep('dropdown-closer', initDropdownCloser);
     safeStep('pwa', initPWA);
     safeStep('drop-zone', setupGlobalDropZone);
     safeStep('drag-hint', showDragDropHint);
@@ -169,20 +181,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 function initPWA() {
-    if (!('serviceWorker' in navigator)) return;
-    // Keep the root-scoped worker to replace older versions that cached
-    // admin pages and public media. The current worker only caches /static/
-    // assets; admin, API and media requests always go to the network.
-    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
-    // Remove the legacy worker from versions that registered it under
-    // /static/ where it never actually controlled the app.
-    navigator.serviceWorker.getRegistrations()
-        .then(regs => regs.forEach(r => {
-            if (new URL(r.scope).pathname.replace(/\/+$/, '') === '/static') {
-                r.unregister();
-            }
-        }))
-        .catch(() => {});
+    if ('serviceWorker' in navigator) {
+        // Keep the root-scoped worker to replace older versions that cached
+        // admin pages and public media. The current worker only caches /static/
+        // assets; admin, API and media requests always go to the network.
+        navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+        // Remove the legacy worker from versions that registered it under
+        // /static/ where it never actually controlled the app.
+        navigator.serviceWorker.getRegistrations()
+            .then(regs => regs.forEach(r => {
+                if (new URL(r.scope).pathname.replace(/\/+$/, '') === '/static') {
+                    r.unregister();
+                }
+            }))
+            .catch(() => {});
+    }
+
+    // "Install app" entry: shown only while the browser offers installation
+    // (Chrome/Edge desktop & Android). iOS installs via the share sheet.
+    const installBtn = document.getElementById('installBtn');
+    let installEvent = null;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        installEvent = e;
+        if (installBtn) installBtn.hidden = false;
+    });
+
+    if (installBtn) {
+        installBtn.addEventListener('click', async () => {
+            if (!installEvent) return;
+            installBtn.hidden = true;
+            installEvent.prompt();
+            try {
+                const choice = await installEvent.userChoice;
+                log('[PWA] install outcome:', choice && choice.outcome);
+            } catch (_) {}
+            installEvent = null;
+        });
+    }
+
+    window.addEventListener('appinstalled', () => {
+        if (installBtn) installBtn.hidden = true;
+        installEvent = null;
+        showToast(t('installed', 'App installed'), 'success');
+    });
 }
 
 
@@ -236,39 +279,42 @@ function initKeyboardShortcuts() {
         // where .matches does not exist.
         if (e.target && typeof e.target.matches === 'function' && e.target.matches('input, textarea')) return;
 
-        const keyMap = {
-            'n': () => (e.ctrlKey || e.metaKey) && DOM.createInput.focus(),
-            'f': () => {
-                if (e.ctrlKey || e.metaKey) {
+        const mod = e.ctrlKey || e.metaKey;
+
+        if (mod && !e.altKey && !e.shiftKey) {
+            switch (e.key.toLowerCase()) {
+                case 'n': e.preventDefault(); DOM.createInput.focus(); return;
+                case 'f':
+                    e.preventDefault();
                     DOM.searchInput.focus();
                     DOM.searchInput.select();
-                }
-            },
-            'g': () => (e.ctrlKey || e.metaKey) && DOM.viewBtn.click(),
-            'Escape': () => {
-                if (!DOM.confirmOverlay.classList.contains('hidden')) {
-                    closeConfirm();
-                } else if (!DOM.modalOverlay.classList.contains('hidden')) {
-                    closeModal();
-                } else if (DOM.searchInput.value) {
-                    DOM.searchInput.value = '';
-                    DOM.searchInput.dispatchEvent(new Event('input'));
-                }
-            },
-            't': () => DOM.themeBtn.click(),
-            'T': () => DOM.themeBtn.click(),
-        };
+                    return;
+                case 'g': e.preventDefault(); DOM.viewBtn.click(); return;
+            }
+            return;
+        }
 
-        const handler = keyMap[e.key];
-        if (handler) {
-            e.preventDefault();
-            handler();
+        if (mod || e.altKey) return;
+
+        if (e.key === 'Escape') {
+            if (!DOM.confirmOverlay.classList.contains('hidden')) {
+                closeConfirm();
+            } else if (!DOM.modalOverlay.classList.contains('hidden')) {
+                closeModal();
+            } else if (document.querySelector('.upload-dropdown.open, .custom-select.open, .settings-dropdown.open')) {
+                closeAllDropdowns();
+            } else if (DOM.searchInput.value) {
+                DOM.searchInput.value = '';
+                DOM.searchInput.dispatchEvent(new Event('input'));
+            }
+        } else if (e.key === 't' || e.key === 'T') {
+            DOM.themeBtn.click();
         }
     });
 
     if (!localStorage.getItem('shortcuts-seen')) {
         setTimeout(() => {
-            showToast(`💡 ${t('shortcuts_hint', 'Shortcuts: Ctrl+N (new), Ctrl+F (search), Ctrl+G (view), T (theme)')}`, 'success');
+            showToast(t('shortcuts_hint', 'Shortcuts: Ctrl+N (new), Ctrl+F (search), Ctrl+G (view), T (theme)'), 'info');
             localStorage.setItem('shortcuts-seen', 'true');
         }, 2000);
     }
@@ -278,7 +324,7 @@ function initKeyboardShortcuts() {
 function showDragDropHint() {
     if (!localStorage.getItem('dragdrop-hint-seen')) {
         setTimeout(() => {
-            showToast('💡 ' + t('dragdrop_hint', 'Drag & drop files anywhere to upload'), 'info');
+            showToast(t('dragdrop_hint', 'Drag & drop files anywhere to upload'), 'info');
             localStorage.setItem('dragdrop-hint-seen', 'true');
         }, 4000);
     }
@@ -349,29 +395,28 @@ function initTheme() {
 
 
 function applyTheme() {
-    document.body.classList.toggle('dark', STATE.isDark);
+    const isDark = STATE.isDark;
+    document.body.classList.toggle('dark', isDark);
+    // Native form controls and scrollbars follow color-scheme.
+    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
 
+    // One resolved color for the browser UI: media attributes are dropped so
+    // a manual toggle wins over the OS preference from now on.
+    const themeColor = isDark ? '#131315' : '#f4f1ec';
     document.querySelectorAll('meta[name="theme-color"]').forEach(meta => {
-        const media = meta.getAttribute('media') || '';
-        if (media.includes('dark')) {
-            meta.content = STATE.isDark ? '#1c1c20' : '#1c1c20';
-        } else {
-            meta.content = STATE.isDark ? '#1c1c20' : '#ffffff';
-        }
+        meta.removeAttribute('media');
+        meta.content = themeColor;
     });
 
     const logo = document.querySelector('.logo');
-    if (logo) logo.src = STATE.isDark ? '/static/logo-dark.svg' : '/static/logo.svg';
+    if (logo) logo.src = isDark ? '/static/logo-dark.svg' : '/static/logo.svg';
 
-    const icons = DOM.themeBtn.querySelectorAll('.theme-icon');
-    icons.forEach(icon => icon.classList.remove('active'));
+    // Sun icon shows in light mode, moon in dark mode.
+    DOM.themeBtn.querySelectorAll('.theme-icon').forEach(icon => {
+        icon.classList.toggle('active', (icon.dataset.icon === 'moon') === isDark);
+    });
 
-    const activeIcon = STATE.isDark
-        ? DOM.themeBtn.querySelector('img[alt="Light"]')
-        : DOM.themeBtn.querySelector('img[alt="Dark"]');
-    if (activeIcon) activeIcon.classList.add('active');
-
-    document.documentElement.setAttribute('data-theme', STATE.isDark ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
 }
 
 
@@ -564,20 +609,6 @@ function initCustomSelect() {
             filterAndSort();
         });
     });
-
-    document.addEventListener('click', (e) => {
-        if (!customSelect.contains(e.target)) {
-            customSelect.classList.remove('open');
-            btn.setAttribute('aria-expanded', 'false');
-        }
-    });
-
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && customSelect.classList.contains('open')) {
-            customSelect.classList.remove('open');
-            btn.setAttribute('aria-expanded', 'false');
-        }
-    });
 }
 
 
@@ -606,7 +637,9 @@ function filterWallpapers() {
     const query = STATE.searchQuery;
     STATE.filteredWallpapers = STATE.wallpapers.filter(wp => {
         const name = (wp.linkName || wp.id || '').toLowerCase();
-        return name.includes(query);
+        // Also match the stored file name so "search by file" works.
+        const file = (wp.imageUrl || '').toLowerCase();
+        return name.includes(query) || file.includes(query);
     });
 }
 
@@ -647,12 +680,10 @@ function updateSearchStats() {
         const tpl = t('search_found', 'Found {{shown}} of {{total}}');
         DOM.searchStats.textContent = tpl.replace('{{shown}}', shown).replace('{{total}}', total);
         DOM.searchStats.title = t('click_to_reset', 'Click to reset search');
-        DOM.searchStats.style.cursor = 'pointer';
     } else {
         const tpl = t('search_total', 'Total: {{total}}');
         DOM.searchStats.textContent = tpl.replace('{{total}}', total);
         DOM.searchStats.title = '';
-        DOM.searchStats.style.cursor = 'default';
     }
 }
 
@@ -746,9 +777,9 @@ async function createAndUpload(file) {
                 fileToUpload = await STATE.compressor.compress(file);
                 if (fileToUpload.size < originalSize) {
                     const info = ImageCompressor.getCompressionInfo(originalSize, fileToUpload.size);
-                    const msg = t('compression_saved', '🗜️ Compressed: {{percent}}% smaller ({{saved}} saved)')
+                    const msg = t('compression_saved', 'Compressed: {{percent}}% smaller ({{saved}} saved)')
                         .replace('{{percent}}', info.percent)
-                        .replace('{{saved}}', formatKB(info.saved));
+                        .replace('{{saved}}', formatSize(info.saved));
                     showToast(msg, 'success');
                 }
             } catch (_) {
@@ -778,7 +809,13 @@ const TOAST_ICONS = {
     info:    `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
 };
 
+const MAX_TOASTS = 4;
+
 function showToast(message, type = 'success') {
+    // Keep the stack short: a burst of errors must not flood the screen.
+    while (DOM.toastContainer.children.length >= MAX_TOASTS) {
+        DOM.toastContainer.firstElementChild.remove();
+    }
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     const icon = TOAST_ICONS[type] || TOAST_ICONS.info;
@@ -794,8 +831,53 @@ function showToast(message, type = 'success') {
     DOM.toastContainer.appendChild(toast);
     setTimeout(() => {
         toast.classList.add('hiding');
-        setTimeout(() => toast.remove(), 400);
+        setTimeout(() => toast.remove(), 320);
     }, 3000);
+}
+
+
+// Focus management: keep Tab inside an open dialog and restore focus to
+// the element that opened it when the dialog closes.
+let lastFocused = null;
+
+function trapFocus(overlay, e) {
+    const focusables = overlay.querySelectorAll('button, input, select, a[href], [tabindex]:not([tabindex="-1"])');
+    if (!focusables.length) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+    }
+}
+
+function openDialog(overlay) {
+    lastFocused = document.activeElement;
+    overlay.classList.remove('hidden');
+    overlay.setAttribute('aria-hidden', 'false');
+}
+
+// Focus on open: do it immediately and again after the first painted frame.
+// Some engines ignore focus() while the unhide transition is starting;
+// others (headless shells) may never run the deferred call. Together the
+// two attempts cover both worlds and are harmless when both run.
+function focusAfterPaint(el) {
+    if (!el) return;
+    const tryFocus = () => { try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); } };
+    tryFocus();
+    requestAnimationFrame(tryFocus);
+}
+
+function closeDialog(overlay) {
+    overlay.classList.add('hidden');
+    overlay.setAttribute('aria-hidden', 'true');
+    if (lastFocused && document.contains(lastFocused)) {
+        try { lastFocused.focus(); } catch (_) {}
+    }
+    lastFocused = null;
 }
 
 
@@ -806,15 +888,13 @@ function showConfirm(message) {
     return new Promise((resolve) => {
         confirmResolve = resolve;
         if (DOM.confirmMessage) DOM.confirmMessage.textContent = message;
-        DOM.confirmOverlay.classList.remove('hidden');
-        DOM.confirmOverlay.setAttribute('aria-hidden', 'false');
-        DOM.confirmDelete.focus();
+        openDialog(DOM.confirmOverlay);
+        focusAfterPaint(DOM.confirmDelete);
     });
 }
 
 function closeConfirm(result = false) {
-    DOM.confirmOverlay.classList.add('hidden');
-    DOM.confirmOverlay.setAttribute('aria-hidden', 'true');
+    closeDialog(DOM.confirmOverlay);
     if (confirmResolve) confirmResolve(result);
     confirmResolve = null;
 }
@@ -827,8 +907,7 @@ function showModal(type, titleKey, placeholderKey = '') {
     return new Promise((resolve) => {
         modalResolve = resolve;
         DOM.modalTitle.textContent = t(titleKey, t('modal_default_title', 'Input'));
-        DOM.modalOverlay.classList.remove('hidden');
-        DOM.modalOverlay.setAttribute('aria-hidden', 'false');
+        openDialog(DOM.modalOverlay);
         DOM.modalInput.value = '';
         DOM.modalInput.classList.add('d-none');
         DOM.modalList.innerHTML = '';
@@ -838,7 +917,7 @@ function showModal(type, titleKey, placeholderKey = '') {
         if (type === 'input') {
             DOM.modalInput.classList.remove('d-none');
             DOM.modalInput.placeholder = placeholderKey ? t(placeholderKey, 'https://...') : t('url_placeholder', 'https://...');
-            DOM.modalInput.focus();
+            focusAfterPaint(DOM.modalInput);
             DOM.modalInput.onkeydown = (e) => { if (e.key === 'Enter') confirmModal(); };
         } else if (type === 'grid') {
             DOM.modalList.classList.remove('hidden');
@@ -852,8 +931,7 @@ function showModal(type, titleKey, placeholderKey = '') {
 
 
 function closeModal() {
-    DOM.modalOverlay.classList.add('hidden');
-    DOM.modalOverlay.setAttribute('aria-hidden', 'true');
+    closeDialog(DOM.modalOverlay);
     if (modalResolve) modalResolve(null);
     modalResolve = null;
 }
@@ -1067,7 +1145,7 @@ function createLinkCard(link) {
 function renderLinks(wallpapers) {
     const links = wallpapers || [];
     if (!links.length) {
-        while (DOM.linksList.firstChild) DOM.linksList.removeChild(DOM.linksList.firstChild);
+        DOM.linksList.replaceChildren();
         setEmptyStateError(false);
         DOM.emptyState.classList.remove('d-none');
         return;
@@ -1076,12 +1154,15 @@ function renderLinks(wallpapers) {
 
     // Reconcile by stable link ID. Search and sort only move existing cards;
     // they do not rebuild previews, copy handlers, or document listeners.
-    const existing = new Map(
-        Array.from(DOM.linksList.children, card => [card.dataset.linkName, card])
-    );
+    // Children without a link ID (skeleton placeholders) are always removed.
+    const existing = new Map();
+    for (const card of Array.from(DOM.linksList.children)) {
+        const name = card.dataset.linkName;
+        if (name && !existing.has(name)) existing.set(name, card);
+    }
     const wanted = new Set(links.map(link => link.linkName || link.id));
-    for (const [name, card] of existing) {
-        if (!wanted.has(name)) card.remove();
+    for (const card of Array.from(DOM.linksList.children)) {
+        if (!card.dataset.linkName || !wanted.has(card.dataset.linkName)) card.remove();
     }
 
     let cursor = DOM.linksList.firstElementChild;
@@ -1257,6 +1338,16 @@ function setupInlineRename(card, link) {
 
 const ACCESS_LEVELS = ['public', 'local', 'token', 'auth'];
 
+// Static, trusted SVG icons for the token action buttons.
+const TOKEN_COPY_SVG = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <rect x="9" y="9" width="13" height="13" rx="2"/>
+  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+</svg>`;
+const TOKEN_ROTATE_SVG = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <polyline points="1 4 1 10 7 10"/>
+  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+</svg>`;
+
 function accessLabel(level) {
     const key = 'access_' + level;
     const defaults = {
@@ -1342,34 +1433,38 @@ function setupAccessControl(card, link) {
     row.appendChild(label);
     row.appendChild(select);
 
-    // Token display + rotate for token level
+    // Token chip with inline copy/rotate actions for token level
     if ((link.accessLevel || 'public') === 'token') {
         const tokenBox = document.createElement('div');
         tokenBox.className = 'access-token-box';
 
-        const tokenInput = document.createElement('input');
-        tokenInput.type = 'text';
-        tokenInput.readOnly = true;
-        tokenInput.className = 'access-token-input';
-        tokenInput.value = link.accessToken || '';
-        tokenInput.setAttribute('aria-label', t('access_token', 'Access token'));
+        const tokenEl = document.createElement('code');
+        tokenEl.className = 'access-token-value';
+        tokenEl.textContent = link.accessToken || '—';
+        tokenEl.title = link.accessToken || '';
+        tokenEl.setAttribute('aria-label', t('access_token', 'Access token'));
 
         const copyTok = document.createElement('button');
         copyTok.type = 'button';
-        copyTok.className = 'btn access-token-btn';
-        copyTok.textContent = t('copy_token', 'Copy token URL');
+        copyTok.className = 'token-icon-btn';
+        copyTok.innerHTML = TOKEN_COPY_SVG; // static trusted markup
+        const copyLabel = t('copy_token', 'Copy token URL');
+        copyTok.setAttribute('aria-label', copyLabel);
+        copyTok.title = copyLabel;
         copyTok.addEventListener('click', (e) => {
             e.preventDefault();
-            const url = publicLinkURL(link);
-            copyToClipboard(url).then(() => {
+            copyToClipboard(publicLinkURL(link)).then(() => {
                 showToast(t('copied', 'Copied!'), 'success');
             }).catch(() => showToast(t('copy_error', 'Failed to copy URL'), 'error'));
         });
 
         const rotateBtn = document.createElement('button');
         rotateBtn.type = 'button';
-        rotateBtn.className = 'btn access-token-btn';
-        rotateBtn.textContent = t('rotate_token', 'Rotate');
+        rotateBtn.className = 'token-icon-btn';
+        rotateBtn.innerHTML = TOKEN_ROTATE_SVG; // static trusted markup
+        const rotateLabel = t('rotate_token', 'Rotate');
+        rotateBtn.setAttribute('aria-label', rotateLabel);
+        rotateBtn.title = rotateLabel;
         rotateBtn.addEventListener('click', async (e) => {
             e.preventDefault();
             rotateBtn.disabled = true;
@@ -1390,7 +1485,7 @@ function setupAccessControl(card, link) {
             finally { rotateBtn.disabled = false; }
         });
 
-        tokenBox.appendChild(tokenInput);
+        tokenBox.appendChild(tokenEl);
         tokenBox.appendChild(copyTok);
         tokenBox.appendChild(rotateBtn);
         row.appendChild(tokenBox);
@@ -1438,7 +1533,7 @@ function updateCard(card, link) {
     }
 
     const dateStr = link.createdAt ? formatDate(link.createdAt) : '—';
-    const sizeStr = link.sizeBytes ? ` · ${formatKB(link.sizeBytes)}` : '';
+    const sizeStr = link.sizeBytes ? ` · ${formatSize(link.sizeBytes)}` : '';
 
     const linkMeta = card.querySelector('.link-meta');
     linkMeta.textContent = `${category} · ${fileType}${sizeStr} · ${dateStr}`;
@@ -1469,10 +1564,11 @@ function updateCard(card, link) {
 
         if (link.hasImage) {
             const isVid = (category === 'video');
+            // Bust browser/API caches only when the file actually changed.
+            const bust = link.modTime ? `?t=${link.modTime}` : '';
             if (isVid) {
                 // Admin preview route is auth-protected and works for all access levels.
-                const videoSrc = (link.preview || ('/api/preview/' + encodeURIComponent(linkName)))
-                    + `?t=${link.modTime || Date.now()}`;
+                const videoSrc = (link.preview || ('/api/preview/' + encodeURIComponent(linkName))) + bust;
                 const video = document.createElement('video');
                 video.src = videoSrc;
                 video.className = 'preview';
@@ -1492,7 +1588,7 @@ function updateCard(card, link) {
                 previewWrapper.appendChild(video);
             } else {
                 const resolvedPreview = link.preview || ('/api/preview/' + encodeURIComponent(linkName));
-                const imgSrc = (resolvedPreview.startsWith('/') ? resolvedPreview : '/' + resolvedPreview) + `?t=${link.modTime || Date.now()}`;
+                const imgSrc = (resolvedPreview.startsWith('/') ? resolvedPreview : '/' + resolvedPreview) + bust;
                 const img = createLazyImage(
                     imgSrc,
                     resolvedPreview ? 'Preview' : 'Image',
@@ -1560,55 +1656,12 @@ function buildNoImageSVG() {
 }
 
 
-// A single shared MutationObserver that runs clean-up callbacks for cards
-// removed from the DOM. One observer for all cards is dramatically cheaper
-// than one observer per card, each watching the whole document subtree.
-const cardCleanups = new Map();
-const cardObserver = 'MutationObserver' in window
-    ? new MutationObserver(records => {
-        // Only scan for detached cards when something was actually removed.
-        if (!records.some(r => r.removedNodes.length)) return;
-        for (const [card, cleanup] of cardCleanups) {
-            if (!document.contains(card)) {
-                cardCleanups.delete(card);
-                cleanup();
-            }
-        }
-    })
-    : null;
-if (cardObserver) {
-    cardObserver.observe(document.body, { childList: true, subtree: true });
-}
-
-function registerCardCleanup(card, cleanup) {
-    if (cardObserver) cardCleanups.set(card, cleanup);
-    else setTimeout(cleanup, 5 * 60 * 1000); // very old browsers: best effort
-}
-
 function setupCardEvents(card, link) {
     const fileInput = card.querySelector('.file-input');
     const dropdown = card.querySelector('.upload-dropdown');
     const toggleBtn = card.querySelector('.upload-toggle-btn');
 
-    // AbortController is missing on older engines. Listeners must never be
-    // the reason card rendering dies: fall back to manual removal on cleanup.
-    const hasAC = typeof AbortController === 'function';
-    const ac = hasAC ? new AbortController() : null;
-    const signal = ac ? ac.signal : undefined;
-
-    const onDocClick = (e) => {
-        if (!dropdown.contains(e.target)) {
-            dropdown.classList.remove('open');
-            toggleBtn.setAttribute('aria-expanded', 'false');
-        }
-    };
-    if (ac) document.addEventListener('click', onDocClick, { signal });
-    else document.addEventListener('click', onDocClick);
-
-    registerCardCleanup(card, () => {
-        if (ac) ac.abort();
-        else document.removeEventListener('click', onDocClick);
-    });
+    // Outside clicks are handled by the single delegated dropdown closer.
 
     // Inline rename
     setupInlineRename(card, link);
@@ -1669,7 +1722,6 @@ function setupCardEvents(card, link) {
 
         try {
             await apiCall(`/api/link/${encodeURIComponent(link.linkName)}`, 'DELETE');
-            ac.abort();
             
             // Remove from state
             STATE.wallpapers = STATE.wallpapers.filter(wp => wp.linkName !== link.linkName);
@@ -1713,9 +1765,9 @@ async function handleUpload(link, fileOrUrl, card, isUrl = false) {
                 fileToUpload = await STATE.compressor.compress(fileOrUrl);
                 if (fileToUpload.size < originalSize) {
                     const info = ImageCompressor.getCompressionInfo(originalSize, fileToUpload.size);
-                    const msg = t('compression_saved', '🗜️ Compressed: {{percent}}% smaller ({{saved}} saved)')
+                    const msg = t('compression_saved', 'Compressed: {{percent}}% smaller ({{saved}} saved)')
                         .replace('{{percent}}', info.percent)
-                        .replace('{{saved}}', formatKB(info.saved));
+                        .replace('{{saved}}', formatSize(info.saved));
                     showToast(msg, 'success');
                 }
             } catch (_) {
@@ -1792,17 +1844,23 @@ function setupGlobalListeners() {
         if (e.target === DOM.modalOverlay) closeModal();
     };
 
+    DOM.modalOverlay.addEventListener('keydown', (e) => {
+        if (e.key === 'Tab' && !DOM.modalOverlay.classList.contains('hidden')) trapFocus(DOM.modalOverlay, e);
+    });
+
     DOM.confirmCancel.onclick = () => closeConfirm(false);
     DOM.confirmDelete.onclick = () => closeConfirm(true);
     DOM.confirmOverlay.onclick = (e) => {
         if (e.target === DOM.confirmOverlay) closeConfirm(false);
     };
-    
-    // Add Enter key handler for confirm delete dialog
+
     DOM.confirmOverlay.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !DOM.confirmOverlay.classList.contains('hidden')) {
+        if (DOM.confirmOverlay.classList.contains('hidden')) return;
+        if (e.key === 'Enter') {
             e.preventDefault();
             closeConfirm(true); // Confirm deletion on Enter
+        } else if (e.key === 'Tab') {
+            trapFocus(DOM.confirmOverlay, e);
         }
     });
 
@@ -1835,10 +1893,17 @@ function setupGlobalListeners() {
 
 
 // UTILS
-function formatKB(bytes) {
-    if (!bytes) return '0 KB';
-    const kb = bytes / 1024;
-    return kb < 10 ? `${kb.toFixed(1)} KB` : `${Math.round(kb)} KB`;
+function formatSize(bytes) {
+    if (!bytes || bytes < 0) return '0 KB';
+    if (bytes < 1024 * 1024) {
+        const kb = bytes / 1024;
+        return `${kb < 10 ? kb.toFixed(1) : Math.round(kb)} KB`;
+    }
+    if (bytes < 1024 * 1024 * 1024) {
+        const mb = bytes / (1024 * 1024);
+        return `${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB`;
+    }
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
 function formatDate(ts) {

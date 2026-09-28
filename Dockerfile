@@ -40,14 +40,19 @@ COPY static ./static
 
 # Verify critical static files exist
 RUN echo "Verifying static files..." && \
-    test -f static/css/style.css || (echo "ERROR: static/css/style.css missing!" && exit 1) && \
-    test -f static/css/skeleton.css || (echo "ERROR: static/css/skeleton.css missing!" && exit 1) && \
-    test -f static/css/settings-menu.css || (echo "ERROR: static/css/settings-menu.css missing!" && exit 1) && \
-    test -f static/js/app.js || (echo "ERROR: static/js/app.js missing!" && exit 1) && \
-    test -f static/js/compressor.js || (echo "ERROR: static/js/compressor.js missing!" && exit 1) && \
-    test -f static/js/settings-menu.js || (echo "ERROR: static/js/settings-menu.js missing!" && exit 1) && \
-    test -f static/logo.svg || (echo "ERROR: static/logo.svg missing!" && exit 1) && \
-    test -f static/favicon.svg || (echo "ERROR: static/favicon.svg missing!" && exit 1) && \
+    for f in \
+      static/css/style.css \
+      static/js/app.js \
+      static/js/compressor.js \
+      static/js/settings-menu.js \
+      static/js/export-import.js \
+      static/sw.js \
+      static/manifest.json \
+      static/logo.svg \
+      static/favicon.svg \
+      static/i18n/en.json \
+      static/icons/icon-512.png \
+    ; do test -f "$f" || (echo "ERROR: $f missing!" && exit 1) || exit 1; done && \
     echo "✓ All critical static files present" && \
     ls -lh static/css/ static/js/ static/*.svg
 

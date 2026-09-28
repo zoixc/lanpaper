@@ -76,7 +76,7 @@
   "load_error_hint": "Failed to load links — check the connection and refresh the page.",
   "auth_required": "Authentication required — sign in again",
   "forbidden": "Access denied",
-  "compression_saved": "🗜️ Compressed: {{percent}}% smaller ({{saved}} saved)",
+  "compression_saved": "Compressed: {{percent}}% smaller ({{saved}} saved)",
   "rename_hint": "Double-click to rename",
   "rename_input_label": "New link name",
   "aria_open_image": "Open image",
@@ -96,5 +96,7 @@
   "access_updated": "Access level updated",
   "copy_token": "Copy token URL",
   "rotate_token": "Rotate",
-  "token_rotated": "Token rotated"
+  "token_rotated": "Token rotated",
+  "install_app": "Install app",
+  "installed": "App installed"
 }
