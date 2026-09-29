@@ -11,8 +11,9 @@ shipped changes see [CHANGELOG.md](CHANGELOG.md).
   - Animated WebP support.
   - Animation-preserving GIF/WebP processing in compressed mode.
   - Both need frame-count and CPU budgets.
-- **More input formats.** HEIC/HEIF and AVIF conversion on upload. SVG only
-  with strict sanitisation or rasterisation.
+- **More input formats.** HEIC/HEIF and AVIF conversion on upload. ICO
+  (largest frame) for favicon collections. SVG only with strict sanitisation
+  or rasterisation.
 - **Token options.** Optional expiry dates and multiple tokens per link.
 - **Access statistics.** Per-link request counts, stored without query
   strings (tokens) and with bounded retention.

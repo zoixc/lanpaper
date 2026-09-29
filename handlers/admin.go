@@ -274,7 +274,8 @@ func AdminPreview(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
 	h.Set("Content-Type", contentType)
 	h.Set("Content-Disposition", "inline")
-	h.Set("Cache-Control", "no-store")
+	h.Set("Cache-Control", mediaCacheControl)
+	setMediaValidators(h, fi)
 	http.ServeContent(w, r, filepath.Base(f.Name()), fi.ModTime(), f)
 }
 
@@ -359,7 +360,8 @@ func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
 	h.Set("Content-Type", mediaContentType(ext))
 	h.Set("Content-Disposition", "inline")
-	h.Set("Cache-Control", "no-store")
+	h.Set("Cache-Control", mediaCacheControl)
+	setMediaValidators(h, fi)
 	http.ServeContent(w, r, filepath.Base(name), fi.ModTime(), f)
 }
 

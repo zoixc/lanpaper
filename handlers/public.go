@@ -70,9 +70,8 @@ func Public(w http.ResponseWriter, r *http.Request) {
 	h.Set("Content-Type", mime)
 	// Link names are restricted to [A-Za-z0-9_-] so this is safe.
 	h.Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s.%s"`, wp.LinkName, wp.MIMEType))
-	// Permissions and content can change at any time. A shared cache (or a
-	// service worker) must not replay an old public image after access changes.
-	h.Set("Cache-Control", "no-store")
+	h.Set("Cache-Control", publicMediaCacheControl(wp.AccessLevel))
+	setMediaValidators(h, fi)
 	h.Set("X-Content-Type-Options", "nosniff")
 
 	http.ServeContent(w, r, wp.LinkName+"."+wp.MIMEType, fi.ModTime(), f)

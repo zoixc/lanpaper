@@ -48,7 +48,8 @@ RUN for f in \
       static/css/style.css static/js/app.js static/js/compressor.js \
       static/js/settings-menu.js static/js/export-import.js static/sw.js \
       static/manifest.json static/logo.svg static/favicon.svg \
-      static/i18n/en.json static/icons/icon-512.png ; \
+      static/i18n/en.json static/icons/icon-512.png \
+      static/fonts/manrope-latin.woff2 ; \
     do test -f "$f" || { echo "ERROR: $f missing" >&2; exit 1; }; done
 
 # Application code and assets stay root-owned (read-only for the service);

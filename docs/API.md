@@ -22,6 +22,14 @@ Examples use `curl` and assume `ADMIN_PASS` is set in the shell.
 - **Bodies.** JSON request bodies are limited to 64 KiB, and trailing data is
   rejected. Unknown fields are ignored.
 - **Errors** are short plain-text messages, for example `Link not found`.
+- **Compression.** Text responses (HTML, CSS, JavaScript, JSON, SVG) of at
+  least 1 KiB are gzip-compressed for clients that send
+  `Accept-Encoding: gzip`, with `Vary: Accept-Encoding`. Media, range requests
+  and `HEAD` responses are never compressed.
+- **Caching.** The admin page and API responses are `Cache-Control: no-store`.
+  Media responses carry `ETag` and `Last-Modified`, and conditional requests
+  (`If-None-Match`, `If-Modified-Since`) get `304` — but only after the access
+  check has passed.
 - **Rate limits** are counted per client, with IPv6 grouped by `/64`, in fixed
   one-minute windows:
 
@@ -187,7 +195,8 @@ Long uploads are allowed: after authentication, the read deadline is at least
 
 Returns the WebP thumbnail. For videos, or when the thumbnail is missing, it
 returns the original media. Always admin-only, whatever the link's access
-level.
+level. `Cache-Control: private, no-cache`: the browser keeps a copy but
+revalidates it on every use.
 
 ### `GET /api/external-images`
 
@@ -202,7 +211,8 @@ slash-separated, for example `["holiday/beach.jpg"]`. The listing:
 
 ### `GET /api/external-image-preview?path=...`
 
-Returns one gallery file after validating its type.
+Returns one gallery file after validating its type, with
+`Cache-Control: private, no-cache`.
 
 | Status | Cause |
 | --- | --- |
@@ -229,7 +239,10 @@ Rebuilds all image thumbnails and removes orphaned ones. The response is
 
 Serves the media of a link:
 
-- `Content-Type`, `Content-Disposition: inline`, `Cache-Control: no-store`.
+- `Content-Type`, `Content-Disposition: inline`, `ETag`, `Last-Modified`.
+- `Cache-Control: private, no-cache` for `public` and `local` links: browsers
+  revalidate before every use, so a changed or revoked link takes effect
+  immediately. `token` and `auth` links are `no-store`.
 - HTTP range requests are supported.
 - Cross-origin embedding is allowed (`Cross-Origin-Resource-Policy: cross-origin`).
 
@@ -245,7 +258,7 @@ Serves the media of a link:
 
 ### `GET /health`
 
-Liveness check, always public. Returns `{"service":"lanpaper","status":"ok","version":"0.10.0"}`.
+Liveness check, always public. Returns `{"service":"lanpaper","status":"ok","version":"0.11.0"}`.
 
 ### `GET /health/ready`
 

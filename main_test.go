@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"image"
 	"image/color"
@@ -13,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -70,7 +72,7 @@ func setupApp(t *testing.T) *testApp {
 			t.Fatal(err)
 		}
 	}
-	srv := httptest.NewServer(newMux())
+	srv := httptest.NewServer(newHandler())
 	t.Cleanup(srv.Close)
 	return &testApp{t: t, server: srv, client: srv.Client(), rootDir: rootDir}
 }
@@ -262,17 +264,28 @@ func TestAppUploadAccessRenameAndDelete(t *testing.T) {
 		t.Fatal("lossless mode changed uploaded PNG")
 	}
 	status, h, _ := a.request("HEAD", "/photo", nil, false, nil)
-	if status != http.StatusOK || h.Get("Cache-Control") != "no-store" || h.Get("Referrer-Policy") != "no-referrer" {
-		t.Fatalf("public media must not be cached/leak tokens: %d %v", status, h)
+	if status != http.StatusOK || h.Get("Cache-Control") != "private, no-cache" || h.Get("Referrer-Policy") != "no-referrer" {
+		t.Fatalf("public media must be revalidated and not leak tokens: %d %v", status, h)
 	}
+	// Unchanged media revalidates with 304 instead of a full download.
+	photoETag, photoModified := h.Get("ETag"), h.Get("Last-Modified")
+	if photoETag == "" || photoModified == "" {
+		t.Fatalf("public media has no validators: %v", h)
+	}
+	a.expect(http.StatusNotModified, "GET", "/photo", nil, false, map[string]string{"If-None-Match": photoETag})
+	a.expect(http.StatusNotModified, "GET", "/photo", nil, false, map[string]string{"If-Modified-Since": photoModified})
 	status, _, chunk := a.request("GET", "/photo", nil, false, map[string]string{"Range": "bytes=0-3"})
 	if status != http.StatusPartialContent || !bytes.Equal(chunk, red[:4]) {
 		t.Fatalf("range failed: %d %v", status, chunk)
 	}
 	_, h, preview := a.request("GET", "/api/preview/photo", nil, true, nil)
-	if h.Get("Content-Type") != "image/webp" || len(preview) < 16 {
+	if h.Get("Content-Type") != "image/webp" || len(preview) < 16 || h.Get("Cache-Control") != "private, no-cache" {
 		t.Fatalf("missing thumbnail: %v, %d bytes", h, len(preview))
 	}
+	previewETag := h.Get("ETag")
+	a.expect(http.StatusNotModified, "GET", "/api/preview/photo", nil, true, map[string]string{"If-None-Match": previewETag})
+	// Authentication runs before revalidation: validators never bypass it.
+	a.expect(http.StatusUnauthorized, "GET", "/api/preview/photo", nil, false, map[string]string{"If-None-Match": previewETag})
 	a.expect(http.StatusUnauthorized, "GET", "/api/preview/photo", nil, false, nil)
 	a.expect(http.StatusNotFound, "GET", "/static/images/photo.png", nil, false, nil)
 
@@ -283,13 +296,25 @@ func TestAppUploadAccessRenameAndDelete(t *testing.T) {
 		t.Fatalf("token not generated: %s %v", raw, err)
 	}
 	a.expect(http.StatusForbidden, "GET", "/photo", nil, false, nil)
-	a.expect(http.StatusOK, "GET", "/photo?token="+tokenLink.AccessToken, nil, false, nil)
+	// A browser that cached the image while it was public must not get a
+	// 304 confirmation once the link requires a token.
+	a.expect(http.StatusForbidden, "GET", "/photo", nil, false, map[string]string{"If-None-Match": photoETag})
+	a.expect(http.StatusForbidden, "GET", "/photo", nil, false, map[string]string{"If-Modified-Since": photoModified})
+	status, h, _ = a.request("GET", "/photo?token="+tokenLink.AccessToken, nil, false, nil)
+	if status != http.StatusOK || h.Get("Cache-Control") != "no-store" {
+		t.Fatalf("token media must not be stored by browsers: %d %v", status, h)
+	}
+	a.expect(http.StatusNotModified, "GET", "/photo?token="+tokenLink.AccessToken, nil, false, map[string]string{"If-None-Match": photoETag})
 	a.expect(http.StatusOK, "GET", "/photo", nil, true, nil)
 
 	a.expect(http.StatusOK, "PATCH", "/api/link/photo", []byte(`{"accessLevel":"auth"}`), true,
 		map[string]string{"Content-Type": "application/json"})
 	a.expect(http.StatusUnauthorized, "GET", "/photo", nil, false, nil)
-	a.expect(http.StatusOK, "GET", "/photo", nil, true, nil)
+	a.expect(http.StatusUnauthorized, "GET", "/photo", nil, false, map[string]string{"If-None-Match": photoETag})
+	status, h, _ = a.request("GET", "/photo", nil, true, nil)
+	if status != http.StatusOK || h.Get("Cache-Control") != "no-store" {
+		t.Fatalf("admin-only media must not be stored by browsers: %d %v", status, h)
+	}
 	a.expect(http.StatusOK, "POST", "/api/link/photo/pin", nil, true, nil)
 	a.expect(http.StatusOK, "PATCH", "/api/link/photo", []byte(`{"newLinkName":"other"}`), true,
 		map[string]string{"Content-Type": "application/json"})
@@ -299,6 +324,87 @@ func TestAppUploadAccessRenameAndDelete(t *testing.T) {
 	a.expect(http.StatusNotFound, "GET", "/other", nil, true, nil)
 	if _, err := os.Stat("data/media/other.png"); !os.IsNotExist(err) {
 		t.Fatalf("media left after deletion: %v", err)
+	}
+}
+
+// Replacing media must invalidate cached copies even within the same second
+// (Last-Modified alone has one-second resolution).
+func TestAppReplacedMediaIsNotRevalidated(t *testing.T) {
+	a := setupApp(t)
+	a.createLink("swap")
+	a.upload(http.StatusOK, "swap", makePNG(t, color.RGBA{R: 255, A: 255}), "")
+	_, h, _ := a.request("GET", "/swap", nil, false, nil)
+	_, ph, _ := a.request("GET", "/api/preview/swap", nil, true, nil)
+	blue := makePNG(t, color.RGBA{B: 255, A: 255})
+	a.upload(http.StatusOK, "swap", blue, "")
+	status, _, body := a.request("GET", "/swap", nil, false, map[string]string{
+		"If-None-Match": h.Get("ETag"), "If-Modified-Since": h.Get("Last-Modified")})
+	if status != http.StatusOK || !bytes.Equal(body, blue) {
+		t.Fatalf("replaced image revalidated as unchanged: HTTP %d", status)
+	}
+	a.expect(http.StatusOK, "GET", "/api/preview/swap", nil, true, map[string]string{
+		"If-None-Match": ph.Get("ETag"), "If-Modified-Since": ph.Get("Last-Modified")})
+}
+
+// Text responses are gzip-compressed through the full handler stack; media,
+// byte ranges and HEAD requests are left untouched.
+func TestAppCompressesTextResponsesOnly(t *testing.T) {
+	a := setupApp(t)
+	gz := map[string]string{"Accept-Encoding": "gzip"}
+	status, h, body := a.request("GET", "/static/css/style.css", nil, false, gz)
+	if status != http.StatusOK || h.Get("Content-Encoding") != "gzip" || h.Get("Accept-Ranges") != "" ||
+		!strings.Contains(h.Get("Vary"), "Accept-Encoding") {
+		t.Fatalf("stylesheet not compressed: HTTP %d %v", status, h)
+	}
+	zr, err := gzip.NewReader(bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	css, err := io.ReadAll(zr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	original, err := os.ReadFile("static/css/style.css")
+	if err != nil || !bytes.Equal(css, original) {
+		t.Fatalf("decompressed stylesheet differs: %v", err)
+	}
+	status, h, _ = a.request("GET", "/admin", nil, true, gz)
+	if status != http.StatusOK || h.Get("Content-Encoding") != "gzip" || h.Get("Cache-Control") != "no-store" {
+		t.Fatalf("admin page not compressed: HTTP %d %v", status, h)
+	}
+	_, h, _ = a.request("GET", "/static/css/style.css", nil, false, map[string]string{"Accept-Encoding": "identity"})
+	if h.Get("Content-Encoding") != "" || h.Get("Content-Length") != strconv.Itoa(len(original)) {
+		t.Fatalf("identity request got an encoded body: %v", h)
+	}
+	_, h, _ = a.request("GET", "/static/css/style.css", nil, false, map[string]string{"Accept-Encoding": "gzip", "Range": "bytes=0-9"})
+	if h.Get("Content-Encoding") != "" || h.Get("Content-Range") == "" {
+		t.Fatalf("range request was compressed: %v", h)
+	}
+	_, h, _ = a.request("HEAD", "/static/css/style.css", nil, false, gz)
+	if h.Get("Content-Encoding") != "" {
+		t.Fatalf("HEAD response claims an encoding: %v", h)
+	}
+
+	// Media is already compressed and keeps its exact bytes and length.
+	img := image.NewRGBA(image.Rect(0, 0, 64, 64))
+	for i := range img.Pix {
+		img.Pix[i] = byte(i * 7)
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+	a.createLink("media")
+	a.upload(http.StatusOK, "media", buf.Bytes(), "")
+	status, h, body = a.request("GET", "/media", nil, false, gz)
+	if status != http.StatusOK || h.Get("Content-Encoding") != "" || !bytes.Equal(body, buf.Bytes()) ||
+		h.Get("Content-Length") != strconv.Itoa(buf.Len()) {
+		t.Fatalf("media response altered: HTTP %d %v", status, h)
+	}
+	// Small JSON bodies are not worth compressing.
+	status, h, _ = a.request("GET", "/health", nil, false, gz)
+	if status != http.StatusOK || h.Get("Content-Encoding") != "" {
+		t.Fatalf("tiny response compressed: HTTP %d %v", status, h)
 	}
 }
 

@@ -53,8 +53,6 @@ func main() {
 
 	go middleware.StartCleaner()
 
-	mux := newMux()
-
 	port := config.Current.Port
 	if !strings.HasPrefix(port, ":") {
 		port = ":" + port
@@ -62,7 +60,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:    port,
-		Handler: mux,
+		Handler: newHandler(),
 		// Slow-header clients are cut off early. ReadTimeout/WriteTimeout
 		// bound every request; the admin upload and preview-regeneration
 		// handlers extend their own deadlines after authentication.
@@ -101,8 +99,13 @@ func main() {
 	log.Println("Server stopped.")
 }
 
-// newMux is shared with the end-to-end HTTP tests, so tests exercise the
-// real authentication, CSRF and routing stack, not just bare handlers.
+// newHandler is shared with the end-to-end HTTP tests, so tests exercise the
+// real compression, authentication, CSRF and routing stack, not just bare
+// handlers.
+func newHandler() http.Handler {
+	return middleware.Gzip(newMux())
+}
+
 func newMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/static/", serveStaticAsset)

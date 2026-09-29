@@ -1,16 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <style>
-    .stroke { stroke: #2a2a28; }
-    .fill-bg { fill: #2a2a28; }
-    .dot { fill: #e8541a; }
-    @media (prefers-color-scheme: dark) {
-      .stroke { stroke: #dde1e8; }
-      .fill-bg { fill: #dde1e8; }
-      .dot { fill: #6e7fcc; }
-    }
-  </style>
-  <rect x="1" y="1" width="30" height="30" rx="6" class="stroke" stroke-width="2"/>
-  <line x1="1" y1="22" x2="31" y2="22" class="stroke" stroke-width="2"/>
-  <circle cx="10" cy="14" r="3.5" class="dot"/>
-  <polyline points="15,22 22,13 29,22" class="fill-bg" stroke="none"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><clipPath id="tile"><rect width="512" height="512" rx="116"/></clipPath><linearGradient id="sky" x1="0.3" y1="0" x2="0.7" y2="1"><stop offset="0" stop-color="#4a2bd3"/><stop offset="0.3" stop-color="#9433c9"/><stop offset="0.5" stop-color="#e2417a"/><stop offset="0.64" stop-color="#ff7447"/><stop offset="0.76" stop-color="#ffab55"/></linearGradient><radialGradient id="glow" cx="256" cy="316" r="230" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffe7a8" stop-opacity="0.9"/><stop offset="0.38" stop-color="#ffb070" stop-opacity="0.35"/><stop offset="1" stop-color="#ff8a5c" stop-opacity="0"/></radialGradient><radialGradient id="sun" cx="0.42" cy="0.38" r="0.7"><stop offset="0" stop-color="#fffbef"/><stop offset="0.55" stop-color="#ffe7ae"/><stop offset="1" stop-color="#ffc56c"/></radialGradient><linearGradient id="ridge1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c73a7e"/><stop offset="1" stop-color="#8c2a74"/></linearGradient><linearGradient id="ridge2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6d2170"/><stop offset="1" stop-color="#46165a"/></linearGradient><linearGradient id="ridge3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b1040"/><stop offset="1" stop-color="#1b0a2c"/></linearGradient><radialGradient id="rim" cx="256" cy="316" r="250" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffe4b5" stop-opacity="0.95"/><stop offset="0.6" stop-color="#ffc59a" stop-opacity="0.35"/><stop offset="1" stop-color="#ffb08a" stop-opacity="0"/></radialGradient><linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.14"/><stop offset="0.5" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><g clip-path="url(#tile)"><rect width="512" height="512" fill="url(#sky)"/><circle cx="256" cy="316" r="230" fill="url(#glow)"/><g fill="none" stroke="#fff4de" stroke-linecap="round" stroke-width="17"><path d="M106.8 243.2A166 166 0 0 1 405.2 243.2" stroke-opacity="0.5"/><path d="M149.9 264.3A118 118 0 0 1 362.1 264.3" stroke-opacity="0.85"/></g><circle cx="256" cy="316" r="76" fill="url(#sun)"/><path d="M0 322L92 262Q118 245 144 262L230 330Q256 350 282 330L376 254Q402 236 428 254L512 312V512H0Z" fill="url(#ridge1)"/><path d="M0 322L92 262Q118 245 144 262L230 330Q256 350 282 330L376 254Q402 236 428 254L512 312" fill="none" stroke="url(#rim)" stroke-width="5" stroke-linejoin="round"/><path d="M0 386C54 366 104 350 156 358C208 366 232 396 284 392C336 388 372 356 424 356C462 356 492 368 512 376V512H0Z" fill="url(#ridge2)"/><path d="M0 444C58 428 110 416 172 424C234 432 272 456 334 450C394 444 436 420 512 428V512H0Z" fill="url(#ridge3)"/></g></svg>

@@ -67,11 +67,16 @@ if (typeof window.CSS.escape !== 'function') {
 
 // navigator.clipboard only exists in secure contexts (HTTPS or localhost).
 // On plain-HTTP LAN deployments (the typical Lanpaper setup) fall back to the
-// legacy execCommand path so "Copy URL" keeps working.
+// legacy execCommand path so "Copy URL" keeps working. The fallback also
+// covers writeText being refused (permission policy, unfocused document).
 function copyToClipboard(text) {
     if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-        return navigator.clipboard.writeText(text);
+        return navigator.clipboard.writeText(text).catch(() => legacyCopy(text));
     }
+    return legacyCopy(text);
+}
+
+function legacyCopy(text) {
     return new Promise((resolve, reject) => {
         const ta = document.createElement('textarea');
         ta.value = text;
@@ -413,7 +418,7 @@ function applyTheme() {
 
     // One resolved color for the browser UI: media attributes are dropped so
     // a manual toggle wins over the OS preference from now on.
-    const themeColor = isDark ? '#131315' : '#f4f1ec';
+    const themeColor = isDark ? '#0b0c10' : '#f3f2f7';
     document.querySelectorAll('meta[name="theme-color"]').forEach(meta => {
         meta.removeAttribute('media');
         meta.content = themeColor;
@@ -1008,7 +1013,12 @@ async function loadExternalImages() {
                 media.alt = file;
             }
             media.className = 'lazy-image-fade';
-            const markLoaded = () => media.classList.add('loaded');
+            const format = (file.split('.').pop() || '').toLowerCase();
+            const markLoaded = () => {
+                if (media.dataset.src) return; // lazy placeholder, not the file
+                media.classList.add('loaded');
+                applyPreviewFit(div, media, format, GALLERY_FRAME);
+            };
             media.addEventListener(isVid ? 'loadeddata' : 'load', markLoaded);
             if (STATE.lazyObserver) {
                 media.dataset.src = previewUrl;
@@ -1161,6 +1171,7 @@ function renderLinks(wallpapers) {
     const links = wallpapers || [];
     if (!links.length) {
         DOM.linksList.replaceChildren();
+        previewVideos.sweep();
         setEmptyStateError(false);
         DOM.emptyState.classList.remove('d-none');
         return;
@@ -1198,6 +1209,7 @@ function renderLinks(wallpapers) {
 
     applyTranslations(DOM.linksList);
     updateAriaLabels();
+    previewVideos.sweep();
 }
 
 
@@ -1224,6 +1236,103 @@ function createLazyImage(src, alt = 'Image', className = 'preview') {
     img.loading = 'lazy';
     return img;
 }
+
+
+// ============================================================
+// PREVIEW FIT & VIDEO PLAYBACK
+// ============================================================
+// Thumbnails keep the source aspect ratio and are never upscaled, so an app
+// icon arrives as a small square. Filling a 16:9 frame with it (cover) would
+// crop and enlarge it. previewFit() picks how CSS presents each image:
+//   'fit-icon'     small, or square with possible transparency: natural size,
+//                  centred on a blurred copy of itself
+//   'fit-contain'  far from the frame's aspect ratio (portrait, panorama):
+//                  the whole image on the same blurred backdrop
+//   ''             photos and wallpapers: fill the frame
+const ICON_MAX_SIDE = 256;
+const ALPHA_FORMATS = new Set(['png', 'webp', 'gif']);
+const CARD_FRAME = { min: 1.3, max: 2.4 };     // 16:9 card previews
+const GALLERY_FRAME = { min: 0.95, max: 1.9 }; // 4:3 gallery tiles
+
+function previewFit(width, height, format, frame) {
+    if (!width || !height) return '';
+    const ratio = width / height;
+    const squarish = ratio >= 0.8 && ratio <= 1.25;
+    if (Math.max(width, height) <= ICON_MAX_SIDE || (squarish && ALPHA_FORMATS.has(format))) {
+        return 'fit-icon';
+    }
+    return ratio < frame.min || ratio > frame.max ? 'fit-contain' : '';
+}
+
+const cssUrl = url => `url("${url.replace(/["\\\n\r]/g, c => encodeURIComponent(c))}")`;
+
+function applyPreviewFit(container, media, format, frame) {
+    const isImg = media.tagName === 'IMG';
+    let fit = isImg
+        ? previewFit(media.naturalWidth, media.naturalHeight, format, frame)
+        : previewFit(media.videoWidth, media.videoHeight, '', frame);
+    if (!isImg && fit) fit = 'fit-contain'; // videos are letterboxed, never icons
+    container.classList.toggle('fit-icon', fit === 'fit-icon');
+    container.classList.toggle('fit-contain', fit === 'fit-contain');
+    // The backdrop reuses the loaded image from the memory cache (no second
+    // request). CSSOM style changes are permitted by the CSP.
+    if (fit && isImg) container.style.setProperty('--thumb', cssUrl(media.currentSrc || media.src));
+    else container.style.removeProperty('--thumb');
+}
+
+function resetPreviewFit(container) {
+    container.classList.remove('fit-icon', 'fit-contain');
+    container.style.removeProperty('--thumb');
+}
+
+// Card videos play only while at least a quarter of them is on screen and
+// the tab is visible, and never with reduced motion: offscreen previews cost
+// no downloads, decoding or battery.
+const previewVideos = (() => {
+    const reduceMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+    const observed = new Set();
+    const visible = new Set();
+    const allowed = () => !document.hidden && !(reduceMotion && reduceMotion.matches);
+    const sync = video => {
+        if (visible.has(video) && video.isConnected && allowed()) {
+            const playing = video.play();
+            if (playing) playing.catch(() => {}); // autoplay policy, or removed meanwhile
+        } else if (!video.paused) {
+            video.pause();
+        }
+    };
+    const syncAll = () => visible.forEach(sync);
+    const observer = 'IntersectionObserver' in window
+        ? new IntersectionObserver(entries => {
+            for (const entry of entries) {
+                if (entry.isIntersecting) visible.add(entry.target);
+                else visible.delete(entry.target);
+                sync(entry.target);
+            }
+        }, { threshold: 0.25 })
+        : null;
+    document.addEventListener('visibilitychange', syncAll);
+    if (reduceMotion && reduceMotion.addEventListener) reduceMotion.addEventListener('change', syncAll);
+    return {
+        observe(video) {
+            if (observer) {
+                observed.add(video);
+                observer.observe(video);
+            } else if (allowed()) {
+                video.autoplay = true; // no IntersectionObserver: previous behaviour
+            }
+        },
+        // Stop tracking videos whose cards were removed or rebuilt.
+        sweep() {
+            for (const video of observed) {
+                if (video.isConnected) continue;
+                observer.unobserve(video);
+                observed.delete(video);
+                visible.delete(video);
+            }
+        },
+    };
+})();
 
 
 // ============================================================
@@ -1552,6 +1661,7 @@ function updateCard(card, link) {
         
         // Clear content
         previewWrapper.innerHTML = '';
+        resetPreviewFit(previewWrapper);
         
         // Re-add pin button first
         if (existingPinBtn) {
@@ -1568,20 +1678,24 @@ function updateCard(card, link) {
                 const video = document.createElement('video');
                 video.src = videoSrc;
                 video.className = 'preview';
-                video.autoplay = true;
                 video.muted = true;
                 video.loop = true;
                 video.playsInline = true;
                 video.setAttribute('playsinline', '');
                 video.setAttribute('preload', 'metadata');
+                video.addEventListener('loadedmetadata', () =>
+                    applyPreviewFit(previewWrapper, video, category, CARD_FRAME));
                 video.onerror = () => {
                     // Keep pin button when showing error
                     const pinBtn = previewWrapper.querySelector('.pin-btn');
                     previewWrapper.innerHTML = '';
+                    resetPreviewFit(previewWrapper);
                     if (pinBtn) previewWrapper.appendChild(pinBtn);
                     previewWrapper.appendChild(buildNoImageSVG());
+                    previewVideos.sweep();
                 };
                 previewWrapper.appendChild(video);
+                previewVideos.observe(video);
             } else {
                 const resolvedPreview = link.preview || ('/api/preview/' + encodeURIComponent(linkName));
                 const imgSrc = (resolvedPreview.startsWith('/') ? resolvedPreview : '/' + resolvedPreview) + bust;
@@ -1591,10 +1705,15 @@ function updateCard(card, link) {
                     'preview'
                 );
                 img.classList.add('preview-top-center');
+                img.addEventListener('load', () => {
+                    // Skip the lazy-loading placeholder; classify the real preview.
+                    if (!img.dataset.src) applyPreviewFit(previewWrapper, img, link.mimeType, CARD_FRAME);
+                });
                 img.onerror = () => {
                     // Keep pin button when showing error
                     const pinBtn = previewWrapper.querySelector('.pin-btn');
                     previewWrapper.innerHTML = '';
+                    resetPreviewFit(previewWrapper);
                     if (pinBtn) previewWrapper.appendChild(pinBtn);
                     previewWrapper.appendChild(buildNoImageSVG());
                 };
@@ -1730,6 +1849,7 @@ function setupCardEvents(card, link) {
             
             // Remove card from DOM
             card.remove();
+            previewVideos.sweep();
             
             // Show empty state if needed
             if (!DOM.linksList.children.length) {

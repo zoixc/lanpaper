@@ -12,29 +12,31 @@ import (
 // Arbitrary files or symlinks placed in static/ (particularly the legacy
 // static/images directory or files on mounted volumes) are never served.
 var staticAssets = map[string]bool{
-	"css/style.css":                        true,
-	"js/app.js":                            true,
-	"js/compressor.js":                     true,
-	"js/export-import.js":                  true,
-	"js/settings-menu.js":                  true,
-	"sw.js":                                true,
-	"manifest.json":                        true,
-	"favicon.svg":                          true,
-	"logo.svg":                             true,
-	"logo-dark.svg":                        true,
-	"fonts/Rubik.ttf":                      true,
-	"fonts/Disket/Disket-Mono-Bold.ttf":    true,
-	"fonts/Disket/Disket-Mono-Regular.ttf": true,
-	"i18n/en.json":                         true,
-	"i18n/ru.json":                         true,
-	"i18n/de.json":                         true,
-	"i18n/fr.json":                         true,
-	"i18n/it.json":                         true,
-	"i18n/es.json":                         true,
-	"icons/apple-touch-icon.png":           true,
-	"icons/icon-192.png":                   true,
-	"icons/icon-512.png":                   true,
-	"icons/icon-maskable-512.png":          true,
+	"css/style.css":                   true,
+	"js/app.js":                       true,
+	"js/compressor.js":                true,
+	"js/export-import.js":             true,
+	"js/settings-menu.js":             true,
+	"sw.js":                           true,
+	"manifest.json":                   true,
+	"favicon.svg":                     true,
+	"logo.svg":                        true,
+	"logo-dark.svg":                   true,
+	"fonts/manrope-latin.woff2":       true,
+	"fonts/manrope-cyrillic.woff2":    true,
+	"fonts/unbounded-latin-500.woff2": true,
+	"fonts/OFL-Manrope.txt":           true,
+	"fonts/OFL-Unbounded.txt":         true,
+	"i18n/en.json":                    true,
+	"i18n/ru.json":                    true,
+	"i18n/de.json":                    true,
+	"i18n/fr.json":                    true,
+	"i18n/it.json":                    true,
+	"i18n/es.json":                    true,
+	"icons/apple-touch-icon.png":      true,
+	"icons/icon-192.png":              true,
+	"icons/icon-512.png":              true,
+	"icons/icon-maskable-512.png":     true,
 }
 
 var errNotRegular = errors.New("not a regular file")
@@ -98,6 +100,13 @@ func serveStaticAsset(w http.ResponseWriter, r *http.Request) {
 	case ".js", ".css", ".json":
 		// Not content-hashed: always revalidate so upgrades take effect.
 		h.Set("Cache-Control", "no-cache")
+	case ".woff2":
+		// Not in Go's built-in MIME table; do not depend on /etc/mime.types.
+		h.Set("Content-Type", "font/woff2")
+		h.Set("Cache-Control", "public, max-age=86400")
+	case ".txt":
+		h.Set("Content-Type", "text/plain; charset=utf-8")
+		h.Set("Cache-Control", "public, max-age=86400")
 	default:
 		h.Set("Cache-Control", "public, max-age=86400")
 	}

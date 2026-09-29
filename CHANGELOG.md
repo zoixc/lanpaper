@@ -3,6 +3,73 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
+## [0.11.0] – 2026-09-29
+
+### Changed
+
+- **New admin panel design.** An image-first gallery look: large 16:9
+  previews in framed tiles, a sticky glass toolbar, rounded pill controls and
+  a sunset gradient accent, with matching light and dark themes.
+- **New app icon, favicon and logo**: a sunset between two peaks with signal
+  arcs. SVG favicon and logo; PNG icons at 192 and 512 px, a maskable 512 px
+  icon and a 180 px Apple touch icon.
+- **Fonts:** Manrope for the interface (Latin and Cyrillic) and Unbounded for
+  link IDs, as WOFF2 subsets with their OFL licences: 48 KB instead of 528 KB
+  of TTF. Rubik and the Disket Mono fonts, one of which was never used, are
+  removed. The service worker now precaches 211 KB instead of 713 KB.
+- **Mobile toolbar:** the search field has its own row; the result counter
+  and the sort menu share the next row instead of squeezing into the search
+  field.
+
+### Added
+
+- **Previews for icons and unusual aspect ratios.** Small images, and square
+  images in formats with transparency (PNG, WebP, GIF), are treated as icons:
+  they are shown at their own size on a blurred copy of themselves instead of
+  being cropped and enlarged. Portrait, square and panoramic images are shown
+  whole, and portrait videos are letterboxed. The server gallery uses the same
+  rules.
+- **gzip compression** for text responses of at least 1 KiB (HTML, CSS,
+  JavaScript, JSON, SVG). The admin page downloads about three times less, and
+  a 1,000-link API response shrinks from about 295 KB to 26 KB. Media, range
+  requests and `HEAD` responses are never compressed, so media keeps the
+  `sendfile` path.
+
+### Performance
+
+- **Uploads use far less memory.** Images are resized without a full-size
+  intermediate buffer, and memory is returned to the system as soon as no
+  image is being processed. The process drops back to about 10 MB right after
+  an upload instead of staying at its peak. Peak memory, before → after:
+
+  | Upload | Default | `COMPRESSION_SCALE=50` |
+  | --- | --- | --- |
+  | 4K JPEG | 65 → 23 MB | 179 → 31 MB |
+  | 24 MP JPEG | 114 → 48 MB | 470 → 71 MB |
+  | 36 MP JPEG | 144 → 65 MB | 689 → 99 MB |
+  | Two 24 MP JPEGs at once | 218 → 86 MB | 932 → 132 MB |
+
+  Uploads take 5–60 % longer; memory was the priority.
+- **Browser caching.** Admin previews and `public`/`local` media are
+  revalidated (`Cache-Control: private, no-cache` with `ETag` and
+  `Last-Modified`) instead of downloaded again. The access check still runs
+  on every request, before any `304`. A repeat visit to a 13-link panel
+  transfers about 12 KB instead of 890 KB. `token` and `auth` media stays
+  `no-store`.
+- **Video previews play only while visible** (at least a quarter on screen,
+  tab visible) and never with reduced motion. Offscreen videos are not
+  downloaded: the first visit on a phone transfers about 106 KB instead of
+  1.36 MB.
+
+### Fixed
+
+- The theme and view toggle icons animate again; the stylesheet targeted
+  button IDs that did not exist.
+- Long link names end with an ellipsis instead of being cut off.
+- "Copy URL" falls back to the legacy clipboard method when the browser
+  refuses `navigator.clipboard` (permission policy, unfocused page).
+- Server gallery tiles no longer fade in before the file has loaded.
+
 ## [0.10.0] – 2026-09-28
 
 ### Security

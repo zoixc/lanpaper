@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -22,6 +23,7 @@ import (
 	"github.com/chai2010/webp"
 	_ "golang.org/x/image/bmp"
 	xdraw "golang.org/x/image/draw"
+	"golang.org/x/image/math/f64"
 	_ "golang.org/x/image/tiff"
 	xwebp "golang.org/x/image/webp"
 
@@ -67,9 +69,19 @@ func reserveDecodedPixels(pixels int64) (func(), error) {
 	return func() {
 		decodedPixels.Lock()
 		decodedPixels.inFlight -= pixels
+		idle := decodedPixels.inFlight == 0
 		decodedPixels.Unlock()
+		// A large decode leaves tens of MB of garbage that the runtime would
+		// keep resident for minutes. Hand it back once no image work is left.
+		if idle && pixels >= freeOSMemoryMinPixels {
+			go debug.FreeOSMemory()
+		}
 	}, nil
 }
+
+// freeOSMemoryMinPixels is the decode size (~4 MP) from which returning
+// memory to the OS is worth a forced GC cycle.
+const freeOSMemoryMinPixels = 4_000_000
 
 // copyFile writes to a temporary sibling and renames it into place. io.Copy
 // can use optimized file-to-file copies; a bounded reader still protects
@@ -231,6 +243,11 @@ func scaleImage(src image.Image, scalePercent int) image.Image {
 	return resize(src, float64(scalePercent)/100)
 }
 
+// resize downscales src by scale with a bilinear kernel widened to the scale
+// factor (so every source pixel contributes). It uses Kernel.Transform, not
+// Kernel.Scale: Scale allocates a dstWidth x srcHeight float64 buffer (575 MB
+// to halve a 36 MP photo), while Transform needs no temporary memory and
+// produces the same pixels to within one level of rounding (resize_test.go).
 func resize(src image.Image, scale float64) image.Image {
 	if scale >= 1 {
 		return src
@@ -239,7 +256,10 @@ func resize(src image.Image, scale float64) image.Image {
 	w := max(1, int(float64(b.Dx())*scale))
 	h := max(1, int(float64(b.Dy())*scale))
 	dst := image.NewRGBA(image.Rect(0, 0, w, h))
-	xdraw.BiLinear.Scale(dst, dst.Bounds(), src, b, draw.Src, nil)
+	sx := float64(w) / float64(b.Dx())
+	sy := float64(h) / float64(b.Dy())
+	s2d := f64.Aff3{sx, 0, -float64(b.Min.X) * sx, 0, sy, -float64(b.Min.Y) * sy}
+	xdraw.BiLinear.Transform(dst, s2d, src, b, draw.Src, nil)
 	return dst
 }
 

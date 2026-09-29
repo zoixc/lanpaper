@@ -13,12 +13,19 @@ link, which is handy for digital frames, smart TVs, kiosks and other displays.
 - **Three ways to add media:** upload a file, fetch a public HTTP(S) URL, or
   pick a file from a server-side gallery directory.
 - **Image processing:** thumbnails, optional compression and scaling, and a
-  lossless mode that keeps the original bytes.
+  lossless mode that keeps the original bytes. Memory stays bounded (about
+  50 MB peak for a 24-megapixel photo) and is returned to the system after
+  each upload.
 - **Per-link access levels:** `public`, `local` (LAN only), `token` (secret
   URL) and `auth` (admin only). Media is stored outside the static web root.
-- **Admin panel** (installable PWA) with search, sorting, pinning,
-  drag-and-drop, dark mode, export/import of the link list and six languages
-  (EN, RU, DE, FR, IT, ES).
+- **Admin panel** (installable PWA) with gallery-style previews, search,
+  sorting, pinning, drag-and-drop, dark mode, export/import of the link list
+  and six languages (EN, RU, DE, FR, IT, ES). App icons, portrait and
+  panoramic images are shown whole instead of cropped; video previews play
+  only while visible.
+- **Light on resources:** about 10 MB of RAM when idle, gzip for text
+  responses, media revalidated with `304` instead of downloaded again, and
+  about 50 KB of self-hosted WOFF2 fonts.
 - **Security:** Basic Auth with a brute-force lockout, CSRF protection,
   strict security headers, SSRF-safe downloads and rate limits.
 - **Deployment:** a single static binary in a small non-root Docker image,
