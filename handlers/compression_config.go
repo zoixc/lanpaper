@@ -14,16 +14,14 @@ type CompressionConfigResponse struct {
 	Scale   int `json:"scale"`
 }
 
-// GetCompressionConfig handles GET /api/compression-config.
-// Cache-Control is intentionally short: compression settings can change
-// at runtime via config reload without a server restart.
+// GetCompressionConfig handles GET /api/compression-config. The admin panel
+// uses it to pre-compress images in the browser with the server settings.
 func GetCompressionConfig(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "no-cache")
 	if err := json.NewEncoder(w).Encode(CompressionConfigResponse{
 		Quality: config.Current.Compression.Quality,
 		Scale:   config.Current.Compression.Scale,

@@ -61,20 +61,10 @@ func Load() {
 	Current = Config{
 		Port:                 "8080",
 		MaxUploadMB:          DefaultMaxUploadMB,
-		MaxImages:            0,
 		MaxConcurrentUploads: DefaultMaxConcurrentUploads,
 		MaxWalkDepth:         DefaultMaxWalkDepth,
 		ExternalImageDir:     "external/images",
-		AdminUser:            "",
-		AdminPass:            "",
-		DisableAuth:          false,
-		InsecureSkipVerify:   false,
-		ProxyHost:            "",
-		ProxyPort:            "",
 		ProxyType:            "http",
-		ProxyUsername:        "",
-		ProxyPassword:        "",
-		TrustedProxy:         "",
 		Rate: RateConfig{
 			PublicPerMin: DefaultPublicRatePerMin,
 			UploadPerMin: DefaultUploadRatePerMin,
@@ -94,101 +84,30 @@ func Load() {
 	}
 
 	// Step 3: Override with environment variables (highest priority)
-	if v := os.Getenv("PORT"); v != "" {
-		Current.Port = v
-	}
-	if v := os.Getenv("MAX_UPLOAD_MB"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			Current.MaxUploadMB = n
-		}
-	}
-	if v := os.Getenv("MAX_IMAGES"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			Current.MaxImages = n
-		}
-	}
-	if v := os.Getenv("MAX_CONCURRENT_UPLOADS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			Current.MaxConcurrentUploads = n
-		}
-	}
-	if v := os.Getenv("MAX_WALK_DEPTH"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			Current.MaxWalkDepth = n
-		}
-	}
-	if v := os.Getenv("EXTERNAL_IMAGE_DIR"); v != "" {
-		Current.ExternalImageDir = v
-	}
-	if v := os.Getenv("ADMIN_USER"); v != "" {
-		Current.AdminUser = v
-	}
-	if v := os.Getenv("ADMIN_PASS"); v != "" {
-		Current.AdminPass = v
-	}
-	if v := os.Getenv("DISABLE_AUTH"); v != "" {
-		if b, err := strconv.ParseBool(v); err == nil {
-			Current.DisableAuth = b
-		}
-	}
-	if v := os.Getenv("INSECURE_SKIP_VERIFY"); v != "" {
-		if b, err := strconv.ParseBool(v); err == nil {
-			Current.InsecureSkipVerify = b
-		}
-	}
-	if v := os.Getenv("PROXY_HOST"); v != "" {
-		Current.ProxyHost = v
-	}
-	if v := os.Getenv("PROXY_PORT"); v != "" {
-		Current.ProxyPort = v
-	}
-	if v := os.Getenv("PROXY_TYPE"); v != "" {
-		Current.ProxyType = v
-	}
-	// Support both PROXY_USERNAME and PROXY_USER
-	if v := os.Getenv("PROXY_USERNAME"); v != "" {
-		Current.ProxyUsername = v
-	} else if v := os.Getenv("PROXY_USER"); v != "" {
-		Current.ProxyUsername = v
-	}
-	// Support both PROXY_PASSWORD and PROXY_PASS
-	if v := os.Getenv("PROXY_PASSWORD"); v != "" {
-		Current.ProxyPassword = v
-	} else if v := os.Getenv("PROXY_PASS"); v != "" {
-		Current.ProxyPassword = v
-	}
-	if v := os.Getenv("TRUSTED_PROXY"); v != "" {
-		Current.TrustedProxy = v
-	}
-
-	// Rate limiting overrides
-	if v := os.Getenv("RATE_PUBLIC_PER_MIN"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			Current.Rate.PublicPerMin = n
-		}
-	}
-	if v := os.Getenv("RATE_UPLOAD_PER_MIN"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			Current.Rate.UploadPerMin = n
-		}
-	}
-	if v := os.Getenv("RATE_BURST"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			Current.Rate.Burst = n
-		}
-	}
-
-	// Compression overrides
-	if v := os.Getenv("COMPRESSION_QUALITY"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			Current.Compression.Quality = n
-		}
-	}
-	if v := os.Getenv("COMPRESSION_SCALE"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			Current.Compression.Scale = n
-		}
-	}
+	envString("PORT", &Current.Port)
+	envInt("MAX_UPLOAD_MB", &Current.MaxUploadMB)
+	envInt("MAX_IMAGES", &Current.MaxImages)
+	envInt("MAX_CONCURRENT_UPLOADS", &Current.MaxConcurrentUploads)
+	envInt("MAX_WALK_DEPTH", &Current.MaxWalkDepth)
+	envString("EXTERNAL_IMAGE_DIR", &Current.ExternalImageDir)
+	envString("ADMIN_USER", &Current.AdminUser)
+	envString("ADMIN_PASS", &Current.AdminPass)
+	envBool("DISABLE_AUTH", &Current.DisableAuth)
+	envBool("INSECURE_SKIP_VERIFY", &Current.InsecureSkipVerify)
+	envString("PROXY_HOST", &Current.ProxyHost)
+	envString("PROXY_PORT", &Current.ProxyPort)
+	envString("PROXY_TYPE", &Current.ProxyType)
+	// PROXY_USER / PROXY_PASS are accepted as shorter aliases.
+	envString("PROXY_USER", &Current.ProxyUsername)
+	envString("PROXY_USERNAME", &Current.ProxyUsername)
+	envString("PROXY_PASS", &Current.ProxyPassword)
+	envString("PROXY_PASSWORD", &Current.ProxyPassword)
+	envString("TRUSTED_PROXY", &Current.TrustedProxy)
+	envInt("RATE_PUBLIC_PER_MIN", &Current.Rate.PublicPerMin)
+	envInt("RATE_UPLOAD_PER_MIN", &Current.Rate.UploadPerMin)
+	envInt("RATE_BURST", &Current.Rate.Burst)
+	envInt("COMPRESSION_QUALITY", &Current.Compression.Quality)
+	envInt("COMPRESSION_SCALE", &Current.Compression.Scale)
 
 	validate()
 
@@ -198,6 +117,40 @@ func Load() {
 	}
 	log.Printf("Config loaded: compression quality=%d scale=%d (%s)",
 		Current.Compression.Quality, Current.Compression.Scale, mode)
+}
+
+func envString(name string, dst *string) {
+	if v := os.Getenv(name); v != "" {
+		*dst = v
+	}
+}
+
+// envInt and envBool never silently drop a typo: an invalid value is logged
+// and the previous (config.json or default) value is kept.
+func envInt(name string, dst *int) {
+	v := os.Getenv(name)
+	if v == "" {
+		return
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(v))
+	if err != nil {
+		log.Printf("Warning: ignoring invalid %s=%q (expected an integer)", name, v)
+		return
+	}
+	*dst = n
+}
+
+func envBool(name string, dst *bool) {
+	v := os.Getenv(name)
+	if v == "" {
+		return
+	}
+	b, err := strconv.ParseBool(strings.TrimSpace(v))
+	if err != nil {
+		log.Printf("Warning: ignoring invalid %s=%q (expected true or false)", name, v)
+		return
+	}
+	*dst = b
 }
 
 // parseTrustedProxyValue parses a single TrustedProxy string.
@@ -235,6 +188,10 @@ func IsTrustedProxy(remoteAddr string) bool {
 	return p.cidr.Contains(remote)
 }
 
+// validate clamps out-of-range values to safe defaults. Missing admin
+// credentials are deliberately NOT treated as "auth disabled": the admin
+// endpoints then fail closed (503) while public links and health checks keep
+// working. DISABLE_AUTH=true is the only way to turn authentication off.
 func validate() {
 	portStr := strings.TrimPrefix(Current.Port, ":")
 	if n, err := strconv.Atoi(portStr); err != nil || n < 1 || n > 65535 {
@@ -293,9 +250,4 @@ func validate() {
 	} else {
 		cachedProxyPtr.Store(&parsedProxy{ip: ip, cidr: cidr})
 	}
-
-	// Missing credentials must never silently turn the admin API into an
-	// unauthenticated API. DISABLE_AUTH=true is the explicit opt-in for an
-	// external authentication proxy. With no credentials the admin endpoints
-	// fail closed (503) while public links and health checks remain available.
 }

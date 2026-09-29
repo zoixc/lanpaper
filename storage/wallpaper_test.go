@@ -145,9 +145,7 @@ func TestConcurrentUpdatesAndSnapshots(t *testing.T) {
 	}
 	var wg sync.WaitGroup
 	for range 8 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for range 25 {
 				if _, err := s.Update("counter", func(wp *Wallpaper) error { wp.SizeBytes++; return nil }); err != nil {
 					t.Errorf("concurrent update: %v", err)
@@ -157,7 +155,7 @@ func TestConcurrentUpdatesAndSnapshots(t *testing.T) {
 					snapshot.SizeBytes = -1 // must not mutate store or cache
 				}
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	if wp, _ := s.Get("counter"); wp.SizeBytes != 200 {

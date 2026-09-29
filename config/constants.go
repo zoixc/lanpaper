@@ -6,6 +6,7 @@ const (
 	MaxDecodedPixelsInFlight  = 48_000_000 // across uploads + regeneration, bounds concurrent decoding
 	ThumbnailMaxWidth         = 640
 	ThumbnailMaxHeight        = 360
+	ThumbnailQuality          = 80 // WebP quality of admin-panel previews
 	DefaultCompressionQuality = 85
 	GIFColors                 = 256
 	DefaultCompressionScale   = 100
@@ -20,12 +21,21 @@ const (
 )
 
 const (
-	DownloadTimeout  = 90  // seconds
-	HTTPReadTimeout  = 30  // seconds
-	HTTPWriteTimeout = 120 // seconds; must exceed DownloadTimeout
-	HTTPIdleTimeout  = 120 // seconds
-	ShutdownTimeout  = 30  // seconds
-	MaxRedirects     = 5   // outbound download redirect cap (SSRF defence)
+	DownloadTimeout       = 90  // seconds
+	HTTPReadHeaderTimeout = 10  // seconds
+	HTTPReadTimeout       = 30  // seconds
+	HTTPWriteTimeout      = 120 // seconds; must exceed DownloadTimeout
+	HTTPIdleTimeout       = 120 // seconds
+	ShutdownTimeout       = 30  // seconds
+	MaxRedirects          = 5   // outbound download redirect cap (SSRF defence)
+
+	// Authenticated uploads may need longer than HTTPReadTimeout on slow
+	// links: their deadline is UploadBaseTimeout plus the time needed to
+	// transfer the maximum request size at UploadMinBytesPerSec.
+	UploadBaseTimeout    = 120       // seconds
+	UploadMinBytesPerSec = 256 << 10 // 256 KiB/s
+	// RegenerateTimeout bounds a preview regeneration of the whole library.
+	RegenerateTimeout = 30 * 60 // seconds
 )
 
 const (
@@ -45,6 +55,7 @@ const (
 	MediaDir    = "data/media"
 	PreviewDir  = "data/previews"
 	LegacyMedia = "static/images" // pre-migration location
+	DataDirPerm = 0o700           // data directories are private to the service user
 )
 
 // Access level values for per-link visibility.
@@ -76,3 +87,6 @@ var AllowedMediaExts = map[string]bool{
 	".webp": true, ".bmp": true, ".tiff": true, ".tif": true,
 	".mp4": true, ".webm": true,
 }
+
+// IsVideoExt reports whether a stored media extension is a video format.
+func IsVideoExt(ext string) bool { return ext == "mp4" || ext == "webm" }

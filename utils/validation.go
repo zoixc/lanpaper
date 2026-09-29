@@ -77,10 +77,7 @@ func ValidateFileType(data []byte, expectedExt string) error {
 		return fmt.Errorf("unsupported file type: %s", ext)
 	}
 	if !bytes.HasPrefix(data, magic) {
-		n := len(magic)
-		if len(data) < n {
-			n = len(data)
-		}
+		n := min(len(data), len(magic))
 		log.Printf("Security: magic bytes mismatch for %q: expected %v, got %v", ext, magic, data[:n])
 		return fmt.Errorf("file content does not match extension %s", ext)
 	}

@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"slices"
 	"sort"
 	"sync"
 )
@@ -45,8 +46,7 @@ func LockLinks(names ...string) func() {
 	return func() {
 		// Release in reverse order. Never remove a lock if someone is waiting.
 		linkLocks.Lock()
-		for i := len(locks) - 1; i >= 0; i-- {
-			l := locks[i]
+		for _, l := range slices.Backward(locks) {
 			l.Unlock()
 			l.refs--
 			if l.refs == 0 {

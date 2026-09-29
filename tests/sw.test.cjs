@@ -39,9 +39,10 @@ function loadWorker() {
   const fetch = async input => {
     if (offline) throw new Error('offline');
     const url = new URL(typeof input === 'string' ? input : input.url, origin);
-    const contentType = url.pathname.endsWith('.js') ? 'application/javascript' :
-      url.pathname.endsWith('.css') ? 'text/css' :
-      url.pathname.endsWith('.json') ? 'application/json' : 'image/svg+xml';
+    const contentType = {
+      '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json',
+      '.woff2': 'font/woff2', '.png': 'image/png', '.svg': 'image/svg+xml'
+    }[path.extname(url.pathname)] || 'application/octet-stream';
     return new Response('static asset', { headers: { 'content-type': contentType } });
   };
   vm.runInNewContext(code, { self, URL, Response, caches, fetch });
@@ -78,6 +79,7 @@ test('old admin/media caches are purged, only public application assets remain c
   assert.ok(cacheName, 'install must create a versioned lanpaper-static cache');
   const assetCache = worker.stores.get(cacheName);
   assert.ok(assetCache.has(worker.origin + '/static/css/style.css'));
+  assert.ok(assetCache.has(worker.origin + '/static/fonts/manrope-latin.woff2'));
   assert.ok(!assetCache.has(worker.origin + '/admin'));
 
   for (const route of ['/admin', '/api/wallpapers', '/api/preview/photo',
@@ -89,4 +91,13 @@ test('old admin/media caches are purged, only public application assets remain c
   worker.setOffline(true);
   assert.equal(await (await worker.intercept('/static/css/style.css')).text(), 'static asset');
   assert.equal(await worker.intercept('/photo?token=secret'), undefined);
+});
+
+test('every precached asset exists in static/', () => {
+  const list = code.slice(code.indexOf('STATIC_ASSETS = ['), code.indexOf('];'));
+  const assets = [...list.matchAll(/'(\/static\/[^']+)'/g)].map(match => match[1]);
+  assert.ok(assets.length >= 20, 'precache list not found');
+  for (const asset of assets) {
+    assert.ok(fs.statSync(path.join(__dirname, '..', asset)).isFile(), `${asset} is precached but missing`);
+  }
 });

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -35,13 +36,13 @@ func main() {
 	handlers.InitUploadSemaphore(config.Current.MaxConcurrentUploads)
 
 	for _, d := range []string{"data", config.MediaDir, config.PreviewDir} {
-		if err := os.MkdirAll(d, 0700); err != nil {
+		if err := os.MkdirAll(d, config.DataDirPerm); err != nil {
 			log.Fatalf("Cannot create data directory %s: %v", d, err)
 		}
 	}
-	// External images are optional; legacy directories should not be created
-	// just because an old deployment might have mounted them read-only.
-	if err := os.MkdirAll("external/images", 0755); err != nil {
+	// The server gallery is optional (and often a read-only mount), so a
+	// failure here is not fatal.
+	if err := os.MkdirAll(config.Current.ExternalImageDir, 0755); err != nil {
 		log.Printf("Warning: external gallery unavailable: %v", err)
 	}
 	if err := storage.Global.Load(); err != nil {
@@ -52,8 +53,6 @@ func main() {
 
 	go middleware.StartCleaner()
 
-	mux := newMux()
-
 	port := config.Current.Port
 	if !strings.HasPrefix(port, ":") {
 		port = ":" + port
@@ -61,39 +60,52 @@ func main() {
 
 	srv := &http.Server{
 		Addr:    port,
-		Handler: mux,
-		// ReadTimeout covers headers + body; WriteTimeout must exceed the download context timeout.
-		ReadTimeout:  time.Duration(config.HTTPReadTimeout) * time.Second,
-		WriteTimeout: time.Duration(config.HTTPWriteTimeout) * time.Second,
-		IdleTimeout:  time.Duration(config.HTTPIdleTimeout) * time.Second,
-		// Cap request header size against slowloris / oversized header DoS.
-		MaxHeaderBytes: 1 << 20, // 1 MB
+		Handler: newHandler(),
+		// Slow-header clients are cut off early. ReadTimeout/WriteTimeout
+		// bound every request; the admin upload and preview-regeneration
+		// handlers extend their own deadlines after authentication.
+		ReadHeaderTimeout: time.Duration(config.HTTPReadHeaderTimeout) * time.Second,
+		ReadTimeout:       time.Duration(config.HTTPReadTimeout) * time.Second,
+		WriteTimeout:      time.Duration(config.HTTPWriteTimeout) * time.Second,
+		IdleTimeout:       time.Duration(config.HTTPIdleTimeout) * time.Second,
+		MaxHeaderBytes:    1 << 20, // 1 MB
 	}
 
-	go func() {
-		ch := make(chan os.Signal, 1)
-		signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
-		<-ch
-		log.Println("Shutting down...")
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.ShutdownTimeout)*time.Second)
-		defer cancel()
-		if err := srv.Shutdown(ctx); err != nil {
-			log.Printf("Shutdown error: %v", err)
-		}
-	}()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	log.Printf("Lanpaper %s on %s (max upload %d MB, compression: %d%% quality, %d%% scale)",
 		Version, port, config.Current.MaxUploadMB, config.Current.Compression.Quality, config.Current.Compression.Scale)
 	log.Printf("Admin: http://localhost%s/admin", port)
 
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("Server error: %v", err)
+	serveErr := make(chan error, 1)
+	go func() { serveErr <- srv.ListenAndServe() }()
+
+	select {
+	case err := <-serveErr:
+		if !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("Server error: %v", err)
+		}
+	case <-ctx.Done():
+		stop() // a second signal terminates immediately
+		log.Println("Shutting down...")
+		// Wait for in-flight requests (uploads, metadata writes) to finish.
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.ShutdownTimeout)*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			log.Printf("Shutdown error: %v", err)
+		}
 	}
 	log.Println("Server stopped.")
 }
 
-// newMux is shared with the end-to-end HTTP tests, so tests exercise the
-// real authentication, CSRF and routing stack, not just bare handlers.
+// newHandler is shared with the end-to-end HTTP tests, so tests exercise the
+// real compression, authentication, CSRF and routing stack, not just bare
+// handlers.
+func newHandler() http.Handler {
+	return middleware.Gzip(newMux())
+}
+
 func newMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/static/", serveStaticAsset)
@@ -142,40 +154,6 @@ func handleLinkRoutes(w http.ResponseWriter, r *http.Request) {
 	} else {
 		handlers.Link(w, r)
 	}
-}
-
-// serveServiceWorker serves the service worker from the root path so its
-// scope can cover the whole app (Service-Worker-Allowed: /). Registered at
-// /static/sw.js the scope would be limited to /static/ and the SW would
-// never control /admin or the public link URLs.
-func serveServiceWorker(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	root, err := os.OpenRoot("static")
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	defer root.Close()
-	fi, err := root.Lstat("sw.js")
-	if err != nil || !fi.Mode().IsRegular() {
-		http.NotFound(w, r)
-		return
-	}
-	f, err := root.Open("sw.js")
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	defer f.Close()
-	w.Header().Set("Content-Type", "application/javascript")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Service-Worker-Allowed", "/")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("Referrer-Policy", "no-referrer")
-	http.ServeContent(w, r, "sw.js", fi.ModTime(), f)
 }
 
 func healthHandler(w http.ResponseWriter, _ *http.Request) {

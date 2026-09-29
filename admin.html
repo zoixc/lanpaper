@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>Lanpaper</title>
-  <meta name="description" content="Self-hosted wallpaper, image sharing and URL shortening for your network.">
+  <meta name="description" content="Self-hosted wallpaper and media link server for your network.">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
@@ -13,10 +13,11 @@
   <meta name="apple-mobile-web-app-title" content="Lanpaper">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <!-- theme-color: respects system preference before JS loads -->
-  <meta name="theme-color" content="#f4f1ec" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#131315" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f3f2f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b0c10" media="(prefers-color-scheme: dark)">
   <link rel="manifest" href="/static/manifest.json">
-  <link rel="preload" href="/static/fonts/Rubik.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="/static/fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/unbounded-latin-500.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
@@ -40,7 +41,7 @@
     <!-- Header -->
     <header class="header-row">
       <div class="logo-wrapper">
-        <img src="/static/logo.svg" alt="Lanpaper" class="logo" width="160" height="34">
+        <img src="/static/logo.svg" alt="Lanpaper" class="logo" width="160" height="40">
       </div>
       <div class="controls">
         <div id="settingsDropdown" class="settings-dropdown">
@@ -145,7 +146,7 @@
                maxlength="64"
                aria-label="Link ID"
                data-i18n-aria="aria_link_input">
-        <button type="submit" id="createLinkBtn" class="btn btn--primary" data-i18n="create_btn">
+        <button type="submit" id="createLinkBtn" class="btn btn--primary">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <line x1="12" y1="5" x2="12" y2="19"/>
             <line x1="5" y1="12" x2="19" y2="12"/>

@@ -3,9 +3,10 @@
 .gitignore
 .github
 
-# Documentation
+# Documentation and tests
 *.md
 docs/
+tests/
 
 # Go test artifacts
 *_test.go
@@ -37,9 +38,5 @@ external/
 docker-compose*.yml
 
 # Build artifacts
-lanpaper
+/lanpaper
 lanpaper.exe
-
-# Local dev dirs
-lanpaper/
-homepage/

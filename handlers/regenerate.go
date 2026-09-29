@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"lanpaper/config"
 	"lanpaper/storage"
@@ -40,6 +41,8 @@ func RegeneratePreviews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer regenerating.Store(false)
+	// A large library can take longer than the default write timeout.
+	extendDeadline(w, config.RegenerateTimeout*time.Second)
 
 	wallpapers := storage.Global.GetAll()
 	result := RegeneratePreviewsResult{Total: len(wallpapers)}
@@ -98,7 +101,7 @@ func regenPreview(wp *storage.Wallpaper) error {
 		return err
 	}
 	defer release()
-	if err := os.MkdirAll(config.PreviewDir, 0755); err != nil {
+	if err := os.MkdirAll(config.PreviewDir, config.DataDirPerm); err != nil {
 		return err
 	}
 	stage, err := stagePath(config.PreviewDir, "webp")
@@ -106,7 +109,7 @@ func regenPreview(wp *storage.Wallpaper) error {
 		return err
 	}
 	defer os.Remove(stage)
-	if err := saveImage(thumbnail(img, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight), "webp", stage); err != nil {
+	if err := savePreview(img, stage); err != nil {
 		return err
 	}
 	previewPath := storage.PreviewFilePath(wp.LinkName)

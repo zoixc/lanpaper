@@ -1,7 +1,7 @@
 /**
- * Export/Import functionality for Lanpaper
- * Allows backing up and restoring all data
- * No hidden input elements - uses modern File System Access API with fallback
+ * Export/import of the link list and UI settings.
+ * The backup contains link metadata only (no media files and no access
+ * tokens); importing re-creates missing links without replacing anything.
  */
 
 // DOM Elements for export/import. Local refs only: this file must keep
@@ -24,7 +24,9 @@ function exportData() {
                 viewMode: STATE.viewMode,
                 sortBy: STATE.sortBy
             },
-            wallpapers: STATE.wallpapers
+            // Access tokens are secrets and are never restored by an import,
+            // so they are not written to the backup file.
+            wallpapers: STATE.wallpapers.map(({ accessToken, ...link }) => link)
         };
 
         const dataStr = JSON.stringify(exportData, null, 2);

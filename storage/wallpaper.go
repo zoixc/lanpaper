@@ -239,14 +239,16 @@ func cloneSnap(original []*Wallpaper) []*Wallpaper {
 	return snap
 }
 
-// atomicWrite marshals data to a temp file and renames it atomically,
-// so a crash mid-write never produces a truncated JSON file.
+// atomicWrite marshals data to a temp file, flushes it to stable storage and
+// renames it atomically, so neither a crash nor a power loss mid-write can
+// leave a truncated or empty JSON file behind.
 func atomicWrite(path string, data map[string]*Wallpaper) error {
 	body, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal: %w", err)
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".wallpapers-*.json")
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".wallpapers-*.json")
 	if err != nil {
 		return fmt.Errorf("create temp: %w", err)
 	}
@@ -256,6 +258,11 @@ func atomicWrite(path string, data map[string]*Wallpaper) error {
 		os.Remove(tmpName)
 		return fmt.Errorf("write temp: %w", err)
 	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return fmt.Errorf("sync temp: %w", err)
+	}
 	if err := tmp.Close(); err != nil {
 		os.Remove(tmpName)
 		return fmt.Errorf("close temp: %w", err)
@@ -264,7 +271,17 @@ func atomicWrite(path string, data map[string]*Wallpaper) error {
 		os.Remove(tmpName)
 		return fmt.Errorf("rename temp: %w", err)
 	}
+	syncDir(dir)
 	return nil
+}
+
+// syncDir makes a completed rename durable. Some filesystems (network or
+// FUSE mounts) do not support syncing directories, so this is best effort.
+func syncDir(dir string) {
+	if d, err := os.Open(dir); err == nil {
+		_ = d.Sync()
+		d.Close()
+	}
 }
 
 // MediaPath returns the canonical on-disk path for a link's media file.
@@ -294,11 +311,7 @@ func NormalizeAccessLevel(level string) string {
 // Prefers the new data/ layout; falls back to legacy static/images/ if the
 // new file is missing but the old one still exists (pre-migration installs).
 func derivePaths(wp *Wallpaper) {
-	if wp.AccessLevel == "" {
-		wp.AccessLevel = config.AccessPublic
-	} else {
-		wp.AccessLevel = NormalizeAccessLevel(wp.AccessLevel)
-	}
+	wp.AccessLevel = NormalizeAccessLevel(wp.AccessLevel)
 	// Public URL is always the stable link path — never a direct filesystem URL.
 	wp.ImageURL = "/" + wp.LinkName
 	// Admin preview endpoint (auth-protected); empty when no image.
@@ -313,7 +326,7 @@ func derivePaths(wp *Wallpaper) {
 	legacyImg := filepath.Join(config.LegacyMedia, wp.LinkName+"."+wp.MIMEType)
 	wp.ImagePath = pickExisting(newImg, legacyImg)
 
-	if wp.MIMEType == "mp4" || wp.MIMEType == "webm" {
+	if config.IsVideoExt(wp.MIMEType) {
 		wp.PreviewPath = ""
 		wp.Preview = ""
 		return
@@ -347,11 +360,11 @@ func pickExisting(primary, fallback string) string {
 // MigrateMediaToDataDir moves legacy static/images files into data/media and
 // data/previews. Safe to call repeatedly; skips missing sources.
 func MigrateMediaToDataDir() {
-	if err := os.MkdirAll(config.MediaDir, 0755); err != nil {
+	if err := os.MkdirAll(config.MediaDir, config.DataDirPerm); err != nil {
 		log.Printf("Warning: cannot create %s: %v", config.MediaDir, err)
 		return
 	}
-	if err := os.MkdirAll(config.PreviewDir, 0755); err != nil {
+	if err := os.MkdirAll(config.PreviewDir, config.DataDirPerm); err != nil {
 		log.Printf("Warning: cannot create %s: %v", config.PreviewDir, err)
 		return
 	}
@@ -379,7 +392,7 @@ func MigrateMediaToDataDir() {
 			moved++
 		}
 
-		if wp.MIMEType != "mp4" && wp.MIMEType != "webm" {
+		if !config.IsVideoExt(wp.MIMEType) {
 			dstPrev := PreviewFilePath(wp.LinkName)
 			srcPrev := filepath.Join(config.LegacyMedia, "previews", wp.LinkName+".webp")
 			if moveIfNeeded(srcPrev, dstPrev) {
@@ -419,7 +432,7 @@ func moveIfNeeded(src, dst string) bool {
 	} else if !os.IsNotExist(err) {
 		return false
 	}
-	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dst), config.DataDirPerm); err != nil {
 		log.Printf("Warning: mkdir for %s: %v", dst, err)
 		return false
 	}

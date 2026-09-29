@@ -15,12 +15,15 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/chai2010/webp"
 	_ "golang.org/x/image/bmp"
 	xdraw "golang.org/x/image/draw"
+	"golang.org/x/image/math/f64"
 	_ "golang.org/x/image/tiff"
 	xwebp "golang.org/x/image/webp"
 
@@ -66,30 +69,53 @@ func reserveDecodedPixels(pixels int64) (func(), error) {
 	return func() {
 		decodedPixels.Lock()
 		decodedPixels.inFlight -= pixels
+		idle := decodedPixels.inFlight == 0
 		decodedPixels.Unlock()
+		// A large decode leaves tens of MB of garbage that the runtime would
+		// keep resident for minutes. Hand it back once no image work is left.
+		if idle && pixels >= freeOSMemoryMinPixels {
+			go debug.FreeOSMemory()
+		}
 	}, nil
 }
+
+// freeOSMemoryMinPixels is the decode size (~4 MP) from which returning
+// memory to the OS is worth a forced GC cycle.
+const freeOSMemoryMinPixels = 4_000_000
 
 // copyFile writes to a temporary sibling and renames it into place. io.Copy
 // can use optimized file-to-file copies; a bounded reader still protects
 // against a local source growing after its initial size check.
 func copyFile(dst string, src io.Reader, limit int64) error {
+	return writeFileAtomic(dst, func(out *os.File) error {
+		n, err := io.Copy(out, io.LimitReader(src, limit+1))
+		if err == nil && n > limit {
+			err = errMediaTooLarge
+		}
+		return err
+	})
+}
+
+// writeFileAtomic writes a temporary sibling of dst, flushes it to stable
+// storage and renames it into place. A failed or interrupted write can never
+// truncate an existing file at dst.
+func writeFileAtomic(dst string, write func(*os.File) error) error {
 	out, err := os.CreateTemp(filepath.Dir(dst), ".tmp-*"+filepath.Ext(dst))
 	if err != nil {
 		return err
 	}
 	tmp := out.Name()
 	defer os.Remove(tmp)
-	n, copyErr := io.Copy(out, io.LimitReader(src, limit+1))
+	writeErr := write(out)
+	if writeErr == nil {
+		writeErr = out.Sync()
+	}
 	closeErr := out.Close()
-	if copyErr != nil {
-		return copyErr
+	if writeErr != nil {
+		return writeErr
 	}
 	if closeErr != nil {
 		return closeErr
-	}
-	if n > limit {
-		return errMediaTooLarge
 	}
 	return os.Rename(tmp, dst)
 }
@@ -100,7 +126,7 @@ var mimeToExt = map[string]string{
 	"video/mp4": "mp4", "video/webm": "webm",
 }
 
-func isVideo(ext string) bool { return ext == "mp4" || ext == "webm" }
+func isVideo(ext string) bool { return config.IsVideoExt(ext) }
 
 func storedExt(ext string, lossless bool) string {
 	if !lossless && (ext == "bmp" || ext == "tiff") {
@@ -206,30 +232,45 @@ func decodeImage(r io.ReadSeeker, ext string) (image.Image, func(), error) {
 	return img, release, nil
 }
 
+// thumbnail fits src into maxW x maxH, never upscaling.
 func thumbnail(src image.Image, maxW, maxH int) image.Image {
 	b := src.Bounds()
-	scale := min(float64(maxW)/float64(b.Dx()), float64(maxH)/float64(b.Dy()))
+	return resize(src, min(float64(maxW)/float64(b.Dx()), float64(maxH)/float64(b.Dy())))
+}
+
+// scaleImage applies the configured COMPRESSION_SCALE percentage.
+func scaleImage(src image.Image, scalePercent int) image.Image {
+	return resize(src, float64(scalePercent)/100)
+}
+
+// resize downscales src by scale with a bilinear kernel widened to the scale
+// factor (so every source pixel contributes). It uses Kernel.Transform, not
+// Kernel.Scale: Scale allocates a dstWidth x srcHeight float64 buffer (575 MB
+// to halve a 36 MP photo), while Transform needs no temporary memory and
+// produces the same pixels to within one level of rounding (resize_test.go).
+func resize(src image.Image, scale float64) image.Image {
 	if scale >= 1 {
 		return src
 	}
+	b := src.Bounds()
 	w := max(1, int(float64(b.Dx())*scale))
 	h := max(1, int(float64(b.Dy())*scale))
 	dst := image.NewRGBA(image.Rect(0, 0, w, h))
-	xdraw.BiLinear.Scale(dst, dst.Bounds(), src, b, draw.Src, nil)
+	sx := float64(w) / float64(b.Dx())
+	sy := float64(h) / float64(b.Dy())
+	s2d := f64.Aff3{sx, 0, -float64(b.Min.X) * sx, 0, sy, -float64(b.Min.Y) * sy}
+	xdraw.BiLinear.Transform(dst, s2d, src, b, draw.Src, nil)
 	return dst
 }
 
-func scaleImage(src image.Image, scalePercent int) image.Image {
-	if scalePercent >= 100 {
-		return src
-	}
-	b := src.Bounds()
-	scale := float64(scalePercent) / 100.0
-	w := max(1, int(float64(b.Dx())*scale))
-	h := max(1, int(float64(b.Dy())*scale))
-	dst := image.NewRGBA(image.Rect(0, 0, w, h))
-	xdraw.BiLinear.Scale(dst, dst.Bounds(), src, b, draw.Src, nil)
-	return dst
+// extendDeadline lifts the server-wide read/write timeouts for a long-running
+// admin request. It is only reached after authentication; public requests
+// keep the short server defaults.
+func extendDeadline(w http.ResponseWriter, d time.Duration) {
+	rc := http.NewResponseController(w)
+	deadline := time.Now().Add(d)
+	_ = rc.SetReadDeadline(deadline)
+	_ = rc.SetWriteDeadline(deadline)
 }
 
 func stagePath(dir, ext string) (string, error) {
@@ -324,10 +365,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "File too large", http.StatusRequestEntityTooLarge)
 		return
 	}
+	// Large files over slow links need more than the default read timeout.
+	extendDeadline(w, time.Duration(config.UploadBaseTimeout+maxRequest/config.UploadMinBytesPerSec)*time.Second)
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequest)
 	if err := r.ParseMultipartForm(8 << 20); err != nil {
-		var tooLarge *http.MaxBytesError
-		if errors.As(err, &tooLarge) {
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
 			http.Error(w, "File too large", http.StatusRequestEntityTooLarge)
 		} else {
 			http.Error(w, "Invalid multipart form", http.StatusBadRequest)
@@ -354,11 +396,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Link does not exist", http.StatusBadRequest)
 		return
 	}
-	if err := os.MkdirAll(config.MediaDir, 0755); err != nil {
+	if err := os.MkdirAll(config.MediaDir, config.DataDirPerm); err != nil {
 		http.Error(w, "Storage unavailable", http.StatusInternalServerError)
 		return
 	}
-	if err := os.MkdirAll(config.PreviewDir, 0755); err != nil {
+	if err := os.MkdirAll(config.PreviewDir, config.DataDirPerm); err != nil {
 		http.Error(w, "Storage unavailable", http.StatusInternalServerError)
 		return
 	}
@@ -423,7 +465,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	if localPath {
 		nameExt := strings.TrimPrefix(strings.ToLower(filepath.Ext(sourceName)), ".")
-		if isVideo(ext) != (nameExt == "mp4" || nameExt == "webm") {
+		if isVideo(ext) != isVideo(nameExt) {
 			http.Error(w, "Media type does not match local file", http.StatusBadRequest)
 			return
 		}
@@ -468,7 +510,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer os.Remove(previewStage)
-		if err := saveImage(thumbnail(img, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight), "webp", previewStage); err != nil {
+		if err := savePreview(img, previewStage); err != nil {
 			writeUploadError(w, err)
 			return
 		}
@@ -479,7 +521,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 			err = copyFile(imageStage, source, maxBytes)
 		} else {
-			err = saveImage(img, saveExt, imageStage)
+			err = saveImage(img, saveExt, imageStage, config.Current.Compression.Quality)
 		}
 		if err != nil {
 			writeUploadError(w, err)
@@ -570,26 +612,18 @@ func writeUploadError(w http.ResponseWriter, err error) {
 
 // saveImage encodes to a temporary sibling; a failed encode cannot truncate
 // either an existing stage file or a previously published image.
-func saveImage(img image.Image, format, path string) error {
-	out, err := os.CreateTemp(filepath.Dir(path), ".tmp-*"+filepath.Ext(path))
-	if err != nil {
-		return err
-	}
-	tmp := out.Name()
-	defer os.Remove(tmp)
-	encodeErr := encodeImage(out, img, format)
-	closeErr := out.Close()
-	if encodeErr != nil {
-		return encodeErr
-	}
-	if closeErr != nil {
-		return closeErr
-	}
-	return os.Rename(tmp, path)
+func saveImage(img image.Image, format, path string, quality int) error {
+	return writeFileAtomic(path, func(out *os.File) error {
+		return encodeImage(out, img, format, quality)
+	})
 }
 
-func encodeImage(w io.Writer, img image.Image, format string) error {
-	quality := config.Current.Compression.Quality
+// savePreview writes the WebP thumbnail shown in the admin panel.
+func savePreview(img image.Image, path string) error {
+	return saveImage(thumbnail(img, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight), "webp", path, config.ThumbnailQuality)
+}
+
+func encodeImage(w io.Writer, img image.Image, format string, quality int) error {
 	switch format {
 	case "jpg", "jpeg":
 		return jpeg.Encode(w, img, &jpeg.Options{Quality: quality})

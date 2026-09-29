@@ -2,14 +2,14 @@
   "id": "/",
   "name": "Lanpaper",
   "short_name": "Lanpaper",
-  "description": "Self-hosted wallpaper, image sharing and URL shortening for your network.",
+  "description": "Self-hosted wallpaper and media link server for your network.",
   "start_url": "/admin",
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "any",
-  "background_color": "#f4f1ec",
-  "theme_color": "#f4f1ec",
+  "background_color": "#f3f2f7",
+  "theme_color": "#f3f2f7",
   "lang": "en",
   "categories": ["utilities", "productivity"],
   "icons": [
@@ -41,7 +41,7 @@
     {
       "name": "Create new link",
       "short_name": "New",
-      "description": "Create a new short link",
+      "description": "Create a new wallpaper link",
       "url": "/admin?action=create",
       "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }]
     }

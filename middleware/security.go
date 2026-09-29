@@ -18,7 +18,6 @@ var staticSecurityHeaders = []struct{ key, value string }{
 	// including to other endpoints on the same origin.
 	{"Referrer-Policy", "no-referrer"},
 	{"Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"},
-	{"X-Download-Options", "noopen"},
 	{"Cross-Origin-Resource-Policy", "same-origin"},
 	{"Cross-Origin-Opener-Policy", "same-origin"},
 	// App assets carry CORP: same-origin. Credentialless is also compatible
@@ -27,26 +26,27 @@ var staticSecurityHeaders = []struct{ key, value string }{
 }
 
 // contentSecurityPolicy is the CSP applied to admin/API responses.
-// The admin panel loads only same-origin assets (plus data:/blob: URLs used
-// by the client-side compressor), so no 'unsafe-inline' and no remote
-// sources are needed.
+// The admin panel loads only same-origin assets (plus data: placeholders and
+// the blob: URLs used by the client-side image compressor), so no
+// 'unsafe-inline' and no remote sources are needed.
 const contentSecurityPolicy = "default-src 'none'; " +
 	"script-src 'self'; " +
 	"style-src 'self'; " +
 	"img-src 'self' data: blob:; " +
-	"media-src 'self' blob:; " +
+	"media-src 'self'; " +
 	"connect-src 'self'; " +
 	"font-src 'self'; " +
 	"manifest-src 'self'; " +
-	"worker-src 'self' blob:; " +
+	"worker-src 'self'; " +
 	"object-src 'none'; " +
 	"base-uri 'self'; " +
 	"form-action 'self'; " +
 	"frame-ancestors 'none';"
 
-// publicMediaCSP is a relaxed CSP for public media responses so that
-// consumers (digital frames, <img>/<video> embeds) are not broken.
-const publicMediaCSP = "default-src 'none'; style-src 'none'; script-src 'none'; sandbox;"
+// publicMediaCSP applies to public media responses. It does not affect
+// consumers that embed the media (<img>/<video>, digital frames); it only
+// neutralises the response if it is ever rendered as a document.
+const publicMediaCSP = "default-src 'none'; sandbox"
 
 // sameOriginRequest rejects cross-site and cross-port requests (CSRF).
 // Browsers send Sec-Fetch-Site and/or Origin on unsafe requests. A request
@@ -105,9 +105,12 @@ func sameOriginRequest(r *http.Request) bool {
 	return false
 }
 
+// rightmostHeader returns the last entry of a comma-separated header value.
 func rightmostHeader(value string) string {
-	parts := strings.Split(value, ",")
-	return strings.TrimSpace(parts[len(parts)-1])
+	if i := strings.LastIndexByte(value, ','); i >= 0 {
+		value = value[i+1:]
+	}
+	return strings.TrimSpace(value)
 }
 
 func effectivePort(u *url.URL) string {
@@ -123,6 +126,15 @@ func effectivePort(u *url.URL) string {
 	return ""
 }
 
+// setHSTS enables HTTP Strict Transport Security for HTTPS requests, either
+// served directly or forwarded by the trusted reverse proxy. Plain-HTTP LAN
+// deployments are unaffected.
+func setHSTS(h http.Header, r *http.Request) {
+	if r.TLS != nil || (config.IsTrustedProxy(r.RemoteAddr) && rightmostHeader(r.Header.Get("X-Forwarded-Proto")) == "https") {
+		h.Set("Strict-Transport-Security", "max-age=31536000")
+	}
+}
+
 // WithSecurity attaches security headers and rejects cross-site
 // state-changing requests (CSRF defence).
 func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
@@ -131,9 +143,7 @@ func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 		for _, hh := range staticSecurityHeaders {
 			h.Set(hh.key, hh.value)
 		}
-		if r.TLS != nil || (config.IsTrustedProxy(r.RemoteAddr) && rightmostHeader(r.Header.Get("X-Forwarded-Proto")) == "https") {
-			h.Set("Strict-Transport-Security", "max-age=31536000")
-		}
+		setHSTS(h, r)
 		h.Set("Cache-Control", "no-store")
 		h.Set("Content-Security-Policy", contentSecurityPolicy)
 
@@ -163,7 +173,7 @@ func WithPublicSecurity(next http.HandlerFunc) http.HandlerFunc {
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Referrer-Policy", "no-referrer")
 		h.Set("Content-Security-Policy", publicMediaCSP)
-		h.Set("X-Download-Options", "noopen")
+		setHSTS(h, r)
 		// Public media may be embedded cross-origin (smart TVs, frames).
 		h.Set("Cross-Origin-Resource-Policy", "cross-origin")
 		h.Set("Cache-Control", "no-store")

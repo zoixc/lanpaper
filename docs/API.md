@@ -1,654 +1,279 @@
-# Lanpaper API Documentation
+# Lanpaper HTTP API
 
-Comprehensive API reference for Lanpaper server.
+All endpoints are served by the single Lanpaper process (default port `8080`).
+Examples use `curl` and assume `ADMIN_PASS` is set in the shell.
 
-## Table of Contents
+## Conventions
 
-- [Authentication](#authentication)
-- [Endpoints](#endpoints)
-  - [Health Check](#health-check)
-  - [List Wallpapers](#list-wallpapers)
-  - [Create Link](#create-link)
-  - [Update Link](#update-link)
-  - [Delete Link](#delete-link)
-  - [Upload Image](#upload-image)
-  - [List External Images](#list-external-images)
-  - [Preview External Image](#preview-external-image)
-- [Error Responses](#error-responses)
-- [Rate Limiting](#rate-limiting)
-- [Examples](#examples)
+- **Authentication.** Admin endpoints (`/admin`, `/api/*`) use HTTP Basic Auth
+  with `ADMIN_USER` / `ADMIN_PASS`.
+  - Missing credentials: `401` with `WWW-Authenticate`.
+  - Credentials not configured on the server: `503` (fail closed).
+  - Lockout: after 10 wrong username/password pairs from one client within
+    15 minutes, requests with credentials get `429` plus `Retry-After` until
+    the window ends. Even correct credentials are rejected during the
+    lockout. IPv6 clients are grouped by `/64`.
+  - `DISABLE_AUTH=true` turns built-in auth off. Use it only behind an
+    authenticating reverse proxy.
+- **CSRF.** Browsers must send same-origin `POST`/`PATCH`/`DELETE` requests,
+  as indicated by `Sec-Fetch-Site` / `Origin`. Otherwise the server answers
+  `403`. Non-browser clients that send neither header are accepted, but still
+  need Basic Auth.
+- **Bodies.** JSON request bodies are limited to 64 KiB, and trailing data is
+  rejected. Unknown fields are ignored.
+- **Errors** are short plain-text messages, for example `Link not found`.
+- **Compression.** Text responses (HTML, CSS, JavaScript, JSON, SVG) of at
+  least 1 KiB are gzip-compressed for clients that send
+  `Accept-Encoding: gzip`, with `Vary: Accept-Encoding`. Media, range requests
+  and `HEAD` responses are never compressed.
+- **Caching.** The admin page and API responses are `Cache-Control: no-store`.
+  Media responses carry `ETag` and `Last-Modified`, and conditional requests
+  (`If-None-Match`, `If-Modified-Since`) get `304` — but only after the access
+  check has passed.
+- **Rate limits** are counted per client, with IPv6 grouped by `/64`, in fixed
+  one-minute windows:
 
----
+  | Traffic | Requests per minute | Default |
+  | --- | --- | --- |
+  | Public links | `RATE_PUBLIC_PER_MIN + RATE_BURST` | 120 + 10 |
+  | Uploads and preview regeneration | `RATE_UPLOAD_PER_MIN + RATE_BURST` | 20 + 10 |
 
-## Authentication
+  A limit of `0` disables that limiter. When a limit is exceeded, the server
+  answers `429` with `Retry-After`.
+- **Link names** are 1–64 characters: ASCII letters, digits, `_` and `-`,
+  starting with a letter or digit. The following names are reserved: `api`,
+  `admin`, `static`, `external`, `data`, `health`, `sw.js`, `favicon.ico`,
+  `robots.txt`, `sitemap.xml`, `manifest.json`, `manifest.webmanifest`
+  (case-insensitive).
 
-Lanpaper supports optional HTTP Basic Authentication. Authentication can be disabled by:
+## Link object
 
-1. Setting `DISABLE_AUTH=true` environment variable
-2. Not providing credentials (auto-disabled with warning)
-3. Setting `"disableAuth": true` in `config.json`
-
-When authentication is enabled, include credentials in requests:
-
-```bash
-curl -u admin:password https://lanpaper.example.com/api/wallpapers
-```
-
-Or use Authorization header:
-
-```bash
-curl -H "Authorization: Basic YWRtaW46cGFzc3dvcmQ=" https://lanpaper.example.com/api/wallpapers
-```
-
----
-
-
----
-
-## Access levels
-
-Public media endpoint: `GET /{linkName}`
-
-| `accessLevel` | Requirement |
-|---------------|-------------|
-| `public` | None |
-| `local` | Client IP is private/loopback/link-local/CGNAT |
-| `token` | `?token=` query or `X-Access-Token` header (admin Basic Auth also works) |
-| `auth` | Admin Basic Auth |
-
-Admin previews: `GET /api/preview/{linkName}` (always requires admin auth).
-
-Update access via `PATCH /api/link/{name}`:
-
-```json
-{ "accessLevel": "token" }
-```
-
-Rotate token:
-
-```json
-{ "rotateToken": true }
-```
-
-Media files are stored under `data/media/` and `data/previews/`. The path `/api/preview/` is not served over HTTP.
-
-
-## Endpoints
-
-### Health Check
-
-Check if the server is running.
-
-**Endpoint:** `GET /health`
-
-**Authentication:** Not required
-
-**Response:**
+The API returns links in this shape:
 
 ```json
 {
-  "status": "ok",
-  "service": "lanpaper",
-  "time": 1707456347
-}
-```
-
-**Example:**
-
-```bash
-curl https://lanpaper.example.com/health
-```
-
----
-
-### List Wallpapers
-
-Retrieve all wallpaper links.
-
-**Endpoint:** `GET /api/wallpapers`
-
-**Authentication:** Required (if enabled)
-
-**Response:**
-
-```json
-[
-  {
-    "id": "office-bg",
-    "linkName": "office-bg",
-    "imageUrl": "/office-bg",
-    "preview": "/api/preview/office-bg",
-    "hasImage": true,
-    "mimeType": "jpg",
-    "sizeBytes": 245670,
-    "modTime": 1707456000,
-    "createdAt": 1707450000,
-    "accessLevel": "public",
-    "pinned": false
-  },
-  {
-    "id": "home-screen",
-    "linkName": "home-screen",
-    "imageUrl": "",
-    "preview": "",
-    "hasImage": false,
-    "mimeType": "",
-    "sizeBytes": 0,
-    "modTime": 0,
-    "createdAt": 1707455000
-  }
-]
-```
-
-**Example:**
-
-```bash
-curl -u admin:password https://lanpaper.example.com/api/wallpapers
-```
-
----
-
-### Create Link
-
-Create a new wallpaper link (without image).
-
-**Endpoint:** `POST /api/link`
-
-**Authentication:** Required (if enabled)
-
-**Request Body:**
-
-```json
-{
-  "linkName": "my-wallpaper"
-}
-```
-
-**Validation Rules:**
-- Only alphanumeric characters, hyphens, and underscores
-- Cannot be reserved names: `admin`, `api`, `static`, `health`
-- Must be unique
-
-**Response:** `201 Created`
-
-```json
-{
-  "id": "my-wallpaper",
-  "linkName": "my-wallpaper",
-  "imageUrl": "",
-  "preview": "",
-  "hasImage": false,
-  "mimeType": "",
-  "sizeBytes": 0,
-  "modTime": 0,
-  "createdAt": 1707456500
-}
-```
-
-**Examples:**
-
-```bash
-# Using curl
-curl -X POST -u admin:password \
-  -H "Content-Type: application/json" \
-  -d '{"linkName":"office-wall"}' \
-  https://lanpaper.example.com/api/link
-
-# Using HTTPie
-http POST https://lanpaper.example.com/api/link \
-  linkName=office-wall \
-  -a admin:password
-```
-
-**Error Responses:**
-
-- `400 Bad Request` - Invalid link name
-- `409 Conflict` - Link already exists
-
----
-
-### Update Link
-
-Update link properties (currently not implemented - reserved for future use).
-
-**Endpoint:** `PUT /api/link/{linkName}`
-
-**Authentication:** Required (if enabled)
-
----
-
-### Delete Link
-
-Delete a wallpaper link and its associated image.
-
-**Endpoint:** `DELETE /api/link/{linkName}`
-
-**Authentication:** Required (if enabled)
-
-**Response:** `200 OK`
-
-```json
-{
-  "message": "Link deleted"
-}
-```
-
-**Example:**
-
-```bash
-curl -X DELETE -u admin:password \
-  https://lanpaper.example.com/api/link/office-wall
-```
-
-**Error Responses:**
-
-- `404 Not Found` - Link does not exist
-
----
-
-### Upload Image
-
-Upload an image to an existing link.
-
-**Endpoint:** `POST /api/upload`
-
-**Authentication:** Required (if enabled)
-
-**Content-Type:** `multipart/form-data`
-
-**Form Fields:**
-
-| Field      | Type   | Required | Description                                    |
-|------------|--------|----------|------------------------------------------------|
-| linkName   | string | Yes      | The link ID to upload to                       |
-| file       | file   | No*      | Image/video file                               |
-| url        | string | No*      | URL to download image from or local file path  |
-
-*Either `file` or `url` must be provided.
-
-**Supported Formats:**
-
-- **Images:** JPEG, PNG, GIF, WebP, BMP, TIFF
-- **Videos:** MP4, WebM
-
-**Size Limits:**
-
-Configurable via `MAX_UPLOAD_MB` environment variable or `maxUploadMB` in config (default: 10 MB).
-
-**Response:** `200 OK`
-
-```json
-{
-  "id": "office-wall",
-  "linkName": "office-wall",
-  "imageUrl": "/office-wall",
-  "preview": "/api/preview/office-wall",
+  "id": "bedroom",
+  "linkName": "bedroom",
+  "category": "other",
   "hasImage": true,
+  "imageUrl": "/bedroom",
+  "preview": "/api/preview/bedroom",
   "mimeType": "jpg",
-  "sizeBytes": 245670,
-  "modTime": 1707456800,
-  "createdAt": 1707456500
+  "sizeBytes": 482113,
+  "modTime": 1790620000,
+  "createdAt": 1790610000,
+  "pinned": false,
+  "pinnedAt": 1790630000,
+  "accessLevel": "token",
+  "accessToken": "k3J…"
 }
 ```
 
-**Examples:**
+| Field | Notes |
+| --- | --- |
+| `mimeType` | Stored file extension: `jpg`, `png`, `gif`, `webp`, `bmp`, `tiff`, `mp4` or `webm`. |
+| `preview` | Absent for videos and for links without media. |
+| `pinnedAt` | Present only for pinned links. |
+| `accessToken` | Present only when `accessLevel` is `token`. |
+| `category` | One of `tech`, `life`, `work`, `other`; defaults to `other`. |
+| Timestamps | Unix seconds. |
 
-```bash
-# Upload local file
-curl -X POST -u admin:password \
-  -F "linkName=office-wall" \
-  -F "file=@/path/to/image.jpg" \
-  https://lanpaper.example.com/api/upload
+## Admin endpoints
 
-# Upload from URL
-curl -X POST -u admin:password \
-  -F "linkName=office-wall" \
-  -F "url=https://example.com/image.jpg" \
-  https://lanpaper.example.com/api/upload
+### `GET /api/wallpapers`
 
-# Upload from external directory (server-side)
-curl -X POST -u admin:password \
-  -F "linkName=office-wall" \
-  -F "url=photos/beach.jpg" \
-  https://lanpaper.example.com/api/upload
+Lists links. By default, pinned links come first (most recently pinned
+first), then links with media (newest first), then empty links.
+
+| Query parameter | Meaning |
+| --- | --- |
+| `category` | Filter by category (case-insensitive). |
+| `has_image` | `true` or `false`. |
+| `sort` | `created` or `updated`. Pinned links stay first. |
+| `order` | `desc` (default) or `asc`. |
+| `page`, `page_size` | Optional pagination. `page_size` defaults to 50, maximum 200. |
+
+- Without `page`, the response is a JSON array of link objects.
+- With `page`, the response is
+  `{"data": [...], "total": n, "page": p, "pageSize": s, "totalPages": t}`.
+  An invalid page number returns `400`.
+
+```sh
+curl -u admin:"$ADMIN_PASS" 'http://localhost:8080/api/wallpapers?page=1&page_size=50'
 ```
 
-**Error Responses:**
+### `POST /api/link`
 
-- `400 Bad Request` - Invalid file, unsupported format, or file too large
-- `404 Not Found` - Link does not exist
-- `413 Payload Too Large` - File exceeds maximum size
-- `429 Too Many Requests` - Rate limit exceeded or too many concurrent uploads
+Creates an empty link.
 
----
-
-### List External Images
-
-List available images from the external image directory.
-
-**Endpoint:** `GET /api/external-images`
-
-**Authentication:** Required (if enabled)
-
-**Response:**
-
-```json
-{
-  "images": [
-    "photos/beach.jpg",
-    "photos/mountains.png",
-    "wallpapers/abstract.jpg"
-  ]
-}
+```sh
+curl -u admin:"$ADMIN_PASS" -H 'Content-Type: application/json' \
+  -d '{"linkName":"bedroom","accessLevel":"public"}' http://localhost:8080/api/link
 ```
 
-**Example:**
+- Body fields: `linkName` (required), `category` (optional) and
+  `accessLevel` (optional, default `public`).
+- Choosing `token` generates a random 256-bit token.
+- Success: `201` with the link object.
 
-```bash
-curl -u admin:password https://lanpaper.example.com/api/external-images
+| Status | Message |
+| --- | --- |
+| `400` | `Invalid link name` / `Invalid category` / `Invalid access level` / `Invalid JSON` |
+| `409` | `Link name already taken` |
+
+### `PATCH /api/link/{name}`
+
+Changes one link. The body contains any of these fields:
+
+| Field | Effect |
+| --- | --- |
+| `newLinkName` | Renames the link and its files. When present, the other fields are ignored, so send them in a separate request. |
+| `category` | Sets the category. An empty string resets it to `other`. |
+| `accessLevel` | `public`, `local`, `token` or `auth`. Switching to `token` generates a token, and an existing token is kept. Leaving `token` deletes the token. |
+| `rotateToken` | `true` issues a new token, and the old one stops working immediately. On a link that is not token-protected this returns `400`. |
+
+- Success: `200` with the updated link object.
+- Errors: `404` if the link doesn't exist, `409` if the new name is taken.
+
+```sh
+curl -u admin:"$ADMIN_PASS" -X PATCH -H 'Content-Type: application/json' \
+  -d '{"accessLevel":"token"}' http://localhost:8080/api/link/bedroom
 ```
 
-**Configuration:**
+### `DELETE /api/link/{name}`
 
-Set external image directory:
-- Environment: `EXTERNAL_IMAGE_DIR=/path/to/images`
-- Config: `"externalImageDir": "/path/to/images"`
-- Default: `external/images`
+Deletes the link together with its media and preview.
 
----
+- Success: `204`.
+- Error: `404` if the link doesn't exist.
 
-### Preview External Image
+### `POST /api/link/{name}/pin`
 
-Generate a preview thumbnail for an external image.
+Toggles the pin. Returns `200` with the updated link object.
 
-**Endpoint:** `POST /api/external-image-preview`
+### `POST /api/upload`
 
-**Authentication:** Required (if enabled)
+Sets or replaces the media of an existing link. The request is
+`multipart/form-data` with these fields:
 
-**Request Body:**
+- `linkName`: required. The link must already exist; otherwise the server
+  answers `400 Link does not exist`.
+- One media source:
+  - `file`: an uploaded file.
+  - `url`: a public `http(s)://` URL.
+  - `url` set to a path relative to `EXTERNAL_IMAGE_DIR`, as returned by
+    `/api/external-images`.
 
-```json
-{
-  "path": "photos/beach.jpg"
-}
+```sh
+curl -u admin:"$ADMIN_PASS" -F linkName=bedroom -F file=@photo.jpg http://localhost:8080/api/upload
+curl -u admin:"$ADMIN_PASS" -F linkName=bedroom -F url=https://example.com/photo.jpg http://localhost:8080/api/upload
 ```
 
-**Response:**
+Media handling:
 
-Returns WebP image data (binary) with `Content-Type: image/webp`.
+- The type is detected from the file content, not from the file name or the
+  `Content-Type` header.
+- Images are fully decoded before they are stored.
+- With `COMPRESSION_QUALITY=100` and `COMPRESSION_SCALE=100`, the original
+  bytes are kept. Otherwise images are scaled and re-encoded.
+- A WebP thumbnail is generated for each image.
 
-**Example:**
+Success: `200` with the updated link object.
 
-```bash
-curl -u admin:password \
-  -H "Content-Type: application/json" \
-  -d '{"path":"photos/beach.jpg"}' \
-  https://lanpaper.example.com/api/external-image-preview \
-  --output preview.webp
-```
+| Status | Cause |
+| --- | --- |
+| `400` | Invalid input, unsupported or corrupt media, or a remote URL that is not allowed or failed to download. |
+| `403` / `404` | Gallery path outside the gallery directory / file not found. |
+| `413` | Larger than `MAX_UPLOAD_MB`. |
+| `429` | Rate limit, concurrent-upload limit, or image memory budget exhausted (`Retry-After: 5`). |
+| `500` | Storage error. |
 
-**Error Responses:**
+Long uploads are allowed: after authentication, the read deadline is at least
+120 s plus the time needed to transfer the maximum size at 256 KiB/s.
 
-- `400 Bad Request` - Invalid or unsafe path
-- `404 Not Found` - Image not found
-- `500 Internal Server Error` - Failed to generate preview
+### `GET /api/preview/{name}`
 
----
+Returns the WebP thumbnail. For videos, or when the thumbnail is missing, it
+returns the original media. Always admin-only, whatever the link's access
+level. `Cache-Control: private, no-cache`: the browser keeps a copy but
+revalidates it on every use.
 
-## Error Responses
+### `GET /api/external-images`
 
-All error responses follow this format:
+Returns a JSON array of media paths below `EXTERNAL_IMAGE_DIR`, relative and
+slash-separated, for example `["holiday/beach.jpg"]`. The listing:
 
-```json
-{
-  "error": "Error message description"
-}
-```
+- Skips hidden files and directories.
+- Skips files larger than `MAX_UPLOAD_MB`.
+- Does not descend deeper than `MAX_WALK_DEPTH`.
+- Ignores symlinks that resolve outside the directory.
+- Stops at 5,000 files.
 
-### Common HTTP Status Codes
+### `GET /api/external-image-preview?path=...`
 
-| Code | Meaning                 | Description                           |
-|------|-------------------------|---------------------------------------|
-| 400  | Bad Request             | Invalid input or malformed request    |
-| 401  | Unauthorized            | Authentication required or failed     |
-| 403  | Forbidden               | Access denied                         |
-| 404  | Not Found               | Resource does not exist               |
-| 409  | Conflict                | Resource already exists               |
-| 413  | Payload Too Large       | File exceeds size limit               |
-| 429  | Too Many Requests       | Rate limit exceeded                   |
-| 500  | Internal Server Error   | Server-side error                     |
+Returns one gallery file after validating its type, with
+`Cache-Control: private, no-cache`.
 
----
+| Status | Cause |
+| --- | --- |
+| `400` | Invalid path or media. |
+| `403` | Outside the gallery or unavailable. |
+| `404` | Missing. |
 
-## Rate Limiting
+### `GET /api/compression-config`
 
-Lanpaper implements rate limiting to prevent abuse.
+Returns `{"quality": 85, "scale": 100}`. The admin panel reads these values
+for browser-side JPEG re-encoding.
 
-**Default Limits:**
+### `POST /api/regenerate-previews`
 
-- Public endpoints: 50 requests/minute
-- Admin endpoints: Unlimited (0 = no limit)
-- Upload endpoint: 20 requests/minute
-- Burst allowance: 10 requests
+Rebuilds all image thumbnails and removes orphaned ones. The response is
+`{"total": n, "ok": n, "skipped": n, "errors": n, "failed": ["name", ...]}`.
 
-**Configuration:**
+- Only one run at a time; a second request while one is running returns `429`.
+- Counts towards the upload rate limit.
 
-```json
-{
-  "rate": {
-    "public_per_min": 50,
-    "admin_per_min": 0,
-    "upload_per_min": 20,
-    "burst": 10
-  }
-}
-```
+## Public endpoints
 
-Or via environment variable:
+### `GET /{name}` (and `HEAD`)
 
-```bash
-RATE_LIMIT=100  # Sets all limits to 100/min
-```
+Serves the media of a link:
 
-**Rate Limit Headers:**
+- `Content-Type`, `Content-Disposition: inline`, `ETag`, `Last-Modified`.
+- `Cache-Control: private, no-cache` for `public` and `local` links: browsers
+  revalidate before every use, so a changed or revoked link takes effect
+  immediately. `token` and `auth` links are `no-store`.
+- HTTP range requests are supported.
+- Cross-origin embedding is allowed (`Cross-Origin-Resource-Policy: cross-origin`).
 
-Responses include rate limit information:
+| Access level | Requirement | Denied |
+| --- | --- | --- |
+| `public` | none | — |
+| `local` | Client IP is loopback, RFC 1918, link-local, CGNAT or IPv6 ULA | `403` |
+| `token` | `?token=…` or `X-Access-Token: …`; admin Basic Auth also works | `403` |
+| `auth` | Admin Basic Auth | `401` (`403` with `DISABLE_AUTH=true`) |
 
-```
-X-RateLimit-Limit: 50
-X-RateLimit-Remaining: 45
-X-RateLimit-Reset: 1707456900
-```
+- A link without media returns `404`.
+- Wrong admin credentials count towards the login lockout.
 
----
+### `GET /health`
 
-## Examples
+Liveness check, always public. Returns `{"service":"lanpaper","status":"ok","version":"0.11.0"}`.
 
-### Complete Workflow
+### `GET /health/ready`
 
-```bash
-# 1. Check server health
-curl https://lanpaper.example.com/health
+Readiness check. It verifies that `data/` and `data/media/` are accessible
+and that at least 1 GB of disk space is free.
 
-# 2. Create a new link
-curl -X POST -u admin:password \
-  -H "Content-Type: application/json" \
-  -d '{"linkName":"desktop-bg"}' \
-  https://lanpaper.example.com/api/link
+- Ready: `200` with `{"status":"ready","checks":{...}}`.
+- Not ready: `503`, with a `message` on each failing check.
 
-# 3. Upload an image
-curl -X POST -u admin:password \
-  -F "linkName=desktop-bg" \
-  -F "file=@wallpaper.jpg" \
-  https://lanpaper.example.com/api/upload
+### Other routes
 
-# 4. View the wallpaper
-open https://lanpaper.example.com/desktop-bg
-
-# 5. List all wallpapers
-curl -u admin:password https://lanpaper.example.com/api/wallpapers
-
-# 6. Delete the link
-curl -X DELETE -u admin:password \
-  https://lanpaper.example.com/api/link/desktop-bg
-```
-
-### Python Example
-
-```python
-import requests
-from requests.auth import HTTPBasicAuth
-
-BASE_URL = "https://lanpaper.example.com"
-auth = HTTPBasicAuth("admin", "password")
-
-# Create link
-response = requests.post(
-    f"{BASE_URL}/api/link",
-    json={"linkName": "python-wall"},
-    auth=auth
-)
-print(response.json())
-
-# Upload image
-with open("image.jpg", "rb") as f:
-    response = requests.post(
-        f"{BASE_URL}/api/upload",
-        files={"file": f},
-        data={"linkName": "python-wall"},
-        auth=auth
-    )
-print(response.json())
-
-# List wallpapers
-response = requests.get(f"{BASE_URL}/api/wallpapers", auth=auth)
-wallpapers = response.json()
-for wp in wallpapers:
-    print(f"{wp['id']}: {wp['imageUrl']}")
-```
-
-### JavaScript/Node.js Example
-
-```javascript
-const axios = require('axios');
-const FormData = require('form-data');
-const fs = require('fs');
-
-const BASE_URL = 'https://lanpaper.example.com';
-const auth = {
-  username: 'admin',
-  password: 'password'
-};
-
-// Create link
-async function createLink() {
-  const response = await axios.post(
-    `${BASE_URL}/api/link`,
-    { linkName: 'js-wall' },
-    { auth }
-  );
-  console.log(response.data);
-}
-
-// Upload image
-async function uploadImage() {
-  const form = new FormData();
-  form.append('linkName', 'js-wall');
-  form.append('file', fs.createReadStream('image.jpg'));
-  
-  const response = await axios.post(
-    `${BASE_URL}/api/upload`,
-    form,
-    {
-      auth,
-      headers: form.getHeaders()
-    }
-  );
-  console.log(response.data);
-}
-
-// List wallpapers
-async function listWallpapers() {
-  const response = await axios.get(
-    `${BASE_URL}/api/wallpapers`,
-    { auth }
-  );
-  response.data.forEach(wp => {
-    console.log(`${wp.id}: ${wp.imageUrl}`);
-  });
-}
-```
-
-### Shell Script Example
-
-```bash
-#!/bin/bash
-
-BASE_URL="https://lanpaper.example.com"
-USER="admin"
-PASS="password"
-
-# Function to create link and upload
-upload_wallpaper() {
-    local link_name="$1"
-    local file_path="$2"
-    
-    echo "Creating link: $link_name"
-    curl -s -X POST -u "$USER:$PASS" \
-        -H "Content-Type: application/json" \
-        -d "{\"linkName\":\"$link_name\"}" \
-        "$BASE_URL/api/link"
-    
-    echo -e "\nUploading image..."
-    curl -s -X POST -u "$USER:$PASS" \
-        -F "linkName=$link_name" \
-        -F "file=@$file_path" \
-        "$BASE_URL/api/upload"
-    
-    echo -e "\nDone! View at: $BASE_URL/$link_name"
-}
-
-# Usage
-upload_wallpaper "my-desktop" "/path/to/wallpaper.jpg"
-```
-
----
-
-## Security Considerations
-
-### File Upload Security
-
-1. **MIME Type Validation**: Server validates file type using magic bytes
-2. **Size Limits**: Configurable upload size limits
-3. **Path Traversal Protection**: Strict path validation for external files
-4. **Content Sanitization**: Filenames are sanitized to prevent injection
-
-### Best Practices
-
-1. **Use HTTPS**: Always use TLS/SSL in production
-2. **Strong Passwords**: Use passwords with 16+ characters
-3. **Rate Limiting**: Keep rate limits enabled
-4. **Regular Updates**: Keep server and dependencies updated
-5. **Firewall**: Restrict access to trusted networks if possible
-6. **Monitoring**: Monitor logs for suspicious activity
-
-### Configuration Security
-
-```bash
-# Recommended production settings
-ADMIN_USER=admin
-ADMIN_PASS=<strong-password-here>
-MAX_UPLOAD_MB=50
-RATE_LIMIT=100
-INSECURE_SKIP_VERIFY=false
-DISABLE_AUTH=false
-```
-
----
-
-## Additional Resources
-
-- [Main README](../README.md)
-- [Configuration Guide](CONFIGURATION.md)
-- [Deployment Guide](DEPLOYMENT.md)
-- [GitHub Repository](https://github.com/zoixc/lanpaper)
+| Route | Behaviour |
+| --- | --- |
+| `GET /admin` | Admin panel (Basic Auth). |
+| `/admin.html` | Permanent redirect to `/admin`. |
+| `/` | Redirect to `/admin`. |
+| `GET /sw.js` | Service worker (root scope). |
+| `GET /static/...` | Allowlisted application assets only. Legacy `static/images/` is never served. |
