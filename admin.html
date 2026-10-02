@@ -256,6 +256,53 @@
     </div>
   </div>
 
+  <!-- Versions & Playlist Modal -->
+  <div id="versionsOverlay" class="modal-overlay hidden" aria-modal="true" role="dialog" aria-hidden="true" aria-labelledby="versionsTitle">
+    <div class="modal modal--wide">
+      <h3 id="versionsTitle" data-i18n="versions_title">Versions and playlist</h3>
+      <div class="modal-body">
+        <p id="versionsLinkName" class="versions-link"></p>
+        <p id="versionsHint" class="versions-hint"></p>
+
+        <section class="versions-section">
+          <h4 data-i18n="versions_history">Version history</h4>
+          <div id="versionsList" class="versions-list"></div>
+        </section>
+
+        <section class="versions-section">
+          <h4 data-i18n="versions_playlist">Playlist</h4>
+          <div id="playlistList" class="versions-list"></div>
+          <div class="rotate-controls">
+            <label class="rotate-check">
+              <input type="checkbox" id="rotateEnabled">
+              <span data-i18n="rotate_enabled">Rotate automatically</span>
+            </label>
+            <label class="rotate-field">
+              <span data-i18n="rotate_interval">Every (s)</span>
+              <input type="number" id="rotateInterval" min="5" max="86400" step="5" inputmode="numeric">
+            </label>
+            <label class="rotate-field">
+              <span data-i18n="rotate_order">Order</span>
+              <select id="rotateOrder">
+                <option value="sequential" data-i18n="rotate_order_sequential">Sequential</option>
+                <option value="random" data-i18n="rotate_order_random">Random</option>
+              </select>
+            </label>
+            <button id="rotateSaveBtn" class="btn btn--primary" data-i18n="rotate_save">Save</button>
+          </div>
+        </section>
+
+        <section class="versions-section" id="statsSection">
+          <h4 data-i18n="stats_title">Access statistics</h4>
+          <p id="statsBody" class="versions-hint"></p>
+        </section>
+      </div>
+      <div class="modal-actions">
+        <button id="versionsCloseBtn" class="btn" data-i18n="modal_close">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Link Card Template -->
   <template id="linkCardTemplate">
     <article class="link-card" role="article">
@@ -328,6 +375,22 @@
                 <line x1="6" y1="18" x2="6.01" y2="18"/>
               </svg>
               <span data-i18n="upload_server">Server</span>
+            </button>
+            <!-- Adds a second file behind the same URL; the live file is untouched. -->
+            <button class="upload-menu-item append-file-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              <span data-i18n="upload_append">Add to playlist</span>
+            </button>
+            <input type="file" class="append-file-input d-none" accept="image/*,video/mp4,video/webm">
+            <button class="upload-menu-item versions-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"/>
+                <polyline points="12 7 12 12 15 14"/>
+              </svg>
+              <span data-i18n="versions_btn">Versions</span>
             </button>
           </div>
         </div>

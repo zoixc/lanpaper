@@ -48,6 +48,19 @@ const DOM = {
     confirmCancel: document.getElementById('confirmCancelBtn'),
     confirmDelete: document.getElementById('confirmDeleteBtn'),
 
+    versionsOverlay: document.getElementById('versionsOverlay'),
+    versionsLinkName: document.getElementById('versionsLinkName'),
+    versionsHint: document.getElementById('versionsHint'),
+    versionsList: document.getElementById('versionsList'),
+    playlistList: document.getElementById('playlistList'),
+    rotateEnabled: document.getElementById('rotateEnabled'),
+    rotateInterval: document.getElementById('rotateInterval'),
+    rotateOrder: document.getElementById('rotateOrder'),
+    rotateSave: document.getElementById('rotateSaveBtn'),
+    statsSection: document.getElementById('statsSection'),
+    statsBody: document.getElementById('statsBody'),
+    versionsClose: document.getElementById('versionsCloseBtn'),
+
     createInput: document.getElementById('newLinkId'),
     createForm: document.getElementById('createForm'),
 
@@ -317,6 +330,8 @@ function initKeyboardShortcuts() {
                 closeConfirm();
             } else if (!DOM.modalOverlay.classList.contains('hidden')) {
                 closeModal();
+            } else if (DOM.versionsOverlay && !DOM.versionsOverlay.classList.contains('hidden')) {
+                closeVersions();
             } else if (document.querySelector('.upload-dropdown.open, .custom-select.open, .settings-dropdown.open')) {
                 closeAllDropdowns();
             } else if (DOM.searchInput.value) {
@@ -1641,7 +1656,20 @@ function updateCard(card, link) {
     const sizeStr = link.sizeBytes ? ` · ${formatSize(link.sizeBytes)}` : '';
 
     const linkMeta = card.querySelector('.link-meta');
-    linkMeta.textContent = `${category} · ${fileType}${sizeStr} · ${dateStr}`;
+    // Version, playlist, rotation and hit counters are appended only when the
+    // link actually uses them, so untouched cards read exactly as before.
+    const extras = [];
+    if (link.currentVersion > 1) {
+        extras.push(t('meta_version', 'v{{n}}').replace('{{n}}', link.currentVersion));
+    }
+    if (Array.isArray(link.items) && link.items.length) {
+        extras.push(t('meta_items', '{{n}} in playlist').replace('{{n}}', link.items.length));
+    }
+    if (link.rotate && link.rotate.enabled) extras.push(t('meta_rotating', 'rotating'));
+    if (link.stats && link.stats.hits) {
+        extras.push(t('meta_hits', '{{n}} hits').replace('{{n}}', link.stats.hits));
+    }
+    linkMeta.textContent = [`${category} · ${fileType}${sizeStr} · ${dateStr}`, ...extras].join(' · ');
     linkMeta.setAttribute('aria-label', t('aria_file_info', 'File info'));
 
     setupAccessControl(card, link);
@@ -1817,6 +1845,36 @@ function setupCardEvents(card, link) {
         if (filename) await handleUpload(link, filename, true);
     });
 
+    // Playlist: a second file behind the same URL. It needs media to add to,
+    // which the server also enforces.
+    const appendBtn = card.querySelector('.append-file-btn');
+    const appendInput = card.querySelector('.append-file-input');
+    if (appendBtn && appendInput) {
+        appendBtn.addEventListener('click', () => {
+            dropdown.classList.remove('open');
+            toggleBtn.setAttribute('aria-expanded', 'false');
+            if (!link.hasImage) {
+                showToast(t('append_needs_media', 'Upload a file first — there is nothing to add to yet.'), 'error');
+                return;
+            }
+            appendInput.click();
+        });
+        appendInput.onchange = async () => {
+            if (!appendInput.files.length) return;
+            await handleUpload(link, appendInput.files[0], false, 'append');
+            appendInput.value = '';
+        };
+    }
+
+    const versionsBtn = card.querySelector('.versions-btn');
+    if (versionsBtn) {
+        versionsBtn.addEventListener('click', () => {
+            dropdown.classList.remove('open');
+            toggleBtn.setAttribute('aria-expanded', 'false');
+            openVersions(link);
+        });
+    }
+
     card.ondragover = e => { e.preventDefault(); card.classList.add('drag-over'); };
     card.ondragleave = () => card.classList.remove('drag-over');
     card.ondrop = async e => {
@@ -1865,9 +1923,13 @@ function setupCardEvents(card, link) {
 }
 
 
-async function handleUpload(link, fileOrUrl, isUrl = false) {
+async function handleUpload(link, fileOrUrl, isUrl = false, mode = 'replace') {
     const formData = new FormData();
     formData.append('linkName', link.linkName);
+    // "append" adds a playlist item behind the same URL and leaves the live
+    // file — and therefore every existing embed — untouched.
+    const isAppend = mode === 'append';
+    if (isAppend) formData.append('mode', 'append');
 
     if (isUrl) {
         formData.append('url', fileOrUrl);
@@ -1904,10 +1966,255 @@ async function handleUpload(link, fileOrUrl, isUrl = false) {
         else STATE.wallpapers.push(updatedLink);
         // Re-rendering replaces the card with one built from the new data.
         filterAndSort();
-        showToast(t('upload_success', 'Uploaded!'), 'success');
+        showToast(isAppend
+            ? t('append_success', 'Added to playlist')
+            : t('upload_success', 'Uploaded!'), 'success');
     } catch (_) {}
 }
 
+
+// VERSIONS & PLAYLIST
+// One dialog per link: archived versions (restore/delete), playlist items
+// (open/remove), rotation settings and the in-memory access counters.
+let versionsState = null;
+
+// mediaSelectorURL keeps the token of a protected link and adds ?v= or ?i=.
+function mediaSelectorURL(link, selector) {
+    const base = publicLinkURL(link);
+    if (!selector) return base;
+    return base + (base.includes('?') ? '&' : '?') + selector;
+}
+
+// applyLinkUpdate stores a record returned by the API and refreshes only its
+// card, so an open dialog survives the change.
+function applyLinkUpdate(updated) {
+    if (!updated || !updated.linkName) return null;
+    const idx = STATE.wallpapers.findIndex(wp => wp.linkName === updated.linkName);
+    if (idx !== -1) STATE.wallpapers[idx] = updated;
+    else STATE.wallpapers.push(updated);
+    if (versionsState && versionsState.link.linkName === updated.linkName) {
+        versionsState.link = updated;
+    }
+    const card = DOM.linksList.querySelector(`[data-link-name="${CSS.escape(updated.linkName)}"]`);
+    if (card) updateCard(card, updated);
+    return updated;
+}
+
+function versionsMessage(text, variant = '') {
+    const el = document.createElement('p');
+    el.className = `versions-msg ${variant}`.trim();
+    el.textContent = text;
+    return el;
+}
+
+function versionsRow(kind, title, meta) {
+    const row = document.createElement('div');
+    row.className = `versions-row versions-row--${kind}`;
+
+    const info = document.createElement('div');
+    info.className = 'versions-row-info';
+    const titleEl = document.createElement('span');
+    titleEl.className = 'versions-row-title';
+    titleEl.textContent = title;
+    info.appendChild(titleEl);
+    if (meta) {
+        const metaEl = document.createElement('span');
+        metaEl.className = 'versions-row-meta';
+        metaEl.textContent = meta;
+        info.appendChild(metaEl);
+    }
+    row.appendChild(info);
+
+    const actions = document.createElement('div');
+    actions.className = 'versions-row-actions';
+    row.appendChild(actions);
+    return { row, actions };
+}
+
+function versionsButton(label, variant, onClick) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `btn btn--small ${variant}`.trim();
+    btn.textContent = label;
+    btn.addEventListener('click', onClick);
+    return btn;
+}
+
+function versionsOpenLink(label, href) {
+    const a = document.createElement('a');
+    a.className = 'btn btn--small';
+    a.href = href;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.textContent = label;
+    return a;
+}
+
+function entryMeta(entry) {
+    return [
+        entry.ext ? entry.ext.toUpperCase() : '',
+        entry.sizeBytes ? formatSize(entry.sizeBytes) : '',
+        formatDate(entry.savedAt || entry.modTime || 0),
+    ].filter(Boolean).join(' · ');
+}
+
+async function openVersions(link) {
+    versionsState = { link };
+    DOM.versionsLinkName.textContent = link.linkName;
+    openDialog(DOM.versionsOverlay);
+    applyTranslations(DOM.versionsOverlay);
+    focusAfterPaint(DOM.versionsClose);
+    await refreshVersions();
+}
+
+function closeVersions() {
+    closeDialog(DOM.versionsOverlay);
+    versionsState = null;
+}
+
+async function refreshVersions() {
+    if (!versionsState) return;
+    const link = versionsState.link;
+    const name = encodeURIComponent(link.linkName);
+
+    let data = null;
+    try {
+        data = await apiCall(`/api/link/${name}/history`, 'GET');
+    } catch (_) {
+        DOM.versionsList.replaceChildren(versionsMessage(
+            t('load_error_hint', 'Failed to load — check the connection and try again.'), 'error'));
+        DOM.playlistList.replaceChildren();
+        return;
+    }
+    if (!data) return;
+
+    // --- Version history -------------------------------------------------
+    const rows = [];
+    if (link.hasImage) {
+        const live = data.live || {};
+        const { row, actions } = versionsRow('live',
+            `${t('versions_current', 'Current')} · v${data.currentVersion}`, entryMeta(live));
+        actions.appendChild(versionsOpenLink(t('versions_open', 'Open'), mediaSelectorURL(link, '')));
+        rows.push(row);
+    }
+    const history = Array.isArray(data.history) ? data.history : [];
+    if (!history.length) {
+        rows.push(versionsMessage(data.limit > 0
+            ? t('versions_empty', 'No archived versions yet. Replacing the file keeps the previous one here.')
+            : t('versions_disabled', 'Version history is disabled on this server (HISTORY_LIMIT=0).')));
+    }
+    for (const entry of history) {
+        const { row, actions } = versionsRow('archived', `v${entry.version}`, entryMeta(entry));
+        actions.appendChild(versionsOpenLink(t('versions_open', 'Open'),
+            mediaSelectorURL(link, `v=${entry.version}`)));
+        actions.appendChild(versionsButton(t('versions_restore', 'Restore'), 'btn--primary',
+            () => restoreVersion(link, entry.version)));
+        actions.appendChild(versionsButton(t('delete_btn', 'Delete'), 'btn--danger',
+            () => deleteVersion(link, entry.version)));
+        rows.push(row);
+    }
+    DOM.versionsList.replaceChildren(...rows);
+    DOM.versionsHint.textContent = data.limit > 0
+        ? t('versions_hint', 'Up to {{limit}} archived versions per link · {{size}} used')
+            .replace('{{limit}}', data.limit).replace('{{size}}', formatSize(data.bytes || 0))
+        : '';
+
+    // --- Playlist --------------------------------------------------------
+    const items = Array.isArray(link.items) ? link.items : [];
+    const itemRows = [];
+    if (!items.length) {
+        itemRows.push(versionsMessage(
+            t('playlist_empty', 'No playlist items yet. Use Upload → Add to playlist.')));
+    }
+    for (const item of items) {
+        const { row, actions } = versionsRow('item', `#${item.id}`, entryMeta(item));
+        actions.appendChild(versionsOpenLink(t('versions_open', 'Open'),
+            mediaSelectorURL(link, `i=${item.id}`)));
+        actions.appendChild(versionsButton(t('playlist_remove', 'Remove'), 'btn--danger',
+            () => removePlaylistItem(link, item.id)));
+        itemRows.push(row);
+    }
+    itemRows.push(versionsMessage(
+        t('playlist_count', '{{count}} items · the live file is always position 0')
+            .replace('{{count}}', items.length)));
+    DOM.playlistList.replaceChildren(...itemRows);
+
+    // Rotation needs something to rotate to.
+    const rotate = link.rotate || {};
+    const hasItems = items.length > 0;
+    DOM.rotateEnabled.checked = !!rotate.enabled;
+    DOM.rotateInterval.value = rotate.interval || 60;
+    DOM.rotateOrder.value = rotate.order === 'random' ? 'random' : 'sequential';
+    for (const el of [DOM.rotateEnabled, DOM.rotateInterval, DOM.rotateOrder, DOM.rotateSave]) {
+        if (el) el.disabled = !hasItems;
+    }
+
+    // --- Statistics ------------------------------------------------------
+    const stats = link.stats;
+    DOM.statsBody.textContent = stats && stats.hits
+        ? t('stats_hits', '{{hits}} requests · {{bytes}} transferred · last {{when}}')
+            .replace('{{hits}}', stats.hits)
+            .replace('{{bytes}}', formatSize(stats.bytes || 0))
+            .replace('{{when}}', new Date((stats.lastHit || 0) * 1000).toLocaleString())
+        : t('stats_none', 'Not requested since the server started. Counters are kept in memory and reset on restart.');
+}
+
+async function restoreVersion(link, version) {
+    const msg = t('confirm_restore_msg', 'Restore version {{version}} of "{{name}}"? The file it replaces is archived.')
+        .replace('{{version}}', version).replace('{{name}}', link.linkName);
+    if (!await showConfirm(msg)) return;
+    try {
+        const updated = await apiCall(
+            `/api/link/${encodeURIComponent(link.linkName)}/rollback`, 'POST', { version });
+        applyLinkUpdate(updated);
+        showToast(t('restored_success', 'Version {{version}} restored').replace('{{version}}', version), 'success');
+        await refreshVersions();
+    } catch (_) {}
+}
+
+async function deleteVersion(link, version) {
+    const msg = t('confirm_delete_version_msg', 'Delete archived version {{version}}? This cannot be undone.')
+        .replace('{{version}}', version);
+    if (!await showConfirm(msg)) return;
+    try {
+        const updated = await apiCall(
+            `/api/link/${encodeURIComponent(link.linkName)}/history/${version}`, 'DELETE');
+        applyLinkUpdate(updated);
+        showToast(t('version_deleted', 'Version {{version}} deleted').replace('{{version}}', version), 'success');
+        await refreshVersions();
+    } catch (_) {}
+}
+
+async function removePlaylistItem(link, id) {
+    const msg = t('confirm_remove_item_msg', 'Remove playlist item #{{id}}? This cannot be undone.')
+        .replace('{{id}}', id);
+    if (!await showConfirm(msg)) return;
+    try {
+        const updated = await apiCall(`/api/link/${encodeURIComponent(link.linkName)}`, 'PATCH', { removeItem: id });
+        applyLinkUpdate(updated);
+        showToast(t('item_removed', 'Playlist item removed'), 'success');
+        await refreshVersions();
+    } catch (_) {}
+}
+
+async function saveRotation(link) {
+    const enabled = DOM.rotateEnabled.checked;
+    const raw = parseInt(DOM.rotateInterval.value, 10);
+    // 0 restores the server default; anything else must be inside the bounds.
+    const interval = Number.isFinite(raw) && raw > 0 ? raw : 0;
+    if (enabled && interval !== 0 && (interval < 5 || interval > 86400)) {
+        showToast(t('rotate_interval_invalid', 'The interval must be between 5 and 86400 seconds.'), 'error');
+        return;
+    }
+    try {
+        const updated = await apiCall(`/api/link/${encodeURIComponent(link.linkName)}`, 'PATCH', {
+            rotate: { enabled, interval, order: DOM.rotateOrder.value }
+        });
+        applyLinkUpdate(updated);
+        showToast(t('rotate_saved', 'Rotation updated'), 'success');
+        await refreshVersions();
+    } catch (_) {}
+}
 
 function setupGlobalListeners() {
     DOM.createForm.addEventListener('submit', async (e) => {
@@ -1974,6 +2281,27 @@ function setupGlobalListeners() {
             trapFocus(DOM.confirmOverlay, e);
         }
     });
+
+    if (DOM.versionsOverlay) {
+        DOM.versionsClose.onclick = closeVersions;
+        DOM.versionsOverlay.onclick = (e) => {
+            if (e.target === DOM.versionsOverlay) closeVersions();
+        };
+        DOM.versionsOverlay.addEventListener('keydown', (e) => {
+            if (DOM.versionsOverlay.classList.contains('hidden')) return;
+            // Escape must work while the rotation interval input has focus, which
+            // the document-level shortcut handler ignores on purpose.
+            if (e.key === 'Escape') {
+                e.stopPropagation();
+                closeVersions();
+                return;
+            }
+            if (e.key === 'Tab') trapFocus(DOM.versionsOverlay, e);
+        });
+        DOM.rotateSave.onclick = () => {
+            if (versionsState) saveRotation(versionsState.link);
+        };
+    }
 
     const regenBtn = document.getElementById('regenPreviewsBtn');
     if (regenBtn) {

@@ -17,6 +17,13 @@
     "quality": 100,
     "scale": 100
   },
+  "history": {
+    "limit": 3,
+    "maxMB": 512
+  },
+  "playlistMax": 8,
+  "allowEmbed": false,
+  "corsOrigins": [],
   "proxyType": "http",
   "proxyHost": "",
   "proxyPort": "",

@@ -7,6 +7,19 @@ Examples use `curl` and assume `ADMIN_PASS` is set in the shell.
 
 - **Authentication.** Admin endpoints (`/admin`, `/api/*`) use HTTP Basic Auth
   with `ADMIN_USER` / `ADMIN_PASS`.
+  - **Publish keys.** `PUBLISH_KEYS` (environment only, comma-separated, 16+
+    characters, at most 32) authorizes *publishing* without the admin login:
+    `POST /api/upload` and `POST /api/link`. Send the key as
+    `X-Api-Key: <key>` or `Authorization: Bearer <key>`. Every other admin
+    route — rename, access level, pin, history, rollback, delete, listing —
+    still requires Basic Auth, so a key is not an admin session.
+  - Keys are kept as SHA-256 digests in memory, are never written to
+    `config.json`, and appear in logs only as an 8-hex-character fingerprint.
+  - A wrong key answers `401` and shares the brute-force budget with admin
+    logins: after 10 failures from one client within 15 minutes the client gets
+    `429` plus `Retry-After`, and even a correct key is refused until the
+    window ends. When no keys are configured, an `X-Api-Key` header is ignored
+    completely and cannot lock anybody out.
   - Missing credentials: `401` with `WWW-Authenticate`.
   - Credentials not configured on the server: `503` (fail closed).
   - Lockout: after 10 wrong username/password pairs from one client within
@@ -30,6 +43,22 @@ Examples use `curl` and assume `ADMIN_PASS` is set in the shell.
   Media responses carry `ETag` and `Last-Modified`, and conditional requests
   (`If-None-Match`, `If-Modified-Since`) get `304` — but only after the access
   check has passed.
+- **CORS and embedding.** Public media is same-origin by default: no
+  `Access-Control-Allow-Origin`, `X-Frame-Options: DENY` and a sandboxing CSP.
+  `CORS_ORIGINS` (comma-separated, `*` for any origin) adds
+  `Access-Control-Allow-Origin` for the listed origins plus `Vary: Origin`,
+  `Access-Control-Expose-Headers` (`ETag`, `Last-Modified`, `Content-Length`,
+  `Content-Range`, `Content-Type`) and answers `OPTIONS` preflights with `204`
+  (`Access-Control-Allow-Methods: GET, HEAD, OPTIONS`, `Max-Age: 600`, and the
+  requested headers filtered to an allowlist). Without `CORS_ORIGINS`, or for an
+  origin that is not listed, `OPTIONS` keeps returning `405`.
+  `ALLOW_EMBED=true` additionally drops `X-Frame-Options` and the CSP `sandbox`
+  for `/{name}` only — `/admin` and `/api/*` stay unframable.
+- **Selectors.** `/{name}` serves one file, chosen in this order: `?v=N` (an
+  archived version), `?i=N` (a playlist item, `0` for the live file), otherwise
+  the rotation clock, otherwise the live file. An unusable selector is a `404`;
+  it never silently falls back to different bytes. `?v=` and `?i=` together are
+  a `404`.
 - **Rate limits** are counted per client, with IPv6 grouped by `/64`, in fixed
   one-minute windows:
 
@@ -65,7 +94,15 @@ The API returns links in this shape:
   "pinned": false,
   "pinnedAt": 1790630000,
   "accessLevel": "token",
-  "accessToken": "k3J…"
+  "accessToken": "k3J…",
+  "currentVersion": 4,
+  "history": [
+    { "version": 3, "ext": "jpg", "sizeBytes": 471220, "modTime": 1790615000, "savedAt": 1790620000 },
+    { "version": 2, "ext": "png", "sizeBytes": 903114, "modTime": 1790612000, "savedAt": 1790615000 }
+  ],
+  "items": [ { "id": 1, "ext": "webm", "sizeBytes": 2211003, "modTime": 1790618000, "addedAt": 1790618000 } ],
+  "rotate": { "enabled": true, "interval": 60, "order": "sequential" },
+  "stats": { "hits": 42, "bytes": 20248746, "lastHit": 1790630000 }
 }
 ```
 
@@ -76,6 +113,11 @@ The API returns links in this shape:
 | `pinnedAt` | Present only for pinned links. |
 | `accessToken` | Present only when `accessLevel` is `token`. |
 | `category` | One of `tech`, `life`, `work`, `other`; defaults to `other`. |
+| `currentVersion` | Version number of the file `/{name}` serves. Absent for a link without media; a record written before versioning existed reads as `1`. |
+| `history` | Archived versions, newest first. Absent when nothing is archived. |
+| `items` | Playlist entries behind the same URL. The live file is not listed; it is position `0`. |
+| `rotate` | Present only when the link has playlist items or rotation settings, so links that use neither serialize exactly as before. |
+| `stats` | Requests and bytes served since the process started. In memory only: it resets on restart, holds no visitor identity, and is absent until the link has been requested. `304` and `HEAD` count as a hit with `0` bytes; refused requests (`401`, `403`, `404`, `429`) are not counted. |
 | Timestamps | Unix seconds. |
 
 ## Admin endpoints
@@ -131,18 +173,29 @@ Changes one link. The body contains any of these fields:
 | `category` | Sets the category. An empty string resets it to `other`. |
 | `accessLevel` | `public`, `local`, `token` or `auth`. Switching to `token` generates a token, and an existing token is kept. Leaving `token` deletes the token. |
 | `rotateToken` | `true` issues a new token, and the old one stops working immediately. On a link that is not token-protected this returns `400`. |
+| `rotate` | `{"enabled":bool,"interval":seconds,"order":"sequential"\|"random"}`. Fields are merged with the stored settings, so sending only `enabled` keeps the rest. `interval: 0` restores the default (60 s); any other value must be 5–86400. An unknown `order` returns `400`. Rotation only has an effect while the link has playlist items. |
+| `removeItem` | Playlist item id to delete. `0` or a negative id returns `400`; an id that does not exist returns `404`. The item's file is removed only after the metadata commit. |
 
 - Success: `200` with the updated link object.
-- Errors: `404` if the link doesn't exist, `409` if the new name is taken.
+- Errors: `404` if the link (or the playlist item) doesn't exist, `409` if the
+  new name is taken.
+- Renaming a link moves `data/history/{name}/` and `data/items/{name}/` with it
+  and rolls the move back if the metadata save fails.
 
 ```sh
 curl -u admin:"$ADMIN_PASS" -X PATCH -H 'Content-Type: application/json' \
   -d '{"accessLevel":"token"}' http://localhost:8080/api/link/bedroom
+curl -u admin:"$ADMIN_PASS" -X PATCH -H 'Content-Type: application/json' \
+  -d '{"rotate":{"enabled":true,"interval":300,"order":"random"}}' http://localhost:8080/api/link/bedroom
+curl -u admin:"$ADMIN_PASS" -X PATCH -H 'Content-Type: application/json' \
+  -d '{"removeItem":2}' http://localhost:8080/api/link/bedroom
 ```
 
 ### `DELETE /api/link/{name}`
 
-Deletes the link together with its media and preview.
+Deletes the link together with its media, preview, archived versions
+(`data/history/{name}/`), playlist items (`data/items/{name}/`) and its access
+counters.
 
 - Success: `204`.
 - Error: `404` if the link doesn't exist.
@@ -151,22 +204,99 @@ Deletes the link together with its media and preview.
 
 Toggles the pin. Returns `200` with the updated link object.
 
+### `GET /api/link/{name}/history`
+
+Lists what the URL serves and what can be restored.
+
+```json
+{
+  "linkName": "bedroom",
+  "currentVersion": 4,
+  "live": { "version": 4, "ext": "jpg", "sizeBytes": 482113, "modTime": 1790620000, "savedAt": 1790620000 },
+  "history": [ { "version": 3, "ext": "jpg", "sizeBytes": 471220, "modTime": 1790615000, "savedAt": 1790620000 } ],
+  "limit": 3,
+  "bytes": 471220
+}
+```
+
+| Field | Notes |
+| --- | --- |
+| `live` | The file `/{name}` serves, in the same shape as an archived version. Zero-valued for a link without media. |
+| `history` | Archived versions, newest first. `[]` when nothing is archived. |
+| `limit` | `HISTORY_LIMIT`. `0` means version history is disabled server-wide. |
+| `bytes` | Size of the listed archives for this link. The server-wide budget is `HISTORY_MAX_MB`. |
+
+- Errors: `404` if the link doesn't exist, `405` for any method but `GET`.
+
+```sh
+curl -u admin:"$ADMIN_PASS" http://localhost:8080/api/link/bedroom/history
+```
+
+### `POST /api/link/{name}/rollback`
+
+Restores an archived version as the file the URL serves.
+
+- Body: `{"version":2}` — the version must be listed in `history`.
+- The file that was live is archived by the same operation, so a rollback can
+  itself be rolled back: restoring version 2 of a link at version 4 makes the
+  live file version 5 and archives the displaced file as version 4.
+- The thumbnail is regenerated from the restored file (a video clears it).
+- Success: `200` with the updated link object.
+
+| Status | Cause |
+| --- | --- |
+| `400` | `Invalid version` (missing or `0`) or `Invalid JSON`. |
+| `404` | The link doesn't exist, the version isn't archived, or its file is gone. |
+
+```sh
+curl -u admin:"$ADMIN_PASS" -X POST -H 'Content-Type: application/json' \
+  -d '{"version":2}' http://localhost:8080/api/link/bedroom/rollback
+```
+
+### `DELETE /api/link/{name}/history/{version}`
+
+Drops one archived version and deletes its file immediately.
+
+- Success: `200` with the updated link object.
+- Errors: `400` for an invalid name or version, `404` when the version isn't
+  archived. Removing the last version also removes `data/history/{name}/`.
+
+```sh
+curl -u admin:"$ADMIN_PASS" -X DELETE http://localhost:8080/api/link/bedroom/history/3
+```
+
 ### `POST /api/upload`
 
-Sets or replaces the media of an existing link. The request is
-`multipart/form-data` with these fields:
+Sets or replaces the media of an existing link, or adds a playlist item to it.
+The request is `multipart/form-data` with these fields:
 
 - `linkName`: required. The link must already exist; otherwise the server
-  answers `400 Link does not exist`.
+  answers `400 Link does not exist` (see `autoCreate`).
 - One media source:
   - `file`: an uploaded file.
   - `url`: a public `http(s)://` URL.
   - `url` set to a path relative to `EXTERNAL_IMAGE_DIR`, as returned by
     `/api/external-images`.
+- `mode`: `replace` (default) or `append`.
+  - `replace` swaps the live file and archives the previous one when
+    `HISTORY_LIMIT` is greater than `0`.
+  - `append` stores the file as a playlist item behind the same URL and leaves
+    the live file — and every existing embed — untouched. It needs a link that
+    already has media (`400` otherwise), does not generate a thumbnail, and
+    answers `409 Playlist is full` at `PLAYLIST_MAX` items.
+- `autoCreate`: `1`, `true`, `yes` or `on` creates the link when it does not
+  exist yet, so one request can create a link and push its first file. Optional
+  `category` and `accessLevel` fields are validated and applied to the new link
+  (`400 Invalid access level or category` otherwise). Without the flag an
+  unknown name is still rejected, so a typo cannot silently create a link.
+- Authentication: Basic Auth, or a publish key (`X-Api-Key` /
+  `Authorization: Bearer`) when `PUBLISH_KEYS` is set.
 
 ```sh
 curl -u admin:"$ADMIN_PASS" -F linkName=bedroom -F file=@photo.jpg http://localhost:8080/api/upload
 curl -u admin:"$ADMIN_PASS" -F linkName=bedroom -F url=https://example.com/photo.jpg http://localhost:8080/api/upload
+curl -H "X-Api-Key: $PUBLISH_KEY" -F linkName=frame -F autoCreate=1 -F file=@photo.jpg http://localhost:8080/api/upload
+curl -H "X-Api-Key: $PUBLISH_KEY" -F linkName=frame -F mode=append -F file=@second.jpg http://localhost:8080/api/upload
 ```
 
 Media handling:
@@ -176,14 +306,19 @@ Media handling:
 - Images are fully decoded before they are stored.
 - With `COMPRESSION_QUALITY=100` and `COMPRESSION_SCALE=100`, the original
   bytes are kept. Otherwise images are scaled and re-encoded.
-- A WebP thumbnail is generated for each image.
+- A WebP thumbnail is generated for each image (`mode=append` skips it).
+- The replaced file is moved into `data/history/{name}/{version}.{ext}` — a
+  rename, not a copy — only after the metadata commit succeeded. A failed
+  archive is logged and never fails the upload.
 
 Success: `200` with the updated link object.
 
 | Status | Cause |
 | --- | --- |
-| `400` | Invalid input, unsupported or corrupt media, or a remote URL that is not allowed or failed to download. |
+| `400` | Invalid input, unsupported or corrupt media, an unknown `mode`, an `append` to a link without media, invalid `autoCreate` defaults, or a remote URL that is not allowed or failed to download. |
+| `401` | Missing or wrong credentials, or a wrong publish key. |
 | `403` / `404` | Gallery path outside the gallery directory / file not found. |
+| `409` | The playlist already holds `PLAYLIST_MAX` items. |
 | `413` | Larger than `MAX_UPLOAD_MB`. |
 | `429` | Rate limit, concurrent-upload limit, or image memory budget exhausted (`Retry-After: 5`). |
 | `500` | Storage error. |
@@ -245,6 +380,34 @@ Serves the media of a link:
   immediately. `token` and `auth` links are `no-store`.
 - HTTP range requests are supported.
 - Cross-origin embedding is allowed (`Cross-Origin-Resource-Policy: cross-origin`).
+- `Access-Control-Allow-Origin` and friends are added when `CORS_ORIGINS` is
+  configured and the request's `Origin` is listed (see Conventions).
+
+**Which file is served**
+
+| URL | Serves |
+| --- | --- |
+| `/{name}` | The live file, or the playlist position the rotation clock points at |
+| `/{name}?v=3` | Archived version 3. `?v=` equal to the current version serves the live file. |
+| `/{name}?i=0` | The live file, ignoring rotation |
+| `/{name}?i=2` | The playlist item with id 2 |
+| `/{name}.jpg`, `/{name}.png`, `/{name}/latest`, `/{name}.jpg/latest` | Aliases for `/{name}` |
+
+- The **stored** extension decides `Content-Type` and `Content-Disposition`,
+  never the alias in the URL: `/frame.jpg` on a PNG link still serves
+  `image/png`.
+- Only extensions from the supported media list are treated as aliases, so
+  `/manifest.json`, `/favicon.ico`, `/robots.txt` and `/sw.js` keep answering
+  `404` as before.
+- An unusable selector is a `404`, not a fallback: a display pinned to `?v=3`
+  must never silently start showing something else.
+- Rotation is derived from `floor(now / interval)` (sequential) or a stable hash
+  of the link name and that window (random), so it needs no worker and no state,
+  and every replica reading the same `data/` directory agrees.
+
+**Access counters.** Every delivered response (`200`, `206`, `304`, `HEAD`)
+increments the link's in-memory `stats`; refused requests do not. Counting is
+done in the response writer's `ReadFrom` path, so media still uses `sendfile`.
 
 | Access level | Requirement | Denied |
 | --- | --- | --- |
@@ -258,7 +421,7 @@ Serves the media of a link:
 
 ### `GET /health`
 
-Liveness check, always public. Returns `{"service":"lanpaper","status":"ok","version":"0.11.0"}`.
+Liveness check, always public. Returns `{"service":"lanpaper","status":"ok","version":"0.12.0"}`.
 
 ### `GET /health/ready`
 

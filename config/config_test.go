@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"testing"
@@ -277,5 +278,34 @@ func TestProxyCredentialAliasesPreferLongNames(t *testing.T) {
 	Load()
 	if Current.ProxyUsername != "long-user" || Current.ProxyPassword != "short-pass" {
 		t.Fatalf("proxy credentials = %q/%q", Current.ProxyUsername, Current.ProxyPassword)
+	}
+}
+
+func TestExampleConfigCarriesTheNewDefaults(t *testing.T) {
+	data, err := os.ReadFile("../config.example.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.History.Limit != DefaultHistoryLimit || cfg.History.MaxMB != DefaultHistoryMaxMB {
+		t.Fatalf("example history = %+v, want %+v", cfg.History,
+			HistoryConfig{Limit: DefaultHistoryLimit, MaxMB: DefaultHistoryMaxMB})
+	}
+	if cfg.PlaylistMax != DefaultPlaylistMax {
+		t.Fatalf("example playlistMax = %d, want %d", cfg.PlaylistMax, DefaultPlaylistMax)
+	}
+	// The example must not widen access: embedding and CORS stay opt-in.
+	if cfg.AllowEmbed || len(cfg.CORSOrigins) != 0 {
+		t.Fatalf("the example enables embedding or CORS: %v %v", cfg.AllowEmbed, cfg.CORSOrigins)
+	}
+	// A publish key is a secret and is read from the environment only.
+	if bytes.Contains(data, []byte("publishKeys")) || bytes.Contains(data, []byte("PUBLISH_KEYS")) {
+		t.Fatal("config.example.json mentions publish keys")
+	}
+	if _, ok := MatchPublishKey("any-key-at-all"); ok {
+		t.Fatal("publish keys were parsed without a refresh")
 	}
 }

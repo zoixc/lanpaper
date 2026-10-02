@@ -40,6 +40,18 @@ func main() {
 			log.Fatalf("Cannot create data directory %s: %v", d, err)
 		}
 	}
+	// Playlist items always get their directory; archived versions only when
+	// history is enabled. Both are also created on demand, so a failure here is
+	// a warning and not a reason to refuse to start.
+	extraDirs := []string{config.ItemsDir}
+	if config.Current.History.Limit > 0 {
+		extraDirs = append(extraDirs, config.HistoryDir)
+	}
+	for _, d := range extraDirs {
+		if err := os.MkdirAll(d, config.DataDirPerm); err != nil {
+			log.Printf("Warning: cannot create %s: %v", d, err)
+		}
+	}
 	// The server gallery is optional (and often a read-only mount), so a
 	// failure here is not fatal.
 	if err := os.MkdirAll(config.Current.ExternalImageDir, 0755); err != nil {
@@ -122,10 +134,13 @@ func newMux() *http.ServeMux {
 	mux.HandleFunc("/api/wallpapers", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Wallpapers)))
 	mux.HandleFunc("/api/compression-config", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.GetCompressionConfig)))
 	mux.HandleFunc("/api/preview/", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.AdminPreview)))
-	mux.HandleFunc("/api/link/", middleware.WithSecurity(middleware.MaybeBasicAuth(handleLinkRoutes)))
-	mux.HandleFunc("/api/link", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Link)))
+	// Publish keys (PUBLISH_KEYS) are accepted on the two routes an automation
+	// needs: pushing media and creating the link to push it into. Everything
+	// else on these routes still requires the admin login.
+	mux.HandleFunc("/api/link/", middleware.WithSecurity(middleware.PublishOrAdmin(middleware.AllowPublishCreateLink, handleLinkRoutes)))
+	mux.HandleFunc("/api/link", middleware.WithSecurity(middleware.PublishOrAdmin(middleware.AllowPublishCreateLink, handlers.Link)))
 	mux.HandleFunc("/api/upload",
-		middleware.WithSecurity(middleware.MaybeBasicAuth(
+		middleware.WithSecurity(middleware.PublishOrAdmin(middleware.AllowPublishUpload,
 			middleware.RateLimit(func() (int, int) {
 				return config.Current.Rate.UploadPerMin, config.Current.Rate.Burst
 			})(handlers.Upload),
@@ -146,12 +161,21 @@ func newMux() *http.ServeMux {
 	return mux
 }
 
-// handleLinkRoutes routes /api/link/{name}/pin to TogglePin, everything else to Link
+// handleLinkRoutes dispatches the sub-resources of /api/link/{name}. Every
+// branch keeps its method, so a GET to /pin or a POST to /history still ends up
+// in the handler that answers 405 for it.
 func handleLinkRoutes(w http.ResponseWriter, r *http.Request) {
-	// Check if this is a pin toggle request (must be POST to /pin)
-	if strings.HasSuffix(r.URL.Path, "/pin") && r.Method == http.MethodPost {
+	path := r.URL.Path
+	switch {
+	case r.Method == http.MethodPost && strings.HasSuffix(path, "/pin"):
 		handlers.TogglePin(w, r)
-	} else {
+	case r.Method == http.MethodGet && strings.HasSuffix(path, "/history"):
+		handlers.LinkHistory(w, r)
+	case r.Method == http.MethodPost && strings.HasSuffix(path, "/rollback"):
+		handlers.RollbackLink(w, r)
+	case r.Method == http.MethodDelete && strings.Contains(path, "/history/"):
+		handlers.DeleteHistoryVersion(w, r)
+	default:
 		handlers.Link(w, r)
 	}
 }

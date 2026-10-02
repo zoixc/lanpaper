@@ -21,6 +21,14 @@ type CompressionConfig struct {
 	Scale   int `json:"scale"`   // 1-100, percentage of max dimensions
 }
 
+// HistoryConfig bounds the version history kept for replaced media.
+// Limit is the number of previous versions per link (0 disables history);
+// MaxMB is the budget shared by all links (0 means unlimited).
+type HistoryConfig struct {
+	Limit int `json:"limit"`
+	MaxMB int `json:"maxMB"`
+}
+
 type Config struct {
 	Port                 string            `json:"port"`
 	MaxUploadMB          int               `json:"maxUploadMB"`
@@ -42,6 +50,21 @@ type Config struct {
 	// TrustedProxy is the IP or CIDR of a reverse proxy in front of Lanpaper.
 	// X-Real-IP / X-Forwarded-For are trusted only for requests from this address.
 	TrustedProxy string `json:"trustedProxy,omitempty"`
+
+	// History bounds the versions kept when a link's media is replaced.
+	History HistoryConfig `json:"history"`
+	// PlaylistMax is how many extra items one link may serve from the same URL.
+	PlaylistMax int `json:"playlistMax"`
+	// AllowEmbed drops X-Frame-Options and the CSP sandbox from public media so
+	// dashboards and digital frames can embed it in an <iframe>.
+	AllowEmbed bool `json:"allowEmbed,omitempty"`
+	// CORSOrigins lists the browser origins allowed to read public media with
+	// fetch()/canvas ("*" allows every origin). Empty keeps CORS closed.
+	CORSOrigins []string `json:"corsOrigins,omitempty"`
+	// PublishKeys authorize POST /api/upload and POST /api/link without admin
+	// credentials. Environment-only (PUBLISH_KEYS): a secret is never written
+	// to config.json, so the field is deliberately not serialized.
+	PublishKeys []string `json:"-"`
 }
 
 var Current Config
@@ -74,6 +97,11 @@ func Load() {
 			Quality: DefaultCompressionQuality,
 			Scale:   DefaultCompressionScale,
 		},
+		History: HistoryConfig{
+			Limit: DefaultHistoryLimit,
+			MaxMB: DefaultHistoryMaxMB,
+		},
+		PlaylistMax: DefaultPlaylistMax,
 	}
 
 	// Step 2: Override with config.json (if exists)
@@ -108,6 +136,14 @@ func Load() {
 	envInt("RATE_BURST", &Current.Rate.Burst)
 	envInt("COMPRESSION_QUALITY", &Current.Compression.Quality)
 	envInt("COMPRESSION_SCALE", &Current.Compression.Scale)
+	envInt("HISTORY_LIMIT", &Current.History.Limit)
+	envInt("HISTORY_MAX_MB", &Current.History.MaxMB)
+	envInt("PLAYLIST_MAX", &Current.PlaylistMax)
+	envBool("ALLOW_EMBED", &Current.AllowEmbed)
+	envList("CORS_ORIGINS", &Current.CORSOrigins)
+	// PUBLISH_KEYS is a comma-separated list of API keys. Like ADMIN_PASS it is
+	// a secret and is only read from the environment, never from config.json.
+	envList("PUBLISH_KEYS", &Current.PublishKeys)
 
 	validate()
 
@@ -117,6 +153,20 @@ func Load() {
 	}
 	log.Printf("Config loaded: compression quality=%d scale=%d (%s)",
 		Current.Compression.Quality, Current.Compression.Scale, mode)
+	if Current.History.Limit > 0 {
+		log.Printf("Version history: up to %d previous version(s) per link, %d MB total budget",
+			Current.History.Limit, Current.History.MaxMB)
+	}
+	if len(Current.PublishKeys) > 0 {
+		log.Printf("Publish API keys: %d key(s) accepted for POST /api/upload and POST /api/link",
+			len(Current.PublishKeys))
+	}
+	if Current.AllowEmbed {
+		log.Println("Warning: ALLOW_EMBED=true — public media can be framed by other sites (X-Frame-Options and the CSP sandbox are not sent).")
+	}
+	if CORSConfigured() {
+		log.Printf("CORS for public media enabled for: %s", strings.Join(Current.CORSOrigins, ", "))
+	}
 }
 
 func envString(name string, dst *string) {
@@ -151,6 +201,30 @@ func envBool(name string, dst *bool) {
 		return
 	}
 	*dst = b
+}
+
+// envList reads a comma-separated environment variable into a string slice.
+// As with envInt/envBool an unset or empty variable keeps the previous value,
+// and empty entries are dropped rather than stored.
+func envList(name string, dst *[]string) {
+	v := os.Getenv(name)
+	if strings.TrimSpace(v) == "" {
+		return
+	}
+	*dst = splitList(v)
+}
+
+// splitList splits a comma-separated setting, trimming space and dropping
+// empty entries.
+func splitList(v string) []string {
+	parts := strings.Split(v, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if s := strings.TrimSpace(p); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // parseTrustedProxyValue parses a single TrustedProxy string.
@@ -250,4 +324,24 @@ func validate() {
 	} else {
 		cachedProxyPtr.Store(&parsedProxy{ip: ip, cidr: cidr})
 	}
+
+	if Current.History.Limit < 0 || Current.History.Limit > MaxHistoryLimit {
+		log.Printf("Warning: HISTORY_LIMIT %d out of range (0-%d), using %d",
+			Current.History.Limit, MaxHistoryLimit, DefaultHistoryLimit)
+		Current.History.Limit = DefaultHistoryLimit
+	}
+	if Current.History.MaxMB < 0 || Current.History.MaxMB > MaxHistoryMaxMB {
+		log.Printf("Warning: HISTORY_MAX_MB %d out of range (0-%d), using %d",
+			Current.History.MaxMB, MaxHistoryMaxMB, DefaultHistoryMaxMB)
+		Current.History.MaxMB = DefaultHistoryMaxMB
+	}
+	if Current.PlaylistMax <= 0 || Current.PlaylistMax > MaxPlaylistItems {
+		log.Printf("Warning: PLAYLIST_MAX %d out of range (1-%d), using %d",
+			Current.PlaylistMax, MaxPlaylistItems, DefaultPlaylistMax)
+		Current.PlaylistMax = DefaultPlaylistMax
+	}
+
+	// Publish keys and CORS origins are matched from parsed snapshots so the
+	// request path never locks, splits strings or hashes a list.
+	RefreshDerived()
 }

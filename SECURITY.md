@@ -39,11 +39,41 @@ HTTP Basic Auth protects `/admin`, `/api/*` and the private previews.
 - **No oracle during the lockout.** Credentials are not evaluated while a
   client is locked out, so even a correct guess is rejected.
 - **Shared counter.** The admin API and admin-protected public links (`token`
-  and `auth` levels) use the same counter.
+  and `auth` levels) use the same counter, and so do wrong publish keys
+  (`PUBLISH_KEYS`): guessing an API key costs the same budget as guessing a
+  password, per client.
 - **What counts as a client.** IPv6 clients are grouped by `/64`. Requests
   without credentials (the browser's first challenge) are not counted.
 - **Behind a proxy**, configure `TRUSTED_PROXY`. Otherwise every visitor shares
   the proxy's address and can lock the others out.
+
+### Publish keys
+
+`PUBLISH_KEYS` authorizes *publishing* without the admin login. It is a
+deliberately narrow credential:
+
+| Route | With a valid publish key |
+| --- | --- |
+| `POST /api/upload` (including `mode=append` and `autoCreate=1`) | allowed |
+| `POST /api/link` | allowed |
+| everything else under `/admin` and `/api/*` | falls back to Basic Auth, so a key alone gets `401` |
+
+- **Environment only.** Keys are read from `PUBLISH_KEYS`, never from
+  `config.json`, and the field is not serializable, so an exported or backed-up
+  configuration cannot leak one.
+- **Stored as digests.** Only SHA-256 digests are kept in memory and compared in
+  constant time. Logs show an 8-hex-character fingerprint, never the key.
+- **Parsing rules.** Entries shorter than 16 characters, duplicates and entries
+  beyond the 32-key cap are dropped with a warning instead of being accepted.
+- **No keys configured means no change.** When `PUBLISH_KEYS` is empty, a stray
+  `X-Api-Key` header is ignored entirely: it is not a credential, cannot be
+  guessed into a lockout, and cannot lock an administrator out.
+- **A key is not a session.** It cannot read the link list, change access
+  levels, roll back, rename or delete anything, and it does not bypass the CSRF
+  check for browser requests, the rate limits, the upload validation or the
+  SSRF rules for remote URLs.
+- Rotate keys by changing the environment and restarting: there is no revocation
+  list, and a leaked key can publish new content until it is replaced.
 
 ### Public links
 
@@ -56,6 +86,12 @@ HTTP Basic Auth protects `/admin`, `/api/*` and the private previews.
 
 Previews of private links are available only through the admin API. With
 built-in auth disabled, `auth`-level public URLs stay unavailable.
+
+The access check always runs **before** a selector is resolved, so none of
+`?v=` (archived version), `?i=` (playlist item) or the `.jpg` / `/latest`
+aliases can bypass a link's level: an archived version of a `token` link needs
+the same token as the live file. An unusable selector is a `404` rather than a
+silent fallback to other bytes.
 
 ### Reverse proxy
 
@@ -88,10 +124,13 @@ reverse-proxy access logs.
 | Admin CSRF | State-changing browser requests are rejected when fetch metadata says `cross-site` or `same-site`, or when `Origin` (including its port) does not match. Non-browser clients must still authenticate. |
 | Admin CSP | `default-src 'none'`. Scripts, styles, fonts, media, workers and fetches are same-origin only. Images also allow `data:` and `blob:` for the client-side compressor. `frame-ancestors 'none'`. No inline scripts or styles. |
 | Headers | Everywhere: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`. Admin responses also get COOP `same-origin`, COEP `credentialless` and CORP `same-origin`. Public media allows cross-origin embedding and uses a sandboxing CSP. |
+| CORS and embedding (opt-in) | By default public media sends no `Access-Control-Allow-Origin`, so a cross-origin `fetch()` or canvas read fails, and `X-Frame-Options: DENY` plus a `sandbox` CSP keep it unframable. `CORS_ORIGINS` adds `Access-Control-Allow-Origin` for listed origins only (parsed as URLs: `http`/`https`, no path, no credentials, no wildcard subdomains), with `Vary: Origin`, exposed read-only headers, `GET, HEAD, OPTIONS` and a filtered preflight header echo; unlisted origins get nothing and `OPTIONS` keeps answering `405`. `ALLOW_EMBED=true` drops `X-Frame-Options` and the CSP `sandbox` for `/{name}` only — `/admin` and `/api/*` stay unframable, and both flags are logged as warnings at startup. |
+| Version history and playlists | Archived versions (`data/history/`) and playlist items (`data/items/`) are stored under validated link names and validated media extensions, in the same non-web-root tree as live media, and are reachable only through `/{name}` after the same access check. Both budgets are bounded (`HISTORY_LIMIT`, `HISTORY_MAX_MB`, `PLAYLIST_MAX`), trimming deletes the oldest archives first, and deleting or renaming a link moves or removes its directories with it. |
+| Access counters | Per-link request, byte and last-hit counters live in memory only: no visitor identity, no IP, no user agent, no query string and nothing written to disk. They reset on restart and are visible to the authenticated admin only. |
 | HTTP caching | The admin page and API responses are `no-store`. Admin previews and `public`/`local` media are `private, no-cache` with `ETag`/`Last-Modified`: browsers keep a private copy but revalidate it on every use, and shared caches must not store it. The access check runs before any `304`, so a revoked link is refused at once. `token` and `auth` media is `no-store`, so no copy outlives a token rotation on the client's disk. |
 | Compression | Text responses are gzip-compressed; media never is. BREACH-style length oracles need attacker-chosen input reflected next to a secret in one compressed body. No response does that: JSON is rendered from stored state that only the admin can change, and query parameters only filter, sort or page through it. |
 | HSTS | `Strict-Transport-Security: max-age=31536000` on responses to HTTPS requests, direct or forwarded by the trusted proxy. No `includeSubDomains` or `preload`. Plain-HTTP LAN use is unaffected. |
-| Media isolation | Uploads live in `data/media/` and `data/previews/`. `/static/` serves an allowlist of application assets only; symlinks and swapped files are rejected. Media from legacy `static/images/` is migrated but never served statically. |
+| Media isolation | Uploads live in `data/media/` and `data/previews/`, archived versions in `data/history/` and playlist items in `data/items/`. `/static/` serves an allowlist of application assets only; symlinks and swapped files are rejected. Media from legacy `static/images/` is migrated but never served statically. |
 | Upload validation | Size limits, then content-based type detection (magic bytes). Images are fully decoded before publication. Limits: 16,384 px per side, 36 M pixels per image, 48 M decoded pixels in flight, and a limited number of parallel uploads. MP4/WebM are checked for container signatures only; they are not transcoded or scanned. |
 | Remote URL fetch | HTTP(S) only. Every DNS answer must be a public unicast address. Private, loopback, link-local, CGNAT, documentation, multicast, NAT64, 6to4 and Teredo ranges are blocked. The vetted IP is pinned for the connection. Every redirect is checked again, including through HTTP, HTTPS and SOCKS5 proxies. Time, size and redirects are bounded. |
 | Timeouts | Header read 10 s, request read 30 s, write 120 s, idle 120 s. Only authenticated uploads and preview regeneration extend their own deadlines. Shutdown waits up to 30 s for in-flight requests. |
@@ -124,7 +163,23 @@ reverse-proxy access logs.
    than the file size. Consider upstream request limits on public
    installations.
 6. **Migrations and caches.** Changing an access level cannot remove copies
-   that a client has already downloaded.
+   that a client has already downloaded. Rolling a link back restores older
+   bytes at the same URL, but clients that already cached the newer file keep it
+   until they revalidate.
+7. **Publish keys are write credentials.** Give them only to automation that
+   needs to push content, keep them out of URLs, logs and version control, and
+   replace them by restarting with a new `PUBLISH_KEYS` when one leaks. A key
+   can overwrite the media of any link, which is the same power an admin upload
+   has.
+8. **CORS and embedding widen who can read public media.** `CORS_ORIGINS: *`
+   lets any website read every `public` link with JavaScript, and
+   `ALLOW_EMBED=true` lets any website frame it. List only the origins you
+   control, and remember that `token`, `local` and `auth` links still require
+   their own credential.
+9. **Budget the disk.** Version history keeps up to `HISTORY_LIMIT` extra copies
+   per link within `HISTORY_MAX_MB` for the whole server, and a playlist can
+   hold up to `PLAYLIST_MAX` extra files per link. Set `HISTORY_LIMIT=0` to
+   store only the live file, as before.
 
 ## Reverse proxy examples
 

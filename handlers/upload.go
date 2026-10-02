@@ -28,6 +28,7 @@ import (
 	xwebp "golang.org/x/image/webp"
 
 	"lanpaper/config"
+	"lanpaper/middleware"
 	"lanpaper/storage"
 	"lanpaper/utils"
 )
@@ -137,6 +138,37 @@ func storedExt(ext string, lossless bool) string {
 
 func canUseLosslessMode() bool {
 	return config.Current.Compression.Quality == 100 && config.Current.Compression.Scale == 100
+}
+
+// Upload modes for the optional "mode" form field.
+const (
+	// uploadModeReplace swaps the file behind the URL. It is the default and the
+	// only behaviour Lanpaper had before playlists existed.
+	uploadModeReplace = "replace"
+	// uploadModeAppend adds a playlist item behind the same URL, leaving the
+	// live file (and therefore every existing embed) untouched.
+	uploadModeAppend = "append"
+)
+
+func uploadMode(raw string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", uploadModeReplace:
+		return uploadModeReplace, true
+	case uploadModeAppend:
+		return uploadModeAppend, true
+	}
+	return "", false
+}
+
+// formFlag reads an optional boolean form field ("1", "true", "yes", "on").
+// Anything else — including an absent field — is false, so existing clients
+// keep the behaviour they had.
+func formFlag(raw string) bool {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
 }
 
 // inspectMediaFile validates a bounded file's type using magic bytes, not a
@@ -384,6 +416,16 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid link name", http.StatusBadRequest)
 		return
 	}
+	mode, modeOK := uploadMode(r.FormValue("mode"))
+	if !modeOK {
+		http.Error(w, "Invalid mode (expected replace or append)", http.StatusBadRequest)
+		return
+	}
+	// autoCreate lets a single request create the link and push its first file,
+	// which is what a webhook or a publish key needs. Without the flag an upload
+	// to an unknown name is still rejected, so a typo cannot silently create a
+	// link and an existing client's behaviour does not change.
+	autoCreate := formFlag(r.FormValue("autoCreate"))
 	urlStr := r.FormValue("url")
 	if len(urlStr) > 2048 {
 		http.Error(w, "URL too long", http.StatusBadRequest)
@@ -393,8 +435,38 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	defer unlock()
 	prev, exists := storage.Global.Get(name)
 	if !exists {
-		http.Error(w, "Link does not exist", http.StatusBadRequest)
-		return
+		if !autoCreate {
+			http.Error(w, "Link does not exist", http.StatusBadRequest)
+			return
+		}
+		created, err := createLinkForUpload(name, r)
+		if err != nil {
+			if errors.Is(err, errInvalidLinkDefaults) {
+				http.Error(w, "Invalid access level or category", http.StatusBadRequest)
+				return
+			}
+			writeStoreError(w, err)
+			return
+		}
+		prev = created
+	}
+	// A playlist item lives next to the live file, so the item count and the
+	// target directory are settled before any media is downloaded or decoded.
+	itemID := 0
+	if mode == uploadModeAppend {
+		if !prev.HasImage {
+			http.Error(w, "Link has no media to add to", http.StatusBadRequest)
+			return
+		}
+		if len(prev.Items) >= config.Current.PlaylistMax {
+			http.Error(w, fmt.Sprintf("Playlist is full (max %d items)", config.Current.PlaylistMax), http.StatusConflict)
+			return
+		}
+		itemID = storage.NextItemID(prev.Items)
+		if err := os.MkdirAll(storage.ItemsDirPath(name), config.DataDirPerm); err != nil {
+			http.Error(w, "Storage unavailable", http.StatusInternalServerError)
+			return
+		}
 	}
 	if err := os.MkdirAll(config.MediaDir, config.DataDirPerm); err != nil {
 		http.Error(w, "Storage unavailable", http.StatusInternalServerError)
@@ -474,7 +546,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	video := isVideo(ext)
 	lossless := !video && canUseLosslessMode()
 	saveExt := storedExt(ext, lossless)
-	imageStage, err := stagePath(config.MediaDir, saveExt)
+	// Staging happens in the directory the file will end up in, so publishing is
+	// always a rename within one directory (no cross-device surprise).
+	stageDir := config.MediaDir
+	if mode == uploadModeAppend {
+		stageDir = storage.ItemsDirPath(name)
+	}
+	imageStage, err := stagePath(stageDir, saveExt)
 	if err != nil {
 		http.Error(w, "Storage unavailable", http.StatusInternalServerError)
 		return
@@ -504,15 +582,20 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		if !lossless {
 			img = scaleImage(img, config.Current.Compression.Scale)
 		}
-		previewStage, err = stagePath(config.PreviewDir, "webp")
-		if err != nil {
-			writeUploadError(w, err)
-			return
-		}
-		defer os.Remove(previewStage)
-		if err := savePreview(img, previewStage); err != nil {
-			writeUploadError(w, err)
-			return
+		// Playlist items get no thumbnail: the panel shows one preview per link,
+		// so encoding a WebP for every item would multiply upload CPU and disk
+		// use for metadata nobody looks at.
+		if mode == uploadModeReplace {
+			previewStage, err = stagePath(config.PreviewDir, "webp")
+			if err != nil {
+				writeUploadError(w, err)
+				return
+			}
+			defer os.Remove(previewStage)
+			if err := savePreview(img, previewStage); err != nil {
+				writeUploadError(w, err)
+				return
+			}
 		}
 		if lossless {
 			if _, err := source.Seek(0, io.SeekStart); err != nil {
@@ -535,9 +618,12 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	imagePath := storage.MediaPath(name, saveExt)
+	if mode == uploadModeAppend {
+		imagePath = storage.ItemPath(name, itemID, saveExt)
+	}
 	previewPath := ""
 	previewURL := ""
-	if !video {
+	if !video && mode == uploadModeReplace {
 		previewPath = storage.PreviewFilePath(name)
 		previewURL = "/api/preview/" + name
 	}
@@ -546,6 +632,34 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		writeUploadError(w, err)
 		return
 	}
+
+	if mode == uploadModeAppend {
+		// A playlist item never touches the live file, its preview or its
+		// history: the URL keeps serving exactly what it served before, and the
+		// rotation settings decide when the new file joins in.
+		item := storage.PlaylistItem{
+			ID:        itemID,
+			Ext:       saveExt,
+			SizeBytes: fi.Size(),
+			ModTime:   fi.ModTime().Unix(),
+			AddedAt:   time.Now().Unix(),
+		}
+		appended, err := storage.Global.Update(name, func(wp *storage.Wallpaper) error {
+			wp.Items = storage.AppendItem(wp.Items, item)
+			return nil
+		})
+		if err != nil {
+			imagePub.rollback()
+			writeStoreError(w, err)
+			return
+		}
+		imagePub.finish()
+		log.Printf("Appended playlist item #%d to %s (%s, %d KB)", itemID, name, saveExt, fi.Size()/1024)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(toResponse(appended))
+		return
+	}
+
 	var previewPub publishedFile
 	if previewStage != "" {
 		previewPub, err = publishStaged(previewStage, previewPath, maxBytes)
@@ -581,6 +695,19 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		writeUploadError(w, err)
 		return
 	}
+	// Version history: the backup publishStaged kept IS the file this upload
+	// replaced, so archiving it costs one rename — no extra read, no extra write
+	// and no extra disk block for as long as the link stays. It runs after the
+	// metadata commit and is best effort: a failed archive must never fail an
+	// upload that already succeeded.
+	if config.Current.History.Limit > 0 && imagePub.backup != "" {
+		archived, err := storage.ArchiveReplaced(prev, imagePub.backup, prev.MIMEType, config.Current.History.Limit)
+		if err != nil {
+			log.Printf("Upload: could not archive the previous version of %s: %v", name, err)
+		} else if archived != nil {
+			updated = archived
+		}
+	}
 	imagePub.finish()
 	if previewStage != "" {
 		previewPub.finish()
@@ -596,9 +723,50 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	storage.SchedulePrune(config.Current.MaxImages)
-	log.Printf("Uploaded: %s (%s, %d KB)", name, saveExt, fi.Size()/1024)
+	if fingerprint := middleware.PublisherFingerprint(r); fingerprint != "" {
+		log.Printf("Uploaded: %s (%s, %d KB) with publish key %s", name, saveExt, fi.Size()/1024, fingerprint)
+	} else {
+		log.Printf("Uploaded: %s (%s, %d KB)", name, saveExt, fi.Size()/1024)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(toResponse(updated))
+}
+
+// errInvalidLinkDefaults rejects an auto-created link whose requested access
+// level or category is not on the allow-list.
+var errInvalidLinkDefaults = errors.New("invalid access level or category")
+
+// createLinkForUpload creates the link an upload targets when the client set
+// autoCreate, so a webhook or a publish key can push media in one request
+// instead of create-then-upload. The caller holds the link lock.
+func createLinkForUpload(name string, r *http.Request) (*storage.Wallpaper, error) {
+	rawLevel := strings.TrimSpace(r.FormValue("accessLevel"))
+	if rawLevel != "" && !isValidAccessLevel(rawLevel) {
+		return nil, errInvalidLinkDefaults
+	}
+	level := storage.NormalizeAccessLevel(rawLevel)
+	category := strings.TrimSpace(r.FormValue("category"))
+	if category != "" && !isValidCategory(category) {
+		return nil, errInvalidLinkDefaults
+	}
+	if category == "" {
+		category = "other"
+	}
+	wp := &storage.Wallpaper{
+		ID: name, LinkName: name, Category: category, ImageURL: "/" + name,
+		CreatedAt: time.Now().Unix(), AccessLevel: level,
+	}
+	if level == config.AccessToken {
+		wp.AccessToken = generateAccessToken()
+	}
+	if err := storage.Global.Create(wp); err != nil {
+		return nil, err
+	}
+	created, exists := storage.Global.Get(name)
+	if !exists {
+		return nil, storage.ErrNotFound
+	}
+	return created, nil
 }
 
 func writeUploadError(w http.ResponseWriter, err error) {

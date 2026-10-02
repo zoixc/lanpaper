@@ -24,6 +24,24 @@ services:
       RATE_PUBLIC_PER_MIN: "120"
       RATE_UPLOAD_PER_MIN: "20"
       RATE_BURST: "10"
+      # Version history: how many replaced files are kept per link, and the
+      # disk budget shared by all of them. HISTORY_LIMIT=0 stores only the
+      # live file, exactly like earlier versions.
+      HISTORY_LIMIT: "3"
+      HISTORY_MAX_MB: "512"
+      # Extra files one link can serve from the same URL (?i=2, or rotation).
+      PLAYLIST_MAX: "8"
+      # Publishing from scripts without the admin login. Comma-separated,
+      # 16+ characters each, and only for POST /api/upload and POST /api/link.
+      # Keep it in .env, never in this file: generate one with
+      #   openssl rand -hex 24
+      # PUBLISH_KEYS: "${PUBLISH_KEYS}"
+      # Let the listed sites read public media with JavaScript (comma-separated
+      # origins, or * for any). Without it, cross-origin fetch and canvas fail.
+      # CORS_ORIGINS: "https://dashboard.example.com,https://frame.example.com"
+      # Let other sites frame public media (drops X-Frame-Options and the CSP
+      # sandbox for /{name} only; /admin and /api/* stay unframable).
+      # ALLOW_EMBED: "true"
       # Set only to the IP/CIDR of the reverse proxy; also configure it to
       # overwrite client-supplied X-Real-IP and X-Forwarded-* headers.
       # TRUSTED_PROXY: "172.18.0.1"

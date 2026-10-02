@@ -3,6 +3,130 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
+## [0.12.0] – 2026-10-02
+
+Everything in this release is off by default or backwards compatible: an
+existing `data/` directory, an existing `wallpapers.json` and every existing URL
+keep working unchanged, and a link that uses none of the new features is stored
+and served exactly as before.
+
+### Added
+
+- **Version history and rollback.** Replacing a file archives the one it
+  replaced in `data/history/{link}/{version}.{ext}`. Archived versions stay
+  reachable as `/{name}?v=2`, are listed by `GET /api/link/{name}/history`, can
+  be restored with `POST /api/link/{name}/rollback` and dropped one by one with
+  `DELETE /api/link/{name}/history/{version}`. A rollback archives the file it
+  displaces, so restoring version 2 of a link at version 4 makes the live file
+  version 5 and keeps version 4 — a rollback can always be rolled back. The
+  thumbnail is regenerated from the restored file.
+  - Defaults: `HISTORY_LIMIT=3` versions per link and `HISTORY_MAX_MB=512` as a
+    budget shared by all links. `HISTORY_LIMIT=0` restores the previous
+    replace-only behaviour and writes no archive at all.
+  - When the budget is exceeded, the oldest archives across every link are
+    dropped first, in the background pass that already pruned media. The pass
+    recomputes the total from the metadata before deciding, so a missed counter
+    update heals itself.
+  - Renaming a link moves its archive; deleting a link deletes it.
+- **Playlists and rotation.** One URL can now serve several files.
+  `POST /api/upload` with `mode=append` stores a file as a playlist item in
+  `data/items/{link}/{id}.{ext}` and leaves the live file untouched, so every
+  existing embed keeps showing what it showed. Items are addressable as
+  `/{name}?i=2` (`?i=0` is always the live file) and removable with
+  `PATCH /api/link/{name}` and `{"removeItem":2}`. `PLAYLIST_MAX` (default 8,
+  maximum 64) caps the list and answers `409` when it is full.
+  - `PATCH /api/link/{name}` also accepts
+    `{"rotate":{"enabled":true,"interval":300,"order":"random"}}`. Fields are
+    merged, so toggling `enabled` keeps the interval and the order;
+    `interval: 0` restores the default of 60 s, and any other value must be
+    5–86400 s.
+  - Rotation is **stateless**: the position is derived from
+    `floor(now / interval)` (sequential) or a stable FNV hash of the link name
+    and that window (random). No goroutine, no persisted cursor, no extra
+    request-time I/O, the image cannot flicker inside one window, and two
+    replicas reading the same `data/` directory always agree.
+  - Playlist items get no thumbnail on purpose: a WebP per item would multiply
+    upload CPU and disk for metadata nobody looks at.
+- **Publishing without the admin login.** `PUBLISH_KEYS` (comma-separated,
+  16+ characters, at most 32 keys) authorizes `POST /api/upload` and
+  `POST /api/link` only, via `X-Api-Key` or `Authorization: Bearer`. Renaming,
+  re-scoping, pinning, listing, rolling back and deleting still need Basic Auth,
+  so a leaked key can publish but cannot read or destroy the library.
+- **`autoCreate=1` on upload** creates the link and pushes its first file in one
+  request — what a webhook or a cron job needs. Optional `category` and
+  `accessLevel` fields are validated before the link is created. Without the
+  flag an unknown name is still `400`, so a typo cannot silently create a link.
+- **CORS for public media.** `CORS_ORIGINS` (comma-separated, `*` for any
+  origin) adds `Access-Control-Allow-Origin`, `Vary: Origin` and
+  `Access-Control-Expose-Headers` (`ETag`, `Last-Modified`, `Content-Length`,
+  `Content-Range`, `Content-Type`) and answers `OPTIONS` preflights with `204`,
+  `Access-Control-Allow-Methods: GET, HEAD, OPTIONS`, `Max-Age: 600` and the
+  requested headers filtered to an allowlist. A browser canvas or `fetch()` on
+  another origin can finally read a public link.
+- **`ALLOW_EMBED=true`** drops `X-Frame-Options` and the CSP `sandbox` for
+  public media only, so a kiosk page or a dashboard can frame `/{name}`.
+  `/admin` and `/api/*` stay unframable whatever this flag says.
+- **URL aliases.** `/{name}.jpg`, `/{name}.png`, `/{name}/latest` and
+  combinations of the two resolve to `/{name}`, for clients that insist on a
+  file extension. Only extensions from the supported media list are aliases, so
+  `/manifest.json`, `/favicon.ico`, `/robots.txt` and `/sw.js` keep answering
+  `404`. The stored extension still decides `Content-Type` and
+  `Content-Disposition`, never the alias.
+- **Per-link access counters.** `stats` in the link object reports requests,
+  bytes and the last hit since the process started, in memory only: no visitor
+  identity, no storage, no cost after a restart. `304` and `HEAD` count as a hit
+  with zero bytes; refused requests are not counted.
+- **Admin panel:** a per-link *Versions* dialog lists archived versions
+  (open / restore / delete), playlist items (open / remove), rotation settings
+  and the access counters. The upload menu gained *Add to playlist*, and a card
+  shows `v5 · 2 in playlist · rotating · 42 hits` only when the link uses those
+  features.
+
+### Changed
+
+- `PATCH /api/link/{name}` with `newLinkName` moves `data/history/{name}/` and
+  `data/items/{name}/` along with the media, and rolls the renames back if the
+  metadata save fails. `DELETE /api/link/{name}` removes both directories and
+  the link's counters.
+- `data/items/` is created at startup, `data/history/` only when history is
+  enabled. Both are also created on demand, so a failure to create them is a
+  warning and not a reason to refuse to start.
+- The service worker cache is bumped to `lanpaper-static-v5` so clients pick up
+  the new panel assets.
+
+### Security
+
+- Publish keys are compared as SHA-256 digests in constant time, are never
+  written to `config.json` and appear in logs only as an 8-hex-character
+  fingerprint. A wrong key shares the brute-force budget with admin logins
+  (10 failures per client per 15 minutes, then `429` with `Retry-After`), and
+  the lockout is not an oracle: the right key is refused while it lasts. On a
+  server without `PUBLISH_KEYS` a stray `X-Api-Key` header is ignored entirely
+  and cannot lock anybody out.
+- `CORS_ORIGINS` entries are parsed as URLs: a scheme of `http`/`https`, no path,
+  no credentials and no wildcard subdomains. An origin that is not listed gets
+  no CORS headers at all, and `OPTIONS` keeps answering `405` until CORS is
+  configured, so the default deployment behaves exactly as before.
+- An unusable `?v=` or `?i=` selector is a `404` instead of a silent fallback to
+  other bytes, and the access check of the link always runs before any selector
+  is resolved, so an alias or a version cannot bypass `token`, `local` or `auth`.
+- Archived versions and playlist items are stored under validated link names and
+  validated extensions only, in the same `data/` tree as the live media: nothing
+  new is reachable from the static web root.
+
+### Performance
+
+- Archiving is a **rename** of the backup that an upload already created, so a
+  replacement costs no extra copy and no extra disk read.
+- Rotation and version selection are pure arithmetic on data that is already in
+  memory; a request for `/{name}` does the same single `ServeContent` call as
+  before, and media still uses `sendfile` (the stats counter wraps the response
+  writer with a `ReadFrom` delegate).
+- Playlist appends skip thumbnail generation, and the item cap is checked before
+  any media is downloaded or decoded.
+- The history budget runs in the existing prune worker instead of adding a
+  timer, and the byte counter is a single atomic.
+
 ## [0.11.0] – 2026-09-29
 
 ### Changed

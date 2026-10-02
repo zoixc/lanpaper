@@ -33,6 +33,21 @@ type Wallpaper struct {
 	AccessLevel string `json:"accessLevel,omitempty"` // public|local|token|auth
 	AccessToken string `json:"accessToken,omitempty"` // secret for token level
 
+	// CurrentVersion numbers the live media file. It starts at 1 with the first
+	// upload and increases on every replace and rollback, so a version is never
+	// reused and an old bookmarked ?v= URL cannot silently point at new bytes.
+	// Records written before versioning existed keep 0, which is read as 1.
+	CurrentVersion uint64 `json:"currentVersion,omitempty"`
+	// History lists the replaced versions still on disk, newest first. Files
+	// live in data/history/{link}/{version}.{ext}; empty when HISTORY_LIMIT=0.
+	History []HistoryEntry `json:"history,omitempty"`
+	// Items are extra media files served from the same URL (a playlist). The
+	// live file is position 0 and is not listed here. Files live in
+	// data/items/{link}/{id}.{ext}.
+	Items []PlaylistItem `json:"items,omitempty"`
+	// Rotate switches between the live file and Items over time.
+	Rotate RotateConfig `json:"rotate,omitempty"`
+
 	// Not persisted; derived from MIMEType on Load.
 	ImagePath   string `json:"-"`
 	PreviewPath string `json:"-"`
@@ -479,6 +494,63 @@ func validStoredMediaExt(ext string) bool {
 	return config.AllowedMediaExts["."+ext]
 }
 
+// sanitizeMediaLists drops persisted history and playlist entries this server
+// could not have written (an invalid extension would otherwise be turned into a
+// file path) and normalizes rotation settings.
+//
+// Unlike the identity and media-type checks in Load, a bad value here is
+// ignored rather than fatal: these fields are optional extras added later, and
+// refusing to start — or worse, wiping a link — because of a corrupt counter
+// would degrade the whole server for a feature it may not even use.
+func sanitizeMediaLists(wp *Wallpaper) {
+	if len(wp.History) > 0 {
+		kept := make([]HistoryEntry, 0, len(wp.History))
+		seen := make(map[uint64]bool, len(wp.History))
+		for _, entry := range wp.History {
+			if entry.Version == 0 || seen[entry.Version] || !validStoredMediaExt(entry.Ext) {
+				log.Printf("Warning: dropping invalid history entry of %s (version %d)", wp.LinkName, entry.Version)
+				continue
+			}
+			seen[entry.Version] = true
+			if entry.SizeBytes < 0 {
+				entry.SizeBytes = 0
+			}
+			kept = append(kept, entry)
+		}
+		wp.History = kept
+	}
+	if len(wp.Items) > 0 {
+		kept := make([]PlaylistItem, 0, len(wp.Items))
+		seen := make(map[int]bool, len(wp.Items))
+		for _, item := range wp.Items {
+			if item.ID <= 0 || seen[item.ID] || !validStoredMediaExt(item.Ext) {
+				log.Printf("Warning: dropping invalid playlist item of %s (id %d)", wp.LinkName, item.ID)
+				continue
+			}
+			seen[item.ID] = true
+			if item.SizeBytes < 0 {
+				item.SizeBytes = 0
+			}
+			kept = append(kept, item)
+		}
+		wp.Items = kept
+	}
+	wp.Rotate = NormalizeRotate(wp.Rotate, len(wp.Items) > 0)
+	// Repair a version number that collides with an archived one, so a future
+	// archive can never overwrite a file that is still listed.
+	if _, clash := FindHistory(wp.History, wp.CurrentVersion); clash {
+		highest := wp.CurrentVersion
+		for _, entry := range wp.History {
+			if entry.Version > highest {
+				highest = entry.Version
+			}
+		}
+		log.Printf("Warning: %s had version %d both live and archived; live is now %d",
+			wp.LinkName, wp.CurrentVersion, highest+1)
+		wp.CurrentVersion = highest + 1
+	}
+}
+
 // Load reads wallpapers from disk. A missing file is treated as first run.
 func (s *Store) Load() error {
 	data, err := os.ReadFile(dataFile)
@@ -495,6 +567,7 @@ func (s *Store) Load() error {
 	if m == nil {
 		return fmt.Errorf("invalid wallpaper object in %s", dataFile)
 	}
+	var archived int64
 	for key, wp := range m {
 		if wp == nil || !utils.IsValidLinkName(key) || (wp.HasImage && !validStoredMediaExt(wp.MIMEType)) {
 			// Silently dropping a bad entry would permanently erase it on the
@@ -504,8 +577,13 @@ func (s *Store) Load() error {
 		// Never build file paths from untrusted persisted ID/LinkName fields.
 		// The validated map key is the canonical identifier.
 		wp.ID, wp.LinkName = key, key
+		sanitizeMediaLists(wp)
+		archived += HistoryBytes(wp.History)
 		derivePaths(wp)
 	}
+	// The archive budget is checked from a counter, so it has to start from the
+	// value already on disk.
+	historyBytesTotal.Store(archived)
 	s.Lock()
 	s.generation++
 	for _, wp := range m {
@@ -526,13 +604,16 @@ var (
 )
 
 func SchedulePrune(max int) {
-	if max <= 0 {
+	// With history enabled the same background pass also enforces the archive
+	// budget, so it has to run even when MAX_IMAGES is 0 (unlimited links).
+	if max <= 0 && config.Current.History.Limit <= 0 {
 		return
 	}
 	pruneOnce.Do(func() {
 		go func() {
 			for limit := range pruneRequests {
 				PruneOldImages(limit)
+				TrimHistoryBudget(config.Current.History.MaxMB)
 			}
 		}()
 	})
@@ -569,6 +650,9 @@ func PruneOldImages(max int) {
 				if !wp.HasImage || wp.IsPinned || wp.Version != candidate.Version {
 					return errStale
 				}
+				// The archived versions belong to the media being dropped, so
+				// they leave the budget with it.
+				NoteHistoryBytes(-HistoryBytes(wp.History))
 				*wp = Wallpaper{
 					ID: wp.ID, LinkName: wp.LinkName, Category: wp.Category,
 					CreatedAt: wp.CreatedAt, AccessLevel: wp.AccessLevel,
@@ -591,6 +675,10 @@ func PruneOldImages(max int) {
 					log.Printf("Error removing pruned media %s: %v", path, err)
 				}
 			}
+			// Archived versions, playlist items and access counters of a link
+			// that no longer has media must not outlive it.
+			RemoveLinkExtraDirs(candidate.ID)
+			ForgetStats(candidate.ID)
 		}()
 	}
 }
