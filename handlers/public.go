@@ -156,7 +156,6 @@ func liveVersion(wp *storage.Wallpaper) uint64 {
 // were asked for, because a frame that pinned ?v=3 must not silently start
 // showing something else.
 func selectMedia(wp *storage.Wallpaper, q url.Values) (mediaSelection, bool) {
-	live := mediaSelection{path: wp.ImagePath, ext: wp.MIMEType}
 	versionStr, itemStr := q.Get("v"), q.Get("i")
 
 	switch {
