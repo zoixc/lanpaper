@@ -6,9 +6,9 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"lanpaper/config"
@@ -57,7 +57,10 @@ func publicMediaCacheControl(accessLevel string) string {
 // resolution; the ETag changes whenever a file is replaced, even twice in the
 // same second, so a revalidation never confirms the previous image.
 func setMediaValidators(h http.Header, fi os.FileInfo) {
-	h.Set("ETag", fmt.Sprintf(`"%x-%x"`, fi.ModTime().UnixNano(), fi.Size()))
+	// Hexadecimal modtime and size, as before — built without fmt, because this
+	// runs on every media response, including every 304.
+	h.Set("ETag", `"`+strconv.FormatInt(fi.ModTime().UnixNano(), 16)+
+		"-"+strconv.FormatInt(fi.Size(), 16)+`"`)
 }
 
 func mediaContentType(ext string) string {

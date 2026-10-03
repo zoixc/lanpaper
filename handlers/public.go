@@ -3,7 +3,6 @@
 package handlers
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -62,7 +61,14 @@ func Public(w http.ResponseWriter, r *http.Request) {
 
 	// A version, a playlist item or the rotation clock picks the file; every
 	// selector is resolved from the record, never from the query string.
-	sel, ok := selectMedia(wp, r.URL.Query())
+	// The query is only parsed when there is one: the overwhelmingly common
+	// request is a bare /{name} from a frame or an <img>, and url.Values is a
+	// map allocation this way avoided on the hottest path in the service.
+	var query url.Values
+	if r.URL.RawQuery != "" {
+		query = r.URL.Query()
+	}
+	sel, ok := selectMedia(wp, query)
 	if !ok {
 		http.NotFound(w, r)
 		return
@@ -82,11 +88,15 @@ func Public(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The download name is built once: both parts are already validated, and
+	// concatenation avoids a reflective Sprintf on every media request.
+	filename := wp.LinkName + "." + sel.ext
+
 	h := w.Header()
 	h.Set("Content-Type", mediaContentType(sel.ext))
 	// Link names are restricted to [A-Za-z0-9_-] and extensions to the media
-	// allow-list, so this is safe.
-	h.Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s.%s"`, wp.LinkName, sel.ext))
+	// allow-list, so the quoted filename cannot break out of its parameter.
+	h.Set("Content-Disposition", `inline; filename="`+filename+`"`)
 	h.Set("Cache-Control", publicMediaCacheControl(wp.AccessLevel))
 	setMediaValidators(h, fi)
 	h.Set("X-Content-Type-Options", "nosniff")
@@ -94,7 +104,7 @@ func Public(w http.ResponseWriter, r *http.Request) {
 	// The recorder keeps the sendfile fast path (ReadFrom) and the deadline
 	// control (Unwrap) of the writer it wraps.
 	rec := &hitRecorder{ResponseWriter: w}
-	http.ServeContent(rec, r, wp.LinkName+"."+sel.ext, fi.ModTime(), f)
+	http.ServeContent(rec, r, filename, fi.ModTime(), f)
 	rec.record(wp.LinkName)
 }
 
