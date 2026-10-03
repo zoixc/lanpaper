@@ -524,8 +524,8 @@ func TestAppPublicAliasesCORSEmbedAndStats(t *testing.T) {
 	if stats := a.link("photo").Stats; stats != nil {
 		t.Fatalf("stats appeared before the link was served: %+v", stats)
 	}
-	_, h, _ := a.request("GET", "/photo", nil, false, nil)
-	etag := h.Get("ETag")
+	_, served, _ := a.request("GET", "/photo", nil, false, nil)
+	etag := served.Get("ETag")
 	if etag == "" {
 		t.Fatal("no ETag to revalidate with")
 	}
