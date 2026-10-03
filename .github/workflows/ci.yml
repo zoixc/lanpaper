@@ -47,7 +47,15 @@ jobs:
         run: go vet ./...
 
       - name: Test
-        run: go test -race -count=1 ./...
+        run: |
+          # TEMPORARY (debugging aid): the Actions log host is unreachable from
+          # the review sandbox, so failures are re-emitted as annotations.
+          go test -race -count=1 ./... > /tmp/gotest.log 2>&1 || true
+          grep -E "^(--- FAIL|FAIL|ok |panic|WARNING: DATA RACE)" /tmp/gotest.log \
+            | head -40 | sed 's/^/::error::/' || true
+          grep -E "\.go:[0-9]+:" /tmp/gotest.log | head -40 | sed 's/^/::error::/' || true
+          grep -A 12 "WARNING: DATA RACE" /tmp/gotest.log | head -60 | sed 's/^/::error::/' || true
+          if grep -qE "^(FAIL|panic|WARNING: DATA RACE)" /tmp/gotest.log; then exit 1; fi
 
       - name: Build
         run: go build -trimpath -ldflags="-X main.Version=$(cat VERSION)" -o /dev/null .
