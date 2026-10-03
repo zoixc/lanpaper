@@ -1,0 +1,127 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: MIT -->
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="utf-8">
+<title>Lanpaper — варианты редизайна</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="../../static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="shared.css">
+<style>
+  .hero { padding: var(--s-7) 0 var(--s-5); }
+  .hero h1 { margin: 0 0 8px; font-size: 2rem; font-weight: var(--fw-bold); letter-spacing: -0.035em; }
+  .hero p { margin: 0; max-width: 62ch; color: var(--text-2); }
+  .grid3 { display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  .vcard {
+    display: flex; flex-direction: column; gap: var(--s-3);
+    padding: var(--s-5); text-decoration: none; color: inherit;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+    box-shadow: var(--shadow-xs);
+    transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease);
+  }
+  .vcard:hover { border-color: var(--border-2); box-shadow: var(--shadow-md); transform: translateY(-2px); }
+  .vcard__tag {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: var(--r-sm);
+    font-weight: var(--fw-bold); font-size: var(--t-md); color: #fff;
+    background: var(--accent);
+  }
+  .vcard h2 { margin: 0; font-size: var(--t-lg); font-weight: var(--fw-bold); letter-spacing: -0.02em; }
+  .vcard p { margin: 0; font-size: var(--t-sm); color: var(--text-2); }
+  .vcard ul { margin: 0; padding-left: 18px; font-size: var(--t-sm); color: var(--text-2); }
+  .vcard li { margin-bottom: 3px; }
+  .vcard__foot { margin-top: auto; padding-top: var(--s-3); display: flex; align-items: center; gap: 8px; font-size: var(--t-sm); font-weight: var(--fw-semibold); color: var(--accent-text); }
+  .swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+  .sw { width: 56px; }
+  .sw i { display: block; height: 40px; border-radius: var(--r-sm); border: 1px solid var(--border); }
+  .sw span { display: block; margin-top: 4px; font-size: 10px; color: var(--text-3); text-align: center; }
+  .note { margin-top: var(--s-6); padding: var(--s-4); background: var(--surface-2); border-radius: var(--r-md); font-size: var(--t-sm); color: var(--text-2); }
+  .note b { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="topbar__inner">
+      <a class="brand" href="../../admin.html"><span class="brand__mark" aria-hidden="true"></span><span class="brand__name">Lanpaper</span></a>
+      <span class="topbar__spacer"></span>
+      <button class="iconbtn" data-theme-toggle aria-pressed="false" aria-label="Тёмная тема">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="hero">
+      <h1>Редизайн админ-панели</h1>
+      <p>Три направления на общей дизайн-системе. Все три сохраняют функциональность 0.12.0 целиком: стабильные ссылки, версии, плейлисты, ротация, уровни доступа, publish keys. Переключатель темы — справа сверху (или клавиша <b>T</b>).</p>
+    </div>
+
+    <div class="grid3">
+      <a class="vcard" href="a-library.html">
+        <span class="vcard__tag">A</span>
+        <h2>Библиотека</h2>
+        <p>Контент в центре, хром тихий. Крупные превью, действия появляются по мере надобности.</p>
+        <ul>
+          <li>Сетка или список — на выбор</li>
+          <li>Действия карточки: покой → наведение → меню ⋯</li>
+          <li>Детали, версии, плейлист и статистика — в панели справа</li>
+          <li>Массовые операции по чекбоксам</li>
+        </ul>
+        <span class="vcard__foot">Открыть вариант A →</span>
+      </a>
+
+      <a class="vcard" href="b-streams.html">
+        <span class="vcard__tag">B</span>
+        <h2>Потоки</h2>
+        <p>Плотный рабочий список для больших библиотек. Много ссылок — один экран.</p>
+        <ul>
+          <li>Таблица с сортируемыми колонками</li>
+          <li>Боковая навигация как в приложении</li>
+          <li>Редактирование доступа прямо в строке</li>
+          <li>Массовые действия в шапке списка</li>
+        </ul>
+        <span class="vcard__foot">Открыть вариант B →</span>
+      </a>
+
+      <a class="vcard" href="c-console.html">
+        <span class="vcard__tag">C</span>
+        <h2>Пульт</h2>
+        <p>Наблюдение за экранами: что сейчас показывается, жива ли ссылка, сколько показов.</p>
+        <ul>
+          <li>Статус-индикатор и прогресс ротации</li>
+          <li>Панель деталей всегда открыта на десктопе</li>
+          <li>Быстрые переключатели доступа и ротации</li>
+          <li>Мобильный: список + шторка деталей</li>
+        </ul>
+        <span class="vcard__foot">Открыть вариант C →</span>
+      </a>
+    </div>
+
+    <div class="note">
+      <p style="margin:0 0 12px"><b>Палитра</b> — «тёплая бумага» вместо насыщенного заката. Цвет в интерфейсе отдан контенту; акцент используется точечно — одно главное действие, фокус, выбранное состояние. Все пары прошли проверку контраста WCAG AA.</p>
+      <div class="swatches">
+        <span class="sw"><i style="background:#F6F6F8"></i><span>фон</span></span>
+        <span class="sw"><i style="background:#FFFFFF"></i><span>карточка</span></span>
+        <span class="sw"><i style="background:#E6E7EC"></i><span>линия</span></span>
+        <span class="sw"><i style="background:#4F5AD6"></i><span>акцент</span></span>
+        <span class="sw"><i style="background:#EEF0FE"></i><span>подсветка</span></span>
+        <span class="sw"><i style="background:#2E8F63"></i><span>успех</span></span>
+        <span class="sw"><i style="background:#B07514"></i><span>внимание</span></span>
+        <span class="sw"><i style="background:#C9483F"></i><span>опасность</span></span>
+        <span class="sw"><i style="background:#1C1E24"></i><span>текст</span></span>
+        <span class="sw"><i style="background:linear-gradient(135deg,#6C5CE7,#B95AC9,#F08A5D)"></i><span>бренд</span></span>
+      </div>
+    </div>
+
+    <footer style="margin-top:var(--s-6);display:flex;justify-content:center">
+      <span class="hint">Прототипы · кликабельны · адаптив от 360&nbsp;px · светлая и тёмная темы</span>
+    </footer>
+  </main>
+</div>
+<div class="toasts"></div>
+<script src="proto.js"></script>
+</body>
+</html>

@@ -1,0 +1,202 @@
+/* SPDX-License-Identifier: MIT */
+/* ============================================================
+   LANPAPER — DESIGN TOKENS v2  (soft / "paper" direction)
+   Общий фундамент для всех вариантов редизайна.
+
+   Принципы:
+   1. Цвет в интерфейсе даёт контент (обои), а не хром. Акцент
+      используется точечно: одно главное действие, фокус, активное.
+   2. Никаких «резких» значений: фон не #FFF и не #000, текст не
+      чистый чёрный, тени без цветного свечения.
+   3. Акцент — спокойный индиго. Закатный градиент бренда остаётся
+      только логотипу и паре акцентных точек.
+   4. Все пары текст/фон проверены по WCAG 2.1 (см. 01-audit.md).
+   ============================================================ */
+
+@media (prefers-color-scheme: light) { :root { color-scheme: light; } }
+@media (prefers-color-scheme: dark)  { :root { color-scheme: dark; } }
+
+/* ============================================================
+   LIGHT — «тёплая бумага»
+   ============================================================ */
+:root {
+    /* Поверхности: 4 уровня вместо 2 */
+    --bg:              #F6F6F8;   /* полотно страницы */
+    --bg-sunken:       #EFEFF3;   /* вложенные блоки, треки */
+    --surface:         #FFFFFF;   /* карточки, поля */
+    --surface-2:       #F2F3F6;   /* инпуты, «второй слой» */
+    --surface-hover:   #FAFAFC;
+    --overlay:         rgba(20, 22, 32, 0.38);        /* подложка модалок */
+    --glass:           rgba(255, 255, 255, 0.82);     /* sticky-панели */
+    --glass-border:    rgba(255, 255, 255, 0.6);
+
+    /* Текст */
+    --text:            #1C1E24;   /* 16.7:1 на белом */
+    --text-2:          #5C6170;   /* 6.2:1 */
+    --text-3:          #8B90A0;   /* крупный текст / иконки / подписи */
+    --text-on-accent:  #FFFFFF;
+
+    /* Линии */
+    --border:          #E6E7EC;
+    --border-2:        #D8DAE2;   /* hover, разделители плотных таблиц */
+    --border-focus:    #4F5AD6;
+
+    /* Акцент — спокойный индиго (5.6:1 с белым) */
+    --accent:          #4F5AD6;
+    --accent-rgb:      79, 90, 214;
+    --accent-hover:    #4450C8;
+    --accent-active:   #3C47B8;
+    --accent-soft:     #EEF0FE;   /* фон-подсветка */
+    --accent-soft-2:   #E2E5FD;   /* выбранное состояние */
+    --accent-text:     #3F49BE;   /* акцентный текст на светлом фоне */
+
+    /* Бренд: закат только для логотипа и мелких акцентов */
+    --brand-gradient:  linear-gradient(135deg, #6C5CE7 0%, #B95AC9 52%, #F08A5D 100%);
+
+    /* Семантика — приглушённая, без «сирены» */
+    --success:         #2E8F63;
+    --success-soft:    #E7F5EE;
+    --warning:         #B07514;
+    --warning-soft:    #FBF2E0;
+    --danger:          #C9483F;
+    --danger-soft:     #FBEDEC;
+    --danger-hover:    #B33E36;
+    --info:            #3D7DC4;
+    --info-soft:       #E9F1FA;
+
+    /* Тени: мягкие, нейтральные, низкая непрозрачность */
+    --shadow-xs: 0 1px 2px rgba(20, 22, 32, 0.04);
+    --shadow-sm: 0 1px 3px rgba(20, 22, 32, 0.05), 0 1px 2px rgba(20, 22, 32, 0.03);
+    --shadow-md: 0 4px 12px rgba(20, 22, 32, 0.06), 0 1px 3px rgba(20, 22, 32, 0.04);
+    --shadow-lg: 0 12px 32px rgba(20, 22, 32, 0.10), 0 2px 8px rgba(20, 22, 32, 0.04);
+    --shadow-focus: 0 0 0 3px rgba(var(--accent-rgb), 0.18);
+
+    /* Форма: спокойные радиусы (без «капсул на всём») */
+    --r-xs:  6px;
+    --r-sm:  8px;
+    --r-md:  12px;
+    --r-lg:  16px;
+    --r-xl:  20px;
+    --r-full: 999px;
+
+    /* Ритм: 4px-сетка */
+    --s-1: 4px;   --s-2: 8px;   --s-3: 12px;  --s-4: 16px;
+    --s-5: 20px;  --s-6: 24px;  --s-7: 32px;  --s-8: 40px;  --s-9: 56px;
+
+    /* Размеры контролов: тач-минимум 44px соблюдён */
+    --h-sm: 32px;   /* плотные внутренние кнопки (десктоп) */
+    --h-md: 40px;   /* обычные кнопки/инпуты */
+    --h-lg: 46px;   /* главные CTA, мобильные инпуты */
+    --tap:  44px;   /* минимальная область нажатия на тач */
+
+    /* Типографика */
+    --font-ui: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Unbounded', 'Manrope', system-ui, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    --t-2xs: 0.6875rem;  /* 11 — подписи, бейджи */
+    --t-xs:  0.75rem;    /* 12 — мета */
+    --t-sm:  0.8125rem;  /* 13 — вторичный текст */
+    --t-md:  0.875rem;   /* 14 — базовый UI */
+    --t-lg:  1rem;       /* 16 — акцентные значения */
+    --t-xl:  1.25rem;    /* 20 — заголовок секции */
+    --t-2xl: 1.5rem;     /* 24 — заголовок страницы */
+
+    --fw-normal: 400; --fw-medium: 500; --fw-semibold: 600; --fw-bold: 700;
+
+    --leading-tight: 1.3;
+    --leading:       1.55;
+
+    /* Движение: короткие, «плотные» кривые */
+    --ease: cubic-bezier(0.2, 0, 0, 1);
+    --dur-fast: 120ms;
+    --dur:      180ms;
+    --dur-slow: 260ms;
+
+    /* Слои */
+    --z-base: 1; --z-sticky: 20; --z-header: 40;
+    --z-dropdown: 100; --z-drawer: 200; --z-modal: 300; --z-toast: 400;
+}
+
+/* ============================================================
+   DARK — «графит», не уголь: фон не чёрный, поверхности различимы
+   ============================================================ */
+[data-theme="dark"], body.dark {
+    --bg:              #15161A;
+    --bg-sunken:       #101115;
+    --surface:         #1C1E23;
+    --surface-2:       #23252B;
+    --surface-hover:   #22242A;
+    --overlay:         rgba(9, 10, 14, 0.62);
+    --glass:           rgba(24, 26, 31, 0.82);
+    --glass-border:    rgba(255, 255, 255, 0.06);
+
+    --text:            #ECEDF1;   /* 15.5:1 */
+    --text-2:          #A6ABBA;   /* 7.9:1 */
+    --text-3:          #7D8394;
+    --text-on-accent:  #FFFFFF;
+
+    --border:          #2A2D34;
+    --border-2:        #383B44;
+    --border-focus:    #93A0FF;
+
+    --accent:          #7F8CF5;   /* на тёмном акцент светлее */
+    --accent-rgb:      127, 140, 245;
+    --accent-hover:    #93A0FF;
+    --accent-active:   #6B78EA;
+    --accent-soft:     rgba(127, 140, 245, 0.14);
+    --accent-soft-2:   rgba(127, 140, 245, 0.22);
+    --accent-text:     #A6B0FF;
+
+    --brand-gradient:  linear-gradient(135deg, #7C6CF0 0%, #C36AD4 52%, #F29570 100%);
+
+    --success:         #55B98A;
+    --success-soft:    rgba(85, 185, 138, 0.14);
+    --warning:         #D9A441;
+    --warning-soft:    rgba(217, 164, 65, 0.14);
+    --danger:          #E4736B;
+    --danger-soft:     rgba(228, 115, 107, 0.14);
+    --danger-hover:    #EE857D;
+    --info:            #6FA8E0;
+    --info-soft:       rgba(111, 168, 224, 0.14);
+
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+    --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 14px 36px rgba(0, 0, 0, 0.5);
+    --shadow-focus: 0 0 0 3px rgba(var(--accent-rgb), 0.28);
+}
+
+/* ============================================================
+   БАЗА
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: var(--font-ui);
+    font-size: var(--t-md);
+    line-height: var(--leading);
+    letter-spacing: -0.006em;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+:focus-visible {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+    border-radius: var(--r-xs);
+}
+
+::selection { background: var(--accent-soft-2); }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

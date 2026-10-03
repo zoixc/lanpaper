@@ -1,0 +1,464 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: MIT -->
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="utf-8">
+<title>Lanpaper — Вариант C «Пульт»</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="../../static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="variant-c.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="topbar__inner">
+      <a class="brand" href="index.html"><span class="brand__mark" aria-hidden="true"></span><span class="brand__name">Lanpaper</span></a>
+      <span class="topbar__spacer"></span>
+      <div class="topbar__actions">
+        <a class="btn btn--ghost btn--sm only-desktop" href="index.html">Все варианты</a>
+        <button class="iconbtn" data-theme-toggle aria-pressed="false" aria-label="Тёмная тема">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+        <div class="menu-wrap">
+          <button class="iconbtn" aria-haspopup="true" aria-expanded="false" aria-label="Настройки">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+          <div class="menu">
+            <div class="menu__title">Сервер</div>
+            <button class="menu__item" data-demo="Журнал доступа">Журнал доступа</button>
+            <button class="menu__item" data-demo="Publish keys">Publish keys<span class="menu__key">2</span></button>
+            <button class="menu__item" data-demo="Перегенерация превью запущена">Перегенерировать превью</button>
+            <div class="menu__sep"></div>
+            <button class="menu__item" data-demo="Экспорт выполнен">Экспорт JSON</button>
+            <button class="menu__item" data-demo="Выберите файл">Импорт JSON</button>
+          </div>
+        </div>
+        <button class="btn btn--primary btn--sm" data-demo="Введите ID новой ссылки">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Новая ссылка
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- Полоса состояния -->
+    <div class="statusbar">
+      <span class="statusbar__item"><span class="pulse"></span>Сервер работает</span>
+      <span class="statusbar__item">Ссылок: <b>7</b></span>
+      <span class="statusbar__item">С ротацией: <b>2</b></span>
+      <span class="statusbar__item">Показов за сутки: <b>1&nbsp;842</b></span>
+      <span class="statusbar__item"><span class="pulse pulse--warn"></span>1 ссылка без файла</span>
+      <span class="statusbar__spacer"></span>
+      <span class="statusbar__item u-muted">обновлено только что</span>
+    </div>
+
+    <!-- Инструменты -->
+    <div class="ctools">
+      <div class="field">
+        <svg aria-hidden="true" class="field__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input class="input" type="search" placeholder="Найти экран или файл…" aria-label="Поиск" data-search-input>
+        <button class="field__clear" data-search-clear aria-label="Очистить">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="chips">
+        <button class="chip" data-filter="all" data-filter-kind="single" aria-pressed="true">Все <span class="chip__count">7</span></button>
+        <button class="chip" data-filter="playlist" aria-pressed="false">С ротацией <span class="chip__count">0</span></button>
+        <button class="chip" data-filter="pinned" aria-pressed="false">Приоритетные <span class="chip__count">0</span></button>
+        <button class="chip" data-filter="empty" aria-pressed="false">Требуют внимания <span class="chip__count">0</span></button>
+      </div>
+      <span style="flex:1"></span>
+      <span class="badge badge--outline">Показано <b data-result-count style="margin-left:4px">7</b></span>
+    </div>
+
+    <div class="console">
+      <!-- ============ КАНАЛЫ ============ -->
+      <div class="channels" data-list>
+
+        <!-- /lobby -->
+        <article class="chan is-active" data-item data-search="lobby холл видео плейлист" data-tags="playlist pinned" data-name="lobby" data-date="2026-10-03T08:12" data-size="148.2" data-channels="1">
+          <div class="chan__head">
+            <span class="chan__status"><span class="pulse"></span></span>
+            <span class="chan__name">/lobby</span>
+            <span class="chan__spacer"></span>
+            <span class="badge badge--accent">Плейлист · 6</span>
+          </div>
+          <div class="chan__shot">
+            <img src="media/wp-abstract.jpg" alt="" loading="lazy">
+            <span class="chan__ov">
+              <span class="chan__file">lobby-loop.mp4<small>сейчас на экране</small></span>
+              <span class="chan__live"><i></i>в эфире</span>
+            </span>
+          </div>
+          <div class="chan__body">
+            <div class="chan__meta"><span>MP4</span><i>·</i><span>1920×1080</span><i>·</i><span>148.2 МБ</span><i>·</i><span>обновлено 12 мин назад</span></div>
+            <div class="rotate-bar">
+              <span class="rotate-bar__track"><span class="rotate-bar__fill" style="width:62%"></span></span>
+              <span class="rotate-bar__label">смена через 11 с</span>
+            </div>
+          </div>
+          <div class="chan__foot">
+            <span class="chan__stat"><b>612</b> показов за сутки</span>
+            <span style="flex:1"></span>
+            <span class="badge badge--outline">Публичный</span>
+          </div>
+        </article>
+
+        <!-- /tv -->
+        <article class="chan" data-item data-search="tv кухня картинка" data-tags="image" data-name="tv" data-date="2026-10-03T16:40" data-size="12.4" data-channels="1">
+          <div class="chan__head">
+            <span class="chan__status"><span class="pulse"></span></span>
+            <span class="chan__name">/tv</span>
+            <span class="chan__spacer"></span>
+            <span class="badge badge--outline">Статика</span>
+          </div>
+          <div class="chan__shot">
+            <img src="media/wp-dawn.jpg" alt="" loading="lazy">
+            <span class="chan__ov">
+              <span class="chan__file">kitchen-4k.jpg<small>показывается с 09:12</small></span>
+              <span class="chan__live chan__live--static"><i></i>4 дня</span>
+            </span>
+          </div>
+          <div class="chan__body">
+            <div class="chan__meta"><span>JPEG</span><i>·</i><span>3840×2160</span><i>·</i><span>12.4 МБ</span><i>·</i><span>обновлено 2 ч назад</span></div>
+          </div>
+          <div class="chan__foot">
+            <span class="chan__stat"><b>421</b> показов за сутки</span>
+            <span style="flex:1"></span>
+            <span class="badge badge--outline">Публичный</span>
+          </div>
+        </article>
+
+        <!-- /kids -->
+        <article class="chan" data-item data-search="kids детская видео" data-tags="video local" data-name="kids" data-date="2026-10-02T19:05" data-size="48.2" data-channels="1">
+          <div class="chan__head">
+            <span class="chan__status"><span class="pulse"></span></span>
+            <span class="chan__name">/kids</span>
+            <span class="chan__spacer"></span>
+          </div>
+          <div class="chan__shot">
+            <img src="media/wp-forest.jpg" alt="" loading="lazy">
+            <span class="chan__ov">
+              <span class="chan__file">cartoon-loop.mp4<small>зациклено, 1:12</small></span>
+              <span class="chan__live"><i></i>в эфире</span>
+            </span>
+          </div>
+          <div class="chan__body">
+            <div class="chan__meta"><span>MP4</span><i>·</i><span>1920×1080</span><i>·</i><span>48.2 МБ</span><i>·</i><span>вчера</span></div>
+          </div>
+          <div class="chan__foot">
+            <span class="chan__stat"><b>318</b> показов за сутки</span>
+            <span style="flex:1"></span>
+            <span class="badge badge--outline">Локальная сеть</span>
+          </div>
+        </article>
+
+        <!-- /meeting-room -->
+        <article class="chan" data-item data-search="meeting-room переговорка токен" data-tags="image token" data-name="meeting-room" data-date="2026-10-01T11:20" data-size="3.1" data-channels="1">
+          <div class="chan__head">
+            <span class="chan__status"><span class="pulse"></span></span>
+            <span class="chan__name">/meeting-room</span>
+            <span class="chan__spacer"></span>
+          </div>
+          <div class="chan__shot">
+            <img src="media/wp-city.jpg" alt="" loading="lazy">
+            <span class="chan__ov">
+              <span class="chan__file">meeting-room.jpg<small>доступ по токену</small></span>
+              <span class="chan__live chan__live--static"><i></i>2 дня</span>
+            </span>
+          </div>
+          <div class="chan__body">
+            <div class="chan__meta"><span>JPEG</span><i>·</i><span>2560×1440</span><i>·</i><span>3.1 МБ</span><i>·</i><span>2 дня назад</span></div>
+          </div>
+          <div class="chan__foot">
+            <span class="chan__stat"><b>96</b> показов за сутки</span>
+            <span style="flex:1"></span>
+            <span class="badge badge--warning">Токен</span>
+          </div>
+        </article>
+
+        <!-- /workshop -->
+        <article class="chan" data-item data-search="workshop цех картинка" data-tags="image local" data-name="workshop" data-date="2026-09-29T08:00" data-size="5.8" data-channels="1">
+          <div class="chan__head">
+            <span class="chan__status"><span class="pulse pulse--idle"></span></span>
+            <span class="chan__name">/workshop</span>
+            <span class="chan__spacer"></span>
+            <span class="badge badge--outline">Нет обращений</span>
+          </div>
+          <div class="chan__shot">
+            <img src="media/wp-mono.jpg" alt="" loading="lazy">
+            <span class="chan__ov">
+              <span class="chan__file">workshop.jpg<small>последний показ 6 ч назад</small></span>
+            </span>
+          </div>
+          <div class="chan__body">
+            <div class="chan__meta"><span>JPEG</span><i>·</i><span>3840×2160</span><i>·</i><span>5.8 МБ</span><i>·</i><span>4 дня назад</span></div>
+          </div>
+          <div class="chan__foot">
+            <span class="chan__stat"><b>0</b> показов за сутки</span>
+            <span style="flex:1"></span>
+            <span class="badge badge--outline">Локальная сеть</span>
+          </div>
+        </article>
+
+        <!-- /reception -->
+        <article class="chan" data-item data-search="reception ресепшн пусто внимание" data-tags="empty" data-name="reception" data-date="2026-09-28T09:00" data-size="0" data-channels="0">
+          <div class="chan__head">
+            <span class="chan__status"><span class="pulse pulse--warn"></span></span>
+            <span class="chan__name">/reception</span>
+            <span class="chan__spacer"></span>
+            <span class="badge badge--warning">Нет файла</span>
+          </div>
+          <div class="chan__shot">
+            <span class="shot__empty">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="9" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+              Экран подключён, файла нет
+            </span>
+          </div>
+          <div class="chan__body">
+            <div class="chan__meta"><span>ссылка работает</span><i>·</i><span>создана 5 дней назад</span></div>
+          </div>
+          <div class="chan__foot">
+            <button class="btn btn--primary btn--sm" data-file-demo style="flex:1">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Загрузить файл
+            </button>
+          </div>
+        </article>
+
+        <!-- /garage -->
+        <article class="chan" data-item data-search="garage гараж админ" data-tags="image auth" data-name="garage" data-date="2026-09-20T14:30" data-size="7.2" data-channels="1">
+          <div class="chan__head">
+            <span class="chan__status"><span class="pulse pulse--idle"></span></span>
+            <span class="chan__name">/garage</span>
+            <span class="chan__spacer"></span>
+            <span class="badge badge--outline">Служебная</span>
+          </div>
+          <div class="chan__shot">
+            <img src="media/wp-forest.jpg" alt="" loading="lazy" style="filter:hue-rotate(35deg) saturate(0.7)">
+            <span class="chan__ov">
+              <span class="chan__file">garage.jpg<small>только для админа</small></span>
+            </span>
+          </div>
+          <div class="chan__body">
+            <div class="chan__meta"><span>JPEG</span><i>·</i><span>1920×1080</span><i>·</i><span>7.2 МБ</span><i>·</i><span>2 недели назад</span></div>
+          </div>
+          <div class="chan__foot">
+            <span class="chan__stat"><b>—</b> без счётчика</span>
+            <span style="flex:1"></span>
+            <span class="badge badge--outline">Только админ</span>
+          </div>
+        </article>
+
+        <div class="empty" data-empty-state hidden>
+          <span class="empty__art">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          </span>
+          <p class="empty__title">Экранов не найдено</p>
+          <p class="empty__text">Измените запрос или снимите фильтры.</p>
+        </div>
+      </div>
+
+      <!-- ============ ИНСПЕКТОР ============ -->
+      <aside class="inspector" id="inspector" aria-label="Детали ссылки">
+        <div class="inspector__head">
+          <div class="u-grow">
+            <div class="inspector__name">/lobby</div>
+            <div class="inspector__url">https://lanpaper.local/lobby</div>
+          </div>
+          <button class="iconbtn iconbtn--sm" data-copy="https://lanpaper.local/lobby" aria-label="Копировать URL">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+          <button class="iconbtn iconbtn--sm only-mobile" data-drawer-close aria-label="Закрыть">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <div class="inspector__body">
+          <div class="ins-shot"><img src="media/wp-abstract.jpg" alt=""></div>
+
+          <div class="quick-row">
+            <button class="btn btn--soft btn--sm" data-demo="Открыто в новой вкладке">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              Открыть
+            </button>
+            <button class="btn btn--secondary btn--sm" data-file-demo>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Заменить
+            </button>
+            <div class="menu-wrap">
+              <button class="btn btn--soft btn--sm btn--icon" aria-haspopup="true" aria-expanded="false" aria-label="Ещё действия">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
+              </button>
+              <div class="menu">
+                <button class="menu__item" data-demo="Открепить нечего">Закрепить вверху</button>
+                <button class="menu__item" data-demo="Выгрузка начата">Скачать файл</button>
+                <div class="menu__sep"></div>
+                <button class="menu__item menu__item--danger" data-demo="Открыто подтверждение удаления" data-demo-type="danger">Удалить ссылку</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <p class="detail-section__title">Кто увидит</p>
+            <div class="access-seg" role="group" aria-label="Уровень доступа">
+              <button data-level="public" aria-pressed="true" data-demo="Доступ: публичный">Публично</button>
+              <button data-level="local" aria-pressed="false" data-demo="Доступ: только LAN">LAN</button>
+              <button data-level="token" aria-pressed="false" data-demo="Доступ: по токену">Токен</button>
+              <button data-level="auth" aria-pressed="false" data-demo="Доступ: только админ">Админ</button>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <p class="detail-section__title">Ротация</p>
+            <label class="switch" style="margin-bottom:10px">
+              <input type="checkbox" checked>
+              <span class="switch__track"></span>
+              <span class="switch__label">Менять файл автоматически</span>
+            </label>
+            <div class="rotate__field" style="display:flex;gap:8px;align-items:center;font-size:var(--t-sm);color:var(--text-2)">
+              <span>Каждые</span>
+              <input class="input" style="width:78px;height:32px;text-align:center" type="number" value="30" min="5" max="86400" inputmode="numeric" aria-label="Интервал ротации, секунд">
+              <span>с,</span>
+              <select aria-label="Порядок ротации" style="height:32px;padding:0 8px;font:inherit;font-size:var(--t-sm);background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px">
+                <option>по порядку</option><option>случайно</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <p class="detail-section__title">Очередь плейлиста</p>
+            <div class="pqueue">
+              <div class="pqueue__item is-now">
+                <span class="pqueue__num">1</span>
+                <img class="pqueue__thumb" src="media/wp-abstract.jpg" alt="">
+                <span class="pqueue__name">lobby-loop.mp4</span>
+                <span class="badge badge--accent">сейчас</span>
+              </div>
+              <div class="pqueue__item">
+                <span class="pqueue__num">2</span>
+                <img class="pqueue__thumb" src="media/wp-dawn.jpg" alt="">
+                <span class="pqueue__name">dawn-lake.jpg</span>
+                <button class="iconbtn iconbtn--sm" data-demo="Элемент убран" data-demo-type="danger" aria-label="Убрать">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+              <div class="pqueue__item">
+                <span class="pqueue__num">3</span>
+                <img class="pqueue__thumb" src="media/wp-city.jpg" alt="">
+                <span class="pqueue__name">city-night.jpg</span>
+                <button class="iconbtn iconbtn--sm" data-demo="Элемент убран" data-demo-type="danger" aria-label="Убрать">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+              <div class="pqueue__item">
+                <span class="pqueue__num">4</span>
+                <img class="pqueue__thumb" src="media/wp-mono.jpg" alt="">
+                <span class="pqueue__name">beige-forms.jpg</span>
+                <button class="iconbtn iconbtn--sm" data-demo="Элемент убран" data-demo-type="danger" aria-label="Убрать">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+            </div>
+            <button class="btn btn--secondary btn--block btn--sm" style="margin-top:10px" data-file-demo>Добавить файл в очередь</button>
+          </div>
+
+          <div class="detail-section">
+            <p class="detail-section__title">Показы за 7 дней</p>
+            <div class="stat-grid">
+              <div class="stat"><div class="stat__value">612</div><div class="stat__label">за сутки</div></div>
+              <div class="stat"><div class="stat__value">4 218</div><div class="stat__label">за неделю</div></div>
+            </div>
+            <div class="spark" aria-hidden="true">
+              <span class="spark__bar" style="height:36%"></span><span class="spark__bar" style="height:52%"></span>
+              <span class="spark__bar" style="height:30%"></span><span class="spark__bar" style="height:68%"></span>
+              <span class="spark__bar" style="height:50%"></span><span class="spark__bar" style="height:80%"></span>
+              <span class="spark__bar spark__bar--now" style="height:100%"></span>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <p class="detail-section__title">Версии в архиве</p>
+            <div class="vrow" style="padding-left:0;padding-right:0">
+              <img class="vrow__thumb" src="media/wp-mono.jpg" alt="">
+              <div class="vrow__info">
+                <div class="vrow__title">Версия 2</div>
+                <div class="vrow__meta">lobby-loop-v2.mp4 · 3 дня назад</div>
+              </div>
+              <button class="btn btn--soft btn--sm" data-demo="Версия 2 восстановлена">Вернуть</button>
+            </div>
+            <div class="vrow" style="padding-left:0;padding-right:0">
+              <img class="vrow__thumb" src="media/wp-forest.jpg" alt="">
+              <div class="vrow__info">
+                <div class="vrow__title">Версия 1</div>
+                <div class="vrow__meta">lobby-old.mp4 · 2 недели назад</div>
+              </div>
+              <button class="btn btn--soft btn--sm" data-demo="Версия 1 восстановлена">Вернуть</button>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <p class="detail-section__title">Лента событий</p>
+            <div class="feed">
+              <div class="feed__item"><span class="feed__dot feed__dot--ok"></span><span class="feed__text">Файл заменён на <b>lobby-loop.mp4</b></span><span class="feed__time">12:04</span></div>
+              <div class="feed__item"><span class="feed__dot feed__dot--accent"></span><span class="feed__text">Ротация включена — <b>30 с</b>, по порядку</span><span class="feed__time">11:58</span></div>
+              <div class="feed__item"><span class="feed__dot"></span><span class="feed__text">Добавлен файл в очередь: <b>beige-forms.jpg</b></span><span class="feed__time">11:52</span></div>
+              <div class="feed__item"><span class="feed__dot feed__dot--warn"></span><span class="feed__text">Доступ изменён: <b>LAN → Публичный</b></span><span class="feed__time">вчера</span></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <footer style="margin-top:var(--s-7);display:flex;justify-content:center">
+      <span class="hint">Lanpaper 0.12.0 · <a href="index.html" style="color:var(--text-2)">все варианты дизайна</a></span>
+    </footer>
+  </main>
+</div>
+
+<div class="scrim"></div>
+<div class="toasts"></div>
+<script src="proto.js"></script>
+<script>
+/* Выбор канала обновляет инспектор */
+(function () {
+    const chans = document.querySelectorAll('.chan');
+    const name = document.querySelector('.inspector__name');
+    const url = document.querySelector('.inspector__url');
+    const shot = document.querySelector('.ins-shot img');
+    chans.forEach((c) => {
+        c.addEventListener('click', (e) => {
+            if (e.target.closest('button, a, .menu-wrap')) return;
+            chans.forEach((o) => o.classList.remove('is-active'));
+            c.classList.add('is-active');
+            if (name) name.textContent = '/' + c.dataset.name;
+            if (url) url.textContent = 'https://lanpaper.local/' + c.dataset.name;
+            const img = c.querySelector('.chan__shot img');
+            if (img && shot) shot.src = img.src;
+            if (window.innerWidth <= 960) {
+                document.getElementById('inspector').classList.add('open');
+                document.querySelector('.scrim').classList.add('open');
+            }
+        });
+    });
+
+    const scrim = document.querySelector('.scrim');
+    const ins = document.getElementById('inspector');
+    if (scrim) scrim.addEventListener('click', () => {
+        ins.classList.remove('open');
+        scrim.classList.remove('open');
+    });
+    document.querySelectorAll('[data-drawer-close]').forEach((b) => b.addEventListener('click', () => {
+        ins.classList.remove('open');
+        scrim.classList.remove('open');
+    }));
+})();
+</script>
+</body>
+</html>
