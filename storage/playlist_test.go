@@ -165,7 +165,7 @@ func TestPlaylistIndexRotatesWithoutState(t *testing.T) {
 
 func TestPlaylistNowMatchesPlaylistIndex(t *testing.T) {
 	wp := &Wallpaper{LinkName: "frame", Items: []PlaylistItem{{ID: 1}, {ID: 2}},
-		Rotate: NormalizeRotate(RotateConfig{Enabled: true, Interval: config.MinRotateInterval}, true)}
+		Rotate: NormalizeRotatePtr(&RotateConfig{Enabled: true, Interval: config.MinRotateInterval}, true)}
 	// A handler resolves a whole request against one window, so PlaylistNow must
 	// always return a position this link can actually serve.
 	for range 50 {
