@@ -164,6 +164,10 @@
 
       <div class="search-sort-bar">
         <div class="search-container">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"/>
+            <line x1="16.5" y1="16.5" x2="21" y2="21"/>
+          </svg>
           <input
             type="text"
             id="searchInput"
@@ -180,16 +184,39 @@
           <label class="sort-label" data-i18n="sort_by">Sort by:</label>
           <div class="custom-select" id="customSortSelect">
             <button class="custom-select-btn" aria-haspopup="listbox" aria-expanded="false">
-              <span id="customSortLabel" data-i18n="date_new">Newest first</span>
+              <!-- The label follows the selected option, not a fixed key: syncCustomSelectLabels() owns it. -->
+              <span id="customSortLabel">Newest first</span>
               <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M1 1l4 4 4-4"/>
               </svg>
             </button>
             <div class="custom-select-menu" role="listbox">
-              <div class="custom-select-option" data-value="name_asc" data-i18n="name_asc">Name (A-Z)</div>
-              <div class="custom-select-option" data-value="name_desc" data-i18n="name_desc">Name (Z-A)</div>
-              <div class="custom-select-option selected" data-value="date_desc" data-i18n="date_new">Newest first</div>
-              <div class="custom-select-option" data-value="date_asc" data-i18n="date_old">Oldest first</div>
+              <div class="custom-select-option" tabindex="-1" data-value="name_asc" role="option">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                  <path d="M4 7h8M4 12h12M4 17h16"/>
+                </svg>
+                <span data-i18n="name_asc">Name (A-Z)</span>
+              </div>
+              <div class="custom-select-option" tabindex="-1" data-value="name_desc" role="option">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                  <path d="M4 7h16M4 12h12M4 17h8"/>
+                </svg>
+                <span data-i18n="name_desc">Name (Z-A)</span>
+              </div>
+              <div class="custom-select-option selected" tabindex="-1" data-value="date_desc" role="option" aria-selected="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9"/>
+                  <polyline points="12 7 12 12 15 14"/>
+                </svg>
+                <span data-i18n="date_new">Newest first</span>
+              </div>
+              <div class="custom-select-option" tabindex="-1" data-value="date_asc" role="option">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9"/>
+                  <polyline points="12 7 12 12 9 14"/>
+                </svg>
+                <span data-i18n="date_old">Oldest first</span>
+              </div>
             </div>
           </div>
           <select id="sortSelect" class="sort-select" aria-hidden="true" tabindex="-1">
@@ -241,8 +268,19 @@
         <div id="modalList" class="modal-list hidden"></div>
       </div>
       <div class="modal-actions">
-        <button id="modalCancelBtn" class="btn" data-i18n="modal_cancel">Cancel</button>
-        <button id="modalConfirmBtn" class="btn btn--primary" data-i18n="modal_ok">OK</button>
+        <button id="modalCancelBtn" class="btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+          <span data-i18n="modal_cancel">Cancel</span>
+        </button>
+        <button id="modalConfirmBtn" class="btn btn--primary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          <span data-i18n="modal_ok">OK</span>
+        </button>
       </div>
     </div>
   </div>
@@ -255,8 +293,23 @@
         <p id="confirmMessage"></p>
       </div>
       <div class="modal-actions">
-        <button id="confirmCancelBtn" class="btn" data-i18n="modal_cancel">Cancel</button>
-        <button id="confirmDeleteBtn" class="btn btn--danger" data-i18n="delete_btn">Delete</button>
+        <button id="confirmCancelBtn" class="btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+          <span data-i18n="modal_cancel">Cancel</span>
+        </button>
+        <button id="confirmDeleteBtn" class="btn btn--danger btn--danger-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            <path d="M10 11v6"/>
+            <path d="M14 11v6"/>
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          </svg>
+          <span data-i18n="delete_btn">Delete</span>
+        </button>
       </div>
     </div>
   </div>
@@ -271,12 +324,25 @@
         <p id="versionsHint" class="versions-hint"></p>
 
         <section class="versions-section">
-          <h4 data-i18n="versions_history">Version history</h4>
+          <h4>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+              <circle cx="12" cy="12" r="9"/>
+              <polyline points="12 7 12 12 15 14"/>
+            </svg>
+            <span data-i18n="versions_history">Version history</span>
+          </h4>
           <div id="versionsList" class="versions-list"></div>
         </section>
 
         <section class="versions-section">
-          <h4 data-i18n="versions_playlist">Playlist</h4>
+          <h4>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+              <line x1="4" y1="7" x2="20" y2="7"/>
+              <line x1="4" y1="12" x2="20" y2="12"/>
+              <line x1="4" y1="17" x2="14" y2="17"/>
+            </svg>
+            <span data-i18n="versions_playlist">Playlist</span>
+          </h4>
           <div id="playlistList" class="versions-list"></div>
           <div class="rotate-controls">
             <label class="rotate-check">
@@ -294,17 +360,35 @@
                 <option value="random" data-i18n="rotate_order_random">Random</option>
               </select>
             </label>
-            <button id="rotateSaveBtn" class="btn btn--primary" data-i18n="rotate_save">Save</button>
+            <button id="rotateSaveBtn" class="btn btn--primary">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              <span data-i18n="rotate_save">Save</span>
+            </button>
           </div>
         </section>
 
         <section class="versions-section" id="statsSection">
-          <h4 data-i18n="stats_title">Access statistics</h4>
+          <h4>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+              <line x1="5" y1="20" x2="5" y2="13"/>
+              <line x1="12" y1="20" x2="12" y2="8"/>
+              <line x1="19" y1="20" x2="19" y2="4"/>
+            </svg>
+            <span data-i18n="stats_title">Access statistics</span>
+          </h4>
           <p id="statsBody" class="versions-hint"></p>
         </section>
       </div>
       <div class="modal-actions">
-        <button id="versionsCloseBtn" class="btn" data-i18n="modal_close">Close</button>
+        <button id="versionsCloseBtn" class="btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+          <span data-i18n="modal_close">Close</span>
+        </button>
       </div>
     </div>
   </div>

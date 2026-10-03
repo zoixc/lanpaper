@@ -132,7 +132,7 @@
   "meta_hits": "{{n}} accès",
   "modal_close": "Fermer",
   "aria_more": "Plus d'actions",
-  "change_media": "Modifier",
+  "change_media": "Changer",
   "pult_btn": "Panneau",
   "pult_open": "Ouvrir le panneau",
   "pult_eyebrow": "Panneau du lien",
@@ -144,5 +144,10 @@
   "palette_indigo": "Indigo",
   "palette_terra": "Terracotta",
   "palette_sage": "Sauge",
-  "palette_graphite": "Graphite"
+  "palette_graphite": "Graphite",
+  "cat_image": "Photo",
+  "cat_video": "Vidéo",
+  "cat_other": "Autre",
+  "alt_preview": "Aperçu",
+  "alt_image": "Image"
 }

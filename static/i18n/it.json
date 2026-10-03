@@ -144,5 +144,10 @@
   "palette_indigo": "Indaco",
   "palette_terra": "Terracotta",
   "palette_sage": "Salvia",
-  "palette_graphite": "Grafite"
+  "palette_graphite": "Grafite",
+  "cat_image": "Foto",
+  "cat_video": "Video",
+  "cat_other": "Altro",
+  "alt_preview": "Anteprima",
+  "alt_image": "Immagine"
 }

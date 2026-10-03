@@ -144,5 +144,10 @@
   "palette_indigo": "Индиго",
   "palette_terra": "Терракота",
   "palette_sage": "Шалфей",
-  "palette_graphite": "Графит"
+  "palette_graphite": "Графит",
+  "cat_image": "Фото",
+  "cat_video": "Видео",
+  "cat_other": "Другое",
+  "alt_preview": "Превью",
+  "alt_image": "Изображение"
 }

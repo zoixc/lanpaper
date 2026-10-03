@@ -525,6 +525,7 @@ async function setLanguage(lang) {
     syncCustomSelectLabels();
     updateSearchStats();
     updateAriaLabels();
+    refreshCardsLanguage();
 
     document.querySelectorAll('.lang-option').forEach(opt => {
         opt.classList.toggle('active', opt.dataset.lang === lang);
@@ -560,6 +561,25 @@ function updateAriaLabels() {
     document.querySelectorAll('[data-i18n-aria]').forEach(el => {
         const key = el.dataset.i18nAria;
         if (STATE.translations[key]) el.setAttribute('aria-label', STATE.translations[key]);
+    });
+}
+
+
+// Language-independent pieces of a card are rebuilt at render time; this pass
+// refreshes the ones a language switch would otherwise leave in the old
+// language: the meta line, the access row built by setupAccessControl() and
+// the alt text of the preview.
+function refreshCardsLanguage() {
+    const list = DOM.linksList;
+    if (!list) return;
+    list.querySelectorAll('.link-card').forEach(card => {
+        if (card._link) {
+            updateCard(card, card._link);
+            setupPinButton(card, card._link);
+        }
+        card.querySelectorAll('img.preview').forEach(img => {
+            img.alt = t('alt_preview', 'Preview');
+        });
     });
 }
 
@@ -643,21 +663,64 @@ function initCustomSelect() {
     });
 
     options.forEach(opt => {
-        opt.addEventListener('click', () => {
-            const val = opt.dataset.value;
-            options.forEach(o => o.classList.remove('selected'));
-            opt.classList.add('selected');
-            if (label) label.textContent = opt.textContent;
-            customSelect.classList.remove('open');
-            btn.setAttribute('aria-expanded', 'false');
-            if (DOM.sortSelect) DOM.sortSelect.value = val;
-            STATE.sortBy = val;
-            localStorage.setItem('sortBy', val);
-            filterAndSort();
+        opt.addEventListener('click', () => selectOption(opt));
+        // Keyboard: the list is a listbox, so the arrow keys must move
+        // through it and Enter must pick — buttons alone are not enough.
+        opt.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                selectOption(opt);
+                btn.focus();
+                return;
+            }
+            if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+            e.preventDefault();
+            const list = Array.from(options);
+            const index = list.indexOf(opt);
+            const next = list[(index + (e.key === 'ArrowDown' ? 1 : list.length - 1)) % list.length];
+            if (next) next.focus();
         });
+        opt.addEventListener('focus', () => {
+            options.forEach(o => o.classList.toggle('focused', o === opt));
+        });
+        opt.addEventListener('blur', () => opt.classList.remove('focused'));
     });
+
+    // Opening the menu puts the keyboard on the selected option.
+    btn.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (!customSelect.classList.contains('open')) btn.click();
+            const current = customSelect.querySelector('.custom-select-option.selected') || options[0];
+            if (current) current.focus();
+        }
+    });
+
+    function selectOption(opt) {
+        const val = opt.dataset.value;
+        options.forEach(o => {
+            o.classList.remove('selected');
+            o.setAttribute('aria-selected', 'false');
+        });
+        opt.classList.add('selected');
+        opt.setAttribute('aria-selected', 'true');
+        if (label) label.textContent = optionLabel(opt);
+        customSelect.classList.remove('open');
+        btn.setAttribute('aria-expanded', 'false');
+        if (DOM.sortSelect) DOM.sortSelect.value = val;
+        STATE.sortBy = val;
+        localStorage.setItem('sortBy', val);
+        filterAndSort();
+    }
 }
 
+
+// Each option is an icon plus a <span data-i18n>: the label is read from the
+// span so translating or selecting an option never wipes its icon.
+function optionLabel(opt) {
+    const textEl = opt.querySelector('[data-i18n]');
+    return (textEl || opt).textContent.trim();
+}
 
 function syncCustomSelectLabels() {
     const customSelect = document.getElementById('customSortSelect');
@@ -667,11 +730,13 @@ function syncCustomSelectLabels() {
     const options = customSelect.querySelectorAll('.custom-select-option');
 
     options.forEach(opt => {
-        const i18nKey = opt.dataset.i18n;
-        if (i18nKey && STATE.translations[i18nKey]) opt.textContent = STATE.translations[i18nKey];
+        const textEl = opt.querySelector('[data-i18n]');
+        const i18nKey = textEl && textEl.dataset.i18n;
+        if (i18nKey && STATE.translations[i18nKey]) textEl.textContent = STATE.translations[i18nKey];
         const isSelected = opt.dataset.value === STATE.sortBy;
         opt.classList.toggle('selected', isSelected);
-        if (isSelected && label) label.textContent = opt.textContent;
+        opt.setAttribute('aria-selected', String(isSelected));
+        if (isSelected && label) label.textContent = optionLabel(opt);
     });
 }
 
@@ -1156,6 +1221,16 @@ async function togglePin(link) {
         }
         link.pinned = updatedLink.pinned;
 
+        // Pop the badge on the card that changed, not on every card at load.
+        const card = DOM.linksList && DOM.linksList.querySelector(`[data-link-name="${CSS.escape(link.linkName)}"]`);
+        const pinBtn = card && card.querySelector('.pin-btn');
+        if (pinBtn) {
+            pinBtn.classList.remove('bump');
+            void pinBtn.offsetWidth;
+            pinBtn.classList.add('bump');
+            pinBtn.addEventListener('animationend', () => pinBtn.classList.remove('bump'), { once: true });
+        }
+
         // Show toast
         const msgKey = updatedLink.pinned ? 'pinned' : 'unpinned';
         const msg = t(msgKey, updatedLink.pinned ? 'Pinned to top' : 'Unpinned');
@@ -1179,12 +1254,20 @@ function setupPinButton(card, link) {
     const ariaLabel = t(ariaKey, link.pinned ? 'Unpin this link' : 'Pin this link to top');
     pinBtn.setAttribute('aria-label', ariaLabel);
     pinBtn.title = ariaLabel;
+    // The badge carries the key for the current state, so a later language
+    // switch re-labels it through applyTranslations()/updateAriaLabels().
+    pinBtn.setAttribute('data-i18n-aria', ariaKey);
+    pinBtn.setAttribute('data-i18n-title', ariaKey);
 
-    pinBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        togglePin(link);
-    });
+    // Called again on every language change: bind the handler only once.
+    if (!pinBtn.dataset.bound) {
+        pinBtn.dataset.bound = '1';
+        pinBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            togglePin(link);
+        });
+    }
 
     // The same action, worded for the menu: pin or unpin.
     const menuPin = card.querySelector('.more-pin-btn');
@@ -1261,7 +1344,7 @@ function detectCategory(link) {
 
 const LAZY_PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"%3E%3C/svg%3E';
 
-function createLazyImage(src, alt = 'Image', className = 'preview') {
+function createLazyImage(src, alt, className = 'preview') {
     const img = document.createElement('img');
     if (STATE.lazyObserver) {
         img.dataset.src = src;
@@ -1270,9 +1353,12 @@ function createLazyImage(src, alt = 'Image', className = 'preview') {
     } else {
         img.src = src;
     }
-    img.alt = alt;
+    img.alt = alt || t('alt_image', 'Image');
     img.className = className;
     img.loading = 'lazy';
+    // Decoding off the main thread: a long grid of previews no longer
+    // blocks the first paint after a page load.
+    img.decoding = 'async';
     return img;
 }
 
@@ -1779,6 +1865,7 @@ function updateCard(card, link) {
     linkIdEl.setAttribute('aria-label', t('aria_link_id', 'Link ID'));
 
     const category = link.hasImage ? detectCategory(link) : 'other';
+    const categoryLabel = t('cat_' + category, category);
 
     let fileType;
     if (link.mimeType) {
@@ -1806,7 +1893,7 @@ function updateCard(card, link) {
     if (link.stats && link.stats.hits) {
         extras.push(t('meta_hits', '{{n}} hits').replace('{{n}}', link.stats.hits));
     }
-    linkMeta.textContent = [`${category} · ${fileType}${sizeStr} · ${dateStr}`, ...extras].join(' · ');
+    linkMeta.textContent = [`${categoryLabel} · ${fileType}${sizeStr} · ${dateStr}`, ...extras].join(' · ');
     linkMeta.setAttribute('aria-label', t('aria_file_info', 'File info'));
 
     setupAccessControl(card, link);
@@ -1866,7 +1953,7 @@ function updateCard(card, link) {
                 const imgSrc = (resolvedPreview.startsWith('/') ? resolvedPreview : '/' + resolvedPreview) + bust;
                 const img = createLazyImage(
                     imgSrc,
-                    resolvedPreview ? 'Preview' : 'Image',
+                    resolvedPreview ? t('alt_preview', 'Preview') : t('alt_image', 'Image'),
                     'preview'
                 );
                 img.classList.add('preview-top-center');
@@ -2421,7 +2508,11 @@ function setupGlobalListeners() {
         }
         STATE.createPending = true;
         const btn = DOM.createForm.querySelector('[type="submit"]');
-        if (btn) btn.disabled = true;
+        if (btn) {
+            btn.disabled = true;
+            btn.classList.add('is-busy');
+            btn.setAttribute('aria-busy', 'true');
+        }
         try {
             const created = await apiCall('/api/link', 'POST', { linkName: id });
             DOM.createInput.value = '';
@@ -2447,7 +2538,11 @@ function setupGlobalListeners() {
         } catch (_) {}
         finally {
             STATE.createPending = false;
-            if (btn) btn.disabled = false;
+            if (btn) {
+                btn.disabled = false;
+                btn.classList.remove('is-busy');
+                btn.removeAttribute('aria-busy');
+            }
         }
     });
 
@@ -2500,6 +2595,8 @@ function setupGlobalListeners() {
     if (regenBtn) {
         regenBtn.addEventListener('click', async () => {
             regenBtn.disabled = true;
+            regenBtn.classList.add('is-spinning');
+            regenBtn.setAttribute('aria-busy', 'true');
             const spanEl = regenBtn.querySelector('span');
             const origText = spanEl?.textContent;
             if (spanEl) spanEl.textContent = t('regen_previews_running', 'Regenerating...');
@@ -2517,6 +2614,8 @@ function setupGlobalListeners() {
             } catch (_) {}
             finally {
                 regenBtn.disabled = false;
+                regenBtn.classList.remove('is-spinning');
+                regenBtn.removeAttribute('aria-busy');
                 if (spanEl && origText) spanEl.textContent = origText;
             }
         });
@@ -2539,5 +2638,12 @@ function formatSize(bytes) {
 }
 
 function formatDate(ts) {
-    return ts ? new Date(ts * 1000).toLocaleDateString() : '—';
+    if (!ts) return '—';
+    // The date follows the interface language, not the browser locale: a
+    // German panel should read 03.10.2026 even on an English system.
+    try {
+        return new Date(ts * 1000).toLocaleDateString(STATE.lang || undefined);
+    } catch (_) {
+        return new Date(ts * 1000).toLocaleDateString();
+    }
 }

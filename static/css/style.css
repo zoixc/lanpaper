@@ -490,6 +490,13 @@ img, svg, video { vertical-align: middle; }
     border-radius: 50%;
     flex-shrink: 0;
 }
+
+/* The same button with a word on it (the confirm dialog) */
+.btn--danger-label {
+    width: auto;
+    padding: 0 16px;
+    border-radius: var(--radius-pill);
+}
 .btn--danger:hover {
     background: var(--btn-danger-hover);
     border-color: var(--btn-danger-text);
@@ -868,9 +875,9 @@ body.dark .image-option.fit-contain::before { opacity: 0.4; }
     letter-spacing: 0.03em;
     line-height: 1.5;
     color: #fff;
-    background: rgba(12, 12, 18, 0.66);
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
+    /* No backdrop blur here on purpose: two badges per card would put a
+       compositor filter on every tile of a long list. */
+    background: rgba(12, 12, 18, 0.72);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
@@ -902,6 +909,10 @@ body.dark .preview-wrapper.has-alpha {
         linear-gradient(45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.06) 75%),
         linear-gradient(45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.06) 75%);
 }
+
+/* An image with transparency gets the checkerboard, not a blurred copy of
+   itself: the blur would hide the very thing the pattern is telling. */
+.preview-wrapper.has-alpha::before { display: none; }
 
 /* No zoom on contain-fitted frames: contain + translate only jitters. */
 .preview-link:hover .preview-wrapper.fit-icon img,
@@ -1195,6 +1206,10 @@ body.dark .access-select {
    [ Change ▾ ]  [ Panel ]  [ ⋯ ]  — always visible, never on the image.
    ============================================================ */
 .card-foot {
+    /* Positioned so both footer menus can be anchored to the card edge
+       rather than to their own button: a menu centred on a narrow button
+       runs off the left edge of the first tile in a row. */
+    position: relative;
     display: flex;
     align-items: center;
     align-self: center;
@@ -1203,25 +1218,33 @@ body.dark .access-select {
     min-width: 0;
 }
 
+.card-foot { gap: 4px; }
+
 .card-foot .btn {
     height: 34px;
-    padding: 0 11px;
-    font-size: var(--text-sm);
+    padding: 0 9px;
+    font-size: 0.75rem;      /* 12px: real translations are longer than mock ones */
     gap: 5px;
 }
 
-.card-foot .upload-dropdown { min-width: 0; }
+.card-foot .upload-dropdown { flex: 0 1 auto; min-width: 0; }
 
 .card-foot .upload-toggle-btn {
     max-width: 100%;
     overflow: hidden;
 }
 
-.card-foot .upload-toggle-btn > span {
+/* Both labels shrink with an ellipsis: a long translation ("Изменить",
+   "Modifier", "Pannello") must never push the ⋯ button out of the tile. */
+.card-foot .upload-toggle-btn > span,
+.card-foot .btn--pult > span {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
 }
+
+.card-foot .btn--pult { min-width: 0; }
 
 .card-foot .icon-btn {
     width: 34px;
@@ -1244,6 +1267,9 @@ body.dark .access-select {
     position: absolute;
     top: calc(100% + 6px);
     right: 0;
+    /* Never wider than the tile that owns it (a tile is at least 232px,
+       the container keeps 28px of padding), so it cannot leave the screen. */
+    max-width: min(260px, calc(100vw - 32px));
     padding: 6px;
     min-width: 208px;
     background: var(--glass-strong);
@@ -1279,14 +1305,18 @@ body.dark .access-select {
         transform-origin: bottom right;
     }
     .more-dropdown.open .more-menu { transform: translateY(0) scale(1); }
+    /* Right-aligned to the card, opening upwards: the tile's right edge is
+       always at least 28px inside the viewport, so the menu stays visible. */
     .card-foot .upload-menu {
+        left: auto;
+        right: 0;
         top: auto;
         bottom: calc(100% + 6px);
-        transform: translateX(-50%) translateY(6px) scale(0.97);
-        transform-origin: bottom center;
+        transform: translateY(6px) scale(0.97);
+        transform-origin: bottom right;
     }
     .card-foot .upload-dropdown.open .upload-menu {
-        transform: translateX(-50%) translateY(0) scale(1);
+        transform: translateY(0) scale(1);
     }
 }
 
@@ -1454,6 +1484,18 @@ body.dark .access-select {
     transform: translateX(-50%) translateY(-6px) scale(0.97);
 }
 
+/* A menu never runs off the screen: it scrolls, and it stays inside the
+   viewport even in a 320px window or with long German labels. */
+.upload-menu,
+.more-menu,
+.custom-select-menu,
+.settings-menu {
+    max-width: calc(100vw - 24px);
+    max-height: min(70vh, 460px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
 .custom-select-menu {
     left: 0;
     right: 0;
@@ -1520,6 +1562,13 @@ body.dark .access-select {
     background: var(--accent-subtle);
     color: var(--accent);
     font-weight: var(--fw-bold);
+}
+
+/* Keyboard focus inside the listbox */
+.custom-select-option.focused,
+.custom-select-option:focus-visible {
+    background: var(--btn-secondary-hover);
+    outline: none;
 }
 
 .custom-select-btn {
@@ -1756,9 +1805,14 @@ body.dark .palette-dot::before { box-shadow: inset 0 0 0 1px rgba(255, 255, 255,
 
 .modal-actions {
     display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
     gap: 8px;
 }
+
+/* Dialog buttons carry icons now: they must be able to wrap instead of
+   pushing a long translation past the edge of a 320px screen. */
+.modal-actions .btn { flex: 0 1 auto; min-width: 0; }
 
 .modal-actions .btn--danger {
     width: auto;
@@ -2018,7 +2072,7 @@ body.dark .palette-dot::before { box-shadow: inset 0 0 0 1px rgba(255, 255, 255,
     /* Tiles, not columns: 4–5 per row on a 1024–1440 screen, 2 on a phone.
        The track never drops below 150px so the name, the meta line and the
        three footer buttons stay readable. */
-    grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(236px, 1fr));
     gap: 14px;
 }
 
@@ -2077,18 +2131,6 @@ body.dark .palette-dot::before { box-shadow: inset 0 0 0 1px rgba(255, 255, 255,
 }
 
 .links-list.grid-view .btn--pult { flex: 0 1 auto; }
-
-.links-list.grid-view .upload-menu {
-    left: 0;
-    right: auto;
-    min-width: 180px;
-    transform: translateY(6px) scale(0.97);
-    transform-origin: bottom left;
-}
-
-.links-list.grid-view .upload-dropdown.open .upload-menu {
-    transform: translateY(0) scale(1);
-}
 
 
 /* ============================================================
@@ -2291,6 +2333,10 @@ body.dark .palette-dot::before { box-shadow: inset 0 0 0 1px rgba(255, 255, 255,
         gap: 10px;
     }
     .search-container { display: contents; }
+    /* On phones the pill dissolves (display: contents), so the magnifier
+       would become a stray flex item — the placeholder says the same. */
+    .search-icon { display: none; }
+
     .search-input,
     .search-input:hover {
         flex: 1 1 100%;
@@ -2438,6 +2484,135 @@ body.dark .palette-dot::before { box-shadow: inset 0 0 0 1px rgba(255, 255, 255,
 
 
 /* ============================================================
+   ICONS
+   One grid (24x24), one stroke (1.85), round caps and joins — so icons
+   drawn in different places read as one family. The stroke is set on the
+   root svg: that beats the presentation attribute and is inherited by the
+   paths that do not declare their own.
+   ============================================================ */
+.btn svg,
+.icon-btn svg,
+.upload-menu-item svg,
+.card-menu-item svg,
+.settings-menu-item svg,
+.custom-select-option svg,
+.custom-select-btn svg,
+.versions-section h4 svg,
+.search-icon {
+    stroke-width: 1.85;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Icons answer the pointer with one small move, never a bounce. The
+   animation is transform-only, so it stays on the compositor. */
+/* .icon-btn svg is deliberately absent: the theme and view buttons
+   cross-fade their icons and own that transition. */
+.btn svg,
+.upload-menu-item svg,
+.card-menu-item svg,
+.settings-menu-item svg,
+.custom-select-option svg,
+.copy-url-btn svg,
+.pin-btn svg {
+    transition: transform 0.18s cubic-bezier(0.2, 0.7, 0.2, 1);
+    transform-origin: center;
+}
+
+.upload-menu-item:hover svg,
+.card-menu-item:hover svg,
+.settings-menu-item:hover svg,
+.custom-select-option:hover svg { transform: translateX(2px); }
+
+.btn:hover svg { transform: scale(1.06); }
+.btn--danger:hover svg { transform: rotate(-8deg) scale(1.06); }
+.btn--pult:hover svg { transform: scale(1.1); }
+.copy-url-btn:hover svg { transform: scale(1.1); }
+.more-toggle-btn:hover svg { transform: scale(1.12); }
+
+/* The plus turns while the link is being created: the button is the
+   progress indicator, so no extra spinner element is needed. */
+.create-row .btn--primary:hover svg { transform: rotate(90deg); }
+
+/* The gear tilts on hover and turns when its menu is open (that rule
+   lives above and wins while expanded, hence the guard). */
+#settingsBtn[aria-expanded="false"]:hover svg { transform: rotate(18deg); }
+
+/* Header buttons lift a little, and press back in. */
+.icon-btn:hover { transform: scale(1.05); }
+.icon-btn:active,
+.icon-btn:hover:active { transform: scale(0.94); }
+
+@keyframes pinPop {
+    0%   { transform: scale(0.55); }
+    55%  { transform: scale(1.14); }
+    100% { transform: scale(1); }
+}
+.pin-btn.bump { animation: pinPop 0.36s cubic-bezier(0.2, 1.3, 0.4, 1); }
+.pin-btn:hover svg { transform: scale(1.12); }
+
+/* Badges fade in with the frame they describe. */
+@keyframes badgeIn {
+    from { opacity: 0; transform: translateY(-2px); }
+    to   { opacity: 1; transform: none; }
+}
+.media-badge:not([hidden]) { animation: badgeIn 0.24s ease both; }
+
+/* Busy states: the icon spins instead of the layout shifting. */
+@keyframes iconSpin { to { transform: rotate(360deg); } }
+.is-busy svg,
+.is-spinning svg {
+    animation: iconSpin 0.9s linear infinite;
+    transform-origin: center;
+}
+
+/* On phones both footer menus become a bottom sheet: a 168px tile cannot
+   host a 208px menu without pushing it off the screen, and a sheet is
+   reachable with a thumb. Tapping anywhere else closes it (app.js). */
+@media (max-width: 768px) {
+    .card-foot .upload-menu,
+    .more-menu {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        top: auto;
+        bottom: max(12px, env(safe-area-inset-bottom));
+        width: auto;
+        min-width: 0;
+        max-width: none;
+        max-height: 60vh;
+        padding: 8px;
+        border-radius: 20px;
+        transform: translateY(14px) scale(0.98);
+        transform-origin: bottom center;
+        z-index: calc(var(--z-dropdown) + 2);
+    }
+    .card-foot .upload-dropdown.open .upload-menu,
+    .more-dropdown.open .more-menu { transform: translateY(0) scale(1); }
+
+    .card-menu-item { padding: 11px 12px; }
+    .more-menu .access-row { padding: 10px 12px 8px; }
+
+    /* And the menus in the toolbar and the header scroll instead of
+       stretching past the bottom of the screen. */
+    .custom-select-menu,
+    .settings-menu { max-height: min(60vh, 420px); overflow-y: auto; }
+}
+
+
+/* Magnifier inside the search pill */
+.search-icon {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    margin-left: 14px;
+    color: var(--text-muted);
+    transition: color 0.15s ease;
+}
+.search-container:focus-within .search-icon { color: var(--accent); }
+
+
+/* ============================================================
    MOTION & CONTRAST PREFERENCES
    ============================================================ */
 @media (prefers-reduced-motion: reduce) {
@@ -2485,6 +2660,9 @@ body.dark .palette-dot::before { box-shadow: inset 0 0 0 1px rgba(255, 255, 255,
 .versions-section { margin-bottom: 18px; }
 
 .versions-section h4 {
+    display: flex;
+    align-items: center;
+    gap: 7px;
     margin: 0 0 8px;
     font-size: 13px;
     font-weight: var(--fw-semibold);
@@ -2492,6 +2670,8 @@ body.dark .palette-dot::before { box-shadow: inset 0 0 0 1px rgba(255, 255, 255,
     letter-spacing: 0.06em;
     color: var(--text-muted);
 }
+
+.versions-section h4 svg { flex-shrink: 0; opacity: 0.85; }
 
 .versions-list {
     display: flex;

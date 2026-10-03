@@ -133,7 +133,7 @@
   "modal_close": "Schließen",
   "aria_more": "Weitere Aktionen",
   "change_media": "Ändern",
-  "pult_btn": "Steuerung",
+  "pult_btn": "Panel",
   "pult_open": "Steuerung öffnen",
   "pult_eyebrow": "Link-Steuerung",
   "menu_pin": "Oben anheften",
@@ -144,5 +144,10 @@
   "palette_indigo": "Indigo",
   "palette_terra": "Terrakotta",
   "palette_sage": "Salbei",
-  "palette_graphite": "Graphit"
+  "palette_graphite": "Graphit",
+  "cat_image": "Foto",
+  "cat_video": "Video",
+  "cat_other": "Andere",
+  "alt_preview": "Vorschau",
+  "alt_image": "Bild"
 }
