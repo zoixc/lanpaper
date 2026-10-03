@@ -11,7 +11,8 @@ const STATE = {
     translations: {},
     lang: localStorage.getItem('lang') || navigator.language.slice(0, 2) || 'en',
     isDark: false,
-    viewMode: localStorage.getItem('viewMode') || 'list',
+    // Tiles are the default view: the card is designed as a tile.
+    viewMode: localStorage.getItem('viewMode') || 'grid',
     searchQuery: '',
     sortBy: 'date_desc',
     wallpapers: [],
@@ -127,6 +128,13 @@ window.closeAllDropdowns = function(exceptElement) {
             if (btn) btn.setAttribute('aria-expanded', 'false');
         }
     });
+    document.querySelectorAll('.more-dropdown.open').forEach(dropdown => {
+        if (dropdown !== exceptElement) {
+            dropdown.classList.remove('open');
+            const btn = dropdown.querySelector('.more-toggle-btn');
+            if (btn) btn.setAttribute('aria-expanded', 'false');
+        }
+    });
     document.querySelectorAll('.custom-select.open').forEach(select => {
         if (select !== exceptElement) {
             select.classList.remove('open');
@@ -142,7 +150,7 @@ window.closeAllDropdowns = function(exceptElement) {
 // clicks never reach this; menu item clicks close their own menu.
 function initDropdownCloser() {
     document.addEventListener('click', (e) => {
-        if (e.target.closest('.upload-dropdown, .custom-select, .settings-dropdown')) return;
+        if (e.target.closest('.upload-dropdown, .more-dropdown, .custom-select, .settings-dropdown')) return;
         closeAllDropdowns();
     });
 }
@@ -333,7 +341,7 @@ function initKeyboardShortcuts() {
                 closeModal();
             } else if (DOM.versionsOverlay && !DOM.versionsOverlay.classList.contains('hidden')) {
                 closeVersions();
-            } else if (document.querySelector('.upload-dropdown.open, .custom-select.open, .settings-dropdown.open')) {
+            } else if (document.querySelector('.upload-dropdown.open, .more-dropdown.open, .custom-select.open, .settings-dropdown.open')) {
                 closeAllDropdowns();
             } else if (DOM.searchInput.value) {
                 DOM.searchInput.value = '';
@@ -533,12 +541,19 @@ function applyTranslations(root = document) {
         const key = el.dataset.i18nPlaceholder;
         if (STATE.translations[key]) el.placeholder = STATE.translations[key];
     });
+    root.querySelectorAll('[data-i18n-title]').forEach(el => {
+        const key = el.dataset.i18nTitle;
+        if (STATE.translations[key]) el.title = STATE.translations[key];
+    });
 }
 
 
 function t(key, defaultText) {
     return STATE.translations[key] || defaultText;
 }
+
+// The settings menu builds the palette switcher before translations land.
+window.t = t;
 
 
 function updateAriaLabels() {
@@ -1170,6 +1185,14 @@ function setupPinButton(card, link) {
         e.stopPropagation();
         togglePin(link);
     });
+
+    // The same action, worded for the menu: pin or unpin.
+    const menuPin = card.querySelector('.more-pin-btn');
+    if (menuPin) {
+        const label = menuPin.querySelector('[data-i18n]');
+        if (label) label.setAttribute('data-i18n', link.pinned ? 'menu_unpin' : 'menu_pin');
+        applyTranslations(card);
+    }
 }
 
 
@@ -1290,15 +1313,121 @@ function applyPreviewFit(container, media, format, frame) {
     if (!isImg && fit) fit = 'fit-contain'; // videos are letterboxed, never icons
     container.classList.toggle('fit-icon', fit === 'fit-icon');
     container.classList.toggle('fit-contain', fit === 'fit-contain');
+    // Checkerboard only where transparency is actually possible (a fitted
+    // PNG/WebP/GIF), never behind a photo or a video frame.
+    container.classList.toggle('has-alpha', !!fit && ALPHA_FORMATS.has(format));
     // The backdrop reuses the loaded image from the memory cache (no second
     // request). CSSOM style changes are permitted by the CSP.
     if (fit && isImg) container.style.setProperty('--thumb', cssUrl(media.currentSrc || media.src));
     else container.style.removeProperty('--thumb');
+    updateMediaBadges(container, media, format);
 }
 
 function resetPreviewFit(container) {
-    container.classList.remove('fit-icon', 'fit-contain');
+    container.classList.remove('fit-icon', 'fit-contain', 'has-alpha');
     container.style.removeProperty('--thumb');
+    hideMediaBadges(container);
+}
+
+// ------------------------------------------------------------
+// MEDIA BADGES — format, aspect ratio and duration
+// ------------------------------------------------------------
+// Read off the file that actually loaded, so a card never claims JPEG for a
+// file that turned out to be a PNG. Only cards have .preview-meta; modals
+// and the gallery share applyPreviewFit() but show no badges.
+function gcd(a, b) {
+    while (b) { const rest = a % b; a = b; b = rest; }
+    return a;
+}
+
+// Camera and phone sizes rarely reduce to a small pair (768x1376 is 24:43),
+// so the label snaps to the nearest familiar ratio first.
+const COMMON_RATIOS = [
+    [1, 1], [4, 3], [3, 2], [16, 10], [16, 9], [21, 9], [2, 1],
+    [9, 16], [3, 4], [2, 3], [10, 16], [9, 21], [1, 2],
+];
+
+function ratioLabel(width, height) {
+    if (!width || !height) return '';
+    const ratio = width / height;
+    let best = '';
+    let bestDiff = 0.02;   // 2 % off a familiar ratio
+    for (const [w, h] of COMMON_RATIOS) {
+        const diff = Math.abs(ratio - w / h) / (w / h);
+        if (diff < bestDiff) {
+            bestDiff = diff;
+            best = `${w}:${h}`;
+        }
+    }
+    if (best) return best;
+    const g = gcd(width, height) || 1;
+    const w = Math.round(width / g);
+    const h = Math.round(height / g);
+    return (w <= 64 && h <= 64) ? `${w}:${h}` : '';
+}
+
+function formatDuration(seconds) {
+    if (!isFinite(seconds) || seconds <= 0) return '';
+    const total = Math.round(seconds);
+    const minutes = Math.floor(total / 60);
+    const rest = total % 60;
+    return `${minutes}:${String(rest).padStart(2, '0')}`;
+}
+
+function mediaBadgeTargets(container) {
+    const link = container.parentElement;
+    const meta = link && link.querySelector('.preview-meta');
+    if (!meta) return null;
+    return {
+        fmt: meta.querySelector('.media-badge--fmt'),
+        ratio: meta.querySelector('.media-badge--ratio'),
+        dur: meta.querySelector('.media-badge--dur'),
+    };
+}
+
+function setBadge(el, text) {
+    if (!el) return;
+    if (text) {
+        el.textContent = text;
+        el.hidden = false;
+    } else {
+        el.textContent = '';
+        el.hidden = true;
+    }
+}
+
+function hideMediaBadges(container) {
+    const badges = mediaBadgeTargets(container);
+    if (!badges) return;
+    setBadge(badges.fmt, '');
+    setBadge(badges.ratio, '');
+    setBadge(badges.dur, '');
+}
+
+function updateMediaBadges(container, media, format) {
+    const badges = mediaBadgeTargets(container);
+    if (!badges) return;
+
+    const isImg = media.tagName === 'IMG';
+    const width = isImg ? media.naturalWidth : media.videoWidth;
+    const height = isImg ? media.naturalHeight : media.videoHeight;
+
+    // The stored MIME type is a short token ('jpeg', 'mp4'); fall back to the
+    // file extension of what was actually loaded.
+    let fmt = (format || '').toUpperCase();
+    if (!fmt) {
+        const src = media.currentSrc || media.src || '';
+        const ext = src.split('?')[0].split('.').pop();
+        fmt = /^[a-z0-9]{2,5}$/i.test(ext) ? ext.toUpperCase() : '';
+    }
+    setBadge(badges.fmt, fmt);
+
+    // The ratio only earns its place when it differs from the 16:9 frame.
+    const ratio = width && height ? width / height : 0;
+    const nearFrame = ratio && Math.abs(ratio - 16 / 9) / (16 / 9) < 0.04;
+    setBadge(badges.ratio, nearFrame ? '' : ratioLabel(width, height));
+
+    setBadge(badges.dur, isImg ? '' : formatDuration(media.duration));
 }
 
 // Card videos play only while at least a quarter of them is on screen and
@@ -1454,6 +1583,9 @@ function setupInlineRename(card, link) {
     linkIdEl.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); startEdit(); }
     });
+
+    // Same entry from the card menu (touch screens have no double-click).
+    card._startRename = startEdit;
 }
 
 
@@ -1495,8 +1627,10 @@ function setupAccessControl(card, link) {
     if (!row) {
         row = document.createElement('div');
         row.className = 'access-row';
-        const info = card.querySelector('.link-info');
-        if (info) info.appendChild(row);
+        // The tile has no room for a permanent access row: it lives in the
+        // ⋯ menu, right under the pin action.
+        const host = card.querySelector('.card-menu') || card.querySelector('.link-info');
+        if (host) host.appendChild(row);
         else return;
     }
     row.innerHTML = '';
@@ -1620,6 +1754,8 @@ function updateCopyURL(card, link) {
     const fullUrl = publicLinkURL(link);
     const previewLink = card.querySelector('.preview-link');
     if (previewLink) previewLink.href = fullUrl;
+    const menuOpen = card.querySelector('.more-open-btn');
+    if (menuOpen) menuOpen.href = fullUrl;
     card.dataset.publicUrl = fullUrl;
 }
 
@@ -1753,33 +1889,47 @@ function updateCard(card, link) {
         }
     }
 
-    // Copy button
+    // Copy: the icon next to the name and the entry in the ⋯ menu.
     const copyBtn = card.querySelector('.copy-url-btn');
-    const newCopyBtn = copyBtn.cloneNode(true);
-    copyBtn.parentNode.replaceChild(newCopyBtn, copyBtn);
+    if (copyBtn) {
+        const newCopyBtn = copyBtn.cloneNode(true);
+        copyBtn.parentNode.replaceChild(newCopyBtn, copyBtn);
+        bindCopyButton(newCopyBtn, card, false);
+    }
+    const menuCopyBtn = card.querySelector('.more-copy-btn');
+    if (menuCopyBtn) bindCopyButton(menuCopyBtn, card, true);
+}
 
-    const copyText = newCopyBtn.querySelector('.copy-text');
+
+// The menu closes on copy, so a closing menu would hide its own "Copied!"
+// feedback — that entry reports through a toast instead.
+function bindCopyButton(btn, card, isMenuEntry) {
+    const copyText = btn.querySelector('.copy-text');
     if (copyText) copyText.textContent = t('copy_url', 'Copy URL');
 
-    let copyResetTimer = null;
+    let resetTimer = null;
 
-    newCopyBtn.onclick = (e) => {
+    btn.onclick = (e) => {
         e.preventDefault();
         // Read the URL at click time: access level changes and token
         // rotation update it after this handler was bound.
-        copyToClipboard(card.dataset.publicUrl || fullUrl).then(() => {
-            if (copyResetTimer) clearTimeout(copyResetTimer);
+        copyToClipboard(card.dataset.publicUrl || '').then(() => {
+            if (isMenuEntry) {
+                showToast(t('copied', 'Copied!'), 'success');
+                return;
+            }
+            if (resetTimer) clearTimeout(resetTimer);
 
-            newCopyBtn.classList.add('copied');
+            btn.classList.add('copied');
             if (copyText) copyText.textContent = t('copied', 'Copied!');
-            newCopyBtn.setAttribute('aria-label', t('copied', 'Copied!'));
+            btn.setAttribute('aria-label', t('copied', 'Copied!'));
 
-            copyResetTimer = setTimeout(() => {
-                newCopyBtn.classList.add('fading-out');
-                copyResetTimer = setTimeout(() => {
-                    newCopyBtn.classList.remove('copied', 'fading-out');
+            resetTimer = setTimeout(() => {
+                btn.classList.add('fading-out');
+                resetTimer = setTimeout(() => {
+                    btn.classList.remove('copied', 'fading-out');
                     if (copyText) copyText.textContent = t('copy_url', 'Copy URL');
-                    newCopyBtn.setAttribute('aria-label', t('copy_url', 'Copy URL'));
+                    btn.setAttribute('aria-label', t('copy_url', 'Copy URL'));
                 }, 300);
             }, 1500);
         }).catch(() => {
@@ -1876,6 +2026,47 @@ function setupCardEvents(card, link) {
         });
     }
 
+    // ⋯ menu: everything that is not "change the file". Secondary actions
+    // stay one click away instead of sitting on top of the preview.
+    const moreDropdown = card.querySelector('.more-dropdown');
+    const moreToggle = card.querySelector('.more-toggle-btn');
+    const closeMore = () => {
+        if (!moreDropdown) return;
+        moreDropdown.classList.remove('open');
+        if (moreToggle) moreToggle.setAttribute('aria-expanded', 'false');
+    };
+
+    if (moreDropdown && moreToggle) {
+        moreToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = moreDropdown.classList.contains('open');
+            if (!isOpen) closeAllDropdowns(moreDropdown);
+            moreDropdown.classList.toggle('open', !isOpen);
+            moreToggle.setAttribute('aria-expanded', String(!isOpen));
+        });
+
+        const menuVersions = card.querySelector('.more-versions-btn');
+        if (menuVersions) menuVersions.addEventListener('click', () => {
+            closeMore();
+            openVersions(link);
+        });
+
+        const menuOpenLink = card.querySelector('.more-open-btn');
+        if (menuOpenLink) menuOpenLink.addEventListener('click', closeMore);
+
+        const menuRename = card.querySelector('.more-rename-btn');
+        if (menuRename) menuRename.addEventListener('click', () => {
+            closeMore();
+            if (typeof card._startRename === 'function') card._startRename();
+        });
+
+        const menuPin = card.querySelector('.more-pin-btn');
+        if (menuPin) menuPin.addEventListener('click', () => {
+            closeMore();
+            togglePin(link);
+        });
+    }
+
     card.ondragover = e => { e.preventDefault(); card.classList.add('drag-over'); };
     card.ondragleave = () => card.classList.remove('drag-over');
     card.ondrop = async e => {
@@ -1885,6 +2076,7 @@ function setupCardEvents(card, link) {
     };
 
     card.querySelector('.delete-btn').onclick = async () => {
+        if (typeof closeMore === 'function') closeMore();
         const msg = t('confirm_delete_msg', 'Delete "{{name}}"? This cannot be undone.')
             .replace('{{name}}', link.linkName);
         const confirmed = await showConfirm(msg);

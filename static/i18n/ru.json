@@ -130,5 +130,19 @@
   "meta_items": "{{n}} в плейлисте",
   "meta_rotating": "ротация",
   "meta_hits": "{{n}} запросов",
-  "modal_close": "Закрыть"
+  "modal_close": "Закрыть",
+  "aria_more": "Ещё действия",
+  "change_media": "Изменить",
+  "pult_btn": "Пульт",
+  "pult_open": "Открыть пульт",
+  "pult_eyebrow": "Пульт ссылки",
+  "menu_pin": "Закрепить вверху",
+  "menu_unpin": "Открепить",
+  "rename_title": "Переименовать",
+  "settings_palette": "Цвет",
+  "palette_sunset": "Закат",
+  "palette_indigo": "Индиго",
+  "palette_terra": "Терракота",
+  "palette_sage": "Шалфей",
+  "palette_graphite": "Графит"
 }

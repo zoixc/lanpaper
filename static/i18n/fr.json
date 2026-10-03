@@ -130,5 +130,19 @@
   "meta_items": "{{n}} dans la playlist",
   "meta_rotating": "rotation",
   "meta_hits": "{{n}} accès",
-  "modal_close": "Fermer"
+  "modal_close": "Fermer",
+  "aria_more": "Plus d'actions",
+  "change_media": "Modifier",
+  "pult_btn": "Panneau",
+  "pult_open": "Ouvrir le panneau",
+  "pult_eyebrow": "Panneau du lien",
+  "menu_pin": "Épingler en haut",
+  "menu_unpin": "Détacher",
+  "rename_title": "Renommer",
+  "settings_palette": "Couleur",
+  "palette_sunset": "Coucher de soleil",
+  "palette_indigo": "Indigo",
+  "palette_terra": "Terracotta",
+  "palette_sage": "Sauge",
+  "palette_graphite": "Graphite"
 }

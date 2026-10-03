@@ -3,6 +3,38 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
+## [Unreleased]
+
+Redesign of the admin panel, ported from the design prototypes in `design/`.
+Everything below is presentation only: the API, the stored data and every
+existing URL behave exactly as before.
+
+### Changed
+
+- **Cards are tiles again, and the actions moved off the preview.** The grid
+  lays out five tiles per row on a wide screen, four at 1024–1280 px and two on
+  a phone; below 340 px it drops to one column. Each tile has a permanent
+  footer — `Change ▾ · Panel · ⋯` — instead of the upload/delete buttons that
+  appeared over the image on hover. Turning the phone sideways or resizing the
+  window reflows the grid instead of leaving a single column with dead space.
+- **Previews are fitted to the tile and capped by the 16:9 frame.** Photos and
+  panoramas fill it, portraits, squares and app icons are shown whole on a
+  blurred copy of themselves, and the checkerboard is now shown only for
+  formats that can carry transparency. The format, aspect ratio and video
+  duration are printed in the corners of the frame, read from the file that
+  actually loaded.
+- **Access level, pinning and rename live in the `⋯` menu.** The access row is
+  no longer a permanent line in the card; a pinned link is marked with a badge
+  on the preview instead of a hover button.
+- **Five accent palettes** — the default sunset gradient plus indigo,
+  terracotta, sage and graphite — switched from the settings menu and stored in
+  `localStorage`. Each palette is defined for both themes and keeps white text
+  on the gradient and the accent on a card at ≥ 4.5:1.
+- **Tiles are the default view.** The list view is unchanged and one click
+  away; the choice is still remembered per browser.
+- The service worker cache generation bumps to `lanpaper-static-v7`, so
+  installed PWAs pick up the new stylesheet on the next launch.
+
 ## [0.12.0] – 2026-10-03
 
 Everything in this release is off by default or backwards compatible: an

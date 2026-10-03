@@ -140,6 +140,91 @@ body.dark {
 
 
 /* ============================================================
+   ACCENT PALETTES
+   Chosen in the settings menu, stored in localStorage('palette')
+   and applied as data-palette on <body>. Only accent-hued tokens
+   change: surfaces, radii and spacing are identical in all five.
+   Contrast is checked for both themes — white on the gradient and
+   the accent on a card are >= 4.5:1 in every palette.
+   ============================================================ */
+body[data-palette="indigo"] {
+    --accent:        #4f5ad6;
+    --accent-rgb:    79, 90, 214;
+    --accent-subtle: rgba(79, 90, 214, 0.1);
+    --gradient:      linear-gradient(135deg, #4650c8 0%, #5b66dd 100%);
+    --gradient-glow: 0 6px 18px -6px rgba(79, 90, 214, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    --glow-1:        rgba(96, 110, 240, 0.16);
+    --glow-2:        rgba(120, 200, 190, 0.14);
+}
+body.dark[data-palette="indigo"] {
+    --accent:        #8b96fb;
+    --accent-rgb:    139, 150, 251;
+    --accent-subtle: rgba(139, 150, 251, 0.14);
+    --gradient:      linear-gradient(135deg, #3f49b4 0%, #5a66dd 100%);
+    --gradient-glow: 0 6px 18px -6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    --glow-1:        rgba(90, 102, 221, 0.16);
+    --glow-2:        rgba(60, 190, 175, 0.12);
+}
+
+body[data-palette="terra"] {
+    --accent:        #b4552f;
+    --accent-rgb:    180, 85, 47;
+    --accent-subtle: rgba(180, 85, 47, 0.1);
+    --gradient:      linear-gradient(135deg, #a94c28 0%, #bb5a2e 100%);
+    --gradient-glow: 0 6px 18px -6px rgba(180, 85, 47, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    --glow-1:        rgba(220, 130, 90, 0.18);
+    --glow-2:        rgba(200, 160, 90, 0.14);
+}
+body.dark[data-palette="terra"] {
+    --accent:        #e8926a;
+    --accent-rgb:    232, 146, 106;
+    --accent-subtle: rgba(232, 146, 106, 0.14);
+    --gradient:      linear-gradient(135deg, #a3441f 0%, #bb5a2e 100%);
+    --gradient-glow: 0 6px 18px -6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    --glow-1:        rgba(200, 110, 70, 0.15);
+    --glow-2:        rgba(190, 150, 90, 0.12);
+}
+
+body[data-palette="sage"] {
+    --accent:        #2e7d6b;
+    --accent-rgb:    46, 125, 107;
+    --accent-subtle: rgba(46, 125, 107, 0.1);
+    --gradient:      linear-gradient(135deg, #2a7261 0%, #2f8171 100%);
+    --gradient-glow: 0 6px 18px -6px rgba(46, 125, 107, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    --glow-1:        rgba(90, 200, 175, 0.16);
+    --glow-2:        rgba(140, 200, 160, 0.14);
+}
+body.dark[data-palette="sage"] {
+    --accent:        #6fc4ae;
+    --accent-rgb:    111, 196, 174;
+    --accent-subtle: rgba(111, 196, 174, 0.14);
+    --gradient:      linear-gradient(135deg, #24685a 0%, #2f8171 100%);
+    --gradient-glow: 0 6px 18px -6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    --glow-1:        rgba(70, 180, 155, 0.15);
+    --glow-2:        rgba(120, 180, 140, 0.12);
+}
+
+body[data-palette="graphite"] {
+    --accent:        #46505f;
+    --accent-rgb:    70, 80, 95;
+    --accent-subtle: rgba(70, 80, 95, 0.1);
+    --gradient:      linear-gradient(135deg, #3f4856 0%, #4c5666 100%);
+    --gradient-glow: 0 6px 18px -6px rgba(70, 80, 95, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    --glow-1:        rgba(120, 140, 170, 0.16);
+    --glow-2:        rgba(150, 160, 180, 0.14);
+}
+body.dark[data-palette="graphite"] {
+    --accent:        #a9b6c9;
+    --accent-rgb:    169, 182, 201;
+    --accent-subtle: rgba(169, 182, 201, 0.14);
+    --gradient:      linear-gradient(135deg, #3a4350 0%, #4b5566 100%);
+    --gradient-glow: 0 6px 18px -6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    --glow-1:        rgba(120, 135, 160, 0.15);
+    --glow-2:        rgba(140, 150, 170, 0.12);
+}
+
+
+/* ============================================================
    FONTS (self-hosted WOFF2 subsets)
    ============================================================ */
 @font-face {
@@ -250,7 +335,7 @@ img, svg, video { vertical-align: middle; }
    LAYOUT
    ============================================================ */
 .container {
-    max-width: 1200px;
+    max-width: 1440px;
     width: 100%;
     margin: 0 auto;
     padding: 24px 28px 32px;
@@ -415,6 +500,19 @@ img, svg, video { vertical-align: middle; }
     color: var(--text);
     border-color: var(--border);
 }
+
+/* "Пульт" — always-visible entry to the link panel: filled, not an icon */
+.btn--pult {
+    background: var(--accent-subtle);
+    border-color: transparent;
+    color: var(--accent);
+}
+.btn--pult:hover {
+    background: rgba(var(--accent-rgb), 0.18);
+    border-color: transparent;
+    color: var(--accent);
+}
+.btn--pult svg { width: 15px; height: 15px; }
 .btn--upload:hover {
     background: var(--btn-secondary-hover);
     border-color: var(--border-hover);
@@ -583,10 +681,10 @@ img, svg, video { vertical-align: middle; }
 
 .link-card {
     display: grid;
-    grid-template-columns: 208px minmax(0, 1fr) auto;
+    grid-template-columns: 192px minmax(0, 1fr) auto;
     align-items: center;
-    gap: 20px;
-    padding: 10px 16px 10px 10px;
+    gap: 16px;
+    padding: 9px 14px 9px 9px;
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
@@ -646,8 +744,8 @@ img, svg, video { vertical-align: middle; }
 
 .preview-wrapper {
     position: relative;
-    width: 208px;
-    height: 117px;
+    width: 192px;
+    height: 108px;
     border-radius: 14px;
     overflow: hidden;
     box-shadow: inset 0 0 0 1px var(--border);
@@ -744,6 +842,72 @@ body.dark .image-option.fit-contain::before { opacity: 0.4; }
 }
 
 
+/* Media badges: format, aspect ratio and duration, read off the file
+   that actually loaded (see updateMediaBadges() in app.js). They sit in
+   the corners of the frame, never on top of the buttons. */
+.preview-link { position: relative; }
+
+.preview-meta {
+    position: absolute;
+    inset: 8px;
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.media-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    border-radius: var(--radius-xs);
+    font-family: var(--font-ui);
+    font-size: 0.625rem;          /* 10px */
+    font-weight: var(--fw-bold);
+    letter-spacing: 0.03em;
+    line-height: 1.5;
+    color: #fff;
+    background: rgba(12, 12, 18, 0.66);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.media-badge[hidden] { display: none; }
+
+.media-badge--dur {
+    margin-left: auto;
+    align-self: flex-end;
+}
+
+/* Transparency: the checkerboard is only advertised where it means
+   something — a contain-fitted PNG/WebP/GIF, never under a photo. */
+.preview-wrapper.fit-icon,
+.preview-wrapper.fit-contain {
+    background: var(--bg-secondary);
+}
+.preview-wrapper.has-alpha {
+    background-color: #ffffff;
+    background-image:
+        linear-gradient(45deg, #e9ebef 25%, transparent 25%, transparent 75%, #e9ebef 75%),
+        linear-gradient(45deg, #e9ebef 25%, transparent 25%, transparent 75%, #e9ebef 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 8px 8px;
+}
+body.dark .preview-wrapper.has-alpha {
+    background-color: #1b1e23;
+    background-image:
+        linear-gradient(45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.06) 75%),
+        linear-gradient(45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.06) 75%);
+}
+
+/* No zoom on contain-fitted frames: contain + translate only jitters. */
+.preview-link:hover .preview-wrapper.fit-icon img,
+.preview-link:hover .preview-wrapper.fit-contain img { transform: none; }
+
+
 /* ============================================================
    PIN
    ============================================================ */
@@ -770,10 +934,17 @@ body.dark .image-option.fit-contain::before { opacity: 0.4; }
                 background 0.15s ease, border-color 0.15s ease;
 }
 
-.link-card:hover .pin-btn,
-.pin-btn:focus-visible,
+/* The pin is a state badge, not a hover action: pinning lives in the
+   card menu. It appears on a pinned card only. */
+.pin-btn {
+    visibility: hidden;
+    pointer-events: none;
+}
+
 .pin-btn.pinned {
     opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
     transform: scale(1);
 }
 
@@ -1020,14 +1191,179 @@ body.dark .access-select {
 
 
 /* ============================================================
-   ACTIONS ROW
+   CARD FOOTER
+   [ Change ▾ ]  [ Panel ]  [ ⋯ ]  — always visible, never on the image.
    ============================================================ */
-.actions-row {
+.card-foot {
     display: flex;
     align-items: center;
     align-self: center;
     justify-content: flex-end;
-    gap: 8px;
+    gap: 6px;
+    min-width: 0;
+}
+
+.card-foot .btn {
+    height: 34px;
+    padding: 0 11px;
+    font-size: var(--text-sm);
+    gap: 5px;
+}
+
+.card-foot .upload-dropdown { min-width: 0; }
+
+.card-foot .upload-toggle-btn {
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.card-foot .upload-toggle-btn > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.card-foot .icon-btn {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+}
+
+.button-caret {
+    flex-shrink: 0;
+    opacity: 0.5;
+    transition: transform 0.2s ease;
+}
+.upload-dropdown.open .button-caret,
+.more-dropdown.open .button-caret { transform: rotate(180deg); opacity: 1; }
+
+/* ⋯ menu: secondary actions and the access level */
+.more-dropdown { position: relative; flex: 0 0 auto; }
+
+.more-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    padding: 6px;
+    min-width: 208px;
+    background: var(--glass-strong);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    backdrop-filter: blur(20px) saturate(1.4);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    box-shadow: var(--shadow-lg);
+    z-index: calc(var(--z-dropdown) + 1);
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-6px) scale(0.97);
+    transform-origin: top right;
+    transition: opacity 0.16s ease, transform 0.16s ease, visibility 0s linear 0.16s;
+}
+
+.more-dropdown.open .more-menu {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+    transition: opacity 0.16s ease, transform 0.16s ease, visibility 0s linear 0s;
+}
+
+/* Menus in the footer open upwards: the buttons sit at the bottom edge
+   of a tile, so a downward menu would leave the viewport. */
+@media (min-width: 769px) {
+    .more-menu {
+        top: auto;
+        bottom: calc(100% + 6px);
+        transform: translateY(6px) scale(0.97);
+        transform-origin: bottom right;
+    }
+    .more-dropdown.open .more-menu { transform: translateY(0) scale(1); }
+    .card-foot .upload-menu {
+        top: auto;
+        bottom: calc(100% + 6px);
+        transform: translateX(-50%) translateY(6px) scale(0.97);
+        transform-origin: bottom center;
+    }
+    .card-foot .upload-dropdown.open .upload-menu {
+        transform: translateX(-50%) translateY(0) scale(1);
+    }
+}
+
+.card-menu-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 9px 12px;
+    gap: 10px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: var(--text-base);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+    white-space: nowrap;
+    text-align: left;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+.card-menu-item:hover { background: var(--btn-secondary-hover); }
+
+.card-menu-item svg { flex-shrink: 0; opacity: 0.65; }
+
+.card-menu-item--danger { color: var(--btn-danger-text); }
+.card-menu-item--danger:hover { background: var(--btn-danger-hover); }
+
+.card-menu-sep {
+    height: 1px;
+    margin: 5px 8px;
+    background: var(--border);
+}
+
+/* Access level lives in the ⋯ menu, read back as a compact row */
+.more-menu .access-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 12px 6px;
+    margin: 0;
+    width: 100%;
+}
+.more-menu .access-label {
+    font-size: var(--text-xs);
+    font-weight: var(--fw-semibold);
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.more-menu .access-select {
+    width: 100%;
+    height: var(--control-h);
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    background: var(--btn-secondary);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: var(--text-base);
+    font-weight: var(--fw-semibold);
+    cursor: pointer;
+}
+.more-menu .access-token-box {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    max-width: 100%;
+}
+.more-menu .access-token-value {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .empty-state {
@@ -1283,6 +1619,75 @@ body.dark .access-select {
     background: var(--gradient);
     border-color: transparent;
     color: #fff;
+}
+
+/* Accent palette: five dots, the chosen one carries a marker */
+.palette-options {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 2px;
+}
+
+.palette-dot {
+    position: relative;
+    flex: 1;
+    height: 32px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--radius-xs);
+    background: transparent;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.palette-dot::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.14);
+}
+
+.palette-dot:hover { background: var(--btn-secondary-hover); }
+
+.palette-dot[aria-pressed="true"] {
+    background: var(--btn-secondary);
+    border-color: var(--border-hover);
+}
+
+.palette-dot[aria-pressed="true"]::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 4px;
+    width: 4px;
+    height: 4px;
+    margin-left: -2px;
+    border-radius: 50%;
+    background: var(--accent);
+}
+
+.palette-dot[data-palette-btn="sunset"]::before   { background: linear-gradient(135deg, #d4400e 0%, #d83a52 55%, #c7317a 100%); }
+.palette-dot[data-palette-btn="indigo"]::before   { background: #4f5ad6; }
+.palette-dot[data-palette-btn="terra"]::before    { background: #b4552f; }
+.palette-dot[data-palette-btn="sage"]::before     { background: #2e7d6b; }
+.palette-dot[data-palette-btn="graphite"]::before { background: #46505f; }
+
+body.dark .palette-dot::before { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
+
+/* Title above a dialog that is, in fact, the link panel */
+.panel-eyebrow {
+    margin: 0 0 4px;
+    font-size: var(--text-xs);
+    font-weight: var(--fw-semibold);
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
 }
 
 
@@ -1609,14 +2014,17 @@ body.dark .access-select {
    ============================================================ */
 .links-list.grid-view {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(262px, 1fr));
-    gap: 18px;
+    /* Tiles, not columns: 4–5 per row on a 1024–1440 screen, 2 on a phone.
+       The track never drops below 150px so the name, the meta line and the
+       three footer buttons stay readable. */
+    grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+    gap: 14px;
 }
 
 .links-list.grid-view .link-card {
     display: flex;
     flex-direction: column;
-    padding: 8px;
+    padding: 7px;
     gap: 0;
     text-align: left;
 }
@@ -1638,7 +2046,7 @@ body.dark .access-select {
     width: 100%;
     align-items: stretch;
     flex-grow: 1;
-    padding: 12px 8px 0;
+    padding: 9px 6px 0;
     gap: 4px;
 }
 
@@ -1651,15 +2059,14 @@ body.dark .access-select {
 
 .links-list.grid-view .link-id { font-size: var(--text-base); }
 
-.links-list.grid-view .actions-row {
+.links-list.grid-view .card-foot {
     width: 100%;
     margin-top: auto;
-    padding: 12px 6px 6px;
-    justify-content: stretch;
+    padding: 10px 4px 2px;
 }
 
 .links-list.grid-view .upload-dropdown {
-    flex: 1;
+    flex: 1 1 auto;
     min-width: 0;
 }
 
@@ -1668,15 +2075,19 @@ body.dark .access-select {
     justify-content: center;
 }
 
+.links-list.grid-view .btn--pult { flex: 0 1 auto; }
+
 .links-list.grid-view .upload-menu {
-    left: 50%;
+    left: 0;
     right: auto;
-    min-width: 100%;
+    min-width: 180px;
+    transform: translateY(6px) scale(0.97);
+    transform-origin: bottom left;
 }
 
-.links-list.grid-view .access-row { margin-top: 2px; width: 100%; }
-
-.links-list.grid-view .access-token-box { max-width: 100%; }
+.links-list.grid-view .upload-dropdown.open .upload-menu {
+    transform: translateY(0) scale(1);
+}
 
 
 /* ============================================================
@@ -1836,9 +2247,9 @@ body.dark .access-select {
     .search-sort-bar { flex-basis: 100%; }
 
     .link-card,
-    .skeleton-card.list-skeleton { grid-template-columns: 168px minmax(0, 1fr) auto; }
+    .skeleton-card.list-skeleton { grid-template-columns: 160px minmax(0, 1fr) auto; }
     .preview-wrapper,
-    .list-skeleton .skeleton-preview { width: 168px; height: 94.5px; }
+    .list-skeleton .skeleton-preview { width: 160px; height: 90px; }
 }
 
 
@@ -1909,7 +2320,7 @@ body.dark .access-select {
         display: flex;
         flex-direction: column;
         gap: 0;
-        padding: 8px;
+        padding: 7px;
         animation: none;
     }
 
@@ -1935,17 +2346,19 @@ body.dark .access-select {
         align-items: stretch;
     }
 
-    .link-card .actions-row {
-        padding: 12px 6px 6px;
-        justify-content: stretch;
+    .link-card .card-foot {
+        padding: 10px 4px 2px;
+        justify-content: flex-start;
         width: 100%;
     }
 
-    .link-card .upload-dropdown { flex: 1; min-width: 0; }
+    .link-card .upload-dropdown { flex: 0 1 auto; min-width: 0; }
     .link-card .upload-toggle-btn { width: 100%; justify-content: center; }
 
-    /* Touch screens have no hover: keep the pin reachable. */
-    .pin-btn { opacity: 1; transform: none; }
+    /* Touch targets, and the ⋯ menu opens where the thumb is */
+    .card-foot .btn,
+    .card-foot .icon-btn { height: 36px; }
+    .card-foot .icon-btn { width: 36px; }
 
     .upload-menu {
         left: 0;
@@ -1960,13 +2373,29 @@ body.dark .access-select {
         min-width: 232px;
     }
 
-    .links-list.grid-view { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    /* Tiles reflow with the viewport instead of a fixed two columns */
+    .links-list.grid-view {
+        grid-template-columns: repeat(auto-fill, minmax(186px, 1fr));
+        gap: 10px;
+    }
     .links-list.grid-view .link-card { padding: 6px; }
     .links-list.grid-view .link-card .preview-link,
     .links-list.grid-view .link-card .preview-wrapper { border-radius: 13px; }
-    .links-list.grid-view .link-card .link-info { padding: 10px 6px 0; }
-    .links-list.grid-view .link-card .actions-row { padding: 10px 4px 4px; }
+    .links-list.grid-view .link-card .link-info { padding: 8px 4px 0; }
+    .links-list.grid-view .link-card .card-foot { padding: 8px 2px 1px; gap: 4px; }
     .links-list.grid-view .link-id { font-size: 0.78125rem; }
+    .links-list.grid-view .media-badge { font-size: 9px; padding: 1px 5px; }
+    .links-list.grid-view .preview-meta { inset: 6px; }
+
+    /* Three controls do not fit a 170px tile: the panel button takes a
+       second line, so its label never disappears. */
+    .links-list.grid-view .card-foot { flex-wrap: wrap; }
+    .links-list.grid-view .btn--pult { flex: 1 1 100%; order: 3; }
+    .links-list.grid-view .button-caret { display: none; }
+    .links-list.grid-view .upload-dropdown { flex: 1 1 auto; }
+
+    .media-badge { font-size: 9px; padding: 1px 5px; }
+    .preview-meta { inset: 6px; }
 
     .toast-container {
         left: max(14px, env(safe-area-inset-left));
@@ -1991,6 +2420,19 @@ body.dark .access-select {
     .list-skeleton .skeleton-info { padding: 2px 8px 0; width: 100%; }
     .list-skeleton .skeleton-actions { padding: 4px 6px 6px; width: 100%; }
     .list-skeleton .skeleton-btn { flex: 1; }
+}
+
+
+@media (max-width: 600px) {
+    .links-list.grid-view { grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); }
+}
+
+@media (max-width: 480px) {
+    .links-list.grid-view { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+}
+
+@media (max-width: 340px) {
+    .links-list.grid-view { grid-template-columns: minmax(0, 1fr); }
 }
 
 
