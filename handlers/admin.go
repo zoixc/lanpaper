@@ -226,9 +226,8 @@ func toResponse(wp *storage.Wallpaper) WallpaperResponse {
 	}
 	resp.History = wp.History
 	resp.Items = wp.Items
-	if wp.Rotate.Enabled || len(wp.Items) > 0 {
-		rotate := storage.NormalizeRotate(wp.Rotate, len(wp.Items) > 0)
-		resp.Rotate = &rotate
+	if (wp.Rotate != nil && wp.Rotate.Enabled) || len(wp.Items) > 0 {
+		resp.Rotate = storage.NormalizeRotatePtr(wp.Rotate, len(wp.Items) > 0)
 	}
 	if stats, ok := storage.StatsFor(wp.LinkName); ok {
 		resp.Stats = &stats

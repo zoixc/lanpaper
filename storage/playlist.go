@@ -112,6 +112,21 @@ func NormalizeRotate(rc RotateConfig, hasItems bool) RotateConfig {
 	return rc
 }
 
+// NormalizeRotatePtr is NormalizeRotate for the persisted pointer field: it
+// returns nil when the result is empty, so a link that uses neither playlists
+// nor rotation keeps serializing exactly as it did before these fields existed.
+func NormalizeRotatePtr(rc *RotateConfig, hasItems bool) *RotateConfig {
+	var in RotateConfig
+	if rc != nil {
+		in = *rc
+	}
+	out := NormalizeRotate(in, hasItems)
+	if out == (RotateConfig{}) {
+		return nil
+	}
+	return &out
+}
+
 // PlaylistIndex picks which media a public request should serve: 0 is the live
 // file, 1..n are Items in stored order. The choice is derived from the clock
 // (sequential) or from a stable hash of the link and the time window (random),
@@ -119,7 +134,7 @@ func NormalizeRotate(rc RotateConfig, hasItems bool) RotateConfig {
 // two replicas reading the same data directory always agree.
 func (wp *Wallpaper) PlaylistIndex(now int64) int {
 	count := len(wp.Items) + 1
-	if count < 2 || !wp.Rotate.Enabled {
+	if count < 2 || wp.Rotate == nil || !wp.Rotate.Enabled {
 		return 0
 	}
 	interval := wp.Rotate.Interval

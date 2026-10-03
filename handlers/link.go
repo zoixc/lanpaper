@@ -198,7 +198,10 @@ func Link(w http.ResponseWriter, r *http.Request) {
 			if req.Rotate != nil {
 				// Merge into the stored settings: a PATCH that only toggles
 				// "enabled" must not reset the interval or the order.
-				rotate := wp.Rotate
+				var rotate storage.RotateConfig
+				if wp.Rotate != nil {
+					rotate = *wp.Rotate
+				}
 				if req.Rotate.Enabled != nil {
 					rotate.Enabled = *req.Rotate.Enabled
 				}
@@ -208,7 +211,7 @@ func Link(w http.ResponseWriter, r *http.Request) {
 				if order != "" {
 					rotate.Order = order
 				}
-				wp.Rotate = storage.NormalizeRotate(rotate, len(wp.Items) > 0)
+				wp.Rotate = storage.NormalizeRotatePtr(&rotate, len(wp.Items) > 0)
 			}
 			if req.RemoveItem != nil {
 				items, item, found := storage.WithoutItem(wp.Items, removeID)

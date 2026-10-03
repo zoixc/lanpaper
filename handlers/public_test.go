@@ -98,8 +98,8 @@ func TestSelectMediaResolvesVersionsAndItems(t *testing.T) {
 	}
 
 	// Rotation walks the whole playlist and stays inside it.
-	wp.Rotate = storage.NormalizeRotate(
-		storage.RotateConfig{Enabled: true, Interval: config.MinRotateInterval}, true)
+	wp.Rotate = storage.NormalizeRotatePtr(
+		&storage.RotateConfig{Enabled: true, Interval: config.MinRotateInterval}, true)
 	allowed := map[string]bool{
 		wp.ImagePath:                     true,
 		storage.ItemPath("w", 5, "webm"): true,

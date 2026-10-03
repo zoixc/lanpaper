@@ -45,8 +45,10 @@ type Wallpaper struct {
 	// live file is position 0 and is not listed here. Files live in
 	// data/items/{link}/{id}.{ext}.
 	Items []PlaylistItem `json:"items,omitempty"`
-	// Rotate switches between the live file and Items over time.
-	Rotate RotateConfig `json:"rotate,omitempty"`
+	// Rotate switches between the live file and Items over time. It is a
+	// pointer because encoding/json never omits an empty struct: a link that
+	// does not use rotation must not gain a "rotate" key in wallpapers.json.
+	Rotate *RotateConfig `json:"rotate,omitempty"`
 
 	// Not persisted; derived from MIMEType on Load.
 	ImagePath   string `json:"-"`
@@ -535,7 +537,7 @@ func sanitizeMediaLists(wp *Wallpaper) {
 		}
 		wp.Items = kept
 	}
-	wp.Rotate = NormalizeRotate(wp.Rotate, len(wp.Items) > 0)
+	wp.Rotate = NormalizeRotatePtr(wp.Rotate, len(wp.Items) > 0)
 	// Repair a version number that collides with an archived one, so a future
 	// archive can never overwrite a file that is still listed.
 	if _, clash := FindHistory(wp.History, wp.CurrentVersion); clash {
@@ -599,11 +601,22 @@ func (s *Store) Load() error {
 // A stream of uploads cannot spawn an unbounded number of prune goroutines.
 var (
 	pruneOnce     sync.Once
-	pruneRequests = make(chan int, 1)
+	pruneRequests = make(chan pruneRequest, 1)
 	errStale      = errors.New("record changed while pruning")
 )
 
+// pruneRequest carries everything the background pass needs, so the worker
+// goroutine never reads config.Current behind the caller's back.
+type pruneRequest struct {
+	maxImages int
+	historyMB int
+}
+
 func SchedulePrune(max int) {
+	// Both settings are read here, in the caller's goroutine: the worker must
+	// not touch config.Current, because a request that changes configuration
+	// (or a test that does) would race with it.
+	historyMB := config.Current.History.MaxMB
 	// With history enabled the same background pass also enforces the archive
 	// budget, so it has to run even when MAX_IMAGES is 0 (unlimited links).
 	if max <= 0 && config.Current.History.Limit <= 0 {
@@ -611,14 +624,14 @@ func SchedulePrune(max int) {
 	}
 	pruneOnce.Do(func() {
 		go func() {
-			for limit := range pruneRequests {
-				PruneOldImages(limit)
-				TrimHistoryBudget(config.Current.History.MaxMB)
+			for req := range pruneRequests {
+				PruneOldImages(req.maxImages)
+				TrimHistoryBudget(req.historyMB)
 			}
 		}()
 	})
 	select {
-	case pruneRequests <- max:
+	case pruneRequests <- pruneRequest{maxImages: max, historyMB: historyMB}:
 	default:
 	}
 }

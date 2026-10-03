@@ -50,6 +50,13 @@ func TestPlaylistItemHelpers(t *testing.T) {
 }
 
 func TestNormalizeRotateClampsAndKeepsZero(t *testing.T) {
+	// The persisted field is a pointer, so "unused" has to stay nil.
+	if rc := NormalizeRotatePtr(nil, false); rc != nil {
+		t.Fatalf("an unused record gained rotation settings: %+v", rc)
+	}
+	if rc := NormalizeRotatePtr(&RotateConfig{Enabled: true, Interval: 60}, true); rc == nil || !rc.Enabled {
+		t.Fatalf("rotation settings were dropped: %+v", rc)
+	}
 	if rc := NormalizeRotate(RotateConfig{}, false); rc != (RotateConfig{}) {
 		t.Fatalf("a record without a playlist gained settings: %+v", rc)
 	}
@@ -86,7 +93,7 @@ func TestPlaylistIndexRotatesWithoutState(t *testing.T) {
 		}
 	}
 
-	wp.Rotate = RotateConfig{Enabled: true, Interval: 60, Order: config.RotateOrderSequential}
+	wp.Rotate = &RotateConfig{Enabled: true, Interval: 60, Order: config.RotateOrderSequential}
 	if got := wp.PlaylistIndex(0); got != 0 {
 		t.Fatalf("first window: %d", got)
 	}
@@ -118,7 +125,7 @@ func TestPlaylistIndexRotatesWithoutState(t *testing.T) {
 		t.Fatal("an invalid interval rotated on every second")
 	}
 
-	wp.Rotate = RotateConfig{Enabled: true, Interval: 60, Order: config.RotateOrderRandom}
+	wp.Rotate = &RotateConfig{Enabled: true, Interval: 60, Order: config.RotateOrderRandom}
 	other := &Wallpaper{LinkName: "other", Items: wp.Items, Rotate: wp.Rotate}
 	random, differs := map[int]bool{}, false
 	for window := range 200 {

@@ -339,7 +339,8 @@ func TestLoadSanitizesHistoryAndPlaylist(t *testing.T) {
 	if len(good.Items) != 2 || good.Items[0].ID != 1 || good.Items[1].ID != 2 || good.Items[1].SizeBytes != 0 {
 		t.Fatalf("playlist was not sanitized: %+v", good.Items)
 	}
-	if good.Rotate.Interval != config.MinRotateInterval || good.Rotate.Order != config.RotateOrderSequential || !good.Rotate.Enabled {
+	if good.Rotate == nil || good.Rotate.Interval != config.MinRotateInterval ||
+		good.Rotate.Order != config.RotateOrderSequential || !good.Rotate.Enabled {
 		t.Fatalf("rotation was not normalized: %+v", good.Rotate)
 	}
 	if HistoryBytesTotal() != 12 {
@@ -356,7 +357,7 @@ func TestLoadSanitizesHistoryAndPlaylist(t *testing.T) {
 	// A link that never used the features keeps its zero values, so enabling them
 	// does not rewrite wallpapers.json for every existing link.
 	plain := mustGet(t, "plain")
-	if plain.Rotate != (RotateConfig{}) || len(plain.History) != 0 || len(plain.Items) != 0 || plain.CurrentVersion != 0 {
+	if plain.Rotate != nil || len(plain.History) != 0 || len(plain.Items) != 0 || plain.CurrentVersion != 0 {
 		t.Fatalf("a plain link changed shape: %+v", plain)
 	}
 	// A link that never used the features serializes exactly as before, so an
