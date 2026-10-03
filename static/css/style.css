@@ -1297,6 +1297,7 @@ body.dark .access-select {
     padding: 9px 12px;
     gap: 10px;
     border: none;
+    text-decoration: none;
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--text);
