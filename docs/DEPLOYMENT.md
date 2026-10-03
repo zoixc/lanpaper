@@ -5,10 +5,10 @@ model, trust boundaries, reverse-proxy examples) and [API.md](API.md). It
 covers what to decide before the first request, how to run the process, and
 what to watch afterwards.
 
-Lanpaper is a single binary with no database and no runtime dependencies. That
-makes the deployment small, but it also means the operator owns three things
-the application cannot do alone: **TLS in front of it, backups of `data/`, and
-the network policy that decides who can reach it.**
+Lanpaper is a single static binary with no database and no external services.
+That makes the deployment small, but it also means the operator owns three
+things the application cannot do alone: **TLS in front of it, backups of
+`data/`, and the network policy that decides who can reach it.**
 
 ---
 
@@ -20,10 +20,11 @@ the network policy that decides who can reach it.**
 | Lanpaper terminates TLS | Single host, no proxy available, internal CA | Set `TLS_CERT_FILE` + `TLS_KEY_FILE` (both or neither — a partial configuration refuses to start) |
 | Plain HTTP | LAN only, or a proxy that already enforces auth | Keep the default and never expose the port to the internet |
 
-Only one process should write to a given `data/` directory. Replicas can
-*read* the same directory (rotation is stateless and metadata reads are atomic
-snapshots), but two writers would race on `wallpapers.json`. Scale by putting a
-cache in front, not by running several writers.
+Only one process should write to a given `data/` directory. Replicas can *read*
+the same directory (rotation is stateless, and metadata is renamed atomically,
+so a reader never sees a half-written file), but two writers would overwrite
+each other's `wallpapers.json` — the last rename wins and the other update is
+lost. Scale by putting a cache in front, not by running several writers.
 
 ## 2. Configuration checklist
 
