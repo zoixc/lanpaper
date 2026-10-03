@@ -1,0 +1,159 @@
+/* SPDX-License-Identifier: MIT */
+/* ============================================================
+   ПАЛИТРЫ ПРИЛОЖЕНИЯ
+   Переключатель в сайдбаре меняет data-palette на <html>.
+   Светлые значения — в блоке палитры, тёмные — с [data-theme="dark"].
+   Все пары проверены по WCAG AA (см. design/04-final.md).
+   ============================================================ */
+
+/* Базовые (нейтральные) значения для «матования» медиа — одинаковы везде,
+   кроме фона, который подстраивается под палитру ниже. */
+:root { --matte-bg: var(--surface-2); }
+
+/* ============================================================
+   1. ИНДИГО — спокойный синий, значения по умолчанию из tokens.css
+   ============================================================ */
+[data-palette="indigo"][data-theme="dark"],
+[data-palette="indigo"] { --matte-bg: var(--surface-2); }
+
+/* ============================================================
+   2. ТЕРРАКОТА — тёплая, «бумага и глина»
+   ============================================================ */
+[data-palette="terra"] {
+    --bg:          #FAF7F5;
+    --bg-sunken:   #F3EDE8;
+    --surface-2:   #F4EFEA;
+    --glass:       rgba(255, 255, 255, 0.82);
+
+    --accent:      #B4552F;
+    --accent-rgb:  180, 85, 47;
+    --accent-hover:#A34A28;
+    --accent-active:#91411F;
+    --accent-soft: #FBEEE8;
+    --accent-soft-2:#F6E0D6;
+    --accent-text: #984425;
+}
+[data-palette="terra"][data-theme="dark"] {
+    --bg:          #171310;
+    --bg-sunken:   #110E0B;
+    --surface:     #201A16;
+    --surface-2:   #292119;
+    --surface-hover:#251E18;
+    --glass:       rgba(31, 25, 20, 0.82);
+
+    --accent:      #E8926A;
+    --accent-rgb:  232, 146, 106;
+    --accent-hover:#F09E78;
+    --accent-active:#D98360;
+    --accent-soft: rgba(232, 146, 106, 0.14);
+    --accent-soft-2: rgba(232, 146, 106, 0.22);
+    --accent-text: #F0A886;
+}
+
+/* ============================================================
+   3. ШАЛФЕЙ — зелёная, спокойная и «природная»
+   ============================================================ */
+[data-palette="sage"] {
+    --bg:          #F5F8F6;
+    --bg-sunken:   #EBF1EE;
+    --surface-2:   #EEF4F1;
+    --glass:       rgba(255, 255, 255, 0.82);
+
+    --accent:      #2E7D6B;
+    --accent-rgb:  46, 125, 107;
+    --accent-hover:#28705F;
+    --accent-active:#226453;
+    --accent-soft: #E8F4F0;
+    --accent-soft-2:#D8EBE4;
+    --accent-text: #246354;
+}
+[data-palette="sage"][data-theme="dark"] {
+    --bg:          #121715;
+    --bg-sunken:   #0C100E;
+    --surface:     #1A211E;
+    --surface-2:   #212A26;
+    --surface-hover:#1E2623;
+    --glass:       rgba(26, 33, 30, 0.82);
+
+    --accent:      #6FC4AE;
+    --accent-rgb:  111, 196, 174;
+    --accent-hover:#83D0BB;
+    --accent-active:#5CB49E;
+    --accent-soft: rgba(111, 196, 174, 0.14);
+    --accent-soft-2: rgba(111, 196, 174, 0.22);
+    --accent-text: #8FD5C2;
+}
+
+/* ============================================================
+   4. ГРАФИТ — почти нейтральная, цвет даёт только контент
+   ============================================================ */
+[data-palette="graphite"] {
+    --bg:          #F5F6F7;
+    --bg-sunken:   #ECEEF0;
+    --surface-2:   #EFF1F3;
+    --glass:       rgba(255, 255, 255, 0.82);
+
+    --accent:      #46505F;
+    --accent-rgb:  70, 80, 95;
+    --accent-hover:#3D4653;
+    --accent-active:#353D48;
+    --accent-soft: #EDEFF2;
+    --accent-soft-2:#E0E4E9;
+    --accent-text: #3A4351;
+}
+[data-palette="graphite"][data-theme="dark"] {
+    --bg:          #14161A;
+    --bg-sunken:   #0E1013;
+    --surface:     #1C1F24;
+    --surface-2:   #23272D;
+    --surface-hover:#20242A;
+    --glass:       rgba(28, 31, 36, 0.82);
+
+    --accent:      #A9B6C9;
+    --accent-rgb:  169, 182, 201;
+    --accent-hover:#BAC6D6;
+    --accent-active:#97A5BA;
+    --accent-soft: rgba(169, 182, 201, 0.14);
+    --accent-soft-2: rgba(169, 182, 201, 0.22);
+    --accent-text: #C3CDDB;
+}
+
+/* ---------- Переключатель палитры в сайдбаре ---------- */
+.palette-row {
+    display: flex; align-items: center; gap: 3px;
+    margin-top: var(--s-3);
+    padding: 4px;
+    background: var(--surface-2);
+    border-radius: var(--r-sm);
+}
+.palette-btn {
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    flex: 1; height: 26px; padding: 0;
+    background: transparent; border: 0; border-radius: var(--r-xs);
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease);
+}
+.palette-btn:hover { background: var(--bg-sunken); }
+.palette-btn__dot {
+    width: 14px; height: 14px; border-radius: 50%;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+.palette-btn[aria-pressed="true"] {
+    background: var(--surface);
+    box-shadow: var(--shadow-xs);
+}
+.palette-btn[aria-pressed="true"]::after {
+    content: ""; position: absolute; inset: auto 50% 2px 50%;
+    width: 4px; height: 4px; margin-left: -2px; border-radius: 50%;
+    background: var(--accent);
+}
+.palette-btn[data-palette-btn="indigo"] .palette-btn__dot { background: #4F5AD6; }
+.palette-btn[data-palette-btn="terra"]  .palette-btn__dot { background: #B4552F; }
+.palette-btn[data-palette-btn="sage"]   .palette-btn__dot { background: #2E7D6B; }
+.palette-btn[data-palette-btn="graphite"] .palette-btn__dot { background: #46505F; }
+.palette-label {
+    padding: 0 10px 4px;
+    font-size: var(--t-2xs); font-weight: var(--fw-bold);
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3);
+}
