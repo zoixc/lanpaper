@@ -47,21 +47,7 @@ jobs:
         run: go vet ./...
 
       - name: Test
-        run: |
-          # TEMPORARY (debugging aid): the Actions log host is unreachable from
-          # the review sandbox, so failure excerpts are re-emitted as a few
-          # annotations (GitHub caps them at 10 per run).
-          go test -race -count=1 ./... > /tmp/gotest.log 2>&1 || true
-          grep -E '^(ok|FAIL|---|WARNING)' /tmp/gotest.log > /tmp/fail.log || true
-          echo '---- context ----' >> /tmp/fail.log
-          awk '/^(--- FAIL|WARNING: DATA RACE|panic:)/{c=28} c&&c--' /tmp/gotest.log >> /tmp/fail.log || true
-          split -l 90 /tmp/fail.log /tmp/failpart. || true
-          for f in /tmp/failpart.*; do
-            [ -e "$f" ] || continue
-            msg=$(sed -e 's/%/%25/g' -e 's/\r/%0D/g' "$f" | awk '{printf "%s%%0A", $0}')
-            echo "::error::${msg}"
-          done
-          if grep -qE "^(FAIL|panic|WARNING: DATA RACE)" /tmp/gotest.log; then exit 1; fi
+        run: go test -race -count=1 ./...
 
       - name: Build
         run: go build -trimpath -ldflags="-X main.Version=$(cat VERSION)" -o /dev/null .
