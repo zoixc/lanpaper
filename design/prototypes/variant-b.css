@@ -57,6 +57,15 @@
 .side__track { height: 5px; border-radius: 3px; background: var(--bg-sunken); overflow: hidden; }
 .side__fill { height: 100%; width: 34%; border-radius: 3px; background: var(--accent); }
 
+/* Строка состояния сервера */
+.side__service {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 8px; margin-bottom: 4px;
+    font-size: var(--t-xs); font-weight: var(--fw-medium); color: var(--text-2);
+}
+.side__service-text { flex: 1; color: var(--text); }
+.side__service-ver { font-variant-numeric: tabular-nums; color: var(--text-3); font-size: var(--t-2xs); }
+
 /* ---------- Основная область ---------- */
 .main { min-width: 0; display: flex; flex-direction: column; }
 
@@ -84,24 +93,6 @@
 }
 .tools__search { flex: 1 1 260px; max-width: 380px; }
 .tools__spacer { flex: 1; }
-
-/* Активные фильтры */
-.active-filters { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: var(--s-3); }
-.active-filters:empty { display: none; }
-.afilter {
-    display: inline-flex; align-items: center; gap: 6px;
-    height: 26px; padding: 0 6px 0 10px;
-    font-size: var(--t-xs); font-weight: var(--fw-medium);
-    background: var(--accent-soft); color: var(--accent-text);
-    border-radius: var(--r-full);
-}
-.afilter button {
-    display: flex; align-items: center; justify-content: center;
-    width: 16px; height: 16px; padding: 0; border: 0; border-radius: 50%;
-    background: transparent; color: inherit; cursor: pointer;
-}
-.afilter button:hover { background: rgba(0, 0, 0, 0.08); }
-.afilter svg { width: 11px; height: 11px; }
 
 /* ---------- Таблица ---------- */
 .table {
@@ -184,6 +175,11 @@
 .row__file { font-size: var(--t-xs); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
 
 .row__cell { font-size: var(--t-sm); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.row__sub {
+    display: inline-flex; align-items: center; gap: 3px;
+    margin-top: 2px; font-size: var(--t-2xs); color: var(--text-3);
+}
+.row__sub svg { width: 11px; height: 11px; }
 .row__cell--strong { color: var(--text); font-weight: var(--fw-medium); }
 
 .row__actions { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }

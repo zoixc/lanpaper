@@ -403,6 +403,45 @@
 .tabpanel[hidden] { display: none; }
 
 /* ============================================================
+   СОСТОЯНИЕ СЕРВИСА И АКТИВНЫЕ УСЛОВИЯ (общие для B, C, D)
+   ============================================================ */
+.pulse {
+    position: relative; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--success); flex-shrink: 0;
+}
+.pulse::after {
+    content: ""; position: absolute; inset: 0; border-radius: 50%;
+    background: inherit; opacity: 0.55;
+    animation: pulse 2.2s var(--ease) infinite;
+}
+@keyframes pulse {
+    0%   { transform: scale(1); opacity: 0.5; }
+    70%  { transform: scale(3); opacity: 0; }
+    100% { transform: scale(3); opacity: 0; }
+}
+.pulse--warn { background: var(--warning); }
+.pulse--idle { background: var(--text-3); }
+.pulse--idle::after { animation: none; }
+
+/* Активное условие фильтра: видно, что включено, и снимается одним кликом */
+.active-filters { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: var(--s-3); }
+.active-filters:empty { display: none; }
+.afilter {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 26px; padding: 0 6px 0 10px;
+    font-size: var(--t-xs); font-weight: var(--fw-medium);
+    background: var(--accent-soft); color: var(--accent-text);
+    border-radius: var(--r-full);
+}
+.afilter button {
+    display: flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; padding: 0; border: 0; border-radius: 50%;
+    background: transparent; color: inherit; cursor: pointer;
+}
+.afilter button:hover { background: rgba(0, 0, 0, 0.08); }
+.afilter svg { width: 11px; height: 11px; }
+
+/* ============================================================
    ПАНЕЛЬ ДЕТАЛЕЙ — компоненты (используются A и C)
    ============================================================ */
 .detail-section { margin-bottom: var(--s-5); }

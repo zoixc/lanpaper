@@ -152,6 +152,8 @@
     font-variant-numeric: tabular-nums;
 }
 .link__meta i { font-style: normal; opacity: 0.55; }
+.link__views { display: inline-flex; align-items: center; gap: 3px; }
+.link__views svg { width: 11px; height: 11px; }
 .link__actions {
     display: flex; align-items: center; gap: 2px;
     opacity: 0; transition: opacity var(--dur) var(--ease);
@@ -222,7 +224,7 @@
     .link__quick { display: none; }
     .link__actions { opacity: 1; }
     .link__select { top: 10px; left: 10px; width: 28px; height: 28px; }
-    /* В узкой колонке оставляем тип, размер и дату: разрешение убираем */
-    .link__meta span:nth-child(3),
-    .link__meta i:nth-child(4) { display: none; }
+    /* В узкой колонке оставляем тип, размер и показы: разрешение и дату убираем */
+    .link__meta span:nth-child(3), .link__meta i:nth-child(4),
+    .link__meta span:nth-child(7), .link__meta i:nth-child(8) { display: none; }
 }
