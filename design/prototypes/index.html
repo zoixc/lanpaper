@@ -37,6 +37,15 @@
   .sw { width: 56px; }
   .sw i { display: block; height: 40px; border-radius: var(--r-sm); border: 1px solid var(--border); }
   .sw span { display: block; margin-top: 4px; font-size: 10px; color: var(--text-3); text-align: center; }
+  .vcard--final {
+    grid-column: 1 / -1;
+    border-color: var(--accent);
+    background: linear-gradient(180deg, var(--accent-soft) 0%, var(--surface) 42%);
+    box-shadow: var(--shadow-sm);
+  }
+  .vcard--final h2 { font-size: var(--t-xl); }
+  .vcard--final ul { columns: 2; column-gap: var(--s-6); }
+  @media (max-width: 640px) { .vcard--final ul { columns: 1; } }
   .note { margin-top: var(--s-6); padding: var(--s-4); background: var(--surface-2); border-radius: var(--r-md); font-size: var(--t-sm); color: var(--text-2); }
   .note b { color: var(--text); }
 </style>
@@ -56,8 +65,25 @@
   <main class="wrap">
     <div class="hero">
       <h1>Редизайн админ-панели</h1>
-      <p>Четыре направления на общей дизайн-системе. Все три сохраняют функциональность 0.12.0 целиком: стабильные ссылки, версии, плейлисты, ротация, уровни доступа, publish keys. Переключатель темы — справа сверху (или клавиша <b>T</b>).</p>
+      <p>Есть финалист: A + C + D в одном макете. Ниже — четыре исходных направления на общей дизайн-системе. Все три сохраняют функциональность 0.12.0 целиком: стабильные ссылки, версии, плейлисты, ротация, уровни доступа, publish keys. Переключатель темы — справа сверху (или клавиша <b>T</b>).</p>
     </div>
+
+
+    <a class="vcard vcard--final" href="final.html">
+      <span class="vcard__tag" style="background:var(--brand-gradient)">★</span>
+      <div>
+        <h2 style="display:inline-block;margin-right:8px">Финалист — A + C + D</h2>
+        <span class="badge badge--accent" style="vertical-align:middle">рекомендую начать отсюда</span>
+      </div>
+      <p>Синтез трёх понравившихся вариантов: навигация и статус сервиса из D, карточки и панель деталей из A, телеметрия из C.</p>
+      <ul>
+        <li>Сайдбар разделов на десктопе, бургер — на телефоне</li>
+        <li>В покое карточка спокойная: превью, имя, мета, уровень доступа</li>
+        <li>Прогресс смены кадра у плейлиста и сигнал «нет обращений»</li>
+        <li>Массовые операции, фильтры со счётчиками, панель деталей с вкладками</li>
+      </ul>
+      <span class="vcard__foot">Открыть финалиста →</span>
+    </a>
 
     <div class="grid3">
       <a class="vcard" href="a-library.html">
@@ -112,6 +138,8 @@
         <span class="vcard__foot">Открыть вариант D →</span>
       </a>
     </div>
+
+    <h2 style="margin:var(--s-7) 0 var(--s-3);font-size:var(--t-lg);font-weight:var(--fw-bold);letter-spacing:-0.02em">Исходные направления</h2>
 
     <div class="note">
       <p style="margin:0 0 12px"><b>A vs D.</b> Оба варианта про одно и то же — «ссылки как галерея».
