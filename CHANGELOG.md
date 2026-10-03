@@ -32,8 +32,31 @@ existing URL behave exactly as before.
   on the gradient and the accent on a card at ≥ 4.5:1.
 - **Tiles are the default view.** The list view is unchanged and one click
   away; the choice is still remembered per browser.
+- **One icon family everywhere.** Every glyph in the panel — toolbar, search,
+  sorting, card footer, `⋯` menu, dialogs, the link panel headings — is a
+  single 24×24 stroke set (1.85 px, round caps and joins) and answers on hover:
+  menu items slide, the sort chevron and the plus in *New link* turn, the gear
+  turns while the settings menu is closed, the pin pops in, badges fade in and
+  long operations (creating a link, regenerating previews) spin the button
+  icon. Every animation is `transform`-only and switched off under
+  `prefers-reduced-motion`.
+- **The whole panel is translated.** All six languages carry the same 151 keys;
+  the file-kind label, the date, the image alternative text, the pin button
+  and the sorting/settings menus now follow the selected language, and changing
+  the language re-renders the cards in place instead of only re-labelling the
+  static markup. A new `tests/i18n.test.cjs` keeps the six files in step and
+  guards the `{{placeholder}}` names.
+- **Nothing is clipped.** Dropdowns and menus are anchored to the card, open
+  upward, and are capped at `min(70vh, 460px)` / `calc(100vw - 24px)` with
+  their own scroll; on phones the card menus turn into bottom sheets above the
+  safe-area inset. Long translations shrink their label with an ellipsis rather
+  than pushing the `⋯` button out of the tile.
 - The service worker cache generation bumps to `lanpaper-static-v7`, so
   installed PWAs pick up the new stylesheet on the next launch.
+- Performance stays where it was: the hover, badge and pin animations are
+  `transform`-only, previews are decoded with `decoding="async"`, the blur
+  placeholder is skipped for formats that cannot carry transparency, and the
+  two badges per card no longer use `backdrop-filter`.
 
 ## [0.12.0] – 2026-10-03
 

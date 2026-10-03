@@ -42,9 +42,9 @@ link, which is handy for digital frames, smart TVs, kiosks and other displays.
   images are fitted to the tile and shown whole on a blurred copy of
   themselves, with format, aspect ratio and duration printed in the corners;
   video previews play only while visible. Five accent palettes (sunset,
-  indigo, terracotta, sage, graphite) are switched from the settings menu.
-  A per-link dialog manages versions, playlist items, rotation and access
-  counters.
+  indigo, terracotta, sage, graphite) are switched from the settings menu, and
+  every icon comes from one animated stroke set. A per-link dialog manages
+  versions, playlist items, rotation and access counters.
 - **Light on resources:** about 10 MB of RAM when idle, gzip for text
   responses, media revalidated with `304` instead of downloaded again, and
   about 50 KB of self-hosted WOFF2 fonts. Archived versions are moved, not
@@ -383,7 +383,7 @@ go vet ./...
 go test -race ./...
 go mod verify
 go run golang.org/x/vuln/cmd/govulncheck@latest ./...
-node --test tests/*.test.cjs
+node --test tests/*.test.cjs # API surface, UI contracts and i18n parity
 docker build -t lanpaper .
 ```
 
