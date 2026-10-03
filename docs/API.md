@@ -397,8 +397,8 @@ Serves the media of a link:
   never the alias in the URL: `/frame.jpg` on a PNG link still serves
   `image/png`.
 - Only extensions from the supported media list are treated as aliases, so
-  `/manifest.json`, `/favicon.ico`, `/robots.txt` and `/sw.js` keep answering
-  `404` as before.
+  `/manifest.json`, `/favicon.ico` and `/sw.js` keep answering `404` as before.
+  `/robots.txt` is the one reserved name that answers something: see below.
 - An unusable selector is a `404`, not a fallback: a display pinned to `?v=3`
   must never silently start showing something else.
 - Rotation is derived from `floor(now / interval)` (sequential) or a stable hash
@@ -421,15 +421,27 @@ done in the response writer's `ReadFrom` path, so media still uses `sendfile`.
 
 ### `GET /health`
 
-Liveness check, always public. Returns `{"service":"lanpaper","status":"ok","version":"0.12.0"}`.
+Liveness check, always public, no disk I/O. Returns
+`{"service":"lanpaper","status":"ok","version":"0.12.0"}`. Any method other than
+`GET`/`HEAD` is `405`.
 
 ### `GET /health/ready`
 
 Readiness check. It verifies that `data/` and `data/media/` are accessible
-and that at least 1 GB of disk space is free.
+and that at least 1 GB of disk space is free. Any method other than
+`GET`/`HEAD` is `405`.
 
 - Ready: `200` with `{"status":"ready","checks":{...}}`.
 - Not ready: `503`, with a `message` on each failing check.
+
+### `GET /robots.txt`
+
+Always `200` with `User-agent: *` / `Disallow: /`, cached for an hour. Every
+path on this service is either an admin route or a mutable media link whose
+bytes change without the URL changing, so crawling it costs bandwidth and
+indexes content that is stale by design. The name is reserved, so no link can
+be shadowed by it. An operator who wants a different policy can override this
+path at the reverse proxy.
 
 ### Other routes
 

@@ -58,5 +58,8 @@ Open ideas, roughly in priority order. For shipped changes see
 
 - Browser end-to-end tests in CI (create, upload, access levels, import,
   history rollback, playlist rotation).
+- Benchmarks for the public media path (`BenchmarkPublic…`), so hot-path
+  changes stay measured instead of assumed. The test harness would need a
+  `*testing.B` variant of `setupApp` first.
 - Fuzz tests for media sniffing, path validation and URL checks.
 - An arm64 runtime smoke test in CI; the Docker job currently checks amd64 only.

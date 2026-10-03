@@ -3,7 +3,7 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
-## [0.12.0] – 2026-10-02
+## [0.12.0] – 2026-10-03
 
 Everything in this release is off by default or backwards compatible: an
 existing `data/` directory, an existing `wallpapers.json` and every existing URL
@@ -126,6 +126,44 @@ and served exactly as before.
   any media is downloaded or decoded.
 - The history budget runs in the existing prune worker instead of adding a
   timer, and the byte counter is a single atomic.
+
+### Production readiness
+
+- **A panicking handler costs one request, not the process.** A recovery layer
+  between the gzip middleware and the router logs the method, the path and the
+  stack, and answers a clean `500` when the response has not started yet.
+  Nothing from the panic reaches the client, and the query string is never
+  logged because token links carry their secret there. `http.ErrAbortHandler`
+  is re-raised untouched, so a deliberately abandoned response still behaves
+  the way `net/http` documents. The two background goroutines nobody restarts
+  (the prune worker and the rate-limit cleaner) recover as well.
+- **Optional built-in TLS.** `TLS_CERT_FILE` + `TLS_KEY_FILE` serve HTTPS from
+  the process itself with a TLS 1.2 floor; Go's current cipher suite and curve
+  defaults apply, and HTTP/2 is negotiated automatically. Setting only one of
+  the two is a startup error: refusing to start beats silently serving admin
+  credentials and token URLs in plaintext.
+- **`/robots.txt`** answers `Disallow: /` instead of `404`, so crawlers stop
+  walking mutable media URLs (and stop retrying a path that will never exist).
+- **The probes reject write methods** with `405` instead of answering a `POST`
+  to `/health` as if it were a `GET`.
+- **Startup warnings** for `INSECURE_SKIP_VERIFY=true`, `CORS_ORIGINS=*` and an
+  `ADMIN_PASS` shorter than 12 characters, so an internet-facing mistake is
+  visible in the log on day one.
+- **Package documentation** for `main`, `config`, `storage`, `handlers`,
+  `middleware` and `utils`, spelling out the invariants each package relies on
+  (copy-on-write snapshots, lock ordering, transparent response writers, no
+  global reads on the request path).
+- **Licence hygiene:** every first-party source file carries an
+  `SPDX-License-Identifier: MIT` header, and
+  [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) lists all bundled
+  components (BSD-3-Clause, MIT, SIL OFL 1.1 — no copyleft) with the texts a
+  redistribution must reproduce.
+- **Release automation:** pushing a version tag runs the full test matrix,
+  publishes `linux/amd64` + `linux/arm64` images under the semver tags and
+  creates the GitHub release, after checking that the tag matches `VERSION`.
+- **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** documents the production
+  topology, a hardened systemd unit, log lines worth alerting on, capacity
+  planning, backups and a pre-launch checklist.
 
 ## [0.11.0] – 2026-09-29
 

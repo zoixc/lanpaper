@@ -24,6 +24,8 @@
   "playlistMax": 8,
   "allowEmbed": false,
   "corsOrigins": [],
+  "tlsCertFile": "",
+  "tlsKeyFile": "",
   "proxyType": "http",
   "proxyHost": "",
   "proxyPort": "",

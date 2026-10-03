@@ -5,6 +5,9 @@ guarantee that every hosting setup is safe. Run the current release, keep the
 Go toolchain and base image patched, and serve the admin interface over
 HTTPS.
 
+Deployment, hardening and operations (topology, systemd/Docker, backups,
+capacity, what to alert on) live in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
 ## Reporting a vulnerability
 
 If private vulnerability reporting is enabled for this repository, use
@@ -137,15 +140,20 @@ reverse-proxy access logs.
 | Filesystem and metadata | Per-link locks serialize conflicting operations. Media and metadata are written to a temporary file, flushed with `fsync`, then atomically renamed. The metadata directory is synced as well. Failed writes roll back. Malformed metadata stops startup instead of being discarded on the next save. |
 | Container | Non-root user (uid 100, gid 101). Application files are read-only for the service; only `data/` and the gallery directory are writable. The Compose example drops all capabilities and sets `no-new-privileges`. |
 | PWA cache | The service worker caches only public application assets under `/static/` and revalidates them when online. Admin pages, API responses and media links always go to the network. Old `lanpaper-*` caches are purged on activation. |
-| Supply chain | Dependencies are verified by `go.sum`. CI runs `govulncheck`, pins GitHub Actions to commit SHAs and uses read-only `GITHUB_TOKEN` permissions. Dependabot proposes updates. |
+| Fault isolation | A panic in a handler is caught between the gzip layer and the router: it is logged with the method, the path and the stack, and answered with a plain `500` when the response has not started. No panic value, type, path or frame is ever sent to a client, and the query string is never logged because token links carry their secret there. `http.ErrAbortHandler` is re-raised untouched. The background prune worker and the rate-limit cleaner recover too, so neither can take the process down. |
+| TLS (optional) | `TLS_CERT_FILE` + `TLS_KEY_FILE` terminate HTTPS in the process with `MinVersion` TLS 1.2; cipher suites and curves stay at Go's maintained defaults and HTTP/2 is negotiated automatically. Setting only one of the two is a fatal startup error rather than a silent fallback to plaintext. The usual deployment still terminates TLS at a reverse proxy with `TRUSTED_PROXY` set. |
+| Crawler policy | `/robots.txt` disallows everything. Public links are mutable, credential-protected or both; indexing them costs bandwidth and publishes URLs whose access level may later be tightened. |
+| Supply chain | Dependencies are verified by `go.sum`. CI runs `govulncheck`, pins GitHub Actions to commit SHAs and uses read-only `GITHUB_TOKEN` permissions. Dependabot proposes updates. Every first-party source file carries an `SPDX-License-Identifier: MIT` header and all bundled components are listed with their licences in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) (permissive only — no copyleft). |
 
 ## Operator responsibilities and limits
 
 1. **Serve over HTTPS.** Basic Auth sends the password with every request, so
-   plain HTTP exposes it on the network. Lanpaper does not terminate TLS. It
-   also does not redirect HTTP to HTTPS or provide an authorization proxy.
-   Bind the backend to localhost or a private network when a proxy
-   terminates TLS.
+   plain HTTP exposes it on the network. Terminate TLS at a reverse proxy
+   (recommended, and the only setup that also gives you an HTTP→HTTPS
+   redirect), or set `TLS_CERT_FILE` + `TLS_KEY_FILE` to let Lanpaper serve
+   HTTPS itself. Lanpaper never redirects HTTP to HTTPS on its own and provides
+   no authorization proxy, so bind the listener to localhost or a private
+   network whenever something else terminates TLS.
 2. **Trust your outbound proxy.** For plain-HTTP targets, Lanpaper sends an
    absolute request URI with the vetted IP, plus the original `Host` header.
    A proxy that routes by `Host` instead can defeat DNS pinning.

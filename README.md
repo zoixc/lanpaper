@@ -46,9 +46,13 @@ link, which is handy for digital frames, smart TVs, kiosks and other displays.
 - **Security:** Basic Auth with a brute-force lockout, CSRF protection,
   strict security headers, SSRF-safe downloads and rate limits. Publish keys
   are stored as SHA-256 digests, share the login lockout budget and are never
-  written to `config.json`.
+  written to `config.json`. A panicking handler is answered with a clean `500`
+  and logged with its stack, so one bad request cannot take the process down.
 - **Deployment:** a single static binary in a small non-root Docker image,
-  with optional HTTP/HTTPS/SOCKS5 proxy support for outbound downloads.
+  with optional built-in TLS (`TLS_CERT_FILE` + `TLS_KEY_FILE`),
+  HTTP/HTTPS/SOCKS5 proxy support for outbound downloads, health and readiness
+  probes, graceful shutdown, and a `robots.txt` that keeps crawlers off mutable
+  media URLs. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Quick start
 
@@ -234,6 +238,7 @@ which have the highest priority.
 | `COMPRESSION_QUALITY` | `85` | JPEG/WebP quality, 1–100 |
 | `COMPRESSION_SCALE` | `100` | Stored image size as a percentage of the original, 1–100 |
 | `TRUSTED_PROXY` | unset | IP or CIDR of the reverse proxy. Forwarded headers are trusted only from it. |
+| `TLS_CERT_FILE`, `TLS_KEY_FILE` | unset | Serve HTTPS from the process itself (TLS 1.2+). Both or neither: a half-configured certificate is a startup error, not a silent downgrade to plaintext. |
 | `PROXY_TYPE` | `http` | Outbound proxy type: `http`, `https` or `socks5` |
 | `PROXY_HOST`, `PROXY_PORT` | unset | Optional outbound proxy for URL downloads |
 | `PROXY_USERNAME`, `PROXY_PASSWORD` | unset | Proxy credentials (aliases: `PROXY_USER`, `PROXY_PASS`) |
@@ -311,6 +316,18 @@ curl -H "X-Api-Key: $PUBLISH_KEY" -F linkName=frame -F autoCreate=1 -F file=@pho
   http://localhost:8080/api/upload
 ```
 
+## Production deployment
+
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) is the operational guide: topology
+(reverse proxy vs. built-in TLS), a configuration checklist, Docker and a
+hardened systemd unit, which log lines deserve an alert, capacity planning,
+backups, and a pre-launch checklist.
+
+The short version: terminate TLS at a reverse proxy and set `TRUSTED_PROXY` to
+its address, keep `data/` on a volume that is actually backed up, use a long
+random `ADMIN_PASS`, set `HISTORY_MAX_MB` to what the volume can spare, and
+read every `Warning:` the process prints at startup.
+
 ## Backups and upgrades
 
 Back up the whole persistent `data/` directory: `wallpapers.json`, `media/`,
@@ -368,5 +385,24 @@ CI runs the same checks on Go `oldstable` and `stable`. It then builds the
 Docker image, smoke-tests it, and publishes `linux/amd64` and `linux/arm64`
 images from `main`.
 
-Security reports: see [SECURITY.md](SECURITY.md). License: MIT, see
-[LICENSE](LICENSE).
+## Licensing and commercial use
+
+Lanpaper is **MIT licensed** ([LICENSE](LICENSE)): you may use it, modify it,
+redistribute it and sell it, including as a paid hosted service, as long as the
+copyright notice and the licence text travel with your copies. It comes without
+warranty, and no trademark rights are granted.
+
+Every dependency is permissive too — BSD-3-Clause, MIT, and SIL OFL 1.1 for the
+two bundled fonts — and nothing copyleft is linked into the binary or served by
+it, so a commercial offering carries no source-disclosure obligation. The
+component list, with the licence texts a redistribution has to reproduce, is in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). Every first-party source file
+carries an `SPDX-License-Identifier: MIT` header, so licence scanning tools can
+verify this mechanically.
+
+Planning a proprietary or open-core licence later? Set up a CLA (or copyright
+assignment) **before** accepting outside contributions: MIT-inbound code cannot
+be relicensed unilaterally.
+
+Security reports: see [SECURITY.md](SECURITY.md). Deployment and operations:
+see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
