@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /**
  * Client-side JPEG re-encoding before upload, used only to reduce upload
  * size. By default dimensions are preserved: the server applies

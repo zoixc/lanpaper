@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 package config
 
 import (
@@ -5,6 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -65,6 +68,25 @@ type Config struct {
 	// credentials. Environment-only (PUBLISH_KEYS): a secret is never written
 	// to config.json, so the field is deliberately not serialized.
 	PublishKeys []string `json:"-"`
+
+	// TLSCertFile and TLSKeyFile make the server terminate HTTPS itself instead
+	// of relying on a reverse proxy. Both must be set, or neither: a partial
+	// configuration is a startup error rather than a silent downgrade. The
+	// paths are not secrets, so they may live in config.json.
+	TLSCertFile string `json:"tlsCertFile,omitempty"`
+	TLSKeyFile  string `json:"tlsKeyFile,omitempty"`
+}
+
+// TLSEnabled reports whether the server should listen with TLS.
+func TLSEnabled() bool {
+	return Current.TLSCertFile != "" && Current.TLSKeyFile != ""
+}
+
+// TLSMisconfigured reports a certificate without a key (or the reverse). The
+// caller must not start: serving plaintext to an operator who configured TLS
+// would expose admin credentials and every token URL in the clear.
+func TLSMisconfigured() bool {
+	return (Current.TLSCertFile == "") != (Current.TLSKeyFile == "")
 }
 
 var Current Config
@@ -141,6 +163,8 @@ func Load() {
 	envInt("PLAYLIST_MAX", &Current.PlaylistMax)
 	envBool("ALLOW_EMBED", &Current.AllowEmbed)
 	envList("CORS_ORIGINS", &Current.CORSOrigins)
+	envString("TLS_CERT_FILE", &Current.TLSCertFile)
+	envString("TLS_KEY_FILE", &Current.TLSKeyFile)
 	// PUBLISH_KEYS is a comma-separated list of API keys. Like ADMIN_PASS it is
 	// a secret and is only read from the environment, never from config.json.
 	envList("PUBLISH_KEYS", &Current.PublishKeys)
@@ -166,6 +190,19 @@ func Load() {
 	}
 	if CORSConfigured() {
 		log.Printf("CORS for public media enabled for: %s", strings.Join(Current.CORSOrigins, ", "))
+		if slices.Contains(Current.CORSOrigins, "*") {
+			log.Println("Warning: CORS_ORIGINS=* lets every website read public media with JavaScript. List the origins that need it instead.")
+		}
+	}
+	if Current.InsecureSkipVerify {
+		log.Println("Warning: INSECURE_SKIP_VERIFY=true — certificates of downloaded media are not validated. Use it only for a trusted internal source with a self-signed certificate.")
+	}
+	if Current.AdminPass != "" && len(Current.AdminPass) < MinRecommendedPassLen {
+		log.Printf("Warning: ADMIN_PASS is shorter than %d characters. Any internet-facing deployment needs a long random password.",
+			MinRecommendedPassLen)
+	}
+	if TLSMisconfigured() {
+		log.Println("Warning: TLS_CERT_FILE and TLS_KEY_FILE must be set together; ignoring both.")
 	}
 }
 

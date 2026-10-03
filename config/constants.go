@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 package config
 
 const (
@@ -37,6 +39,11 @@ const (
 	// RegenerateTimeout bounds a preview regeneration of the whole library.
 	RegenerateTimeout = 30 * 60 // seconds
 )
+
+// MinRecommendedPassLen is the length below which a startup warning asks for a
+// stronger ADMIN_PASS. It is advice, not enforcement: short LAN passwords keep
+// working, and the brute-force lockout is the actual defence.
+const MinRecommendedPassLen = 12
 
 const (
 	DefaultPublicRatePerMin  = 120

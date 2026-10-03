@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /**
  * Lanpaper Frontend Logic
  * Handles UI interactions, API calls, and state management.

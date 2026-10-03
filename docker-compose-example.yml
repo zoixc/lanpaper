@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Copy to docker-compose.yml. Set ADMIN_PASS in your shell or an untracked
 # .env file before starting; the example must never deploy with a known password.
 #

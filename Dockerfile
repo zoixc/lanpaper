@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # --- Stage 1: Builder ---
 FROM golang:1.27-alpine AS builder
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /**
  * Export/import of the link list and UI settings.
  * The backup contains link metadata only (no media files and no access

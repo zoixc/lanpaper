@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 package main
 
 import (
@@ -6,6 +8,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 )
 
 // staticAssets is the allowlist of application files served from static/.
@@ -135,4 +138,26 @@ func serveServiceWorker(w http.ResponseWriter, r *http.Request) {
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Referrer-Policy", "no-referrer")
 	http.ServeContent(w, r, "sw.js", fi.ModTime(), f)
+}
+
+// robotsBody keeps crawlers off the media URLs. Everything below "/" is either
+// an admin route or a mutable link whose bytes change without the URL changing,
+// so an indexed copy is stale by design — and every crawl re-downloads a file
+// the operator is paying bandwidth for.
+const robotsBody = "User-agent: *\nDisallow: /\n"
+
+// serveRobotsTxt answers the one path a crawler asks for before anything else.
+// It replaces the 404 the reserved name produced, which only made bots retry.
+func serveRobotsTxt(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	h := w.Header()
+	h.Set("Content-Type", "text/plain; charset=utf-8")
+	h.Set("Cache-Control", "public, max-age=3600")
+	h.Set("X-Content-Type-Options", "nosniff")
+	// A zero modTime means no Last-Modified: the body never changes, so there
+	// is nothing to revalidate against.
+	http.ServeContent(w, r, "robots.txt", time.Time{}, strings.NewReader(robotsBody))
 }

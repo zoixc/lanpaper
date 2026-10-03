@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 package storage
 
 import (
@@ -8,6 +10,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"sync"
@@ -625,8 +628,7 @@ func SchedulePrune(max int) {
 	pruneOnce.Do(func() {
 		go func() {
 			for req := range pruneRequests {
-				PruneOldImages(req.maxImages)
-				TrimHistoryBudget(req.historyMB)
+				runPrunePass(req)
 			}
 		}()
 	})
@@ -694,4 +696,18 @@ func PruneOldImages(max int) {
 			ForgetStats(candidate.ID)
 		}()
 	}
+}
+
+// runPrunePass performs one background maintenance pass. It runs on a goroutine
+// nobody restarts, so a panic must not escape: one bad record would otherwise
+// take the whole server down between two uploads. The pass is idempotent — the
+// next request schedules it again.
+func runPrunePass(req pruneRequest) {
+	defer func() {
+		if p := recover(); p != nil {
+			log.Printf("Critical: background prune recovered from a panic: %v\n%s", p, debug.Stack())
+		}
+	}()
+	PruneOldImages(req.maxImages)
+	TrimHistoryBudget(req.historyMB)
 }

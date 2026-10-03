@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const ImageCompressor = require('../static/js/compressor.js');

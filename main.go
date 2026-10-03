@@ -1,7 +1,10 @@
+// SPDX-License-Identifier: MIT
+
 package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"log"
@@ -70,6 +73,13 @@ func main() {
 		port = ":" + port
 	}
 
+	// Refusing to start beats silently serving plaintext to an operator who
+	// asked for TLS: a half-configured certificate is always a mistake.
+	if config.TLSMisconfigured() {
+		log.Fatal("TLS_CERT_FILE and TLS_KEY_FILE must be set together; refusing to serve plain HTTP")
+	}
+	tlsEnabled := config.TLSEnabled()
+
 	srv := &http.Server{
 		Addr:    port,
 		Handler: newHandler(),
@@ -82,16 +92,32 @@ func main() {
 		IdleTimeout:       time.Duration(config.HTTPIdleTimeout) * time.Second,
 		MaxHeaderBytes:    1 << 20, // 1 MB
 	}
+	if tlsEnabled {
+		// Explicit floor: TLS 1.0/1.1 are still accepted by some stacks when
+		// the field is left at its zero value. Cipher suites and curves stay at
+		// Go's defaults, which are kept current and reject the weak ones.
+		srv.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	log.Printf("Lanpaper %s on %s (max upload %d MB, compression: %d%% quality, %d%% scale)",
-		Version, port, config.Current.MaxUploadMB, config.Current.Compression.Quality, config.Current.Compression.Scale)
-	log.Printf("Admin: http://localhost%s/admin", port)
+	scheme := "http"
+	if tlsEnabled {
+		scheme = "https"
+	}
+	log.Printf("Lanpaper %s on %s (%s, max upload %d MB, compression: %d%% quality, %d%% scale)",
+		Version, port, scheme, config.Current.MaxUploadMB, config.Current.Compression.Quality, config.Current.Compression.Scale)
+	log.Printf("Admin: %s://localhost%s/admin", scheme, port)
 
 	serveErr := make(chan error, 1)
-	go func() { serveErr <- srv.ListenAndServe() }()
+	go func() {
+		if tlsEnabled {
+			serveErr <- srv.ListenAndServeTLS(config.Current.TLSCertFile, config.Current.TLSKeyFile)
+			return
+		}
+		serveErr <- srv.ListenAndServe()
+	}()
 
 	select {
 	case err := <-serveErr:
@@ -112,10 +138,10 @@ func main() {
 }
 
 // newHandler is shared with the end-to-end HTTP tests, so tests exercise the
-// real compression, authentication, CSRF and routing stack, not just bare
-// handlers.
+// real compression, authentication, CSRF, panic-recovery and routing stack,
+// not just bare handlers.
 func newHandler() http.Handler {
-	return middleware.Gzip(newMux())
+	return middleware.Gzip(middleware.Recover(newMux()))
 }
 
 func newMux() *http.ServeMux {
@@ -128,6 +154,10 @@ func newMux() *http.ServeMux {
 	mux.HandleFunc("/admin.html", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin", http.StatusPermanentRedirect)
 	})
+	// Crawlers have no business walking mutable media links: every hit costs
+	// bandwidth and an indexed URL outlives the access level it was public
+	// under. The name is reserved, so no link can ever be shadowed by it.
+	mux.HandleFunc("/robots.txt", serveRobotsTxt)
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/health/ready", readyHandler)
 	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Admin)))
@@ -180,7 +210,13 @@ func handleLinkRoutes(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func healthHandler(w http.ResponseWriter, _ *http.Request) {
+// healthHandler is the liveness probe: it answers as long as the process can
+// serve HTTP, without touching the disk.
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	if !isReadMethod(r) {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -191,7 +227,14 @@ func healthHandler(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-func readyHandler(w http.ResponseWriter, _ *http.Request) {
+// readyHandler is the readiness probe: it fails while the data directories are
+// unreachable or the disk is nearly full, so an orchestrator stops sending
+// traffic instead of serving 500s.
+func readyHandler(w http.ResponseWriter, r *http.Request) {
+	if !isReadMethod(r) {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	type check struct {
 		OK      bool   `json:"ok"`
 		Message string `json:"message,omitempty"`
@@ -245,4 +288,11 @@ func getDiskFreeGB(path string) (float64, error) {
 	}
 	freeBytes := stat.Bavail * uint64(stat.Bsize)
 	return float64(freeBytes) / (1024 * 1024 * 1024), nil
+}
+
+// isReadMethod reports whether a request only reads (GET or HEAD). Probes and
+// static answers reject everything else with 405 instead of doing work for a
+// method they do not implement.
+func isReadMethod(r *http.Request) bool {
+	return r.Method == http.MethodGet || r.Method == http.MethodHead
 }
