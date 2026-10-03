@@ -77,8 +77,8 @@ sub('<html lang="ru" data-theme="light">',
     '<html lang="ru" data-theme="light" data-palette="indigo">')
 sub('<link rel="stylesheet" href="final.css">',
     '''<link rel="stylesheet" href="final.css">
-<link rel="stylesheet" href="palettes.css">
-<link rel="stylesheet" href="final2.css">''')
+<link rel="stylesheet" href="palettes.css?v=2">
+<link rel="stylesheet" href="final2.css?v=2">''')
 sub('<title>Lanpaper — финальный вариант (A + C + D)</title>',
     '<title>Lanpaper — финальная версия (компактная, любые медиа, 4 палитры)</title>')
 
@@ -116,10 +116,11 @@ ICONS = {
 }
 def ic(name, w=1.8, size=None):
     style = f' style="width:{size}px;height:{size}px"' if size else ''
+    cls = ' class="btn__caret"' if name == 'caret' else ''
     if name == 'dots':
         return ('<svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"'
                 f'{style}>{ICONS[name]}</svg>')
-    return (f'<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+    return (f'<svg aria-hidden="true"{cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" '
             f'stroke-width="{w}" stroke-linecap="round" stroke-linejoin="round"{style}>{ICONS[name]}</svg>')
 
 
