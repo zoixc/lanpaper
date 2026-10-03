@@ -461,7 +461,9 @@ func TestAppPublicAliasesCORSEmbedAndStats(t *testing.T) {
 		}
 	}
 	// Reserved names and non-media extensions keep resolving exactly as before.
-	for _, path := range []string{"/manifest.json", "/favicon.ico", "/robots.txt", "/sitemap.xml", "/photo.txt", "/photo/other", "/api/nope", "/static/photo.png"} {
+	// /robots.txt is the single exception: no link can ever claim that name, so
+	// it answers the crawler policy instead of a 404 (see production_test.go).
+	for _, path := range []string{"/manifest.json", "/favicon.ico", "/sitemap.xml", "/photo.txt", "/photo/other", "/api/nope", "/static/photo.png"} {
 		a.expect(http.StatusNotFound, "GET", path, nil, false, nil)
 	}
 	// An alias cannot bypass the access level of the link it resolves to.

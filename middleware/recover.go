@@ -3,6 +3,7 @@
 package middleware
 
 import (
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -28,6 +29,14 @@ func Recover(next http.Handler) http.Handler {
 			p := recover()
 			if p == nil {
 				return
+			}
+			// http.ErrAbortHandler is the documented way to abandon a response
+			// (a client that vanished mid-download, bytes that no longer match
+			// the header already sent). It belongs to net/http, which suppresses
+			// the log entry and closes the connection instead of inventing a
+			// response, so it is re-raised untouched.
+			if err, ok := p.(error); ok && errors.Is(err, http.ErrAbortHandler) {
+				panic(p)
 			}
 			// Only the path is logged: on token links the query string carries
 			// the secret, and a panic log must not become a token dump.

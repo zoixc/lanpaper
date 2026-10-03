@@ -38,6 +38,32 @@ func TestRecoverAnswersAClean500(t *testing.T) {
 	}
 }
 
+func TestRecoverLetsErrAbortHandlerThrough(t *testing.T) {
+	// Aborting a response is not a bug: net/http must see the sentinel so it
+	// closes the connection quietly instead of answering 500 for a request
+	// whose response was deliberately abandoned.
+	h := Recover(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("half a body"))
+		panic(http.ErrAbortHandler)
+	}))
+
+	rec := httptest.NewRecorder()
+	defer func() {
+		p := recover()
+		if p == nil {
+			t.Fatal("http.ErrAbortHandler was swallowed")
+		}
+		if err, ok := p.(error); !ok || !errors.Is(err, http.ErrAbortHandler) {
+			t.Fatalf("re-raised %v (%T), want http.ErrAbortHandler", p, p)
+		}
+		if rec.Code != http.StatusOK {
+			t.Fatalf("the recovery answered %d for an aborted response", rec.Code)
+		}
+	}()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/photo", nil))
+	t.Fatal("the handler did not panic")
+}
+
 func TestRecoverLeavesAStartedResponseAlone(t *testing.T) {
 	h := Recover(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
