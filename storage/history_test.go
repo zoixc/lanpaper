@@ -227,7 +227,9 @@ func TestTrimHistoryBudgetDropsOldestFirst(t *testing.T) {
 		t.Fatal("a budget that is not exceeded trimmed anyway")
 	}
 
-	TrimHistoryBudget(3) // one version has to go
+	// One version over the budget (8 MiB archived, 6 MiB allowed): the oldest
+	// archive of the link that archived first goes, and nothing else.
+	TrimHistoryBudget(3 * versionMB)
 	if history := mustGet(t, "b").History; len(history) != 1 || history[0].Version != 2 {
 		t.Fatalf("the oldest version was not dropped first: %+v", history)
 	}
@@ -238,22 +240,24 @@ func TestTrimHistoryBudgetDropsOldestFirst(t *testing.T) {
 		t.Fatalf("archive counter = %d after the first trim", HistoryBytesTotal())
 	}
 
-	// The budget is shared by every link, so trimming continues across them.
-	TrimHistoryBudget(2 * versionMB)
-	if len(mustGet(t, "b").History) != 0 {
-		t.Fatalf("link b kept versions: %+v", mustGet(t, "b").History)
+	// The budget is shared by every link, so trimming continues across them:
+	// 6 MiB -> b.v2 (4 MiB) -> a.v1 (2 MiB), which is what a 2 MiB budget allows.
+	TrimHistoryBudget(versionMB)
+	if history := mustGet(t, "b").History; len(history) != 0 {
+		t.Fatalf("link b kept versions: %+v", history)
 	}
-	if len(mustGet(t, "a").History) != 2 {
-		t.Fatalf("link a was trimmed although it was newer: %+v", mustGet(t, "a").History)
+	if history := mustGet(t, "a").History; len(history) != 1 || history[0].Version != 2 {
+		t.Fatalf("link a kept the wrong versions: %+v", history)
 	}
-	if HistoryBytesTotal() != 2*version {
+	if HistoryBytesTotal() != version {
 		t.Fatalf("archive counter = %d after the second trim", HistoryBytesTotal())
 	}
 
-	// A missed delta self-heals: the pass recomputes the total before deciding.
+	// A missed delta self-heals: the pass recomputes the total before deciding,
+	// so an inflated counter is corrected instead of trimming good versions.
 	NoteHistoryBytes(1 << 30)
 	TrimHistoryBudget(64)
-	if HistoryBytesTotal() != 2*version {
+	if HistoryBytesTotal() != version {
 		t.Fatalf("the counter did not self-heal: %d", HistoryBytesTotal())
 	}
 }

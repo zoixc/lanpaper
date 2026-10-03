@@ -52,7 +52,9 @@ jobs:
           # the review sandbox, so failure excerpts are re-emitted as a few
           # annotations (GitHub caps them at 10 per run).
           go test -race -count=1 ./... > /tmp/gotest.log 2>&1 || true
-          awk '/^(--- FAIL|WARNING: DATA RACE|panic:)/{c=28} c&&c--' /tmp/gotest.log > /tmp/fail.log || true
+          grep -E '^(ok|FAIL|---|WARNING)' /tmp/gotest.log > /tmp/fail.log || true
+          echo '---- context ----' >> /tmp/fail.log
+          awk '/^(--- FAIL|WARNING: DATA RACE|panic:)/{c=28} c&&c--' /tmp/gotest.log >> /tmp/fail.log || true
           split -l 90 /tmp/fail.log /tmp/failpart. || true
           for f in /tmp/failpart.*; do
             [ -e "$f" ] || continue
