@@ -1,0 +1,173 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: MIT -->
+<html lang="ru" data-theme="light" data-palette="indigo">
+<head>
+<meta charset="utf-8">
+<title>Lanpaper — палитры</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="../../static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="shared.css">
+<link rel="stylesheet" href="variant-a.css">
+<link rel="stylesheet" href="palettes.css">
+<style>
+/* Страница-обзор: показывает четыре палитры рядом, светлую и тёмную.
+   Токены каждой палитры включаются атрибутом data-palette на колонке. */
+.wrap { max-width: 1180px; }
+.pal-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-4); }
+@media (max-width: 900px) { .pal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .pal-grid { grid-template-columns: 1fr; } }
+
+.pal-card {
+    display: flex; flex-direction: column; gap: var(--s-3);
+    padding: var(--s-4);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    color: var(--text);
+}
+.pal-card__head { display: flex; align-items: center; gap: var(--s-2); }
+.pal-card__dot { width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.14); }
+.pal-card__name { font-family: var(--font-display); font-weight: var(--fw-bold); font-size: var(--t-md); }
+.pal-card__hint { font-size: var(--t-xs); color: var(--text-3); }
+.pal-card__row { display: flex; gap: 6px; }
+.pal-swatch { flex: 1; height: 34px; border-radius: var(--r-sm); box-shadow: inset 0 0 0 1px var(--border); }
+.pal-sample {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--s-2);
+    padding: 9px 11px; border-radius: var(--r-sm);
+    font-size: var(--t-xs);
+}
+.pal-sample--accent { background: var(--accent); color: var(--text-on-accent); font-weight: var(--fw-semibold); }
+.pal-sample--soft { background: var(--accent-soft); color: var(--accent-text); font-weight: var(--fw-semibold); }
+.pal-sample--surface { background: var(--surface); color: var(--text-2); border: 1px solid var(--border); }
+.pal-sample--surface2 { background: var(--surface-2); color: var(--text-2); }
+.pal-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.pal-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pal-ratio { font-size: var(--t-2xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.pal-preview { display: flex; gap: 6px; align-items: center; }
+.pal-preview__shot {
+    position: relative; width: 72px; aspect-ratio: 16 / 9; border-radius: var(--r-sm);
+    background: var(--matte-bg); overflow: hidden; box-shadow: inset 0 0 0 1px var(--border);
+}
+.pal-preview__shot i {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 34%; height: 62%; border-radius: 3px; background: var(--accent);
+}
+.pal-preview__shot b {
+    position: absolute; left: 5px; bottom: 5px;
+    padding: 1px 5px; border-radius: 4px;
+    font-size: 9px; font-weight: var(--fw-bold); color: #fff; background: rgba(14,16,22,.62);
+}
+.pal-theme-row { margin-top: var(--s-8); }
+.pal-theme-row__title { display: flex; align-items: center; gap: var(--s-3); margin: 0 0 var(--s-3); }
+.pal-theme-row__title h2 { margin: 0; font-size: var(--t-lg); }
+.note { margin-top: var(--s-6); }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="topbar__inner">
+      <a class="brand" href="index.html"><span class="brand__mark" aria-hidden="true"></span><span class="brand__name">Lanpaper</span></a>
+      <span class="topbar__spacer"></span>
+      <a class="btn btn--secondary btn--sm" href="final2.html">Финальная версия</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+  <header class="page-head">
+    <div>
+      <h1 class="page-head__title">Четыре палитры приложения</h1>
+      <p class="page-head__sub">Одна и та же сетка, одни и те же токены — меняется только цвет. В финальной версии палитра переключается в сайдбаре кнопками «Цвет» и запоминается в браузере.</p>
+    </div>
+    <div class="page-head__actions">
+      <a class="btn btn--secondary btn--sm" href="final2.html">Открыть финальную версию</a>
+      <a class="btn btn--ghost btn--sm" href="index.html">Все варианты</a>
+    </div>
+  </header>
+
+  <section class="pal-theme-row">
+    <div class="pal-theme-row__title"><h2>Светлая тема</h2><span class="hint">значения по умолчанию</span></div>
+    <div class="pal-grid" id="palLight"></div>
+  </section>
+
+  <section class="pal-theme-row">
+    <div class="pal-theme-row__title"><h2>Тёмная тема</h2><span class="hint">те же акценты, светлее и мягче</span></div>
+    <div class="pal-grid" id="palDark"></div>
+  </section>
+
+  <p class="note hint">Все пары «белый на акценте», «акцентный текст на мягкой подложке», «основной текст на фоне» проверены по WCAG AA (минимум 4.5:1). Значения подписаны под каждой колонкой. Цвет — единственное, что меняется: размеры, отступы, сетка и поведение остаются общими.</p>
+
+  <footer style="margin-top:var(--s-8);display:flex;justify-content:center">
+    <span class="hint">Lanpaper 0.12.0 · локальный сервер · <a href="index.html" style="color:var(--text-2)">все варианты дизайна</a></span>
+  </footer>
+  </main>
+</div>
+
+<script>
+(() => {
+  const PALETTES = [
+    { id: 'indigo',   name: 'Индиго',      hint: 'спокойный синий, как сейчас', dot: '#4F5AD6',
+      white: '5.58', text: '6.37', body: '15.43', second: '5.72', dark: '6.00' },
+    { id: 'terra',    name: 'Терракота',   hint: 'тёплая: бумага и глина', dot: '#B4552F',
+      white: '4.91', text: '5.80', body: '15.42', second: '6.16', dark: '7.70' },
+    { id: 'sage',     name: 'Шалфей',      hint: 'зелёная, натуральная', dot: '#2E7D6B',
+      white: '4.93', text: '6.24', body: '15.02', second: '5.34', dark: '8.79' },
+    { id: 'graphite', name: 'Графит',      hint: 'нейтральная, строгая', dot: '#46505F',
+      white: '8.16', text: '8.67', body: '15.60', second: '5.52', dark: '8.82' },
+  ];
+
+  function card(p) {
+    const el = document.createElement('article');
+    el.className = 'pal-card';
+    el.dataset.palette = p.id;
+    el.innerHTML = `
+      <div class="pal-card__head">
+        <span class="pal-card__dot" style="background:${p.dot}"></span>
+        <span class="pal-card__name">${p.name}</span>
+      </div>
+      <p class="pal-card__hint">${p.hint}</p>
+      <div class="pal-card__row" aria-hidden="true">
+        <span class="pal-swatch" style="background:var(--bg)"></span>
+        <span class="pal-swatch" style="background:var(--surface)"></span>
+        <span class="pal-swatch" style="background:var(--surface-2)"></span>
+        <span class="pal-swatch" style="background:var(--accent-soft)"></span>
+        <span class="pal-swatch" style="background:var(--accent)"></span>
+      </div>
+      <div class="pal-sample pal-sample--accent"><span>Акцентная кнопка</span><span aria-hidden="true">→</span></div>
+      <div class="pal-sample pal-sample--soft"><span>Пульт ссылки</span><span aria-hidden="true">⇄</span></div>
+      <div class="pal-sample pal-sample--surface">Основной текст <span class="pal-ratio">${p.body}:1</span></div>
+      <div class="pal-sample pal-sample--surface2">Второстепенный <span class="pal-ratio">${p.second}:1</span></div>
+      <div class="pal-btns">
+        <span class="btn btn--primary btn--sm">Изменить</span>
+        <span class="btn btn--secondary btn--sm">Открыть</span>
+        <span class="btn btn--soft btn--sm">Пульт</span>
+      </div>
+      <div class="pal-chips">
+        <span class="chip" aria-pressed="true">Все <span class="chip__count">13</span></span>
+        <span class="chip" aria-pressed="false">Видео <span class="chip__count">3</span></span>
+      </div>
+      <div class="pal-preview">
+        <span class="pal-preview__shot"><i></i><b>9:16</b></span>
+        <span class="pal-card__hint">Превью с «матованием»:<br>фон — из палитры</span>
+      </div>
+      <p class="pal-ratio">Белый на акценте ${p.white}:1 · акцентный текст на мягком ${p.text}:1 · акцент на тёмном фоне ${p.dark}:1</p>
+    `;
+    return el;
+  }
+
+  const light = document.getElementById('palLight');
+  const dark = document.getElementById('palDark');
+  PALETTES.forEach((p) => {
+    light.appendChild(card(p));
+    const d = card(p);
+    d.dataset.theme = 'dark';
+    d.dataset.palette = p.id;
+    dark.appendChild(d);
+  });
+})();
+</script>
+</body>
+</html>

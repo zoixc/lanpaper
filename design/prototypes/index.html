@@ -1,0 +1,211 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: MIT -->
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="utf-8">
+<title>Lanpaper — варианты редизайна</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="../../static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="shared.css">
+<style>
+  .hero { padding: var(--s-7) 0 var(--s-5); }
+  .hero h1 { margin: 0 0 8px; font-size: 2rem; font-weight: var(--fw-bold); letter-spacing: -0.035em; }
+  .hero p { margin: 0; max-width: 62ch; color: var(--text-2); }
+  .grid3 { display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  .vcard {
+    display: flex; flex-direction: column; gap: var(--s-3);
+    padding: var(--s-5); text-decoration: none; color: inherit;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+    box-shadow: var(--shadow-xs);
+    transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease);
+  }
+  .vcard:hover { border-color: var(--border-2); box-shadow: var(--shadow-md); transform: translateY(-2px); }
+  .vcard__tag {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: var(--r-sm);
+    font-weight: var(--fw-bold); font-size: var(--t-md); color: #fff;
+    background: var(--accent);
+  }
+  .vcard h2 { margin: 0; font-size: var(--t-lg); font-weight: var(--fw-bold); letter-spacing: -0.02em; }
+  .vcard p { margin: 0; font-size: var(--t-sm); color: var(--text-2); }
+  .vcard ul { margin: 0; padding-left: 18px; font-size: var(--t-sm); color: var(--text-2); }
+  .vcard li { margin-bottom: 3px; }
+  .vcard__foot { margin-top: auto; padding-top: var(--s-3); display: flex; align-items: center; gap: 8px; font-size: var(--t-sm); font-weight: var(--fw-semibold); color: var(--accent-text); }
+  .swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+  .sw { width: 56px; }
+  .sw i { display: block; height: 40px; border-radius: var(--r-sm); border: 1px solid var(--border); }
+  .sw span { display: block; margin-top: 4px; font-size: 10px; color: var(--text-3); text-align: center; }
+  .vcard--final {
+    grid-column: 1 / -1;
+    border-color: var(--accent);
+    background: linear-gradient(180deg, var(--accent-soft) 0%, var(--surface) 42%);
+    box-shadow: var(--shadow-sm);
+  }
+  .vcard--final h2 { font-size: var(--t-xl); }
+  .vcard--final ul { columns: 2; column-gap: var(--s-6); }
+  @media (max-width: 640px) { .vcard--final ul { columns: 1; } }
+  .note { margin-top: var(--s-6); padding: var(--s-4); background: var(--surface-2); border-radius: var(--r-md); font-size: var(--t-sm); color: var(--text-2); }
+  .note b { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="topbar__inner">
+      <a class="brand" href="../../admin.html"><span class="brand__mark" aria-hidden="true"></span><span class="brand__name">Lanpaper</span></a>
+      <span class="topbar__spacer"></span>
+      <button class="iconbtn" data-theme-toggle aria-pressed="false" aria-label="Тёмная тема">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="hero">
+      <h1>Редизайн админ-панели</h1>
+      <p>Финалист — синтез A + C + D; его компактная версия с видимым пультом, превью для любых медиа и четырьмя палитрами стоит первой. Ниже — четыре исходных направления на общей дизайн-системе. Все сохраняют функциональность 0.12.0 целиком: стабильные ссылки, версии, плейлисты, ротация, уровни доступа, publish keys. Переключатель темы — справа сверху (или клавиша <b>T</b>).</p>
+    </div>
+
+
+    <a class="vcard vcard--final" href="final2.html">
+      <span class="vcard__tag" style="background:var(--brand-gradient)">★</span>
+      <div>
+        <h2 style="display:inline-block;margin-right:8px">Финалист — компактный, с палитрами</h2>
+        <span class="badge badge--accent" style="vertical-align:middle">рекомендую начать отсюда</span>
+      </div>
+      <p>Тот же синтез A + C + D, но плотнее и с ответами на замечания: плитка 4–5 в ряд, видимый «Пульт» в каждой карточке, превью под размер плитки и четыре палитры.</p>
+      <ul>
+        <li>Футер карточки: <b>Изменить ▾ · Пульт · ⋯</b> — пульт видно без наведения</li>
+        <li>Превью 16:9 для вертикалей, панорам, квадратов, иконок с альфой и видео</li>
+        <li>Палитры: Индиго, Терракота, Шалфей, Графит — переключатель в сайдбаре</li>
+        <li>Плитка 4–5 в ряд на десктопе: сайдбар 228 px, трек от 236 px, панель 430 px</li>
+        <li>Превью вписывается по ширине плитки и ограничено высотой кадра 16:9</li>
+        <li>Кнопок поверх превью нет — все действия в постоянном футере карточки</li>
+        <li>Мобильная сетка: 2 колонки на телефоне, фильтры липнут под шапкой</li>
+      </ul>
+      <span class="vcard__foot">Открыть финалиста →</span>
+    </a>
+
+    <div class="grid3">
+      <a class="vcard" href="palettes.html">
+        <span class="vcard__tag" style="background:var(--accent)">◐</span>
+        <h2>Палитры</h2>
+        <p>Четыре палитры рядом, светлая и тёмная: образцы токенов, кнопок, чипов и превью плюс значения контраста по WCAG AA.</p>
+        <ul>
+          <li>Индиго, Терракота, Шалфей, Графит</li>
+          <li>Каждая пара ≥ 4.5:1 — можно выбирать по вкусу</li>
+          <li>Переключается в самой финальной версии</li>
+        </ul>
+        <span class="vcard__foot">Сравнить палитры →</span>
+      </a>
+
+      <a class="vcard" href="final.html">
+        <span class="vcard__tag">★</span>
+        <h2>Финалист, версия 1</h2>
+        <p>Принятый синтез A + C + D без правок: просторнее, пульт спрятан в меню ⋯, превью без правил для разных медиа.</p>
+        <ul>
+          <li>Оставлен для сравнения «до/после»</li>
+          <li>Сайдбар 248 px, карточка от 268 px</li>
+        </ul>
+        <span class="vcard__foot">Открыть версию 1 →</span>
+      </a>
+
+      <a class="vcard" href="../04-final.md">
+        <span class="vcard__tag">⚑</span>
+        <h2>Что изменилось</h2>
+        <p>Разбор правок: точки входа в пульт, таблица компактности, правила превью по типам медиа и таблица контраста палитр.</p>
+        <ul>
+          <li>Разбор по трём замечаниям</li>
+          <li>Что проверено автотестами стенда</li>
+        </ul>
+        <span class="vcard__foot">Читать разбор →</span>
+      </a>
+    </div>
+
+    <div class="grid3">
+      <a class="vcard" href="a-library.html">
+        <span class="vcard__tag">A</span>
+        <h2>Библиотека</h2>
+        <p>Контент в центре, хром тихий. Крупные превью, действия появляются по мере надобности.</p>
+        <ul>
+          <li>Сетка или список — на выбор</li>
+          <li>Действия карточки: покой → наведение → меню ⋯</li>
+          <li>Детали, версии, плейлист и статистика — в панели справа</li>
+          <li>Массовые операции по чекбоксам</li>
+        </ul>
+        <span class="vcard__foot">Открыть вариант A →</span>
+      </a>
+
+      <a class="vcard" href="b-streams.html">
+        <span class="vcard__tag">B</span>
+        <h2>Потоки</h2>
+        <p>Плотный рабочий список для больших библиотек. Много ссылок — один экран.</p>
+        <ul>
+          <li>Таблица с сортируемыми колонками</li>
+          <li>Боковая навигация как в приложении</li>
+          <li>Редактирование доступа прямо в строке</li>
+          <li>Массовые действия в шапке списка</li>
+        </ul>
+        <span class="vcard__foot">Открыть вариант B →</span>
+      </a>
+
+      <a class="vcard" href="c-console.html">
+        <span class="vcard__tag">C</span>
+        <h2>Пульт</h2>
+        <p>Наблюдение за экранами: что сейчас показывается, жива ли ссылка, сколько показов.</p>
+        <ul>
+          <li>Статус-индикатор и прогресс ротации</li>
+          <li>Панель деталей всегда открыта на десктопе</li>
+          <li>Быстрые переключатели доступа и ротации</li>
+          <li>Мобильный: список + шторка деталей</li>
+        </ul>
+        <span class="vcard__foot">Открыть вариант C →</span>
+      </a>
+
+      <a class="vcard" href="d-sections.html">
+        <span class="vcard__tag" style="background:var(--brand-gradient)">D</span>
+        <h2>Разделы <span class="badge badge--accent" style="vertical-align:middle">доработанный «вариант 2»</span></h2>
+        <p>Ваш второй макет, доведённый до рабочего состояния: та же раскладка, но без двусмысленностей.</p>
+        <ul>
+          <li>Сайдбар только для разделов, действия — отдельной группой</li>
+          <li>У фильтра есть число активных условий, а сами условия видно и можно снять</li>
+          <li>«Заменить» и «⋯» открывают версии, плейлист и доступ</li>
+          <li>На телефоне сайдбар — выдвижная панель, в сетке две карточки</li>
+        </ul>
+        <span class="vcard__foot">Открыть вариант D →</span>
+      </a>
+    </div>
+
+    <h2 style="margin:var(--s-7) 0 var(--s-3);font-size:var(--t-lg);font-weight:var(--fw-bold);letter-spacing:-0.02em">Исходные направления</h2>
+
+    <div class="note">
+      <p style="margin:0 0 12px"><b>A vs D.</b> Оба варианта про одно и то же — «ссылки как галерея».
+      A — авторский подход: минимум хрома, действия появляются по наведению.
+      D — ваш второй макет: постоянный сайдбар с разделами и карточка с бейджем доступа.
+      Разница в том, насколько явно интерфейс показывает свои возможности: D заметнее для новичка, A спокойнее для ежедневной работы.</p>
+      <p style="margin:0 0 12px"><b>Палитра</b> — «тёплая бумага» вместо насыщенного заката. Цвет в интерфейсе отдан контенту; акцент используется точечно — одно главное действие, фокус, выбранное состояние. Все пары прошли проверку контраста WCAG AA.</p>
+      <div class="swatches">
+        <span class="sw"><i style="background:#F6F6F8"></i><span>фон</span></span>
+        <span class="sw"><i style="background:#FFFFFF"></i><span>карточка</span></span>
+        <span class="sw"><i style="background:#E6E7EC"></i><span>линия</span></span>
+        <span class="sw"><i style="background:#4F5AD6"></i><span>акцент</span></span>
+        <span class="sw"><i style="background:#EEF0FE"></i><span>подсветка</span></span>
+        <span class="sw"><i style="background:#2E8F63"></i><span>успех</span></span>
+        <span class="sw"><i style="background:#B07514"></i><span>внимание</span></span>
+        <span class="sw"><i style="background:#C9483F"></i><span>опасность</span></span>
+        <span class="sw"><i style="background:#1C1E24"></i><span>текст</span></span>
+        <span class="sw"><i style="background:linear-gradient(135deg,#6C5CE7,#B95AC9,#F08A5D)"></i><span>бренд</span></span>
+      </div>
+    </div>
+
+    <footer style="margin-top:var(--s-6);display:flex;justify-content:center">
+      <span class="hint">Прототипы · кликабельны · адаптив от 360&nbsp;px · светлая и тёмная темы</span>
+    </footer>
+  </main>
+</div>
+<div class="toasts"></div>
+<script src="proto.js"></script>
+</body>
+</html>

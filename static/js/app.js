@@ -11,7 +11,8 @@ const STATE = {
     translations: {},
     lang: localStorage.getItem('lang') || navigator.language.slice(0, 2) || 'en',
     isDark: false,
-    viewMode: localStorage.getItem('viewMode') || 'list',
+    // Tiles are the default view: the card is designed as a tile.
+    viewMode: localStorage.getItem('viewMode') || 'grid',
     searchQuery: '',
     sortBy: 'date_desc',
     wallpapers: [],
@@ -127,6 +128,13 @@ window.closeAllDropdowns = function(exceptElement) {
             if (btn) btn.setAttribute('aria-expanded', 'false');
         }
     });
+    document.querySelectorAll('.more-dropdown.open').forEach(dropdown => {
+        if (dropdown !== exceptElement) {
+            dropdown.classList.remove('open');
+            const btn = dropdown.querySelector('.more-toggle-btn');
+            if (btn) btn.setAttribute('aria-expanded', 'false');
+        }
+    });
     document.querySelectorAll('.custom-select.open').forEach(select => {
         if (select !== exceptElement) {
             select.classList.remove('open');
@@ -142,7 +150,7 @@ window.closeAllDropdowns = function(exceptElement) {
 // clicks never reach this; menu item clicks close their own menu.
 function initDropdownCloser() {
     document.addEventListener('click', (e) => {
-        if (e.target.closest('.upload-dropdown, .custom-select, .settings-dropdown')) return;
+        if (e.target.closest('.upload-dropdown, .more-dropdown, .custom-select, .settings-dropdown')) return;
         closeAllDropdowns();
     });
 }
@@ -333,7 +341,7 @@ function initKeyboardShortcuts() {
                 closeModal();
             } else if (DOM.versionsOverlay && !DOM.versionsOverlay.classList.contains('hidden')) {
                 closeVersions();
-            } else if (document.querySelector('.upload-dropdown.open, .custom-select.open, .settings-dropdown.open')) {
+            } else if (document.querySelector('.upload-dropdown.open, .more-dropdown.open, .custom-select.open, .settings-dropdown.open')) {
                 closeAllDropdowns();
             } else if (DOM.searchInput.value) {
                 DOM.searchInput.value = '';
@@ -517,6 +525,7 @@ async function setLanguage(lang) {
     syncCustomSelectLabels();
     updateSearchStats();
     updateAriaLabels();
+    refreshCardsLanguage();
 
     document.querySelectorAll('.lang-option').forEach(opt => {
         opt.classList.toggle('active', opt.dataset.lang === lang);
@@ -533,6 +542,10 @@ function applyTranslations(root = document) {
         const key = el.dataset.i18nPlaceholder;
         if (STATE.translations[key]) el.placeholder = STATE.translations[key];
     });
+    root.querySelectorAll('[data-i18n-title]').forEach(el => {
+        const key = el.dataset.i18nTitle;
+        if (STATE.translations[key]) el.title = STATE.translations[key];
+    });
 }
 
 
@@ -540,11 +553,33 @@ function t(key, defaultText) {
     return STATE.translations[key] || defaultText;
 }
 
+// The settings menu builds the palette switcher before translations land.
+window.t = t;
+
 
 function updateAriaLabels() {
     document.querySelectorAll('[data-i18n-aria]').forEach(el => {
         const key = el.dataset.i18nAria;
         if (STATE.translations[key]) el.setAttribute('aria-label', STATE.translations[key]);
+    });
+}
+
+
+// Language-independent pieces of a card are rebuilt at render time; this pass
+// refreshes the ones a language switch would otherwise leave in the old
+// language: the meta line, the access row built by setupAccessControl() and
+// the alt text of the preview.
+function refreshCardsLanguage() {
+    const list = DOM.linksList;
+    if (!list) return;
+    list.querySelectorAll('.link-card').forEach(card => {
+        if (card._link) {
+            updateCard(card, card._link);
+            setupPinButton(card, card._link);
+        }
+        card.querySelectorAll('img.preview').forEach(img => {
+            img.alt = t('alt_preview', 'Preview');
+        });
     });
 }
 
@@ -628,21 +663,64 @@ function initCustomSelect() {
     });
 
     options.forEach(opt => {
-        opt.addEventListener('click', () => {
-            const val = opt.dataset.value;
-            options.forEach(o => o.classList.remove('selected'));
-            opt.classList.add('selected');
-            if (label) label.textContent = opt.textContent;
-            customSelect.classList.remove('open');
-            btn.setAttribute('aria-expanded', 'false');
-            if (DOM.sortSelect) DOM.sortSelect.value = val;
-            STATE.sortBy = val;
-            localStorage.setItem('sortBy', val);
-            filterAndSort();
+        opt.addEventListener('click', () => selectOption(opt));
+        // Keyboard: the list is a listbox, so the arrow keys must move
+        // through it and Enter must pick — buttons alone are not enough.
+        opt.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                selectOption(opt);
+                btn.focus();
+                return;
+            }
+            if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+            e.preventDefault();
+            const list = Array.from(options);
+            const index = list.indexOf(opt);
+            const next = list[(index + (e.key === 'ArrowDown' ? 1 : list.length - 1)) % list.length];
+            if (next) next.focus();
         });
+        opt.addEventListener('focus', () => {
+            options.forEach(o => o.classList.toggle('focused', o === opt));
+        });
+        opt.addEventListener('blur', () => opt.classList.remove('focused'));
     });
+
+    // Opening the menu puts the keyboard on the selected option.
+    btn.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (!customSelect.classList.contains('open')) btn.click();
+            const current = customSelect.querySelector('.custom-select-option.selected') || options[0];
+            if (current) current.focus();
+        }
+    });
+
+    function selectOption(opt) {
+        const val = opt.dataset.value;
+        options.forEach(o => {
+            o.classList.remove('selected');
+            o.setAttribute('aria-selected', 'false');
+        });
+        opt.classList.add('selected');
+        opt.setAttribute('aria-selected', 'true');
+        if (label) label.textContent = optionLabel(opt);
+        customSelect.classList.remove('open');
+        btn.setAttribute('aria-expanded', 'false');
+        if (DOM.sortSelect) DOM.sortSelect.value = val;
+        STATE.sortBy = val;
+        localStorage.setItem('sortBy', val);
+        filterAndSort();
+    }
 }
 
+
+// Each option is an icon plus a <span data-i18n>: the label is read from the
+// span so translating or selecting an option never wipes its icon.
+function optionLabel(opt) {
+    const textEl = opt.querySelector('[data-i18n]');
+    return (textEl || opt).textContent.trim();
+}
 
 function syncCustomSelectLabels() {
     const customSelect = document.getElementById('customSortSelect');
@@ -652,11 +730,13 @@ function syncCustomSelectLabels() {
     const options = customSelect.querySelectorAll('.custom-select-option');
 
     options.forEach(opt => {
-        const i18nKey = opt.dataset.i18n;
-        if (i18nKey && STATE.translations[i18nKey]) opt.textContent = STATE.translations[i18nKey];
+        const textEl = opt.querySelector('[data-i18n]');
+        const i18nKey = textEl && textEl.dataset.i18n;
+        if (i18nKey && STATE.translations[i18nKey]) textEl.textContent = STATE.translations[i18nKey];
         const isSelected = opt.dataset.value === STATE.sortBy;
         opt.classList.toggle('selected', isSelected);
-        if (isSelected && label) label.textContent = opt.textContent;
+        opt.setAttribute('aria-selected', String(isSelected));
+        if (isSelected && label) label.textContent = optionLabel(opt);
     });
 }
 
@@ -1141,6 +1221,16 @@ async function togglePin(link) {
         }
         link.pinned = updatedLink.pinned;
 
+        // Pop the badge on the card that changed, not on every card at load.
+        const card = DOM.linksList && DOM.linksList.querySelector(`[data-link-name="${CSS.escape(link.linkName)}"]`);
+        const pinBtn = card && card.querySelector('.pin-btn');
+        if (pinBtn) {
+            pinBtn.classList.remove('bump');
+            void pinBtn.offsetWidth;
+            pinBtn.classList.add('bump');
+            pinBtn.addEventListener('animationend', () => pinBtn.classList.remove('bump'), { once: true });
+        }
+
         // Show toast
         const msgKey = updatedLink.pinned ? 'pinned' : 'unpinned';
         const msg = t(msgKey, updatedLink.pinned ? 'Pinned to top' : 'Unpinned');
@@ -1164,12 +1254,28 @@ function setupPinButton(card, link) {
     const ariaLabel = t(ariaKey, link.pinned ? 'Unpin this link' : 'Pin this link to top');
     pinBtn.setAttribute('aria-label', ariaLabel);
     pinBtn.title = ariaLabel;
+    // The badge carries the key for the current state, so a later language
+    // switch re-labels it through applyTranslations()/updateAriaLabels().
+    pinBtn.setAttribute('data-i18n-aria', ariaKey);
+    pinBtn.setAttribute('data-i18n-title', ariaKey);
 
-    pinBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        togglePin(link);
-    });
+    // Called again on every language change: bind the handler only once.
+    if (!pinBtn.dataset.bound) {
+        pinBtn.dataset.bound = '1';
+        pinBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            togglePin(link);
+        });
+    }
+
+    // The same action, worded for the menu: pin or unpin.
+    const menuPin = card.querySelector('.more-pin-btn');
+    if (menuPin) {
+        const label = menuPin.querySelector('[data-i18n]');
+        if (label) label.setAttribute('data-i18n', link.pinned ? 'menu_unpin' : 'menu_pin');
+        applyTranslations(card);
+    }
 }
 
 
@@ -1238,7 +1344,7 @@ function detectCategory(link) {
 
 const LAZY_PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"%3E%3C/svg%3E';
 
-function createLazyImage(src, alt = 'Image', className = 'preview') {
+function createLazyImage(src, alt, className = 'preview') {
     const img = document.createElement('img');
     if (STATE.lazyObserver) {
         img.dataset.src = src;
@@ -1247,9 +1353,12 @@ function createLazyImage(src, alt = 'Image', className = 'preview') {
     } else {
         img.src = src;
     }
-    img.alt = alt;
+    img.alt = alt || t('alt_image', 'Image');
     img.className = className;
     img.loading = 'lazy';
+    // Decoding off the main thread: a long grid of previews no longer
+    // blocks the first paint after a page load.
+    img.decoding = 'async';
     return img;
 }
 
@@ -1290,15 +1399,121 @@ function applyPreviewFit(container, media, format, frame) {
     if (!isImg && fit) fit = 'fit-contain'; // videos are letterboxed, never icons
     container.classList.toggle('fit-icon', fit === 'fit-icon');
     container.classList.toggle('fit-contain', fit === 'fit-contain');
+    // Checkerboard only where transparency is actually possible (a fitted
+    // PNG/WebP/GIF), never behind a photo or a video frame.
+    container.classList.toggle('has-alpha', !!fit && ALPHA_FORMATS.has(format));
     // The backdrop reuses the loaded image from the memory cache (no second
     // request). CSSOM style changes are permitted by the CSP.
     if (fit && isImg) container.style.setProperty('--thumb', cssUrl(media.currentSrc || media.src));
     else container.style.removeProperty('--thumb');
+    updateMediaBadges(container, media, format);
 }
 
 function resetPreviewFit(container) {
-    container.classList.remove('fit-icon', 'fit-contain');
+    container.classList.remove('fit-icon', 'fit-contain', 'has-alpha');
     container.style.removeProperty('--thumb');
+    hideMediaBadges(container);
+}
+
+// ------------------------------------------------------------
+// MEDIA BADGES — format, aspect ratio and duration
+// ------------------------------------------------------------
+// Read off the file that actually loaded, so a card never claims JPEG for a
+// file that turned out to be a PNG. Only cards have .preview-meta; modals
+// and the gallery share applyPreviewFit() but show no badges.
+function gcd(a, b) {
+    while (b) { const rest = a % b; a = b; b = rest; }
+    return a;
+}
+
+// Camera and phone sizes rarely reduce to a small pair (768x1376 is 24:43),
+// so the label snaps to the nearest familiar ratio first.
+const COMMON_RATIOS = [
+    [1, 1], [4, 3], [3, 2], [16, 10], [16, 9], [21, 9], [2, 1],
+    [9, 16], [3, 4], [2, 3], [10, 16], [9, 21], [1, 2],
+];
+
+function ratioLabel(width, height) {
+    if (!width || !height) return '';
+    const ratio = width / height;
+    let best = '';
+    let bestDiff = 0.02;   // 2 % off a familiar ratio
+    for (const [w, h] of COMMON_RATIOS) {
+        const diff = Math.abs(ratio - w / h) / (w / h);
+        if (diff < bestDiff) {
+            bestDiff = diff;
+            best = `${w}:${h}`;
+        }
+    }
+    if (best) return best;
+    const g = gcd(width, height) || 1;
+    const w = Math.round(width / g);
+    const h = Math.round(height / g);
+    return (w <= 64 && h <= 64) ? `${w}:${h}` : '';
+}
+
+function formatDuration(seconds) {
+    if (!isFinite(seconds) || seconds <= 0) return '';
+    const total = Math.round(seconds);
+    const minutes = Math.floor(total / 60);
+    const rest = total % 60;
+    return `${minutes}:${String(rest).padStart(2, '0')}`;
+}
+
+function mediaBadgeTargets(container) {
+    const link = container.parentElement;
+    const meta = link && link.querySelector('.preview-meta');
+    if (!meta) return null;
+    return {
+        fmt: meta.querySelector('.media-badge--fmt'),
+        ratio: meta.querySelector('.media-badge--ratio'),
+        dur: meta.querySelector('.media-badge--dur'),
+    };
+}
+
+function setBadge(el, text) {
+    if (!el) return;
+    if (text) {
+        el.textContent = text;
+        el.hidden = false;
+    } else {
+        el.textContent = '';
+        el.hidden = true;
+    }
+}
+
+function hideMediaBadges(container) {
+    const badges = mediaBadgeTargets(container);
+    if (!badges) return;
+    setBadge(badges.fmt, '');
+    setBadge(badges.ratio, '');
+    setBadge(badges.dur, '');
+}
+
+function updateMediaBadges(container, media, format) {
+    const badges = mediaBadgeTargets(container);
+    if (!badges) return;
+
+    const isImg = media.tagName === 'IMG';
+    const width = isImg ? media.naturalWidth : media.videoWidth;
+    const height = isImg ? media.naturalHeight : media.videoHeight;
+
+    // The stored MIME type is a short token ('jpeg', 'mp4'); fall back to the
+    // file extension of what was actually loaded.
+    let fmt = (format || '').toUpperCase();
+    if (!fmt) {
+        const src = media.currentSrc || media.src || '';
+        const ext = src.split('?')[0].split('.').pop();
+        fmt = /^[a-z0-9]{2,5}$/i.test(ext) ? ext.toUpperCase() : '';
+    }
+    setBadge(badges.fmt, fmt);
+
+    // The ratio only earns its place when it differs from the 16:9 frame.
+    const ratio = width && height ? width / height : 0;
+    const nearFrame = ratio && Math.abs(ratio - 16 / 9) / (16 / 9) < 0.04;
+    setBadge(badges.ratio, nearFrame ? '' : ratioLabel(width, height));
+
+    setBadge(badges.dur, isImg ? '' : formatDuration(media.duration));
 }
 
 // Card videos play only while at least a quarter of them is on screen and
@@ -1454,6 +1669,9 @@ function setupInlineRename(card, link) {
     linkIdEl.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); startEdit(); }
     });
+
+    // Same entry from the card menu (touch screens have no double-click).
+    card._startRename = startEdit;
 }
 
 
@@ -1495,8 +1713,10 @@ function setupAccessControl(card, link) {
     if (!row) {
         row = document.createElement('div');
         row.className = 'access-row';
-        const info = card.querySelector('.link-info');
-        if (info) info.appendChild(row);
+        // The tile has no room for a permanent access row: it lives in the
+        // ⋯ menu, right under the pin action.
+        const host = card.querySelector('.card-menu') || card.querySelector('.link-info');
+        if (host) host.appendChild(row);
         else return;
     }
     row.innerHTML = '';
@@ -1620,6 +1840,8 @@ function updateCopyURL(card, link) {
     const fullUrl = publicLinkURL(link);
     const previewLink = card.querySelector('.preview-link');
     if (previewLink) previewLink.href = fullUrl;
+    const menuOpen = card.querySelector('.more-open-btn');
+    if (menuOpen) menuOpen.href = fullUrl;
     card.dataset.publicUrl = fullUrl;
 }
 
@@ -1643,6 +1865,7 @@ function updateCard(card, link) {
     linkIdEl.setAttribute('aria-label', t('aria_link_id', 'Link ID'));
 
     const category = link.hasImage ? detectCategory(link) : 'other';
+    const categoryLabel = t('cat_' + category, category);
 
     let fileType;
     if (link.mimeType) {
@@ -1670,7 +1893,7 @@ function updateCard(card, link) {
     if (link.stats && link.stats.hits) {
         extras.push(t('meta_hits', '{{n}} hits').replace('{{n}}', link.stats.hits));
     }
-    linkMeta.textContent = [`${category} · ${fileType}${sizeStr} · ${dateStr}`, ...extras].join(' · ');
+    linkMeta.textContent = [`${categoryLabel} · ${fileType}${sizeStr} · ${dateStr}`, ...extras].join(' · ');
     linkMeta.setAttribute('aria-label', t('aria_file_info', 'File info'));
 
     setupAccessControl(card, link);
@@ -1730,7 +1953,7 @@ function updateCard(card, link) {
                 const imgSrc = (resolvedPreview.startsWith('/') ? resolvedPreview : '/' + resolvedPreview) + bust;
                 const img = createLazyImage(
                     imgSrc,
-                    resolvedPreview ? 'Preview' : 'Image',
+                    resolvedPreview ? t('alt_preview', 'Preview') : t('alt_image', 'Image'),
                     'preview'
                 );
                 img.classList.add('preview-top-center');
@@ -1753,33 +1976,47 @@ function updateCard(card, link) {
         }
     }
 
-    // Copy button
+    // Copy: the icon next to the name and the entry in the ⋯ menu.
     const copyBtn = card.querySelector('.copy-url-btn');
-    const newCopyBtn = copyBtn.cloneNode(true);
-    copyBtn.parentNode.replaceChild(newCopyBtn, copyBtn);
+    if (copyBtn) {
+        const newCopyBtn = copyBtn.cloneNode(true);
+        copyBtn.parentNode.replaceChild(newCopyBtn, copyBtn);
+        bindCopyButton(newCopyBtn, card, false);
+    }
+    const menuCopyBtn = card.querySelector('.more-copy-btn');
+    if (menuCopyBtn) bindCopyButton(menuCopyBtn, card, true);
+}
 
-    const copyText = newCopyBtn.querySelector('.copy-text');
+
+// The menu closes on copy, so a closing menu would hide its own "Copied!"
+// feedback — that entry reports through a toast instead.
+function bindCopyButton(btn, card, isMenuEntry) {
+    const copyText = btn.querySelector('.copy-text');
     if (copyText) copyText.textContent = t('copy_url', 'Copy URL');
 
-    let copyResetTimer = null;
+    let resetTimer = null;
 
-    newCopyBtn.onclick = (e) => {
+    btn.onclick = (e) => {
         e.preventDefault();
         // Read the URL at click time: access level changes and token
         // rotation update it after this handler was bound.
-        copyToClipboard(card.dataset.publicUrl || fullUrl).then(() => {
-            if (copyResetTimer) clearTimeout(copyResetTimer);
+        copyToClipboard(card.dataset.publicUrl || '').then(() => {
+            if (isMenuEntry) {
+                showToast(t('copied', 'Copied!'), 'success');
+                return;
+            }
+            if (resetTimer) clearTimeout(resetTimer);
 
-            newCopyBtn.classList.add('copied');
+            btn.classList.add('copied');
             if (copyText) copyText.textContent = t('copied', 'Copied!');
-            newCopyBtn.setAttribute('aria-label', t('copied', 'Copied!'));
+            btn.setAttribute('aria-label', t('copied', 'Copied!'));
 
-            copyResetTimer = setTimeout(() => {
-                newCopyBtn.classList.add('fading-out');
-                copyResetTimer = setTimeout(() => {
-                    newCopyBtn.classList.remove('copied', 'fading-out');
+            resetTimer = setTimeout(() => {
+                btn.classList.add('fading-out');
+                resetTimer = setTimeout(() => {
+                    btn.classList.remove('copied', 'fading-out');
                     if (copyText) copyText.textContent = t('copy_url', 'Copy URL');
-                    newCopyBtn.setAttribute('aria-label', t('copy_url', 'Copy URL'));
+                    btn.setAttribute('aria-label', t('copy_url', 'Copy URL'));
                 }, 300);
             }, 1500);
         }).catch(() => {
@@ -1876,6 +2113,47 @@ function setupCardEvents(card, link) {
         });
     }
 
+    // ⋯ menu: everything that is not "change the file". Secondary actions
+    // stay one click away instead of sitting on top of the preview.
+    const moreDropdown = card.querySelector('.more-dropdown');
+    const moreToggle = card.querySelector('.more-toggle-btn');
+    const closeMore = () => {
+        if (!moreDropdown) return;
+        moreDropdown.classList.remove('open');
+        if (moreToggle) moreToggle.setAttribute('aria-expanded', 'false');
+    };
+
+    if (moreDropdown && moreToggle) {
+        moreToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = moreDropdown.classList.contains('open');
+            if (!isOpen) closeAllDropdowns(moreDropdown);
+            moreDropdown.classList.toggle('open', !isOpen);
+            moreToggle.setAttribute('aria-expanded', String(!isOpen));
+        });
+
+        const menuVersions = card.querySelector('.more-versions-btn');
+        if (menuVersions) menuVersions.addEventListener('click', () => {
+            closeMore();
+            openVersions(link);
+        });
+
+        const menuOpenLink = card.querySelector('.more-open-btn');
+        if (menuOpenLink) menuOpenLink.addEventListener('click', closeMore);
+
+        const menuRename = card.querySelector('.more-rename-btn');
+        if (menuRename) menuRename.addEventListener('click', () => {
+            closeMore();
+            if (typeof card._startRename === 'function') card._startRename();
+        });
+
+        const menuPin = card.querySelector('.more-pin-btn');
+        if (menuPin) menuPin.addEventListener('click', () => {
+            closeMore();
+            togglePin(link);
+        });
+    }
+
     card.ondragover = e => { e.preventDefault(); card.classList.add('drag-over'); };
     card.ondragleave = () => card.classList.remove('drag-over');
     card.ondrop = async e => {
@@ -1885,6 +2163,7 @@ function setupCardEvents(card, link) {
     };
 
     card.querySelector('.delete-btn').onclick = async () => {
+        if (typeof closeMore === 'function') closeMore();
         const msg = t('confirm_delete_msg', 'Delete "{{name}}"? This cannot be undone.')
             .replace('{{name}}', link.linkName);
         const confirmed = await showConfirm(msg);
@@ -2229,7 +2508,11 @@ function setupGlobalListeners() {
         }
         STATE.createPending = true;
         const btn = DOM.createForm.querySelector('[type="submit"]');
-        if (btn) btn.disabled = true;
+        if (btn) {
+            btn.disabled = true;
+            btn.classList.add('is-busy');
+            btn.setAttribute('aria-busy', 'true');
+        }
         try {
             const created = await apiCall('/api/link', 'POST', { linkName: id });
             DOM.createInput.value = '';
@@ -2255,7 +2538,11 @@ function setupGlobalListeners() {
         } catch (_) {}
         finally {
             STATE.createPending = false;
-            if (btn) btn.disabled = false;
+            if (btn) {
+                btn.disabled = false;
+                btn.classList.remove('is-busy');
+                btn.removeAttribute('aria-busy');
+            }
         }
     });
 
@@ -2308,6 +2595,8 @@ function setupGlobalListeners() {
     if (regenBtn) {
         regenBtn.addEventListener('click', async () => {
             regenBtn.disabled = true;
+            regenBtn.classList.add('is-spinning');
+            regenBtn.setAttribute('aria-busy', 'true');
             const spanEl = regenBtn.querySelector('span');
             const origText = spanEl?.textContent;
             if (spanEl) spanEl.textContent = t('regen_previews_running', 'Regenerating...');
@@ -2325,6 +2614,8 @@ function setupGlobalListeners() {
             } catch (_) {}
             finally {
                 regenBtn.disabled = false;
+                regenBtn.classList.remove('is-spinning');
+                regenBtn.removeAttribute('aria-busy');
                 if (spanEl && origText) spanEl.textContent = origText;
             }
         });
@@ -2347,5 +2638,12 @@ function formatSize(bytes) {
 }
 
 function formatDate(ts) {
-    return ts ? new Date(ts * 1000).toLocaleDateString() : '—';
+    if (!ts) return '—';
+    // The date follows the interface language, not the browser locale: a
+    // German panel should read 03.10.2026 even on an English system.
+    try {
+        return new Date(ts * 1000).toLocaleDateString(STATE.lang || undefined);
+    } catch (_) {
+        return new Date(ts * 1000).toLocaleDateString();
+    }
 }

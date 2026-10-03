@@ -1,0 +1,170 @@
+/* SPDX-License-Identifier: MIT */
+/* ============================================================
+   ФИНАЛЬНЫЙ ВАРИАНТ — синтез A + C + D
+   A: контент, карточки, три слоя действий, панель деталей
+   C: состояние сервиса, прогресс ротации, сигнал «нет обращений»
+   D: сайдбар разделов на десктопе
+   ============================================================ */
+
+.fshell {
+    display: grid;
+    grid-template-columns: 248px minmax(0, 1fr);
+    min-height: 100vh;
+    min-height: 100dvh;
+}
+.fmain { min-width: 0; }
+
+/* ---------- Сайдбар разделов ---------- */
+.fside {
+    position: sticky; top: 0; align-self: start;
+    height: 100vh; height: 100dvh;
+    display: flex; flex-direction: column;
+    padding: var(--s-4) var(--s-3);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+}
+.fside__brand {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 8px var(--s-5);
+    text-decoration: none; color: inherit;
+}
+.fside__mark { width: 28px; height: 28px; border-radius: 8px; background: var(--brand-gradient); flex-shrink: 0; }
+.fside__name { font-size: var(--t-md); font-weight: var(--fw-bold); letter-spacing: -0.02em; }
+
+.fside__nav { display: flex; flex-direction: column; gap: 2px; }
+.fnav {
+    display: flex; align-items: center; gap: 10px;
+    height: 36px; padding: 0 10px;
+    font: inherit; font-size: var(--t-md); font-weight: var(--fw-medium);
+    color: var(--text-2); text-decoration: none;
+    background: transparent; border: 0; border-radius: var(--r-sm);
+    cursor: pointer; text-align: left; width: 100%;
+    transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.fnav:hover { background: var(--surface-2); color: var(--text); }
+.fnav svg { width: 17px; height: 17px; color: var(--text-3); flex-shrink: 0; }
+.fnav:hover svg { color: var(--text-2); }
+.fnav.is-active { background: var(--accent-soft); color: var(--accent-text); font-weight: var(--fw-semibold); }
+.fnav.is-active svg { color: var(--accent-text); }
+.fnav__count {
+    margin-left: auto; padding: 1px 6px; border-radius: var(--r-full);
+    font-size: var(--t-2xs); font-weight: var(--fw-semibold);
+    font-variant-numeric: tabular-nums;
+    background: var(--surface-2); color: var(--text-3);
+}
+.fnav.is-active .fnav__count { background: var(--surface); color: var(--accent-text); }
+
+.fside__minor {
+    margin-top: auto; padding-top: var(--s-4);
+    border-top: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 2px;
+}
+.fside__label {
+    padding: 0 10px 6px;
+    font-size: var(--t-2xs); font-weight: var(--fw-bold);
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3);
+}
+.fnav--minor { height: 32px; font-size: var(--t-sm); }
+.fnav--minor svg { width: 15px; height: 15px; }
+
+.fservice {
+    display: flex; align-items: center; gap: 9px;
+    margin-top: var(--s-3); padding: 11px var(--s-3);
+    background: var(--surface-2); border-radius: var(--r-md);
+}
+.fservice__info { display: flex; flex-direction: column; min-width: 0; }
+.fservice__title { font-size: var(--t-xs); font-weight: var(--fw-semibold); }
+.fservice__meta { font-size: var(--t-2xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+/* ---------- Шапка и состояние сервиса ---------- */
+/* Логотип живёт в сайдбаре — в шапке он не нужен, кроме мобильного */
+.fshell .brand { display: none; }
+.fside__toggle { display: none; }
+
+.fstatus {
+    display: flex; align-items: center; gap: 8px;
+    margin: 10px 0 0;
+    font-size: var(--t-xs); color: var(--text-2);
+}
+.fstatus__warn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 8px;
+    font-weight: var(--fw-semibold);
+    background: var(--warning-soft); color: var(--warning);
+    border-radius: var(--r-full);
+}
+.fstatus__warn svg { width: 12px; height: 12px; }
+
+/* ---------- Прогресс ротации (из варианта C) ---------- */
+.frotate {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 7px;
+}
+.frotate__track {
+    position: relative; flex: 1; height: 4px; border-radius: 2px;
+    background: var(--bg-sunken); overflow: hidden;
+}
+.frotate__fill {
+    position: absolute; inset: 0 auto 0 0;
+    border-radius: 2px; background: var(--accent);
+}
+.frotate__label {
+    font-size: var(--t-2xs); color: var(--text-2);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+
+/* ---------- Мобильный: сайдбар становится выдвижным ---------- */
+.fscrim { display: none; }
+
+@media (max-width: 1023px) {
+    .fshell { grid-template-columns: minmax(0, 1fr); }
+
+    .fside {
+        position: fixed; top: 0; left: 0; bottom: 0;
+        z-index: calc(var(--z-drawer) + 1);
+        width: 272px; height: 100dvh;
+        transform: translateX(-102%);
+        transition: transform var(--dur-slow) var(--ease);
+        box-shadow: var(--shadow-lg);
+    }
+    .fside.open { transform: none; }
+
+    .fscrim {
+        display: block; position: fixed; inset: 0;
+        z-index: var(--z-drawer);
+        background: var(--overlay);
+        opacity: 0; visibility: hidden;
+        transition: opacity var(--dur) var(--ease), visibility var(--dur);
+    }
+    .fscrim.open { opacity: 1; visibility: visible; }
+
+    .fside__toggle { display: inline-flex; }
+    .fshell .brand { display: flex; }
+
+    /* Сайдбар раскрыт поверх контента — при открытии он должен быть виден */
+    .fside__toggle { order: -1; }
+}
+
+@media (max-width: 768px) {
+    .fstatus { flex-wrap: wrap; gap: 6px; }
+    .frotate { margin-top: 6px; }
+}
+
+/* ---------- Подвал сайдбара: действия панели ---------- */
+.fside__actions {
+    display: flex; align-items: center; gap: 2px;
+    margin-top: var(--s-2);
+    padding: 4px;
+    background: var(--surface-2); border-radius: var(--r-sm);
+}
+.fside__actions .iconbtn { flex: 1; }
+.fside__actions .menu-wrap { flex: 1; }
+.fside__actions .menu-wrap .iconbtn { width: 100%; }
+
+/* ---------- Десктоп: шапка не нужна, всё в сайдбаре ---------- */
+@media (min-width: 1024px) {
+    .fshell .topbar { display: none; }
+    /* Липкая строка фильтров остаётся липкой, но уже от верха окна */
+    .fshell .filters { top: 12px; }
+    .fshell .wrap { padding-top: var(--s-6); }
+}

@@ -1,0 +1,275 @@
+/* SPDX-License-Identifier: MIT */
+/* ============================================================
+   ВАРИАНТ D — «РАЗДЕЛЫ» (доработанный «вариант 2»)
+   Берём раскладку из присланного макета: сайдбар с разделами,
+   заголовок с подзаголовком, одна строка инструментов, карточка
+   с бейджем доступа и «⋯». Доделываем то, чего в макете не было:
+   мобильное поведение, вход в версии/плейлисты/ротацию,
+   осмысленное пустое состояние, честные подписи у фильтров.
+   ============================================================ */
+
+.dshell {
+    display: grid;
+    grid-template-columns: 244px minmax(0, 1fr);
+    min-height: 100vh; min-height: 100dvh;
+}
+
+/* ---------- Сайдбар: только разделы ---------- */
+.dside {
+    position: sticky; top: 0; align-self: start;
+    height: 100vh; height: 100dvh;
+    display: flex; flex-direction: column;
+    padding: var(--s-4) var(--s-3);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+}
+.dside__brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px var(--s-5); text-decoration: none; color: inherit; }
+.dside__mark { width: 28px; height: 28px; border-radius: 8px; background: var(--brand-gradient); flex-shrink: 0; }
+.dside__name { font-size: var(--t-md); font-weight: var(--fw-bold); letter-spacing: -0.02em; }
+
+.dside__nav { display: flex; flex-direction: column; gap: 2px; }
+.dnav {
+    display: flex; align-items: center; gap: 10px;
+    height: 36px; padding: 0 10px;
+    font: inherit; font-size: var(--t-md); font-weight: var(--fw-medium);
+    color: var(--text-2); text-decoration: none;
+    background: transparent; border: 0; border-radius: var(--r-sm);
+    cursor: pointer; text-align: left; width: 100%;
+    transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.dnav:hover { background: var(--surface-2); color: var(--text); }
+.dnav svg { width: 17px; height: 17px; color: var(--text-3); flex-shrink: 0; }
+.dnav:hover svg { color: var(--text-2); }
+.dnav.is-active { background: var(--accent-soft); color: var(--accent-text); font-weight: var(--fw-semibold); }
+.dnav.is-active svg { color: var(--accent-text); }
+
+/* Второстепенные ссылки — ниже, отдельной группой */
+.dside__minor { margin-top: auto; padding-top: var(--s-4); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
+.dnav--minor { height: 32px; font-size: var(--t-sm); }
+.dnav--minor svg { width: 15px; height: 15px; }
+
+/* Карточка состояния сервиса */
+.dservice {
+    display: flex; align-items: center; gap: 9px;
+    margin-top: var(--s-3); padding: 11px var(--s-3);
+    background: var(--surface-2); border-radius: var(--r-md);
+}
+.dservice__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); flex-shrink: 0; }
+.dservice__info { flex: 1; min-width: 0; }
+.dservice__title { font-size: var(--t-xs); font-weight: var(--fw-semibold); }
+.dservice__meta { font-size: var(--t-2xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+/* ---------- Контент ---------- */
+.dmain { min-width: 0; display: flex; flex-direction: column; }
+
+.dhead {
+    display: flex; align-items: flex-start; gap: var(--s-4);
+    padding: var(--s-6) var(--s-6) var(--s-4);
+}
+.dhead__icon {
+    display: flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px; flex-shrink: 0;
+    border-radius: var(--r-md);
+    background: var(--accent-soft); color: var(--accent-text);
+}
+.dhead__icon svg { width: 20px; height: 20px; }
+.dhead__title { margin: 0; font-size: var(--t-2xl); font-weight: var(--fw-bold); letter-spacing: -0.03em; line-height: 1.2; }
+.dhead__sub { margin: 3px 0 0; font-size: var(--t-sm); color: var(--text-2); }
+.dhead__actions { margin-left: auto; display: flex; align-items: center; gap: var(--s-2); }
+
+.dcontent { padding: 0 var(--s-6) var(--s-8); }
+
+/* ---------- Строка инструментов: одна, но с подписями ---------- */
+.dtools {
+    display: flex; align-items: center; gap: var(--s-2);
+    flex-wrap: wrap;
+    padding: var(--s-2);
+    margin-bottom: var(--s-3);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-xs);
+}
+.dtools__search { flex: 1 1 240px; min-width: 180px; }
+.dtools__search .input { height: var(--h-md); }
+
+/* Кнопка фильтра с числом активных условий */
+.dfilter { position: relative; }
+.dfilter__n {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 18px; height: 18px; padding: 0 5px;
+    font-size: var(--t-2xs); font-weight: var(--fw-bold);
+    background: var(--accent); color: #fff; border-radius: var(--r-full);
+}
+
+.dtoggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: var(--h-md); padding: 0 12px;
+    font: inherit; font-size: var(--t-sm); font-weight: var(--fw-semibold);
+    color: var(--text-2); background: var(--surface-2);
+    border: 1px solid transparent; border-radius: var(--r-sm);
+    cursor: pointer; white-space: nowrap;
+}
+.dtoggle:hover { color: var(--text); background: var(--bg-sunken); }
+.dtoggle svg { width: 15px; height: 15px; }
+
+/* Активные условия — всегда видно, что включено */
+.dactive { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: var(--s-3); }
+.dactive:empty { display: none; }
+.dactive__chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 28px; padding: 0 6px 0 11px;
+    font-size: var(--t-xs); font-weight: var(--fw-medium);
+    background: var(--accent-soft); color: var(--accent-text);
+    border-radius: var(--r-full);
+}
+.dactive__chip button {
+    display: flex; align-items: center; justify-content: center;
+    width: 17px; height: 17px; padding: 0; border: 0; border-radius: 50%;
+    background: transparent; color: inherit; cursor: pointer;
+}
+.dactive__chip button:hover { background: rgba(0, 0, 0, 0.08); }
+.dactive__chip svg { width: 11px; height: 11px; }
+
+/* ---------- Сетка карточек ---------- */
+.dgrid { display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fill, minmax(272px, 1fr)); }
+.dgrid[data-view="list"] { grid-template-columns: 1fr; gap: var(--s-3); }
+
+.dcard {
+    position: relative;
+    display: flex; flex-direction: column;
+    padding: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-xs);
+    transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.dcard:hover { border-color: var(--border-2); box-shadow: var(--shadow-md); }
+.dcard.is-selected { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.dcard[hidden] { display: none; }
+
+/* Пин не висит постоянно: в покое карточка чистая */
+.dcard__pin {
+    position: absolute; top: 14px; right: 14px; z-index: 3;
+    display: flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; padding: 0;
+    background: var(--surface); color: var(--text-2);
+    border: 1px solid var(--border); border-radius: var(--r-sm);
+    box-shadow: var(--shadow-xs); cursor: pointer;
+    opacity: 0; transform: translateY(-3px);
+    transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease), color var(--dur-fast) var(--ease);
+}
+.dcard:hover .dcard__pin, .dcard:focus-within .dcard__pin, .dcard__pin.is-pinned { opacity: 1; transform: none; }
+.dcard__pin:hover { color: var(--text); border-color: var(--border-2); }
+.dcard__pin.is-pinned { color: var(--accent); border-color: transparent; background: var(--accent-soft); }
+.dcard__pin svg { width: 15px; height: 15px; }
+.dcard__pin.is-pinned svg { fill: currentColor; }
+
+.dcard__check {
+    position: absolute; top: 14px; left: 14px; z-index: 3;
+    display: none; align-items: center; justify-content: center;
+    width: 26px; height: 26px;
+    background: var(--surface); border-radius: var(--r-xs); box-shadow: var(--shadow-sm);
+}
+.dgrid.is-selecting .dcard__check { display: flex; }
+
+.dcard .shot { border-radius: var(--r-md); }
+.dcard:hover .shot__img { transform: scale(1.03); }
+
+.dcard__body { display: flex; flex-direction: column; gap: 7px; padding: 11px 8px 6px; min-width: 0; }
+.dcard__top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.dcard__name {
+    flex: 1; min-width: 0; margin: 0;
+    font-family: var(--font-display); font-size: 0.9375rem; font-weight: 500; letter-spacing: -0.01em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Копирование — по наведению, как в макете было всегда включено */
+.dcard__tools { display: flex; align-items: center; gap: 2px; opacity: 0; transition: opacity var(--dur) var(--ease); }
+.dcard:hover .dcard__tools, .dcard:focus-within .dcard__tools { opacity: 1; }
+@media (pointer: coarse) { .dcard__tools { opacity: 1; } }
+
+/* Мета с иконками */
+.dmeta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: var(--t-xs); color: var(--text-2); }
+.dmeta__i { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+.dmeta__i svg { width: 13px; height: 13px; color: var(--text-3); flex-shrink: 0; }
+
+/* Доступ — бейдж, редактируется в меню панели */
+.daccess {
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 22px; padding: 0 8px;
+    font-size: var(--t-2xs); font-weight: var(--fw-semibold);
+    border-radius: var(--r-xs);
+    background: var(--success-soft); color: var(--success);
+}
+.daccess[data-level="local"] { background: var(--info-soft); color: var(--info); }
+.daccess[data-level="token"] { background: var(--warning-soft); color: var(--warning); }
+.daccess[data-level="auth"]  { background: var(--surface-2);  color: var(--text-2); }
+.daccess svg { width: 12px; height: 12px; }
+
+.dcard__foot { display: flex; align-items: center; gap: var(--s-2); padding: 0 8px 8px; }
+.dcard__foot .btn { flex: 1; }
+
+/* Режим списка */
+.dgrid[data-view="list"] .dcard { flex-direction: row; align-items: center; gap: var(--s-4); padding: 8px 12px 8px 8px; }
+.dgrid[data-view="list"] .shot { width: 168px; flex-shrink: 0; }
+.dgrid[data-view="list"] .dcard__body { flex: 1; padding: 0; }
+.dgrid[data-view="list"] .dcard__foot { flex: 0 0 auto; padding: 0; }
+.dgrid[data-view="list"] .dcard__foot .btn { flex: 0 0 auto; }
+.dgrid[data-view="list"] .dcard__pin { top: 50%; right: 12px; transform: translateY(-50%); }
+.dgrid[data-view="list"] .dcard:hover .dcard__pin { transform: translateY(-50%); }
+@media (max-width: 560px) {
+    .dgrid[data-view="list"] .dcard { flex-direction: column; align-items: stretch; }
+    .dgrid[data-view="list"] .shot { width: 100%; }
+    .dgrid[data-view="list"] .dcard__foot { padding: 0 4px 4px; }
+}
+
+/* ---------- Панель деталей: та же, что в A ---------- */
+
+/* ---------- Мобильное: сайдбар становится выдвижной панелью ---------- */
+.dside__toggle { display: none; }
+.dscrim { display: none; }
+
+@media (max-width: 900px) {
+    .dshell { grid-template-columns: minmax(0, 1fr); }
+
+    .dside {
+        position: fixed; top: 0; left: 0; bottom: 0; z-index: calc(var(--z-drawer) + 1);
+        width: 272px; height: 100dvh;
+        border-right: 1px solid var(--border);
+        transform: translateX(-102%);
+        transition: transform var(--dur-slow) var(--ease);
+        box-shadow: var(--shadow-lg);
+    }
+    .dside.open { transform: none; }
+    .dscrim {
+        display: block; position: fixed; inset: 0; z-index: var(--z-drawer);
+        background: var(--overlay); opacity: 0; visibility: hidden;
+        transition: opacity var(--dur) var(--ease), visibility var(--dur);
+    }
+    .dscrim.open { opacity: 1; visibility: visible; }
+
+    .dside__toggle { display: inline-flex; }
+    .dhead { padding: var(--s-4) var(--s-4) var(--s-3); gap: var(--s-3); }
+    .dhead__icon { width: 34px; height: 34px; border-radius: var(--r-sm); }
+    .dhead__icon svg { width: 17px; height: 17px; }
+    .dhead__title { font-size: var(--t-xl); }
+    .dhead__actions { margin-left: auto; }
+    .dhead__actions .dhead__label { display: none; }
+    .dcontent { padding: 0 var(--s-4) var(--s-7); }
+
+    .dtools { gap: var(--s-1); padding: 6px; }
+    .dtools__search { flex: 1 1 100%; }
+    .dtools__spacer { display: none; }
+
+    .dgrid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--s-3); }
+    .dcard { padding: 6px; }
+    .dcard__body { padding: 9px 5px 4px; gap: 6px; }
+    .dcard__name { font-size: var(--t-md); }
+    .dcard__pin { opacity: 1; transform: none; top: 11px; right: 11px; width: 28px; height: 28px; }
+    .dcard__check { top: 11px; left: 11px; }
+    .dcard__foot { padding: 0 4px 4px; gap: 6px; }
+    .dmeta { gap: 8px; font-size: var(--t-2xs); }
+    /* В узкой колонке убираем дату и размер — оставляем тип и показы */
+    .dmeta__i[data-hide="sm"] { display: none; }
+}

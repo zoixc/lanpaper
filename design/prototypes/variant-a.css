@@ -1,0 +1,230 @@
+/* SPDX-License-Identifier: MIT */
+/* ============================================================
+   ВАРИАНТ A — «БИБЛИОТЕКА»
+   Контент в центре, хром тихий. Сетка крупных превью,
+   прогрессивное раскрытие действий, панель деталей справа.
+   ============================================================ */
+
+/* ---------- Заголовок страницы ---------- */
+.page-head {
+    display: flex; align-items: flex-end; gap: var(--s-4);
+    flex-wrap: wrap;
+    padding: var(--s-2) 0 var(--s-5);
+}
+.page-head__title {
+    margin: 0;
+    font-size: var(--t-2xl); font-weight: var(--fw-bold); letter-spacing: -0.03em;
+    line-height: 1.15;
+}
+.page-head__sub {
+    margin: 4px 0 0;
+    font-size: var(--t-sm); color: var(--text-2);
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.page-head__sub b { font-weight: var(--fw-semibold); color: var(--text); }
+.page-head__dot { width: 3px; height: 3px; border-radius: 50%; background: var(--border-2); }
+.page-head__actions { display: flex; align-items: center; gap: var(--s-2); margin-left: auto; }
+
+/* ---------- Липкая строка фильтров ---------- */
+.filters {
+    position: sticky; top: 60px; z-index: var(--z-sticky);
+    display: flex; align-items: center; gap: var(--s-3);
+    flex-wrap: wrap;
+    padding: var(--s-3) 0;
+    margin-bottom: var(--s-4);
+    background: linear-gradient(var(--bg) 72%, transparent);
+    transition: box-shadow var(--dur) var(--ease);
+}
+.filters.is-stuck { box-shadow: 0 12px 16px -16px rgba(20, 22, 32, 0.35); }
+.filters__search { flex: 1 1 260px; min-width: 200px; max-width: 420px; }
+.filters__right { display: flex; align-items: center; gap: var(--s-2); margin-left: auto; }
+.filters__chips { flex: 1 1 100%; order: 3; }
+@media (min-width: 1100px) {
+    .filters__chips { order: 0; flex: 0 1 auto; }
+    .filters__search { flex: 0 1 300px; }
+}
+
+/* ---------- Панель массовых действий ---------- */
+.bulkbar {
+    /* Не sticky: строка фильтров липнет на той же высоте и они бы
+       наложились друг на друга. На мобильном панель уходит вниз. */
+    position: relative; z-index: calc(var(--z-sticky) + 1);
+    display: flex; align-items: center; gap: var(--s-3);
+    flex-wrap: wrap;
+    padding: 10px var(--s-3);
+    margin-bottom: var(--s-4);
+    background: var(--surface);
+    border: 1px solid var(--accent-soft-2);
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-md);
+    animation: bulkIn var(--dur) var(--ease);
+}
+@keyframes bulkIn { from { opacity: 0; transform: translateY(-6px); } }
+.bulkbar__count { font-size: var(--t-md); font-weight: var(--fw-semibold); white-space: nowrap; }
+.bulkbar__count span { color: var(--accent-text); }
+.bulkbar__spacer { flex: 1; }
+.bulkbar__group { display: flex; align-items: center; gap: var(--s-1); }
+
+/* ---------- Сетка / список ---------- */
+.library { display: grid; gap: var(--s-5); }
+.library[data-view="grid"] { grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); }
+.library[data-view="list"] { grid-template-columns: 1fr; gap: var(--s-3); }
+
+/* ---------- Карточка ---------- */
+.link {
+    position: relative;
+    display: flex; flex-direction: column;
+    padding: 8px 8px 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-xs);
+    transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease),
+                background var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.link:hover {
+    border-color: var(--border-2);
+    box-shadow: var(--shadow-md);
+}
+.link.is-selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.link[hidden] { display: none; }
+
+/* Чекбокс выбора */
+.link__select {
+    position: absolute; top: 12px; left: 12px; z-index: 3;
+    display: none; align-items: center; justify-content: center;
+    width: 26px; height: 26px;
+    background: var(--surface); border-radius: var(--r-xs); box-shadow: var(--shadow-sm);
+}
+/* Чекбоксы появляются только в режиме выбора — и уступают им место
+   угловые бейджи превью. */
+.library.is-selecting .link__select { display: flex; }
+.library.is-selecting .link .shot__tl,
+.library.is-selecting .link .shot__bl { display: none; }
+.library.is-selecting .link__quick { display: none; }
+
+/* Превью */
+.link .shot { border-radius: var(--r-md); }
+.link:hover .shot__img { transform: scale(1.03); }
+
+/* Быстрые действия поверх превью */
+.link__quick {
+    position: absolute; z-index: 2;
+    right: 8px; bottom: 8px;
+    display: flex; gap: 6px;
+    opacity: 0; transform: translateY(4px);
+    transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.link:hover .link__quick, .link:focus-within .link__quick { opacity: 1; transform: none; }
+.link__quick .btn {
+    background: rgba(255, 255, 255, 0.94); color: #14161c;
+    border-color: transparent; box-shadow: var(--shadow-sm);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.link__quick .btn:hover { background: #fff; }
+.link__quick .btn--primary-q { background: var(--accent); color: #fff; }
+.link__quick .btn--primary-q:hover { background: var(--accent-hover); }
+
+/* Тело карточки */
+.link__body {
+    display: flex; flex-direction: column; gap: 3px;
+    padding: 11px 8px 8px;
+    min-width: 0;
+}
+.link__row { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.link__name {
+    margin: 0; min-width: 0; flex: 1;
+    font-family: var(--font-display);
+    font-size: 0.9375rem; font-weight: 500; letter-spacing: -0.01em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.link__file {
+    font-size: var(--t-xs); color: var(--text-2);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.link__meta {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    margin-top: 5px;
+    font-size: var(--t-2xs); color: var(--text-3);
+    font-variant-numeric: tabular-nums;
+}
+.link__meta i { font-style: normal; opacity: 0.55; }
+.link__views { display: inline-flex; align-items: center; gap: 3px; }
+.link__views svg { width: 11px; height: 11px; }
+.link__actions {
+    display: flex; align-items: center; gap: 2px;
+    opacity: 0; transition: opacity var(--dur) var(--ease);
+}
+.link:hover .link__actions, .link:focus-within .link__actions { opacity: 1; }
+@media (pointer: coarse) { .link__actions { opacity: 1; } }
+
+/* ---------- Режим «список» ---------- */
+.library[data-view="list"] .link {
+    flex-direction: row; align-items: center; gap: var(--s-4);
+    padding: 8px 12px 8px 8px;
+}
+.library[data-view="list"] .shot { width: 168px; flex-shrink: 0; }
+.library[data-view="list"] .link__body {
+    flex: 1; padding: 0; gap: 2px;
+}
+.library[data-view="list"] .link__meta { margin-top: 3px; }
+.library[data-view="list"] .link__quick { display: none; }
+.library[data-view="list"] .link__actions { opacity: 1; }
+.library[data-view="list"] .link__body .btn--soft { display: none; }
+@media (max-width: 560px) {
+    .library[data-view="list"] .link { flex-direction: column; align-items: stretch; }
+    .library[data-view="list"] .shot { width: 100%; }
+}
+
+/* Действие «Заменить» в теле карточки (список) */
+.link__inline { display: none; }
+.library[data-view="list"] .link__inline { display: inline-flex; }
+
+/* ---------- Панель деталей ----------
+   Внутренние компоненты панели (доступ, версии, плейлист,
+   статистика, лента) живут в shared.css — их использует и вариант C. */
+.detail-hero { border-radius: var(--r-md); overflow: hidden; margin-bottom: var(--s-4); }
+
+/* ---------- Мобильная адаптация ---------- */
+@media (max-width: 768px) {
+    .page-head { align-items: stretch; padding-bottom: var(--s-4); }
+    .page-head__title { font-size: var(--t-xl); }
+    .page-head__actions { width: 100%; margin-left: 0; }
+    .page-head__actions .btn { flex: 1; }
+
+    .filters {
+        position: static;
+        gap: var(--s-2);
+        padding: var(--s-2) 0 var(--s-3);
+        background: none;
+    }
+    .filters__search { flex: 1 1 100%; max-width: none; }
+    .filters__right { margin-left: 0; width: 100%; }
+    .filters__right .menu-wrap:first-child { flex: 1; }
+    .filters__right .menu-wrap:first-child .btn { width: 100%; justify-content: flex-start; }
+    .filters__chips {
+        flex-wrap: nowrap; overflow-x: auto;
+        margin: 0 calc(-1 * var(--s-4)); padding: 0 var(--s-4) 2px;
+        scrollbar-width: none;
+    }
+    .filters__chips::-webkit-scrollbar { display: none; }
+
+    .bulkbar { position: fixed; left: var(--s-2); right: var(--s-2); bottom: max(var(--s-2), env(safe-area-inset-bottom)); top: auto; z-index: var(--z-drawer); }
+    .bulkbar__group--wide { flex: 1; }
+    .bulkbar__group--wide .btn { flex: 1; }
+
+    .library[data-view="grid"] { grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: var(--s-3); }
+    .link { padding: 6px 6px 2px; }
+    .link__body { padding: 9px 5px 6px; }
+    .link__name { font-size: var(--t-md); }
+    .link__file { display: none; }
+    .link__quick { display: none; }
+    .link__actions { opacity: 1; }
+    .link__select { top: 10px; left: 10px; width: 28px; height: 28px; }
+    /* В узкой колонке оставляем тип, размер и показы: разрешение и дату убираем */
+    .link__meta span:nth-child(3), .link__meta i:nth-child(4),
+    .link__meta span:nth-child(7), .link__meta i:nth-child(8) { display: none; }
+}
