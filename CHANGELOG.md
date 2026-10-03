@@ -3,7 +3,7 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
-## [Unreleased]
+## [0.13.0] – 2026-10-03
 
 Redesign of the admin panel, ported from the design prototypes in `design/`.
 Everything below is presentation only: the API, the stored data and every
