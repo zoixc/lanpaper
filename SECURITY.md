@@ -240,7 +240,8 @@ from the client.
 
 ## Checks for contributors
 
-Run these before changing security-sensitive code:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the invariants a change must not
+break. Run these before changing security-sensitive code:
 
 ```sh
 gofmt -l . && go vet ./... && go test -race ./...

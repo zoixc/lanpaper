@@ -383,7 +383,11 @@ docker build -t lanpaper .
 
 CI runs the same checks on Go `oldstable` and `stable`. It then builds the
 Docker image, smoke-tests it, and publishes `linux/amd64` and `linux/arm64`
-images from `main`.
+images from `main`. Pushing a version tag runs the same gate and creates the
+GitHub release (see `.github/workflows/release.yml`).
+
+Contributing — invariants, compatibility rules and review bar:
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licensing and commercial use
 
