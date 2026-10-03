@@ -3,7 +3,7 @@
 <html lang="ru" data-theme="light" data-palette="indigo">
 <head>
 <meta charset="utf-8">
-<title>Lanpaper — финальная версия (компактная, любые медиа, 4 палитры)</title>
+<title>Lanpaper — финальная версия: компактно, с пультом и палитрами</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="../../static/favicon.svg" type="image/svg+xml">
@@ -11,8 +11,8 @@
 <link rel="stylesheet" href="shared.css">
 <link rel="stylesheet" href="variant-a.css">
 <link rel="stylesheet" href="final.css">
-<link rel="stylesheet" href="palettes.css?v=2">
-<link rel="stylesheet" href="final2.css?v=2">
+<link rel="stylesheet" href="palettes.css?v=7">
+<link rel="stylesheet" href="final2.css?v=7">
 </head>
 <body>
 <div class="fshell">
@@ -65,17 +65,19 @@
       </span>
     </div>
 
-    <!-- Палитра -->
-    <div class="palette-label">Цвет</div>
-    <div class="palette-row" role="group" aria-label="Палитра приложения">
-      <button class="palette-btn" data-palette-btn="indigo" aria-pressed="true" title="Индиго" aria-label="Палитра Индиго"><span class="palette-btn__dot"></span></button>
-      <button class="palette-btn" data-palette-btn="terra" aria-pressed="false" title="Терракота" aria-label="Палитра Терракота"><span class="palette-btn__dot"></span></button>
-      <button class="palette-btn" data-palette-btn="sage" aria-pressed="false" title="Шалфей" aria-label="Палитра Шалфей"><span class="palette-btn__dot"></span></button>
-      <button class="palette-btn" data-palette-btn="graphite" aria-pressed="false" title="Графит" aria-label="Палитра Графит"><span class="palette-btn__dot"></span></button>
-    </div>
-
     <!-- Действия панели: на десктопе шапка не нужна, всё живёт здесь -->
-    <div class="fside__actions">
+    <!-- Палитра: четыре варианта, выбор запоминается -->
+  <div class="fside__palette">
+    <div class="palette-label">Палитра</div>
+    <div class="palette-row" role="group" aria-label="Палитра приложения">
+      <button class="palette-dot" data-palette-btn="indigo" aria-pressed="true" title="Индиго" aria-label="Индиго"></button>
+      <button class="palette-dot" data-palette-btn="terra" aria-pressed="false" title="Терракота" aria-label="Терракота"></button>
+      <button class="palette-dot" data-palette-btn="sage" aria-pressed="false" title="Шалфей" aria-label="Шалфей"></button>
+      <button class="palette-dot" data-palette-btn="graphite" aria-pressed="false" title="Графит" aria-label="Графит"></button>
+    </div>
+  </div>
+
+  <div class="fside__actions">
       <button class="iconbtn" data-theme-toggle aria-pressed="false" aria-label="Тёмная тема">
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
@@ -171,7 +173,7 @@
         <p class="page-head__sub">
           <span><b data-result-count>13</b> из 13</span>
           <span class="page-head__dot"></span>
-          <span>2.3 ГБ медиа</span>
+          <span>2.4 ГБ медиа</span>
           <span class="page-head__dot"></span>
           <span>3 плейлиста</span>
         </p>
@@ -220,8 +222,8 @@
         <button class="chip" data-filter="pinned" aria-pressed="false">Закреплённые <span class="chip__count">0</span></button>
         <button class="chip" data-filter="playlist" aria-pressed="false">Плейлисты <span class="chip__count">0</span></button>
         <button class="chip" data-filter="video" aria-pressed="false">Видео <span class="chip__count">0</span></button>
+        <button class="chip" data-filter="image" aria-pressed="false">Картинки <span class="chip__count">0</span></button>
         <button class="chip" data-filter="icon" aria-pressed="false">Иконки <span class="chip__count">0</span></button>
-        <button class="chip" data-filter="gif" aria-pressed="false">Анимация <span class="chip__count">0</span></button>
         <button class="chip" data-filter="local" aria-pressed="false">Только LAN <span class="chip__count">0</span></button>
       </div>
 
@@ -315,17 +317,18 @@
           <label class="check"><input type="checkbox" aria-label="Выбрать /lobby"><span class="check__box"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></label>
         </div>
         <div class="shot">
-          <img class="shot__img" src="media/wp-abstract.jpg" alt="" loading="lazy">
+          <span class="shot__fmt">MP4</span>
+            <span class="shot__fmt shot__fmt--ratio">16:9</span>
+            <img class="shot__img" src="media/wp-abstract.jpg" alt="" loading="lazy">
           <span class="shot__tl"><span class="badge badge--accent">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.5 15a9 9 0 1 1-2.1-9.4L23 10"/></svg>
-            Плейлист</span>
-            <span class="shot__count">6 файлов</span></span>
+            Плейлист</span></span>
+          <span class="shot__count">6 файлов</span>
           <span class="shot__tr"><span class="badge">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
             Закреплено</span></span>
           <span class="shot__bl"><span class="badge"><i style="width:6px;height:6px;border-radius:50%;background:#4fd39a;display:inline-block"></i>Публичный</span>
             <span class="badge">↻ каждые 30 с</span></span>
-
         </div>
         <div class="link__body">
           <div class="link__row">
@@ -354,21 +357,24 @@
               <div class="menu__title">Заменить медиа</div>
               <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Файл с устройства</button>
               <button class="menu__item" data-demo="Вставьте ссылку на файл"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3A5 5 0 0 0 13.1 3.1l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3A5 5 0 0 0 10.9 20.9l1.7-1.7"/></svg>По ссылке (URL)</button>
-              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>            </div>
+              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>
+            </div>
           </div>
           <button class="btn btn--soft btn--sm btn--pult" data-drawer-open data-title="/lobby" data-sub="https://lanpaper.local/lobby">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>
             <span class="btn__label">Пульт</span>
           </button>
           <div class="menu-wrap">
-            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Ещё действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
             <div class="menu">
               <button class="menu__item" data-drawer-open data-title="/lobby" data-sub="https://lanpaper.local/lobby"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Открыть пульт<span class="menu__key">4</span></button>
               <button class="menu__item" data-demo="Открыто в новой вкладке"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Открыть</button>
               <button class="menu__item" data-copy="https://lanpaper.local/lobby"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Копировать URL</button>
               <div class="menu__sep"></div>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Заменить файл</button>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Добавить в плейлист</button>
               <button class="menu__item" data-demo="Ссылка закреплена"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>Закрепить вверху</button>
-              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Уровень доступа</button>
+              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Уровень доступа</button>
               <div class="menu__sep"></div>
               <button class="menu__item" data-demo="Открыто подтверждение удаления" data-demo-type="danger"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>Удалить</button>
             </div>
@@ -383,11 +389,10 @@
           <label class="check"><input type="checkbox" aria-label="Выбрать /tv"><span class="check__box"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></label>
         </div>
         <div class="shot">
-          <span class="shot__fmt"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>JPEG</span>
+          <span class="shot__fmt">JPEG</span>
             <span class="shot__fmt shot__fmt--ratio">16:9</span>
             <img class="shot__img" src="media/wp-dawn.jpg" alt="" loading="lazy">
           <span class="shot__bl"><span class="badge"><i style="width:6px;height:6px;border-radius:50%;background:#4fd39a;display:inline-block"></i>Публичный</span></span>
-
         </div>
         <div class="link__body">
           <div class="link__row">
@@ -410,21 +415,24 @@
               <div class="menu__title">Заменить медиа</div>
               <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Файл с устройства</button>
               <button class="menu__item" data-demo="Вставьте ссылку на файл"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3A5 5 0 0 0 13.1 3.1l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3A5 5 0 0 0 10.9 20.9l1.7-1.7"/></svg>По ссылке (URL)</button>
-              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>            </div>
+              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>
+            </div>
           </div>
           <button class="btn btn--soft btn--sm btn--pult" data-drawer-open data-title="/tv" data-sub="https://lanpaper.local/tv">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>
             <span class="btn__label">Пульт</span>
           </button>
           <div class="menu-wrap">
-            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Ещё действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
             <div class="menu">
               <button class="menu__item" data-drawer-open data-title="/tv" data-sub="https://lanpaper.local/tv"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Открыть пульт<span class="menu__key">3</span></button>
               <button class="menu__item" data-demo="Открыто в новой вкладке"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Открыть</button>
               <button class="menu__item" data-copy="https://lanpaper.local/tv"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Копировать URL</button>
               <div class="menu__sep"></div>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Заменить файл</button>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Добавить в плейлист</button>
               <button class="menu__item" data-demo="Ссылка закреплена"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>Закрепить вверху</button>
-              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Уровень доступа</button>
+              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Уровень доступа</button>
               <div class="menu__sep"></div>
               <button class="menu__item" data-demo="Открыто подтверждение удаления" data-demo-type="danger"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>Удалить</button>
             </div>
@@ -439,13 +447,12 @@
           <label class="check"><input type="checkbox" aria-label="Выбрать /kids"><span class="check__box"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></label>
         </div>
         <div class="shot">
-          <span class="shot__fmt"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>MP4</span>
+          <span class="shot__fmt">MP4</span>
             <span class="shot__fmt shot__fmt--ratio">16:9</span>
             <img class="shot__img" src="media/wp-forest.jpg" alt="" loading="lazy">
           <span class="shot__dur">1:12</span>
             <span class="shot__play"><span><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z"/></svg></span></span>
           <span class="shot__bl"><span class="badge"><i style="width:6px;height:6px;border-radius:50%;background:#7cb8ff;display:inline-block"></i>Локальная сеть</span></span>
-
         </div>
         <div class="link__body">
           <div class="link__row">
@@ -468,21 +475,24 @@
               <div class="menu__title">Заменить медиа</div>
               <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Файл с устройства</button>
               <button class="menu__item" data-demo="Вставьте ссылку на файл"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3A5 5 0 0 0 13.1 3.1l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3A5 5 0 0 0 10.9 20.9l1.7-1.7"/></svg>По ссылке (URL)</button>
-              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>            </div>
+              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>
+            </div>
           </div>
           <button class="btn btn--soft btn--sm btn--pult" data-drawer-open data-title="/kids" data-sub="https://lanpaper.local/kids">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>
             <span class="btn__label">Пульт</span>
           </button>
           <div class="menu-wrap">
-            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Ещё действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
             <div class="menu">
               <button class="menu__item" data-drawer-open data-title="/kids" data-sub="https://lanpaper.local/kids"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Открыть пульт<span class="menu__key">1</span></button>
               <button class="menu__item" data-demo="Открыто в новой вкладке"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Открыть</button>
               <button class="menu__item" data-copy="https://lanpaper.local/kids"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Копировать URL</button>
               <div class="menu__sep"></div>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Заменить файл</button>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Добавить в плейлист</button>
               <button class="menu__item" data-demo="Ссылка закреплена"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>Закрепить вверху</button>
-              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Уровень доступа</button>
+              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Уровень доступа</button>
               <div class="menu__sep"></div>
               <button class="menu__item" data-demo="Открыто подтверждение удаления" data-demo-type="danger"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>Удалить</button>
             </div>
@@ -497,11 +507,10 @@
           <label class="check"><input type="checkbox" aria-label="Выбрать /meeting-room"><span class="check__box"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></label>
         </div>
         <div class="shot">
-          <span class="shot__fmt"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>JPEG</span>
+          <span class="shot__fmt">JPEG</span>
             <span class="shot__fmt shot__fmt--ratio">16:9</span>
             <img class="shot__img" src="media/wp-city.jpg" alt="" loading="lazy">
           <span class="shot__bl"><span class="badge"><i style="width:6px;height:6px;border-radius:50%;background:#f0c46a;display:inline-block"></i>Токен</span></span>
-
         </div>
         <div class="link__body">
           <div class="link__row">
@@ -524,21 +533,24 @@
               <div class="menu__title">Заменить медиа</div>
               <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Файл с устройства</button>
               <button class="menu__item" data-demo="Вставьте ссылку на файл"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3A5 5 0 0 0 13.1 3.1l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3A5 5 0 0 0 10.9 20.9l1.7-1.7"/></svg>По ссылке (URL)</button>
-              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>            </div>
+              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>
+            </div>
           </div>
           <button class="btn btn--soft btn--sm btn--pult" data-drawer-open data-title="/meeting-room" data-sub="https://lanpaper.local/meeting-room">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>
             <span class="btn__label">Пульт</span>
           </button>
           <div class="menu-wrap">
-            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Ещё действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
             <div class="menu">
               <button class="menu__item" data-drawer-open data-title="/meeting-room" data-sub="https://lanpaper.local/meeting-room"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Открыть пульт</button>
               <button class="menu__item" data-demo="Открыто в новой вкладке"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Открыть</button>
               <button class="menu__item" data-copy="https://lanpaper.local/meeting-room"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Копировать URL</button>
               <div class="menu__sep"></div>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Заменить файл</button>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Добавить в плейлист</button>
               <button class="menu__item" data-demo="Ссылка закреплена"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>Закрепить вверху</button>
-              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Уровень доступа</button>
+              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Уровень доступа</button>
               <div class="menu__sep"></div>
               <button class="menu__item" data-demo="Открыто подтверждение удаления" data-demo-type="danger"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>Удалить</button>
             </div>
@@ -553,11 +565,10 @@
           <label class="check"><input type="checkbox" aria-label="Выбрать /workshop"><span class="check__box"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></label>
         </div>
         <div class="shot">
-          <span class="shot__fmt"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>JPEG</span>
+          <span class="shot__fmt">JPEG</span>
             <span class="shot__fmt shot__fmt--ratio">16:9</span>
             <img class="shot__img" src="media/wp-mono.jpg" alt="" loading="lazy">
           <span class="shot__bl"><span class="badge badge--warning">Нет обращений</span></span>
-
         </div>
         <div class="link__body">
           <div class="link__row">
@@ -580,21 +591,24 @@
               <div class="menu__title">Заменить медиа</div>
               <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Файл с устройства</button>
               <button class="menu__item" data-demo="Вставьте ссылку на файл"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3A5 5 0 0 0 13.1 3.1l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3A5 5 0 0 0 10.9 20.9l1.7-1.7"/></svg>По ссылке (URL)</button>
-              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>            </div>
+              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>
+            </div>
           </div>
           <button class="btn btn--soft btn--sm btn--pult" data-drawer-open data-title="/workshop" data-sub="https://lanpaper.local/workshop">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>
             <span class="btn__label">Пульт</span>
           </button>
           <div class="menu-wrap">
-            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Ещё действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
             <div class="menu">
               <button class="menu__item" data-drawer-open data-title="/workshop" data-sub="https://lanpaper.local/workshop"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Открыть пульт</button>
               <button class="menu__item" data-demo="Открыто в новой вкладке"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Открыть</button>
               <button class="menu__item" data-copy="https://lanpaper.local/workshop"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Копировать URL</button>
               <div class="menu__sep"></div>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Заменить файл</button>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Добавить в плейлист</button>
               <button class="menu__item" data-demo="Ссылка закреплена"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>Закрепить вверху</button>
-              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Уровень доступа</button>
+              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Уровень доступа</button>
               <div class="menu__sep"></div>
               <button class="menu__item" data-demo="Открыто подтверждение удаления" data-demo-type="danger"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>Удалить</button>
             </div>
@@ -614,7 +628,6 @@
             Нет файла
           </span>
           <span class="shot__bl"><span class="badge"><i style="width:6px;height:6px;border-radius:50%;background:#4fd39a;display:inline-block"></i>Публичный</span></span>
-
         </div>
         <div class="link__body">
           <div class="link__row">
@@ -637,21 +650,21 @@
               <div class="menu__title">Добавить медиа</div>
               <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Файл с устройства</button>
               <button class="menu__item" data-demo="Вставьте ссылку на файл"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3A5 5 0 0 0 13.1 3.1l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3A5 5 0 0 0 10.9 20.9l1.7-1.7"/></svg>По ссылке (URL)</button>
-              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>            </div>
+              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>
+            </div>
           </div>
           <button class="btn btn--soft btn--sm btn--pult" data-drawer-open data-title="/reception" data-sub="https://lanpaper.local/reception">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>
             <span class="btn__label">Пульт</span>
           </button>
           <div class="menu-wrap">
-            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Ещё действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
             <div class="menu">
               <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Загрузить файл</button>
               <button class="menu__item" data-drawer-open data-title="/reception" data-sub="https://lanpaper.local/reception"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Открыть пульт</button>
               <button class="menu__item" data-copy="https://lanpaper.local/reception"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Копировать URL</button>
               <div class="menu__sep"></div>
-              <button class="menu__item" data-demo="Ссылка закреплена"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>Закрепить вверху</button>
-              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Уровень доступа</button>
+              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Уровень доступа</button>
               <div class="menu__sep"></div>
               <button class="menu__item" data-demo="Открыто подтверждение удаления" data-demo-type="danger"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>Удалить</button>
             </div>
@@ -666,11 +679,10 @@
           <label class="check"><input type="checkbox" aria-label="Выбрать /garage"><span class="check__box"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></label>
         </div>
         <div class="shot">
-          <span class="shot__fmt"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>JPEG</span>
+          <span class="shot__fmt">JPEG</span>
             <span class="shot__fmt shot__fmt--ratio">16:9</span>
             <img class="shot__img" src="media/wp-forest.jpg" alt="" loading="lazy" style="filter:hue-rotate(35deg) saturate(0.7)">
           <span class="shot__bl"><span class="badge"><i style="width:6px;height:6px;border-radius:50%;background:#b8bcc9;display:inline-block"></i>Только админ</span></span>
-
         </div>
         <div class="link__body">
           <div class="link__row">
@@ -693,21 +705,24 @@
               <div class="menu__title">Заменить медиа</div>
               <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Файл с устройства</button>
               <button class="menu__item" data-demo="Вставьте ссылку на файл"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3A5 5 0 0 0 13.1 3.1l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3A5 5 0 0 0 10.9 20.9l1.7-1.7"/></svg>По ссылке (URL)</button>
-              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>            </div>
+              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>
+            </div>
           </div>
           <button class="btn btn--soft btn--sm btn--pult" data-drawer-open data-title="/garage" data-sub="https://lanpaper.local/garage">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>
             <span class="btn__label">Пульт</span>
           </button>
           <div class="menu-wrap">
-            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Ещё действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
             <div class="menu">
               <button class="menu__item" data-drawer-open data-title="/garage" data-sub="https://lanpaper.local/garage"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Открыть пульт</button>
               <button class="menu__item" data-demo="Открыто в новой вкладке"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Открыть</button>
               <button class="menu__item" data-copy="https://lanpaper.local/garage"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Копировать URL</button>
               <div class="menu__sep"></div>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Заменить файл</button>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Добавить в плейлист</button>
               <button class="menu__item" data-demo="Ссылка закреплена"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>Закрепить вверху</button>
-              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Уровень доступа</button>
+              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Уровень доступа</button>
               <div class="menu__sep"></div>
               <button class="menu__item" data-demo="Открыто подтверждение удаления" data-demo-type="danger"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>Удалить</button>
             </div>
@@ -717,16 +732,17 @@
       </article>
 
     </div>
-        <!-- /signage — вертикальная картинка 9:16 -->
-        <article class="link" data-item data-search="signage вертикальная стойка vertical-poster.jpg" data-tags="image local" data-name="signage" data-date="2026-10-02T10:15" data-size="8.4">
+        <!-- /signage — вертикальный постер 9:16: показываем целиком, фон размыт -->
+        <article class="link" data-item data-search="signage стойка вертикальный постер vertical-poster.jpg" data-tags="image local" data-name="signage" data-date="2026-10-02T10:15" data-size="8.4">
           <div class="link__select" data-select>
             <label class="check"><input type="checkbox" aria-label="Выбрать /signage"><span class="check__box"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></label>
           </div>
           <div class="shot shot--matte">
             
             <span class="shot__blur" style="background-image:url(media/wp-vertical.jpg)" aria-hidden="true"></span><img class="shot__img" src="media/wp-vertical.jpg" alt="" loading="lazy">
-            <span class="shot__fmt"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>JPEG</span>
+            <span class="shot__fmt">JPEG</span>
             <span class="shot__fmt shot__fmt--ratio">9:16</span>
+            <span class="shot__bl"><span class="badge"><i style="width:6px;height:6px;border-radius:50%;background:#4fd39a;display:inline-block"></i>Публичный</span></span>
           </div>
           <div class="link__body">
             <div class="link__row">
@@ -748,21 +764,24 @@
               <div class="menu__title">Заменить медиа</div>
               <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Файл с устройства</button>
               <button class="menu__item" data-demo="Вставьте ссылку на файл"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3A5 5 0 0 0 13.1 3.1l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3A5 5 0 0 0 10.9 20.9l1.7-1.7"/></svg>По ссылке (URL)</button>
-              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>            </div>
+              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>
+            </div>
           </div>
           <button class="btn btn--soft btn--sm btn--pult" data-drawer-open data-title="/signage" data-sub="https://lanpaper.local/signage">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>
             <span class="btn__label">Пульт</span>
           </button>
           <div class="menu-wrap">
-            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Ещё действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
             <div class="menu">
               <button class="menu__item" data-drawer-open data-title="/signage" data-sub="https://lanpaper.local/signage"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Открыть пульт</button>
               <button class="menu__item" data-demo="Открыто в новой вкладке"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Открыть</button>
               <button class="menu__item" data-copy="https://lanpaper.local/signage"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Копировать URL</button>
               <div class="menu__sep"></div>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Заменить файл</button>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Добавить в плейлист</button>
               <button class="menu__item" data-demo="Ссылка закреплена"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>Закрепить вверху</button>
-              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Уровень доступа</button>
+              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Уровень доступа</button>
               <div class="menu__sep"></div>
               <button class="menu__item" data-demo="Открыто подтверждение удаления" data-demo-type="danger"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>Удалить</button>
             </div>
@@ -771,15 +790,16 @@
 </div>
         </article>
 
-        <!-- /app-icon — PNG с прозрачностью -->
-        <article class="link" data-item data-search="app-icon иконка приложения png прозрачность" data-tags="icon" data-name="app-icon" data-date="2026-10-03T12:05" data-size="0.08">
+        <!-- /app-icon — PNG с прозрачностью: шахматка и запас по краям -->
+        <article class="link" data-item data-search="app-icon иконка приложения png прозрачность логотип" data-tags="icon" data-name="app-icon" data-date="2026-10-03T12:05" data-size="0.08">
           <div class="link__select" data-select>
             <label class="check"><input type="checkbox" aria-label="Выбрать /app-icon"><span class="check__box"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></label>
           </div>
-          <div class="shot shot--icon shot--alpha">
+          <div class="shot shot--matte shot--alpha shot--icon">
             <img class="shot__img" src="media/app-icon.png" alt="" loading="lazy">
             <span class="shot__fmt">PNG</span>
-            <span class="shot__fmt shot__fmt--ratio">альфа</span>
+            <span class="shot__fmt shot__fmt--ratio">512×512</span>
+            <span class="shot__bl"><span class="badge"><i style="width:6px;height:6px;border-radius:50%;background:#4fd39a;display:inline-block"></i>Публичный</span></span>
           </div>
           <div class="link__body">
             <div class="link__row">
@@ -789,7 +809,7 @@
               </span>
             </div>
             <p class="link__file">app-icon.png</p>
-            <p class="link__meta"><span>PNG · альфа</span><i>·</i><span>512×512</span><i>·</i><span>84 КБ</span><i>·</i><span class="link__views"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="2.6"/></svg>210</span></p>
+            <p class="link__meta"><span>PNG · прозрачность</span><i>·</i><span>512×512</span><i>·</i><span>84 КБ</span><i>·</i><span class="link__views"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="2.6"/></svg>210</span></p>
                   <div class="link__foot link__foot--split">
           <div class="menu-wrap menu-wrap--grow">
             <button class="btn btn--secondary btn--sm" aria-haspopup="true" aria-expanded="false">
@@ -801,21 +821,24 @@
               <div class="menu__title">Заменить медиа</div>
               <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Файл с устройства</button>
               <button class="menu__item" data-demo="Вставьте ссылку на файл"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3A5 5 0 0 0 13.1 3.1l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3A5 5 0 0 0 10.9 20.9l1.7-1.7"/></svg>По ссылке (URL)</button>
-              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>            </div>
+              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>
+            </div>
           </div>
           <button class="btn btn--soft btn--sm btn--pult" data-drawer-open data-title="/app-icon" data-sub="https://lanpaper.local/app-icon">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>
             <span class="btn__label">Пульт</span>
           </button>
           <div class="menu-wrap">
-            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Ещё действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
             <div class="menu">
               <button class="menu__item" data-drawer-open data-title="/app-icon" data-sub="https://lanpaper.local/app-icon"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Открыть пульт</button>
               <button class="menu__item" data-demo="Открыто в новой вкладке"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Открыть</button>
               <button class="menu__item" data-copy="https://lanpaper.local/app-icon"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Копировать URL</button>
               <div class="menu__sep"></div>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Заменить файл</button>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Добавить в плейлист</button>
               <button class="menu__item" data-demo="Ссылка закреплена"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>Закрепить вверху</button>
-              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Уровень доступа</button>
+              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Уровень доступа</button>
               <div class="menu__sep"></div>
               <button class="menu__item" data-demo="Открыто подтверждение удаления" data-demo-type="danger"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>Удалить</button>
             </div>
@@ -824,15 +847,16 @@
 </div>
         </article>
 
-        <!-- /panorama — очень широкий кадр -->
-        <article class="link" data-item data-search="panorama панорама city-panorama.jpg" data-tags="image" data-name="panorama" data-date="2026-10-01T09:30" data-size="18.2">
+        <!-- /panorama — панорама 21:9: кроп по рамке, подпись формата -->
+        <article class="link" data-item data-search="panorama панорама city-panorama.jpg широкий" data-tags="image" data-name="panorama" data-date="2026-10-01T09:30" data-size="18.2">
           <div class="link__select" data-select>
             <label class="check"><input type="checkbox" aria-label="Выбрать /panorama"><span class="check__box"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></label>
           </div>
           <div class="shot shot--pano">
             <img class="shot__img" src="media/wp-panorama.jpg" alt="" loading="lazy">
-            <span class="shot__fmt"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>JPEG</span>
+            <span class="shot__fmt">JPEG</span>
             <span class="shot__fmt shot__fmt--ratio">21:9</span>
+            <span class="shot__bl"><span class="badge"><i style="width:6px;height:6px;border-radius:50%;background:#4fd39a;display:inline-block"></i>Публичный</span></span>
           </div>
           <div class="link__body">
             <div class="link__row">
@@ -842,7 +866,7 @@
               </span>
             </div>
             <p class="link__file">city-panorama.jpg</p>
-            <p class="link__meta"><span>JPEG</span><i>·</i><span>5040×2160</span><i>·</i><span>18.2 МБ</span><i>·</i><span class="link__views"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="2.6"/></svg>88</span></p>
+            <p class="link__meta"><span>JPEG</span><i>·</i><span>8000×2000</span><i>·</i><span>18.2 МБ</span><i>·</i><span class="link__views"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="2.6"/></svg>88</span></p>
                   <div class="link__foot link__foot--split">
           <div class="menu-wrap menu-wrap--grow">
             <button class="btn btn--secondary btn--sm" aria-haspopup="true" aria-expanded="false">
@@ -854,21 +878,24 @@
               <div class="menu__title">Заменить медиа</div>
               <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Файл с устройства</button>
               <button class="menu__item" data-demo="Вставьте ссылку на файл"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3A5 5 0 0 0 13.1 3.1l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3A5 5 0 0 0 10.9 20.9l1.7-1.7"/></svg>По ссылке (URL)</button>
-              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>            </div>
+              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>
+            </div>
           </div>
           <button class="btn btn--soft btn--sm btn--pult" data-drawer-open data-title="/panorama" data-sub="https://lanpaper.local/panorama">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>
             <span class="btn__label">Пульт</span>
           </button>
           <div class="menu-wrap">
-            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Ещё действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
             <div class="menu">
               <button class="menu__item" data-drawer-open data-title="/panorama" data-sub="https://lanpaper.local/panorama"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Открыть пульт</button>
               <button class="menu__item" data-demo="Открыто в новой вкладке"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Открыть</button>
               <button class="menu__item" data-copy="https://lanpaper.local/panorama"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Копировать URL</button>
               <div class="menu__sep"></div>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Заменить файл</button>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Добавить в плейлист</button>
               <button class="menu__item" data-demo="Ссылка закреплена"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>Закрепить вверху</button>
-              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Уровень доступа</button>
+              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Уровень доступа</button>
               <div class="menu__sep"></div>
               <button class="menu__item" data-demo="Открыто подтверждение удаления" data-demo-type="danger"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>Удалить</button>
             </div>
@@ -877,16 +904,17 @@
 </div>
         </article>
 
-        <!-- /brand-tile — квадратный WebP -->
-        <article class="link" data-item data-search="brand-tile квадрат webp плитка" data-tags="icon" data-name="brand-tile" data-date="2026-09-30T15:40" data-size="0.4">
+        <!-- /brand-tile — квадрат 1:1 (обои, плитка): матуем с размытым фоном -->
+        <article class="link" data-item data-search="brand-tile плитка бренда webp квадрат обои" data-tags="icon" data-name="brand-tile" data-date="2026-09-30T15:40" data-size="0.4">
           <div class="link__select" data-select>
             <label class="check"><input type="checkbox" aria-label="Выбрать /brand-tile"><span class="check__box"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></label>
           </div>
-          <div class="shot shot--square">
+          <div class="shot shot--matte ">
             
             <span class="shot__blur" style="background-image:url(media/wp-square.jpg)" aria-hidden="true"></span><img class="shot__img" src="media/wp-square.jpg" alt="" loading="lazy">
             <span class="shot__fmt">WebP</span>
             <span class="shot__fmt shot__fmt--ratio">1:1</span>
+            <span class="shot__bl"><span class="badge"><i style="width:6px;height:6px;border-radius:50%;background:#4fd39a;display:inline-block"></i>Публичный</span></span>
           </div>
           <div class="link__body">
             <div class="link__row">
@@ -908,21 +936,24 @@
               <div class="menu__title">Заменить медиа</div>
               <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Файл с устройства</button>
               <button class="menu__item" data-demo="Вставьте ссылку на файл"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3A5 5 0 0 0 13.1 3.1l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3A5 5 0 0 0 10.9 20.9l1.7-1.7"/></svg>По ссылке (URL)</button>
-              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>            </div>
+              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>
+            </div>
           </div>
           <button class="btn btn--soft btn--sm btn--pult" data-drawer-open data-title="/brand-tile" data-sub="https://lanpaper.local/brand-tile">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>
             <span class="btn__label">Пульт</span>
           </button>
           <div class="menu-wrap">
-            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Ещё действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
             <div class="menu">
               <button class="menu__item" data-drawer-open data-title="/brand-tile" data-sub="https://lanpaper.local/brand-tile"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Открыть пульт</button>
               <button class="menu__item" data-demo="Открыто в новой вкладке"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Открыть</button>
               <button class="menu__item" data-copy="https://lanpaper.local/brand-tile"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Копировать URL</button>
               <div class="menu__sep"></div>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Заменить файл</button>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Добавить в плейлист</button>
               <button class="menu__item" data-demo="Ссылка закреплена"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>Закрепить вверху</button>
-              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Уровень доступа</button>
+              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Уровень доступа</button>
               <div class="menu__sep"></div>
               <button class="menu__item" data-demo="Открыто подтверждение удаления" data-demo-type="danger"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>Удалить</button>
             </div>
@@ -931,8 +962,8 @@
 </div>
         </article>
 
-        <!-- /animation — GIF -->
-        <article class="link" data-item data-search="animation гифка gif анимация loop.gif" data-tags="image gif" data-name="animation" data-date="2026-09-29T18:20" data-size="2.1">
+        <!-- /animation — GIF: кроп по рамке, в подписи видно, что это анимация -->
+        <article class="link" data-item data-search="animation анимация gif loop.gif луп" data-tags="image" data-name="animation" data-date="2026-09-29T18:20" data-size="2.1">
           <div class="link__select" data-select>
             <label class="check"><input type="checkbox" aria-label="Выбрать /animation"><span class="check__box"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></label>
           </div>
@@ -940,6 +971,7 @@
             <img class="shot__img" src="media/wp-city.jpg" alt="" loading="lazy">
             <span class="shot__fmt">GIF · анимация</span>
             <span class="shot__fmt shot__fmt--ratio">4:3</span>
+            <span class="shot__bl"><span class="badge"><i style="width:6px;height:6px;border-radius:50%;background:#4fd39a;display:inline-block"></i>Публичный</span></span>
           </div>
           <div class="link__body">
             <div class="link__row">
@@ -961,21 +993,24 @@
               <div class="menu__title">Заменить медиа</div>
               <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Файл с устройства</button>
               <button class="menu__item" data-demo="Вставьте ссылку на файл"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3A5 5 0 0 0 13.1 3.1l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3A5 5 0 0 0 10.9 20.9l1.7-1.7"/></svg>По ссылке (URL)</button>
-              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>            </div>
+              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>
+            </div>
           </div>
           <button class="btn btn--soft btn--sm btn--pult" data-drawer-open data-title="/animation" data-sub="https://lanpaper.local/animation">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>
             <span class="btn__label">Пульт</span>
           </button>
           <div class="menu-wrap">
-            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Ещё действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
             <div class="menu">
               <button class="menu__item" data-drawer-open data-title="/animation" data-sub="https://lanpaper.local/animation"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Открыть пульт</button>
               <button class="menu__item" data-demo="Открыто в новой вкладке"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Открыть</button>
               <button class="menu__item" data-copy="https://lanpaper.local/animation"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Копировать URL</button>
               <div class="menu__sep"></div>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Заменить файл</button>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Добавить в плейлист</button>
               <button class="menu__item" data-demo="Ссылка закреплена"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>Закрепить вверху</button>
-              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Уровень доступа</button>
+              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Уровень доступа</button>
               <div class="menu__sep"></div>
               <button class="menu__item" data-demo="Открыто подтверждение удаления" data-demo-type="danger"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>Удалить</button>
             </div>
@@ -984,17 +1019,19 @@
 </div>
         </article>
 
-        <!-- /menu-board — вертикальное видео 9:16 -->
-        <article class="link" data-item data-search="menu-board меню видео вертикальное board.mp4" data-tags="video" data-name="menu-board" data-date="2026-10-03T07:45" data-size="24.6">
+        <!-- /menu-board — вертикальное видео 9:16: кадр целиком, длительность на месте -->
+        <article class="link" data-item data-search="menu-board меню видео вертикальное board.mp4 стойка" data-tags="video local" data-name="menu-board" data-date="2026-10-03T07:45" data-size="24.6">
           <div class="link__select" data-select>
             <label class="check"><input type="checkbox" aria-label="Выбрать /menu-board"><span class="check__box"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></label>
           </div>
           <div class="shot shot--matte">
             
-            <span class="shot__blur" style="background-image:url(media/wp-mono.jpg)" aria-hidden="true"></span><img class="shot__img" src="media/wp-mono.jpg" alt="" loading="lazy"><span class="shot__play"><span><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z"/></svg></span></span>
+            <span class="shot__blur" style="background-image:url(media/wp-mono.jpg)" aria-hidden="true"></span><img class="shot__img" src="media/wp-mono.jpg" alt="" loading="lazy">
+            <span class="shot__play"><span><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z"/></svg></span></span>
+            <span class="shot__dur">0:18</span>
             <span class="shot__fmt">MP4</span>
             <span class="shot__fmt shot__fmt--ratio">9:16</span>
-            <span class="shot__dur">0:18</span>
+            <span class="shot__bl"><span class="badge"><i style="width:6px;height:6px;border-radius:50%;background:#4fd39a;display:inline-block"></i>Публичный</span></span>
           </div>
           <div class="link__body">
             <div class="link__row">
@@ -1016,21 +1053,24 @@
               <div class="menu__title">Заменить медиа</div>
               <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Файл с устройства</button>
               <button class="menu__item" data-demo="Вставьте ссылку на файл"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3A5 5 0 0 0 13.1 3.1l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3A5 5 0 0 0 10.9 20.9l1.7-1.7"/></svg>По ссылке (URL)</button>
-              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>            </div>
+              <button class="menu__item" data-demo="Галерея сервера"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Из галереи сервера</button>
+            </div>
           </div>
           <button class="btn btn--soft btn--sm btn--pult" data-drawer-open data-title="/menu-board" data-sub="https://lanpaper.local/menu-board">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>
             <span class="btn__label">Пульт</span>
           </button>
           <div class="menu-wrap">
-            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+            <button class="iconbtn iconbtn--sm" aria-haspopup="true" aria-expanded="false" aria-label="Ещё действия"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
             <div class="menu">
               <button class="menu__item" data-drawer-open data-title="/menu-board" data-sub="https://lanpaper.local/menu-board"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Открыть пульт</button>
               <button class="menu__item" data-demo="Открыто в новой вкладке"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Открыть</button>
               <button class="menu__item" data-copy="https://lanpaper.local/menu-board"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Копировать URL</button>
               <div class="menu__sep"></div>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Заменить файл</button>
+              <button class="menu__item" data-file-demo><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Добавить в плейлист</button>
               <button class="menu__item" data-demo="Ссылка закреплена"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>Закрепить вверху</button>
-              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/></svg>Уровень доступа</button>
+              <button class="menu__item" data-demo="Доступ: локальная сеть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg>Уровень доступа</button>
               <div class="menu__sep"></div>
               <button class="menu__item" data-demo="Открыто подтверждение удаления" data-demo-type="danger"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>Удалить</button>
             </div>
@@ -1235,34 +1275,36 @@
 <div class="toasts"></div>
 <script src="proto.js"></script>
 <script>
-/* Палитра приложения: выбор хранится в localStorage */
+/* Палитра приложения: выбор запоминается в браузере */
 (function () {
-    const key = 'lp-palette';
-    const root = document.documentElement;
-    function setPalette(p, save) {
-        root.dataset.palette = p;
-        document.querySelectorAll('[data-palette-btn]').forEach((b) =>
-            b.setAttribute('aria-pressed', String(b.dataset.paletteBtn === p)));
-        if (save) { try { localStorage.setItem(key, p); } catch (e) {} }
+    var KEY = 'lp-palette';
+    var root = document.documentElement;
+    function setPalette(name, save) {
+        root.setAttribute('data-palette', name);
+        document.querySelectorAll('[data-palette-btn]').forEach(function (b) {
+            b.setAttribute('aria-pressed', String(b.getAttribute('data-palette-btn') === name));
+        });
+        if (save) { try { localStorage.setItem(KEY, name); } catch (e) {} }
     }
-    let saved = null;
-    try { saved = localStorage.getItem(key); } catch (e) {}
+    var saved = null;
+    try { saved = localStorage.getItem(KEY); } catch (e) {}
     setPalette(saved || 'indigo', false);
-    document.querySelectorAll('[data-palette-btn]').forEach((b) =>
-        b.addEventListener('click', () => setPalette(b.dataset.paletteBtn, true)));
+    document.querySelectorAll('[data-palette-btn]').forEach(function (b) {
+        b.addEventListener('click', function () { setPalette(b.getAttribute('data-palette-btn'), true); });
+    });
 })();
 
-/* Клик по карточке открывает пульт ссылки */
+/* Клик по карточке открывает пульт ссылки.
+   Кнопки, ссылки, чекбоксы и меню обрабатываются как обычно. */
 (function () {
-    const list = document.querySelector('[data-list]');
-    document.querySelectorAll('[data-item]').forEach((card) => {
-        card.addEventListener('click', (e) => {
+    var list = document.querySelector('[data-list]');
+    document.querySelectorAll('[data-item]').forEach(function (card) {
+        card.addEventListener('click', function (e) {
             if (e.target.closest('a, button, input, label, .menu-wrap')) return;
             if (list && list.classList.contains('is-selecting')) return;
-            const name = card.dataset.name;
-            if (name && window.protoDrawer) {
-                window.protoDrawer.open({ title: '/' + name, sub: 'https://lanpaper.local/' + name });
-            }
+            var name = card.getAttribute('data-name');
+            if (!name || !window.protoDrawer) return;
+            window.protoDrawer.open({ title: '/' + name, sub: 'https://lanpaper.local/' + name });
         });
     });
 })();

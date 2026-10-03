@@ -1,43 +1,32 @@
 /* SPDX-License-Identifier: MIT */
 /* ============================================================
-   ФИНАЛЬНАЯ ВЕРСИЯ 2
-   Компактнее, аккуратные превью любых медиа, заметный пульт ссылки.
+   ФИНАЛЬНАЯ ВЕРСИЯ: компактнее, пульт на виду, превью любых медиа
    Подключается после final.css, поэтому переопределяет его.
-
-   Правило этого файла: то, что меняет каркас (сетку, липкие отступы,
-   ширины), живёт внутри медиазапросов. Безусловное правило здесь
-   перебило бы мобильные правила final.css — на этом уже один раз
-   споткнулись: сайдбар уходил во «fixed», а сетка продолжала
-   резервировать под него 226 px, и список сжимался в узкую полосу.
    ============================================================ */
 
 /* ============================================================
-   1. КАРКАС: три режима ширины
+   1. КОМПАКТНОСТЬ
+   Всё, что меняет каркас, — внутри медиазапросов: безусловное
+   правило перебило бы мобильные правила final.css.
    ============================================================ */
 
-/* Высота шапки: по ней выравнивается липкая строка фильтров.
-   Значения те же, что в shared.css (60 px, на телефоне 54 px). */
+/* Высота шапки: по ней выравнивается липкая строка фильтров */
 :root { --topbar-h: 60px; }
 @media (max-width: 768px) { :root { --topbar-h: 54px; } }
 
-/* --- 1.1. Десктоп: сайдбар фиксированной ширины, шапки нет --- */
+/* --- Десктоп: сайдбар фиксированной ширины, шапки нет --- */
 @media (min-width: 1024px) {
-    .fshell { grid-template-columns: 226px minmax(0, 1fr); }
+    .fshell { grid-template-columns: 228px minmax(0, 1fr); }
     .fshell .wrap { padding: var(--s-5) var(--s-5) var(--s-7); }
-    /* Шапка скрыта, поэтому фильтры липнут от самого верха окна */
     .fshell .filters { top: 10px; }
 }
 
-/* --- 1.2. Телефон и планшет: сайдбар — выдвижная панель --- */
+/* --- Телефон и планшет: сайдбар уезжает в выдвижную панель --- */
 @media (max-width: 1023px) {
-    /* Сайдбар вне потока, значит в сетке не должно оставаться колонки
-       под него: контент занимает всю ширину страницы. */
     .fshell { display: block; }
     .fmain { min-width: 0; }
     .fshell .wrap { padding: var(--s-4) var(--s-4) var(--s-7); }
-    /* Фильтры встают ровно под шапкой, а не под ней: иначе шапка
-       с кнопками перекрывает строку поиска и чипы. +1px — нижняя
-       граница шапки, чтобы она не срезала верх строки фильтров. */
+    /* Фильтры встают ровно под шапкой, иначе шапка их перекрывает */
     .fshell .filters {
         top: calc(var(--topbar-h) + 1px);
         background: var(--bg);
@@ -45,10 +34,6 @@
     }
     .fshell .filters.is-stuck { box-shadow: 0 12px 16px -16px rgba(20, 22, 32, 0.35); }
 }
-
-/* ============================================================
-   2. КОМПАКТНОСТЬ
-   ============================================================ */
 
 /* Сайдбар: плотнее — и на десктопе, и в выдвижной панели */
 .fside { padding: var(--s-3) 10px; }
@@ -60,10 +45,7 @@
 .fservice { padding: 9px 10px; margin-top: var(--s-2); }
 .fservice__meta { font-size: 10px; }
 .fside__actions { margin-top: 6px; }
-
-/* Переключатель палитры живёт здесь же */
-.palette-label { margin-top: var(--s-3); }
-.palette-row { margin-top: 2px; }
+.fside__palette { margin-top: var(--s-2); }
 
 /* Заголовок и фильтры */
 .page-head { padding: 0 0 var(--s-4); }
@@ -74,80 +56,82 @@
 .filters__right .btn--sm, .filters__right .segmented__item { height: 30px; }
 .filters__chips .chip { height: 30px; padding: 0 10px; }
 
-/* Сетка карточек.
-   Трек растёт вместе с шириной страницы, поэтому на любом экране
-   число колонок меняется само: 232 px на десктопе, 168 px на планшете,
-   150 px на телефоне и одна колонка на очень узких экранах. */
-.library { gap: var(--s-4); }
-.library[data-view="grid"] { grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); }
+/* Сетка: число колонок меняется вместе с ширина окна */
+.library { gap: 14px; }
+.library[data-view="grid"] { grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); }
 @media (max-width: 768px) {
     .library { gap: 10px; }
-    /* Планшет: три колонки вместо четырёх узких */
     .library[data-view="grid"] { grid-template-columns: repeat(auto-fill, minmax(186px, 1fr)); }
 }
 @media (max-width: 600px) {
     .library[data-view="grid"] { grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); }
 }
 @media (max-width: 480px) {
-    /* Телефон: две колонки */
     .library[data-view="grid"] { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 }
 @media (max-width: 340px) {
-    /* Совсем узкий экран: одна колонка во всю ширину */
     .library[data-view="grid"] { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* Карточка */
 .link { padding: 7px 7px 5px; }
 .link .shot { border-radius: var(--r-sm); }
-.link__body { padding: 9px 6px 6px; gap: 2px; }
-.link__file { font-size: 11px; line-height: 1.35; }
-.link__meta { margin-top: 4px; gap: 7px; font-size: 10.5px; }
-.link__meta svg { width: 11px; height: 11px; }
-.link__name { font-size: 14px; }
+.link__body { padding: 9px 7px 6px; gap: 2px; }
+.link__file { margin-top: 1px; font-size: 11px; }
+.link__meta { margin-top: 3px; gap: 8px; font-size: 11px; }
+.link__meta svg { width: 12px; height: 12px; }
+.link__name { font-size: 14.5px; }
 .link__actions .iconbtn--sm { width: 26px; height: 26px; }
 
-/* Нижняя строка карточки: [Изменить ▾] [Пульт] [⋯] */
-.link__foot { display: flex; align-items: center; gap: 4px; padding: 2px 6px 5px; }
+/* ============================================================
+   2. ФУТЕР КАРТОЧКИ: [Изменить ▾] [Пульт] [⋯]
+   Действия видно всегда — раньше они появлялись только при
+   наведении, из-за чего пульт было не найти.
+   ============================================================ */
+.link__foot {
+    display: flex; align-items: center; gap: 5px;
+    padding: 2px 5px 4px;
+}
 .link__foot .menu-wrap--grow { flex: 1 1 auto; min-width: 0; }
 .link__foot .menu-wrap--grow > .btn { width: 100%; }
 .link__foot > .menu-wrap:last-child { flex: 0 0 auto; }
-.link__foot .btn--pult { flex: 0 1 auto; }
-.link__foot .btn--sm { height: 32px; padding: 0 9px; font-size: 12.5px; gap: 6px; }
-.link__foot .iconbtn { flex: 0 0 auto; width: 32px; height: 32px; }
-/* Длинная подпись ужимается многоточием, а не ломает строку */
+.link__foot .btn--sm { height: 34px; padding: 0 9px; font-size: 12.5px; gap: 6px; }
 .link__foot .btn__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.btn--pult { color: var(--accent-text); background: var(--accent-soft); border-color: transparent; }
+.link__foot .iconbtn { flex: 0 0 auto; width: 34px; height: 34px; }
+.link__foot .btn--pult { flex: 0 1 auto; }
+.btn--pult {
+    color: var(--accent-text); background: var(--accent-soft); border-color: transparent;
+}
 .btn--pult:hover { background: var(--accent-soft-2); }
-.btn--pult svg { width: 14px; height: 14px; }
+.btn--pult svg { width: 15px; height: 15px; }
 .btn__label { display: inline; }
 
-/* Панель деталей — тоже плотнее */
-.drawer { width: min(430px, 100%); }
-.drawer__head { padding: var(--s-4) var(--s-4) var(--s-3); }
+/* Курсор-подсказка: карточка тоже открывает пульт */
+@media (hover: hover) {
+    .link { cursor: pointer; }
+    .link:hover .link__name { color: var(--accent-text); }
+}
+.link__name { transition: color var(--dur-fast) var(--ease); }
+
+/* Пульт ссылки: подпись в шапке панели */
 .drawer__eyebrow {
     font-size: var(--t-2xs); font-weight: var(--fw-bold);
     letter-spacing: 0.07em; text-transform: uppercase; color: var(--accent-text);
     margin-bottom: 3px;
 }
-.drawer__body { padding: var(--s-4); }
-.detail-section { margin-bottom: var(--s-4); }
-.tabs { margin-bottom: var(--s-4); }
+.drawer { width: min(440px, 100%); }
 .vrow, .prow { padding: 7px; }
 
-/* --- 2.1. Телефон: карточка и её действия --- */
 @media (max-width: 768px) {
     .link { padding: 6px 6px 4px; }
     .link__body { padding: 8px 5px 4px; }
-    /* Три кнопки в узкую карточку не влезают, а прятать пульт нельзя:
-       «Пульт» переезжает во вторую строку и занимает всю ширину. */
-    .link__foot { flex-wrap: wrap; padding: 2px 5px 4px; }
+    /* Три кнопки в узкую карточку не влезают: «Пульт» уходит во вторую
+       строку и занимает всю ширину, подпись остаётся на виду. */
+    .link__foot { flex-wrap: wrap; }
     .link__foot .btn--pult { flex: 1 1 100%; order: 3; margin-top: 2px; }
-    /* Тап-таргеты как в остальном интерфейсе (36 px, shared.css) */
     .link__foot .btn { height: 36px; }
     .link__foot .iconbtn { width: 36px; height: 36px; }
-    /* Стрелка «открывается меню» в узкой карточке только мешает: место
-       нужно подпись, а не шеврон. */
+    /* Шеврон в узкой карточке только мешает подписи */
     .link__foot .btn__caret { display: none; }
 }
 @media (max-width: 480px) {
@@ -156,110 +140,98 @@
 
 /* ============================================================
    3. ПРЕВЬЮ ДЛЯ ЛЮБОГО ТИПА МЕДИА
-   Правило простое: карточка всегда 16:9, поэтому сетка ровная.
-   Меняется только то, как медиа вписано в рамку.
+   Кадр всегда 16:9 — сетка остаётся ровной. Меняется только
+   способ вписывания: кроп, матование или шахматка.
    ============================================================ */
-
-.shot { position: relative; overflow: hidden; background: var(--matte-bg); }
+.shot { position: relative; overflow: hidden; }
 .shot__img { position: relative; z-index: 1; }
 
-/* --- 3.1. «Матование»: медиа целиком по центру ---
-   Вертикальные картинки, квадраты, иконки — всё то, что нельзя
-   обрезать без потери смысла. */
-.shot--matte .shot__img { object-fit: contain; padding: 9%; }
-.shot--square .shot__img { object-fit: contain; padding: 14%; }
-.shot--icon .shot__img { object-fit: contain; padding: 24%; }
-/* В режиме матования зум при наведении только портит кадр */
+/* 3.1 Матование: вертикальные и квадратные кадры видно целиком */
+.shot--matte { background: var(--matte-bg, var(--surface-2, #E9EBEF)); }
+.shot--matte .shot__img { object-fit: contain; padding: 8%; }
+.shot--icon .shot__img { padding: 18%; }
 .link:hover .shot--matte .shot__img,
-.link:hover .shot--square .shot__img,
 .link:hover .shot--icon .shot__img { transform: none; }
 
-/* Подложка из размытой копии кадра: поля выглядят намеренно, а не грязно */
+/* 3.2 Размытая подложка из того же кадра — поля не выглядят пустыми */
 .shot__blur {
-    position: absolute; inset: -12%;
+    position: absolute; inset: -8%;
     z-index: 0;
     background-size: cover;
     background-position: center;
-    filter: blur(22px) saturate(1.5);
+    filter: blur(20px) saturate(1.6);
     transform: scale(1.08);
-    opacity: 0.5;
+    opacity: 0.55;
     pointer-events: none;
 }
-[data-theme="dark"] .shot__blur { opacity: 0.32; }
+[data-theme="dark"] .shot__blur { opacity: 0.4; }
 
-/* --- 3.2. Шахматка под прозрачные PNG/WebP/SVG/ICO --- */
+/* 3.3 Шахматка под прозрачные PNG/WebP/SVG/ICO */
 .shot--alpha {
     background-color: #FFFFFF;
     background-image:
-        linear-gradient(45deg, #EDEFF3 25%, transparent 25%, transparent 75%, #EDEFF3 75%),
-        linear-gradient(45deg, #EDEFF3 25%, transparent 25%, transparent 75%, #EDEFF3 75%);
-    background-size: 18px 18px;
-    background-position: 0 0, 9px 9px;
+        linear-gradient(45deg, #E9EBEF 25%, transparent 25%, transparent 75%, #E9EBEF 75%),
+        linear-gradient(45deg, #E9EBEF 25%, transparent 25%, transparent 75%, #E9EBEF 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 8px 8px;
 }
 [data-theme="dark"] .shot--alpha {
-    background-color: #191C21;
+    background-color: #1B1E23;
     background-image:
-        linear-gradient(45deg, rgba(255, 255, 255, 0.055) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.055) 75%),
-        linear-gradient(45deg, rgba(255, 255, 255, 0.055) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.055) 75%);
+        linear-gradient(45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.06) 75%),
+        linear-gradient(45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.06) 75%);
 }
 
-/* --- 3.3. Панорама: широкий кадр оставляем полосой на всю рамку --- */
+/* 3.4 Панорама: широкий кадр кроем по рамке, показываем полосой */
 .shot--pano .shot__img { object-fit: cover; object-position: center; }
 
-/* --- 3.4. Пустая ссылка: пунктирная рамка вместо битой картинки --- */
-.shot--none { background: var(--bg-sunken); }
-.shot--none::after {
-    content: ""; position: absolute; inset: 6px; z-index: 2;
-    border: 1px dashed var(--border-2); border-radius: var(--r-sm);
-    pointer-events: none;
-}
-.shot--none .shot__empty { z-index: 3; }
-
-/* --- 3.5. Плашки на превью: формат, пропорции, длительность, счётчик --- */
+/* 3.5 Подписи на превью: формат, пропорции, длительность, файлы */
 .shot__fmt, .shot__dur, .shot__count {
-    position: absolute; z-index: 3;
-    display: inline-flex; align-items: center; gap: 4px;
+    position: absolute; z-index: 2;
+    display: inline-flex; align-items: center;
     padding: 2px 6px;
-    font-size: 10px; font-weight: var(--fw-bold); letter-spacing: 0.03em;
-    color: #fff; background: rgba(14, 16, 22, 0.62);
+    font-size: 10px; font-weight: var(--fw-bold); letter-spacing: 0.02em;
+    color: #fff; background: rgba(14, 16, 22, 0.72);
     -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
     border-radius: var(--r-xs);
     font-variant-numeric: tabular-nums;
-    pointer-events: none;
 }
-.shot__fmt { left: 7px; top: 7px; }
-.shot__fmt--ratio { left: auto; right: 7px; }
-.shot__fmt svg { width: 10px; height: 10px; }
-.shot__dur { right: 7px; bottom: 7px; }
-.shot__count {
-    right: 7px; bottom: 7px;
-    background: var(--accent); border-radius: var(--r-full);
-    padding: 2px 7px;
-}
+.shot__fmt { left: 6px; top: 6px; }
+.shot__fmt--ratio { left: auto; right: 6px; }
+.shot__dur { right: 6px; bottom: 6px; }
+.shot__count { right: 6px; bottom: 6px; background: var(--accent); border-radius: var(--r-full); padding: 2px 7px; }
+/* Если у плейлиста есть и счётчик, и подписи снизу — счётчик уходит вверх */
+.shot__bl ~ .shot__count { bottom: auto; top: 6px; }
 
-/* Плашка воспроизведения — по центру кадра */
+/* Акцентная плашка превью тоже следует палитре */
+.shot__bl .badge--accent { background: rgba(var(--accent-rgb), 0.86); }
+
+/* Плашка воспроизведения */
 .shot__play { z-index: 2; pointer-events: none; }
 .shot__play span {
     background: rgba(14, 16, 22, 0.42);
     -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
-/* В режиме выбора плашки уступают место чекбоксам */
+/* В режиме выбора подписи уступают место чекбоксам */
 .library.is-selecting .shot__fmt,
 .library.is-selecting .shot__dur,
 .library.is-selecting .shot__count { display: none; }
 
-/* --- 3.6. Тип медиа в подписи --- */
-.link__meta .fmt {
-    display: inline-flex; align-items: center; gap: 3px;
-    font-weight: var(--fw-semibold);
-}
+/* ============================================================
+   4. РЕЖИМ СПИСКА И МЕНЮ ФУТЕРА
+   ============================================================ */
+.library[data-view="list"] .link { padding: 7px 10px 7px 7px; gap: var(--s-3); }
+.library[data-view="list"] .shot { width: 132px; }
+.library[data-view="list"] .shot__fmt--ratio { display: none; }
+.library[data-view="list"] .link__body { padding: 0; }
+.library[data-view="list"] .link__foot { padding: 4px 0 0; }
+.library[data-view="list"] .link__foot .menu-wrap--grow { flex: 0 0 auto; }
+/* variant-a.css прячет .btn--soft в списке — «Пульт» возвращаем */
+.library[data-view="list"] .link__body .btn--soft { display: inline-flex; }
 
-/* --- 3.7. Меню футера открываются вверх ---
-   Кнопки стоят у нижнего края карточки, и обычное «вниз» у последнего
-   ряда уезжало бы за экран. На телефоне меню и так превращается
-   в bottom sheet, поэтому правило только для широких экранов. */
+/* Меню футера открываются вверх: кнопки стоят у нижнего края карточки */
 @media (min-width: 769px) {
     .link__foot .menu {
         top: auto;
@@ -269,24 +241,3 @@
     }
     .link__foot .menu--left { transform-origin: bottom left; }
 }
-
-/* ============================================================
-   4. РЕЖИМ СПИСКА — компактная строка
-   ============================================================ */
-.library[data-view="list"] .link { padding: 7px 10px 7px 7px; gap: var(--s-3); }
-.library[data-view="list"] .shot { width: 132px; }
-.library[data-view="list"] .shot__fmt--ratio { display: none; }
-.library[data-view="list"] .link__body { gap: 1px; padding: 0; }
-.library[data-view="list"] .link__foot { padding: 0; }
-.library[data-view="list"] .link__foot .menu-wrap--grow { flex: 0 0 auto; }
-
-/* ============================================================
-   5. ПУЛЬТ ССЫЛКИ: три видимых точки входа
-   ============================================================ */
-/* 1) кнопка «Пульт» в футере карточки, 2) пункт «Открыть пульт» в ⋯,
-   3) клик по самой карточке. Здесь — только поведение курсора. */
-@media (hover: hover) {
-    .link { cursor: pointer; }
-    .link:hover .link__name { color: var(--accent-text); }
-}
-.link__name { transition: color var(--dur-fast) var(--ease); }
