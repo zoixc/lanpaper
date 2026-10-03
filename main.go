@@ -1,7 +1,10 @@
+// SPDX-License-Identifier: MIT
+
 package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"log"
@@ -40,6 +43,18 @@ func main() {
 			log.Fatalf("Cannot create data directory %s: %v", d, err)
 		}
 	}
+	// Playlist items always get their directory; archived versions only when
+	// history is enabled. Both are also created on demand, so a failure here is
+	// a warning and not a reason to refuse to start.
+	extraDirs := []string{config.ItemsDir}
+	if config.Current.History.Limit > 0 {
+		extraDirs = append(extraDirs, config.HistoryDir)
+	}
+	for _, d := range extraDirs {
+		if err := os.MkdirAll(d, config.DataDirPerm); err != nil {
+			log.Printf("Warning: cannot create %s: %v", d, err)
+		}
+	}
 	// The server gallery is optional (and often a read-only mount), so a
 	// failure here is not fatal.
 	if err := os.MkdirAll(config.Current.ExternalImageDir, 0755); err != nil {
@@ -58,6 +73,13 @@ func main() {
 		port = ":" + port
 	}
 
+	// Refusing to start beats silently serving plaintext to an operator who
+	// asked for TLS: a half-configured certificate is always a mistake.
+	if config.TLSMisconfigured() {
+		log.Fatal("TLS_CERT_FILE and TLS_KEY_FILE must be set together; refusing to serve plain HTTP")
+	}
+	tlsEnabled := config.TLSEnabled()
+
 	srv := &http.Server{
 		Addr:    port,
 		Handler: newHandler(),
@@ -70,16 +92,32 @@ func main() {
 		IdleTimeout:       time.Duration(config.HTTPIdleTimeout) * time.Second,
 		MaxHeaderBytes:    1 << 20, // 1 MB
 	}
+	if tlsEnabled {
+		// Explicit floor: TLS 1.0/1.1 are still accepted by some stacks when
+		// the field is left at its zero value. Cipher suites and curves stay at
+		// Go's defaults, which are kept current and reject the weak ones.
+		srv.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	log.Printf("Lanpaper %s on %s (max upload %d MB, compression: %d%% quality, %d%% scale)",
-		Version, port, config.Current.MaxUploadMB, config.Current.Compression.Quality, config.Current.Compression.Scale)
-	log.Printf("Admin: http://localhost%s/admin", port)
+	scheme := "http"
+	if tlsEnabled {
+		scheme = "https"
+	}
+	log.Printf("Lanpaper %s on %s (%s, max upload %d MB, compression: %d%% quality, %d%% scale)",
+		Version, port, scheme, config.Current.MaxUploadMB, config.Current.Compression.Quality, config.Current.Compression.Scale)
+	log.Printf("Admin: %s://localhost%s/admin", scheme, port)
 
 	serveErr := make(chan error, 1)
-	go func() { serveErr <- srv.ListenAndServe() }()
+	go func() {
+		if tlsEnabled {
+			serveErr <- srv.ListenAndServeTLS(config.Current.TLSCertFile, config.Current.TLSKeyFile)
+			return
+		}
+		serveErr <- srv.ListenAndServe()
+	}()
 
 	select {
 	case err := <-serveErr:
@@ -100,10 +138,10 @@ func main() {
 }
 
 // newHandler is shared with the end-to-end HTTP tests, so tests exercise the
-// real compression, authentication, CSRF and routing stack, not just bare
-// handlers.
+// real compression, authentication, CSRF, panic-recovery and routing stack,
+// not just bare handlers.
 func newHandler() http.Handler {
-	return middleware.Gzip(newMux())
+	return middleware.Gzip(middleware.Recover(newMux()))
 }
 
 func newMux() *http.ServeMux {
@@ -116,16 +154,23 @@ func newMux() *http.ServeMux {
 	mux.HandleFunc("/admin.html", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin", http.StatusPermanentRedirect)
 	})
+	// Crawlers have no business walking mutable media links: every hit costs
+	// bandwidth and an indexed URL outlives the access level it was public
+	// under. The name is reserved, so no link can ever be shadowed by it.
+	mux.HandleFunc("/robots.txt", serveRobotsTxt)
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/health/ready", readyHandler)
 	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Admin)))
 	mux.HandleFunc("/api/wallpapers", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Wallpapers)))
 	mux.HandleFunc("/api/compression-config", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.GetCompressionConfig)))
 	mux.HandleFunc("/api/preview/", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.AdminPreview)))
-	mux.HandleFunc("/api/link/", middleware.WithSecurity(middleware.MaybeBasicAuth(handleLinkRoutes)))
-	mux.HandleFunc("/api/link", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Link)))
+	// Publish keys (PUBLISH_KEYS) are accepted on the two routes an automation
+	// needs: pushing media and creating the link to push it into. Everything
+	// else on these routes still requires the admin login.
+	mux.HandleFunc("/api/link/", middleware.WithSecurity(middleware.PublishOrAdmin(middleware.AllowPublishCreateLink, handleLinkRoutes)))
+	mux.HandleFunc("/api/link", middleware.WithSecurity(middleware.PublishOrAdmin(middleware.AllowPublishCreateLink, handlers.Link)))
 	mux.HandleFunc("/api/upload",
-		middleware.WithSecurity(middleware.MaybeBasicAuth(
+		middleware.WithSecurity(middleware.PublishOrAdmin(middleware.AllowPublishUpload,
 			middleware.RateLimit(func() (int, int) {
 				return config.Current.Rate.UploadPerMin, config.Current.Rate.Burst
 			})(handlers.Upload),
@@ -146,17 +191,32 @@ func newMux() *http.ServeMux {
 	return mux
 }
 
-// handleLinkRoutes routes /api/link/{name}/pin to TogglePin, everything else to Link
+// handleLinkRoutes dispatches the sub-resources of /api/link/{name}. Every
+// branch keeps its method, so a GET to /pin or a POST to /history still ends up
+// in the handler that answers 405 for it.
 func handleLinkRoutes(w http.ResponseWriter, r *http.Request) {
-	// Check if this is a pin toggle request (must be POST to /pin)
-	if strings.HasSuffix(r.URL.Path, "/pin") && r.Method == http.MethodPost {
+	path := r.URL.Path
+	switch {
+	case r.Method == http.MethodPost && strings.HasSuffix(path, "/pin"):
 		handlers.TogglePin(w, r)
-	} else {
+	case r.Method == http.MethodGet && strings.HasSuffix(path, "/history"):
+		handlers.LinkHistory(w, r)
+	case r.Method == http.MethodPost && strings.HasSuffix(path, "/rollback"):
+		handlers.RollbackLink(w, r)
+	case r.Method == http.MethodDelete && strings.Contains(path, "/history/"):
+		handlers.DeleteHistoryVersion(w, r)
+	default:
 		handlers.Link(w, r)
 	}
 }
 
-func healthHandler(w http.ResponseWriter, _ *http.Request) {
+// healthHandler is the liveness probe: it answers as long as the process can
+// serve HTTP, without touching the disk.
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	if !isReadMethod(r) {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -167,7 +227,14 @@ func healthHandler(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-func readyHandler(w http.ResponseWriter, _ *http.Request) {
+// readyHandler is the readiness probe: it fails while the data directories are
+// unreachable or the disk is nearly full, so an orchestrator stops sending
+// traffic instead of serving 500s.
+func readyHandler(w http.ResponseWriter, r *http.Request) {
+	if !isReadMethod(r) {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	type check struct {
 		OK      bool   `json:"ok"`
 		Message string `json:"message,omitempty"`
@@ -221,4 +288,11 @@ func getDiskFreeGB(path string) (float64, error) {
 	}
 	freeBytes := stat.Bavail * uint64(stat.Bsize)
 	return float64(freeBytes) / (1024 * 1024 * 1024), nil
+}
+
+// isReadMethod reports whether a request only reads (GET or HEAD). Probes and
+// static answers reject everything else with 405 instead of doing work for a
+// method they do not implement.
+func isReadMethod(r *http.Request) bool {
+	return r.Method == http.MethodGet || r.Method == http.MethodHead
 }

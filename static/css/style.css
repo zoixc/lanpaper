@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* ============================================================
    LANPAPER — DESIGN SYSTEM
    Single stylesheet: base, components, views, overlays.
@@ -2010,4 +2011,181 @@ body.dark .access-select {
         --border:       var(--border-focus);
         --border-hover: var(--text-muted);
     }
+}
+
+/* ==========================================================================
+   Versions & playlist dialog
+   One dialog per link: archived versions, playlist items, rotation and the
+   in-memory access counters. Only additive rules — nothing above is changed,
+   so cards and dialogs that do not use these features render as before.
+   ========================================================================== */
+
+/* A confirmation always sits above the dialog that asked for it. */
+#confirmOverlay { z-index: calc(var(--z-modal) + 10); }
+
+.modal--wide { max-width: 720px; }
+
+.versions-link {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: var(--text-base);
+    color: var(--text);
+    margin: 0 0 4px;
+    word-break: break-all;
+}
+
+.versions-hint {
+    margin: 0 0 12px;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.versions-section { margin-bottom: 18px; }
+
+.versions-section h4 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: var(--fw-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+.versions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: min(34vh, 280px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.versions-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--btn-secondary);
+}
+
+.versions-row--live { border-color: var(--border-hover); }
+
+.versions-row-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.versions-row-title {
+    font-weight: var(--fw-semibold);
+    font-size: var(--text-base);
+}
+
+.versions-row-meta {
+    color: var(--text-muted);
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.versions-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+}
+
+.versions-msg {
+    margin: 0;
+    padding: 10px 12px;
+    color: var(--text-muted);
+    font-size: 13px;
+    border: 1px dashed var(--border);
+    border-radius: 14px;
+}
+.versions-msg.error { color: var(--error); border-color: var(--error); }
+
+/* Text buttons inside the dialog: .btn--danger is an icon-only circle
+   everywhere else, so its geometry is undone here. */
+.btn--small { height: 30px; padding: 0 12px; font-size: 13px; }
+
+.versions-row-actions .btn,
+.rotate-controls .btn {
+    width: auto;
+    height: 30px;
+    padding: 0 12px;
+    border-radius: var(--radius-pill);
+    font-size: 13px;
+}
+
+.versions-row-actions .btn--danger {
+    background: transparent;
+    color: var(--btn-danger-text);
+    border-color: var(--border);
+}
+.versions-row-actions .btn--danger:hover {
+    background: var(--btn-danger-hover);
+    border-color: var(--btn-danger-text);
+}
+
+.rotate-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+}
+
+.rotate-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.rotate-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.rotate-field input[type="number"] {
+    width: 84px;
+    height: 30px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--btn-secondary);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+}
+
+.rotate-field select {
+    height: 30px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--btn-secondary);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+}
+
+.rotate-check input:disabled,
+.rotate-field input:disabled,
+.rotate-field select:disabled { opacity: 0.45; cursor: not-allowed; }
+
+@media (max-width: 560px) {
+    .versions-row { flex-direction: column; align-items: stretch; }
+    .versions-row-actions { justify-content: flex-end; }
 }

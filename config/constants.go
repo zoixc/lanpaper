@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 package config
 
 const (
@@ -37,6 +39,11 @@ const (
 	// RegenerateTimeout bounds a preview regeneration of the whole library.
 	RegenerateTimeout = 30 * 60 // seconds
 )
+
+// MinRecommendedPassLen is the length below which a startup warning asks for a
+// stronger ADMIN_PASS. It is advice, not enforcement: short LAN passwords keep
+// working, and the brute-force lockout is the actual defence.
+const MinRecommendedPassLen = 12
 
 const (
 	DefaultPublicRatePerMin  = 120
@@ -90,3 +97,45 @@ var AllowedMediaExts = map[string]bool{
 
 // IsVideoExt reports whether a stored media extension is a video format.
 func IsVideoExt(ext string) bool { return ext == "mp4" || ext == "webm" }
+
+// Version history and playlist items live in their own directories next to
+// the media they belong to, so the canonical data/media/{link}.{ext} layout
+// (and every tool that reads it) keeps working unchanged.
+const (
+	HistoryDir = "data/history" // data/history/{link}/{version}.{ext}
+	ItemsDir   = "data/items"   // data/items/{link}/{id}.{ext}
+)
+
+// History defaults and hard bounds. HISTORY_LIMIT=0 disables versioning
+// entirely; HISTORY_MAX_MB=0 disables the global budget.
+const (
+	DefaultHistoryLimit = 3
+	MaxHistoryLimit     = 50
+	DefaultHistoryMaxMB = 512
+	MaxHistoryMaxMB     = 1 << 16 // 65536 MiB = 64 GiB, i.e. "no realistic limit"
+)
+
+// Playlist defaults and hard bounds. Rotation intervals are clamped so a
+// typo cannot turn a public link into a per-request randomizer.
+const (
+	DefaultPlaylistMax    = 8
+	MaxPlaylistItems      = 64
+	DefaultRotateInterval = 60 // seconds
+	MinRotateInterval     = 5
+	MaxRotateInterval     = 24 * 3600
+)
+
+// Rotation orders for RotateConfig.Order.
+const (
+	RotateOrderSequential = "sequential"
+	RotateOrderRandom     = "random"
+)
+
+// Publish keys (PUBLISH_KEYS) authorize uploads without admin credentials.
+// They are secrets, so they are only ever compared as SHA-256 digests and
+// only ever logged as an 8 hex character fingerprint.
+const (
+	MaxPublishKeys    = 32
+	MinPublishKeyLen  = 16
+	KeyFingerprintLen = 8
+)

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # --- Stage 1: Builder ---
 FROM golang:1.27-alpine AS builder
 
@@ -42,6 +43,10 @@ WORKDIR /app
 COPY --from=builder /out/lanpaper .
 COPY admin.html .
 COPY static ./static
+# The licence and the third-party notices ship inside the image: a redistributor
+# (or an auditor scanning a running container) must be able to read them without
+# the repository.
+COPY LICENSE THIRD-PARTY-NOTICES.md ./
 
 # Fail the build early if an application asset is missing.
 RUN for f in \
@@ -49,7 +54,8 @@ RUN for f in \
       static/js/settings-menu.js static/js/export-import.js static/sw.js \
       static/manifest.json static/logo.svg static/favicon.svg \
       static/i18n/en.json static/icons/icon-512.png \
-      static/fonts/manrope-latin.woff2 ; \
+      static/fonts/manrope-latin.woff2 \
+      LICENSE THIRD-PARTY-NOTICES.md ; \
     do test -f "$f" || { echo "ERROR: $f missing" >&2; exit 1; }; done
 
 # Application code and assets stay root-owned (read-only for the service);

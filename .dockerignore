@@ -3,8 +3,10 @@
 .gitignore
 .github
 
-# Documentation and tests
+# Documentation and tests. The licence notices are the exception: attribution
+# has to travel with the artifact, not only with the repository.
 *.md
+!THIRD-PARTY-NOTICES.md
 docs/
 tests/
 

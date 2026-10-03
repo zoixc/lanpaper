@@ -1,9 +1,10 @@
+// SPDX-License-Identifier: MIT
 /* Lanpaper service worker: public application assets only.
  * Admin/API responses and mutable media links must always reach the server.
  * In particular, an image that was public yesterday must not be replayed
  * offline after its link is changed to token-only or admin-only.
  */
-const STATIC_CACHE = 'lanpaper-static-v4';
+const STATIC_CACHE = 'lanpaper-static-v6';
 const STATIC_ASSETS = [
   '/static/css/style.css',
   '/static/js/app.js',

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 package handlers
 
 import (
@@ -100,10 +102,12 @@ func Link(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var req struct {
-			NewLinkName *string `json:"newLinkName"`
-			Category    *string `json:"category"`
-			AccessLevel *string `json:"accessLevel"`
-			RotateToken bool    `json:"rotateToken"`
+			NewLinkName *string      `json:"newLinkName"`
+			Category    *string      `json:"category"`
+			AccessLevel *string      `json:"accessLevel"`
+			RotateToken bool         `json:"rotateToken"`
+			Rotate      *rotatePatch `json:"rotate"`
+			RemoveItem  *int         `json:"removeItem"`
 		}
 		if !decodeLinkJSON(w, r, &req) {
 			return
@@ -140,8 +144,37 @@ func Link(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid access level", http.StatusBadRequest)
 			return
 		}
+		// Playlist rotation and item removal are validated before anything is
+		// locked, so a bad request costs no I/O.
+		order := ""
+		if req.Rotate != nil {
+			if req.Rotate.Order != nil {
+				order = strings.ToLower(strings.TrimSpace(*req.Rotate.Order))
+				if order != config.RotateOrderSequential && order != config.RotateOrderRandom {
+					http.Error(w, "Invalid rotation order", http.StatusBadRequest)
+					return
+				}
+			}
+			if req.Rotate.Interval != nil {
+				interval := *req.Rotate.Interval
+				if interval != 0 && (interval < config.MinRotateInterval || interval > config.MaxRotateInterval) {
+					http.Error(w, fmt.Sprintf("Rotation interval must be %d-%d seconds (0 restores the default)",
+						config.MinRotateInterval, config.MaxRotateInterval), http.StatusBadRequest)
+					return
+				}
+			}
+		}
+		removeID := 0
+		if req.RemoveItem != nil {
+			removeID = *req.RemoveItem
+			if removeID <= 0 {
+				http.Error(w, "Invalid playlist item", http.StatusBadRequest)
+				return
+			}
+		}
 		unlock := storage.LockLinks(name)
 		defer unlock()
+		var removedItem storage.PlaylistItem
 		wp, err := storage.Global.Update(name, func(wp *storage.Wallpaper) error {
 			if req.Category != nil {
 				wp.Category = *req.Category
@@ -164,15 +197,56 @@ func Link(w http.ResponseWriter, r *http.Request) {
 				}
 				wp.AccessToken = generateAccessToken()
 			}
+			if req.Rotate != nil {
+				// Merge into the stored settings: a PATCH that only toggles
+				// "enabled" must not reset the interval or the order.
+				var rotate storage.RotateConfig
+				if wp.Rotate != nil {
+					rotate = *wp.Rotate
+				}
+				if req.Rotate.Enabled != nil {
+					rotate.Enabled = *req.Rotate.Enabled
+				}
+				if req.Rotate.Interval != nil {
+					rotate.Interval = *req.Rotate.Interval
+				}
+				if order != "" {
+					rotate.Order = order
+				}
+				wp.Rotate = storage.NormalizeRotatePtr(&rotate, len(wp.Items) > 0)
+			}
+			if req.RemoveItem != nil {
+				items, item, found := storage.WithoutItem(wp.Items, removeID)
+				if !found {
+					return errItemNotFound
+				}
+				wp.Items = items
+				removedItem = item
+			}
 			return nil
 		})
 		if errors.Is(err, errNotTokenLink) {
 			http.Error(w, "Link is not token-protected", http.StatusBadRequest)
 			return
 		}
+		if errors.Is(err, errItemNotFound) {
+			http.Error(w, "Playlist item not found", http.StatusNotFound)
+			return
+		}
 		if err != nil {
 			writeStoreError(w, err)
 			return
+		}
+		// The item file is removed only after the metadata commit, so a failed
+		// save can never leave a listed item without its bytes.
+		if removedItem.ID > 0 {
+			path := storage.ItemPath(name, removedItem.ID, removedItem.Ext)
+			if removeErr := os.Remove(path); removeErr != nil && !os.IsNotExist(removeErr) {
+				log.Printf("Could not remove playlist item %s: %v", path, removeErr)
+			}
+			// Succeeds only when no other item remains in the directory.
+			_ = os.Remove(storage.ItemsDirPath(name))
+			log.Printf("Removed playlist item #%d from %s", removedItem.ID, name)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(toResponse(wp))
@@ -199,6 +273,10 @@ func Link(w http.ResponseWriter, r *http.Request) {
 					filepath.Join(config.LegacyMedia, "previews", name+".webp"))
 			}
 		}
+		// Archived versions, playlist items and the access counters belong to the
+		// link and must not outlive it.
+		storage.RemoveLinkExtraDirs(name)
+		storage.ForgetStats(name)
 		w.WriteHeader(http.StatusNoContent)
 
 	default:
@@ -207,6 +285,19 @@ func Link(w http.ResponseWriter, r *http.Request) {
 }
 
 var errNotTokenLink = errors.New("not a token-protected link")
+
+// errItemNotFound is returned by a PATCH that removes a playlist item id the
+// link does not have.
+var errItemNotFound = errors.New("playlist item not found")
+
+// rotatePatch is the PATCH body for playlist rotation. Every field is optional
+// and a missing field keeps the value the link already has, which is why they
+// are pointers: false, 0 and "" are meaningful values, not "unset".
+type rotatePatch struct {
+	Enabled  *bool   `json:"enabled"`
+	Interval *int    `json:"interval"`
+	Order    *string `json:"order"`
+}
 
 // renameLink holds both names for the whole operation. A failed metadata save
 // rolls file renames back instead of leaving the old URL pointing to nothing.
@@ -267,8 +358,17 @@ func renameLink(oldName, newName string) (*storage.Wallpaper, error) {
 			}
 		}
 	}
+	// Archived versions and playlist items move as whole directories. Most links
+	// have neither, and a missing directory is not an error.
+	movedDirs, err := storage.MoveLinkExtraDirs(oldName, newName)
+	if err != nil {
+		storage.UndoMovedDirs(movedDirs)
+		rollback()
+		return nil, err
+	}
 	renamed, err := storage.Global.Rename(oldName, newName)
 	if err != nil {
+		storage.UndoMovedDirs(movedDirs)
 		rollback()
 		return nil, err
 	}

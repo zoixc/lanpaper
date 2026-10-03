@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 /**
  * Settings Menu Control
  * Manages the dropdown with language selection, data tools and app actions.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Weekly update PRs for Go modules, pinned GitHub Actions and Docker base images.
 version: 2
 updates:

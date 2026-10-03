@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 package handlers
 
 import (
@@ -47,6 +49,21 @@ type WallpaperResponse struct {
 	AccessLevel string `json:"accessLevel"`
 	// AccessToken is only included for token-level links so the admin can copy it.
 	AccessToken string `json:"accessToken,omitempty"`
+
+	// CurrentVersion numbers the file the URL serves. Archived versions are
+	// addressable as /{name}?v=N and restorable via /api/link/{name}/rollback.
+	CurrentVersion uint64 `json:"currentVersion,omitempty"`
+	// History lists the archived versions, newest first.
+	History []storage.HistoryEntry `json:"history,omitempty"`
+	// Items are the playlist entries behind the same URL. The live file is not
+	// listed; it is position 0.
+	Items []storage.PlaylistItem `json:"items,omitempty"`
+	// Rotate is present only for links that have a playlist or rotation settings,
+	// so links that use neither serialize exactly as before.
+	Rotate *storage.RotateConfig `json:"rotate,omitempty"`
+	// Stats counts deliveries since the process started and is absent until the
+	// link has been requested at least once.
+	Stats *storage.AccessStats `json:"stats,omitempty"`
 }
 
 type PaginatedResponse struct {
@@ -199,6 +216,23 @@ func toResponse(wp *storage.Wallpaper) WallpaperResponse {
 	// Only expose the token to the authenticated admin for token-level links.
 	if wp.AccessLevel == config.AccessToken && wp.AccessToken != "" {
 		resp.AccessToken = wp.AccessToken
+	}
+	// Version, playlist and statistics are additive: a link that uses none of
+	// them produces the payload it always produced.
+	switch {
+	case wp.CurrentVersion > 0:
+		resp.CurrentVersion = wp.CurrentVersion
+	case wp.HasImage:
+		// Records written before versioning existed serve version 1.
+		resp.CurrentVersion = 1
+	}
+	resp.History = wp.History
+	resp.Items = wp.Items
+	if (wp.Rotate != nil && wp.Rotate.Enabled) || len(wp.Items) > 0 {
+		resp.Rotate = storage.NormalizeRotatePtr(wp.Rotate, len(wp.Items) > 0)
+	}
+	if stats, ok := storage.StatsFor(wp.LinkName); ok {
+		resp.Stats = &stats
 	}
 	return resp
 }

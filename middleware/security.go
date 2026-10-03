@@ -1,9 +1,12 @@
+// SPDX-License-Identifier: MIT
+
 package middleware
 
 import (
 	"log"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"lanpaper/config"
@@ -47,6 +50,89 @@ const contentSecurityPolicy = "default-src 'none'; " +
 // consumers that embed the media (<img>/<video>, digital frames); it only
 // neutralises the response if it is ever rendered as a document.
 const publicMediaCSP = "default-src 'none'; sandbox"
+
+// embeddedMediaCSP is used when ALLOW_EMBED=true: the same "load nothing"
+// policy without the sandbox directive, because sandbox also blocks the
+// framing that the operator explicitly asked for.
+const embeddedMediaCSP = "default-src 'none'"
+
+// corsMaxAge tells a browser how long it may cache a preflight answer, so a
+// frame that reloads every minute does not pay for a second request each time.
+const corsMaxAge = 600
+
+// corsRequestHeaders are the request headers a cross-origin media read may
+// preflight for. Only this list is echoed back, so the endpoint never advertises
+// headers it does not understand.
+var corsRequestHeaders = map[string]bool{
+	"range":             true,
+	"if-range":          true,
+	"if-none-match":     true,
+	"if-modified-since": true,
+	"x-access-token":    true,
+	"authorization":     true,
+	"cache-control":     true,
+	"pragma":            true,
+}
+
+// applyCORS adds the Access-Control-* headers for a cross-origin media read.
+// Nothing is sent when CORS_ORIGINS is unset or the Origin is not allowed, so
+// the default deployment keeps behaving exactly as before: no
+// Access-Control-Allow-Origin header at all.
+func applyCORS(h http.Header, r *http.Request) bool {
+	value, ok := config.CORSAllowOrigin(r.Header.Get("Origin"))
+	if !ok {
+		return false
+	}
+	h.Set("Access-Control-Allow-Origin", value)
+	if value != "*" {
+		// A shared cache must not hand one origin's response to another.
+		h.Add("Vary", "Origin")
+	}
+	h.Set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+	h.Set("Access-Control-Expose-Headers", "ETag, Last-Modified, Content-Length, Content-Range, Content-Type")
+	h.Set("Access-Control-Max-Age", strconv.Itoa(corsMaxAge))
+	return true
+}
+
+// HandleCORSOptions answers a CORS preflight for public media. It reports
+// whether the request was handled: with CORS disabled, or for an Origin that is
+// not allowed, the caller keeps the previous 405 behaviour.
+func HandleCORSOptions(w http.ResponseWriter, r *http.Request) bool {
+	if r.Method != http.MethodOptions || !config.CORSConfigured() {
+		return false
+	}
+	h := w.Header()
+	if !applyCORS(h, r) {
+		return false
+	}
+	if allowed := filterCORSRequestHeaders(r.Header.Get("Access-Control-Request-Headers")); allowed != "" {
+		h.Set("Access-Control-Allow-Headers", allowed)
+	}
+	// 204 carries no body, so no Content-Length is set: a proxy must not read a
+	// preflight answer as the start of a media response.
+	w.WriteHeader(http.StatusNoContent)
+	return true
+}
+
+// filterCORSRequestHeaders keeps the allowed subset of a preflight's
+// Access-Control-Request-Headers list, canonically cased and de-duplicated.
+func filterCORSRequestHeaders(list string) string {
+	if strings.TrimSpace(list) == "" {
+		return ""
+	}
+	parts := strings.Split(list, ",")
+	out := make([]string, 0, len(parts))
+	seen := make(map[string]bool, len(parts))
+	for _, item := range parts {
+		name := strings.ToLower(strings.TrimSpace(item))
+		if name == "" || seen[name] || !corsRequestHeaders[name] {
+			continue
+		}
+		seen[name] = true
+		out = append(out, http.CanonicalHeaderKey(name))
+	}
+	return strings.Join(out, ", ")
+}
 
 // sameOriginRequest rejects cross-site and cross-port requests (CSRF).
 // Browsers send Sec-Fetch-Site and/or Origin on unsafe requests. A request
@@ -166,17 +252,27 @@ func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 
 // WithPublicSecurity attaches a minimal set of security headers suitable for
 // public media responses (no CSRF check — GET only).
+//
+// ALLOW_EMBED=true relaxes exactly two of them (X-Frame-Options and the CSP
+// sandbox) so dashboards and digital frames can put the media in an <iframe>.
+// The relaxation is opt-in because it removes the protection against a public
+// link being framed by a hostile page.
 func WithPublicSecurity(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
-		h.Set("X-Frame-Options", "DENY")
 		h.Set("Referrer-Policy", "no-referrer")
-		h.Set("Content-Security-Policy", publicMediaCSP)
+		if config.Current.AllowEmbed {
+			h.Set("Content-Security-Policy", embeddedMediaCSP)
+		} else {
+			h.Set("X-Frame-Options", "DENY")
+			h.Set("Content-Security-Policy", publicMediaCSP)
+		}
 		setHSTS(h, r)
 		// Public media may be embedded cross-origin (smart TVs, frames).
 		h.Set("Cross-Origin-Resource-Policy", "cross-origin")
 		h.Set("Cache-Control", "no-store")
+		applyCORS(h, r)
 		next(w, r)
 	}
 }

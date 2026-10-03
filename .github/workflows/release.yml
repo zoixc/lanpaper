@@ -1,0 +1,147 @@
+# SPDX-License-Identifier: MIT
+name: Release
+
+# Tag-triggered release pipeline. Tags in this repository are plain semver
+# (0.12.0); the v-prefixed form is accepted as well.
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+# Creating the GitHub release is the only write this workflow needs.
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # A tag can point at a commit that main never built, so the whole gate is
+  # repeated here: a release must not ship what CI would reject.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+
+      # Refuse to publish a tag that does not match the version the binary
+      # would report: /health answers with VERSION, so a mismatch is visible
+      # to every operator and every probe.
+      - name: Check the tag matches VERSION
+        run: |
+          version="$(cat VERSION)"
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match VERSION (${version})"
+            exit 1
+          fi
+          echo "Tag ${GITHUB_REF_NAME} matches VERSION ${version}."
+
+      - name: Verify dependencies
+        run: |
+          go mod download
+          go mod verify
+
+      - name: Check formatting
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "Run gofmt -w on:"; echo "$unformatted"; exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race -count=1 ./...
+
+      - name: Build
+        run: |
+          go build -trimpath -buildvcs=false \
+            -ldflags="-s -w -X main.Version=${VERSION}" -o /dev/null .
+
+      - name: Vulnerability check
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: lts/*
+
+      - name: Frontend syntax check and tests
+        run: |
+          for f in static/js/*.js static/sw.js; do node --check "$f"; done
+          node --test tests/*.test.cjs
+
+  image:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Semver tags plus :latest, so "ptabi/lanpaper:0.12" keeps working for
+      # anyone who pins a minor and ":latest" always points at a released tag.
+      - name: Build and push
+        run: |
+          version="$(cat VERSION)"
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --build-arg VERSION="${version}" \
+            -t "ptabi/lanpaper:${version}" \
+            -t "ptabi/lanpaper:${version%.*}" \
+            -t "ptabi/lanpaper:latest" \
+            --push .
+
+  release:
+    needs: [verify, image]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The CHANGELOG section for this version is the release note. If it is
+      # missing (a hotfix tag, an edited file) fall back to generated notes
+      # instead of publishing an empty release.
+      - name: Collect release notes
+        run: |
+          version="$(cat VERSION)"
+          awk -v ver="${version}" '
+            index($0, "## [" ver "]") == 1 { flag = 1; next }
+            flag && /^## \[/ { exit }
+            flag { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "No CHANGELOG section for ${version}; using generated notes."
+            echo "GENERATE=1" >> "$GITHUB_ENV"
+          fi
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(cat VERSION)"
+          if [ "${GENERATE:-0}" = "1" ]; then
+            gh release create "${GITHUB_REF_NAME}" \
+              --title "Lanpaper ${version}" --generate-notes
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              --title "Lanpaper ${version}" --notes-file notes.md
+          fi

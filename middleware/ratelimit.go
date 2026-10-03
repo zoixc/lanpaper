@@ -1,9 +1,12 @@
+// SPDX-License-Identifier: MIT
+
 package middleware
 
 import (
 	"log"
 	"net"
 	"net/http"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,14 +33,25 @@ func StartCleaner() {
 	ticker := time.NewTicker(time.Duration(config.RateLimitCleanerInterval) * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
-		now := time.Now()
-		muCounts.Lock()
-		for key, c := range counts {
-			if now.Sub(c.start) >= c.span {
-				delete(counts, key)
-			}
+		cleanExpiredCounts(time.Now())
+	}
+}
+
+// cleanExpiredCounts drops the windows that have run out. It runs on a goroutine
+// nobody restarts, so a panic is contained here: without the cleaner the counter
+// map would grow with every client IP that ever made a request.
+func cleanExpiredCounts(now time.Time) {
+	defer func() {
+		if p := recover(); p != nil {
+			log.Printf("Critical: rate-limit cleaner recovered from a panic: %v\n%s", p, debug.Stack())
 		}
-		muCounts.Unlock()
+	}()
+	muCounts.Lock()
+	defer muCounts.Unlock()
+	for key, c := range counts {
+		if now.Sub(c.start) >= c.span {
+			delete(counts, key)
+		}
 	}
 }
 
