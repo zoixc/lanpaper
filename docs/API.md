@@ -422,7 +422,7 @@ done in the response writer's `ReadFrom` path, so media still uses `sendfile`.
 ### `GET /health`
 
 Liveness check, always public, no disk I/O. Returns
-`{"service":"lanpaper","status":"ok","version":"0.12.0"}`. Any method other than
+`{"service":"lanpaper","status":"ok","version":"0.12.1"}`. Any method other than
 `GET`/`HEAD` is `405`.
 
 ### `GET /health/ready`

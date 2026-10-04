@@ -3,29 +3,41 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
-## [Unreleased]
+## [0.12.1] – 2026-10-04
+
+A rollback release. The admin redesign published as 0.13.0 broke the panel
+layout in normal use, so the presentation returns to exactly the 0.12.0 state.
+Nothing else moved: no Go code changed, and the API, the stored data, the
+access levels and every existing URL behave as they did in 0.12.0.
 
 ### Changed
 
-- **The 0.13.0 admin redesign is rolled back.** The tile grid, the card footer
-  (`Change ▾ · Panel · ⋯`), the fitted previews, the five accent palettes and
-  the animated icon set visibly broke the panel, so `admin.html`,
-  `static/css/style.css`, `static/js/app.js`, `static/js/settings-menu.js`,
-  `static/sw.js` and the six translation files are back to their 0.12.0 state
-  and the service worker cache generation is `lanpaper-static-v6` again.
-  `VERSION` returns to `0.12.0`. The redesign had already been tagged and
-  published as 0.13.0, so `ptabi/lanpaper:0.13.0` still contains it; `latest`
-  is rebuilt from `main` and no longer does. Only the presentation is affected:
-  the API, the stored data and every URL behave as they did in 0.12.0.
+- **The admin panel is back to the 0.12.0 interface.** The tile grid, the
+  permanent card footer (`Change ▾ · Panel · ⋯`), the previews fitted into a
+  16:9 frame, the five accent palettes and the animated icon set are reverted.
+  `admin.html`, `static/css/style.css`, `static/js/app.js`,
+  `static/js/settings-menu.js`, `static/sw.js` and the six `static/i18n/*.json`
+  files are byte-identical to 0.12.0 again; hover actions on the preview, the
+  access row in the card and the gallery/list toggle all work as before.
+- **The service worker cache generation is `lanpaper-static-v6` again.** An
+  installed PWA that picked up `v7` from 0.13.0 deletes that cache when the
+  rolled-back `sw.js` activates — `activate` purges every `lanpaper-*` cache
+  except the current one — so no stale stylesheet survives the downgrade.
+- **0.13.0 is superseded.** `ptabi/lanpaper:0.13.0` still contains the
+  redesign; `:latest`, `:0.12` and `:0.12.1` do not. Update to 0.12.1 (or
+  re-pull `latest`) to get the working panel back.
 
 ### Added
 
-- `design/` keeps the UI/UX audit, the design tokens and the clickable
-  prototypes produced for the redesign, so a second attempt starts from them.
-  They are static files: nothing under `design/` is served by the application.
-- `tests/i18n.test.cjs` keeps the six translations in step — the same key set
-  in every language, no empty or untranslated values, every key referenced by
-  `admin.html` and the scripts present, `{{placeholder}}` names preserved.
+- `design/` stays in the repository: the UI/UX audit, the design tokens and the
+  clickable prototypes that the redesign was built from, so a second attempt
+  starts from them rather than from scratch. Nothing under `design/` is served
+  by the application, and the directory is excluded from the Docker build
+  context.
+- `tests/i18n.test.cjs` keeps the six translations in step: the same key set in
+  every language, no empty or untranslated values, every key referenced by
+  `admin.html` and the scripts present in all six files, and `{{placeholder}}`
+  names preserved. The checked key list matches the reverted interface.
 
 ## [0.12.0] – 2026-10-03
 

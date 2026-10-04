@@ -58,6 +58,12 @@ Open ideas, roughly in priority order. For shipped changes see
 
 - Browser end-to-end tests in CI (create, upload, access levels, import,
   history rollback, playlist rotation).
+- A visual review gate for admin UI work. The 0.13.0 redesign passed jsdom
+  assertions, a CSS-cascade analysis and contrast checks, still broke the layout
+  in a real browser, and was rolled back in 0.12.1. Layout changes need eyes on
+  them — desktop, tablet and phone, both themes, a full and an empty library —
+  before they merge. The mockups and the design tokens for a second attempt are
+  kept in `design/`.
 - Benchmarks for the public media path (`BenchmarkPublic…`), so hot-path
   changes stay measured instead of assumed. The test harness would need a
   `*testing.B` variant of `setupApp` first.
