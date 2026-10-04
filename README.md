@@ -33,18 +33,12 @@ link, which is handy for digital frames, smart TVs, kiosks and other displays.
   each upload.
 - **Per-link access levels:** `public`, `local` (LAN only), `token` (secret
   URL) and `auth` (admin only). Media is stored outside the static web root.
-- **Admin panel** (installable PWA) with a tile grid of previews (five per row
-  on a wide screen, two on a phone), search, sorting, pinning, drag-and-drop,
-  dark mode, export/import of the link list and six languages (EN, RU, DE, FR,
-  IT, ES). Each tile keeps its actions in a permanent footer — change the
-  file, open the link panel, or pick a secondary action from the menu — so
-  nothing sits on top of the preview. App icons, portrait and panoramic
-  images are fitted to the tile and shown whole on a blurred copy of
-  themselves, with format, aspect ratio and duration printed in the corners;
-  video previews play only while visible. Five accent palettes (sunset,
-  indigo, terracotta, sage, graphite) are switched from the settings menu, and
-  every icon comes from one animated stroke set. A per-link dialog manages
-  versions, playlist items, rotation and access counters.
+- **Admin panel** (installable PWA) with gallery-style previews, search,
+  sorting, pinning, drag-and-drop, dark mode, export/import of the link list
+  and six languages (EN, RU, DE, FR, IT, ES). App icons, portrait and
+  panoramic images are shown whole instead of cropped; video previews play
+  only while visible. A per-link dialog manages versions, playlist items,
+  rotation and access counters.
 - **Light on resources:** about 10 MB of RAM when idle, gzip for text
   responses, media revalidated with `304` instead of downloaded again, and
   about 50 KB of self-hosted WOFF2 fonts. Archived versions are moved, not

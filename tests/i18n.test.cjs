@@ -31,19 +31,11 @@ function referencedKeys() {
   for (const match of scripts.matchAll(/\bt\(\s*['"]([a-z0-9_]*[a-z0-9])['"]/g)) {
     keys.add(match[1]);
   }
-  // Keys passed through a variable: t('cat_' + category, ...) and friends.
-  keys.add('cat_image');
-  keys.add('cat_video');
-  keys.add('cat_other');
+  // Keys assembled at runtime: `'access_' + level` in app.js.
   keys.add('access_public');
   keys.add('access_local');
   keys.add('access_token');
   keys.add('access_auth');
-  keys.add('palette_sunset');
-  keys.add('palette_indigo');
-  keys.add('palette_terra');
-  keys.add('palette_sage');
-  keys.add('palette_graphite');
   return keys;
 }
 
@@ -88,7 +80,7 @@ test('placeholders such as {{n}} survive translation', () => {
 
 test('each non-English language actually translates the interface', () => {
   // A handful of strings that must not stay English in a translated panel.
-  const mustDiffer = ['create_btn', 'delete_btn', 'settings_language', 'pult_btn', 'change_media'];
+  const mustDiffer = ['create_btn', 'delete_btn', 'settings_language', 'upload_file', 'search_placeholder'];
   for (const lang of LANGS.filter(l => l !== 'en')) {
     const identical = mustDiffer.filter(key => translations[lang][key] === translations.en[key]);
     // A word may legitimately coincide (Italian "Video", French "Photo"), so

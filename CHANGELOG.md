@@ -3,60 +3,29 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
-## [0.13.0] – 2026-10-03
-
-Redesign of the admin panel, ported from the design prototypes in `design/`.
-Everything below is presentation only: the API, the stored data and every
-existing URL behave exactly as before.
+## [Unreleased]
 
 ### Changed
 
-- **Cards are tiles again, and the actions moved off the preview.** The grid
-  lays out five tiles per row on a wide screen, four at 1024–1280 px and two on
-  a phone; below 340 px it drops to one column. Each tile has a permanent
-  footer — `Change ▾ · Panel · ⋯` — instead of the upload/delete buttons that
-  appeared over the image on hover. Turning the phone sideways or resizing the
-  window reflows the grid instead of leaving a single column with dead space.
-- **Previews are fitted to the tile and capped by the 16:9 frame.** Photos and
-  panoramas fill it, portraits, squares and app icons are shown whole on a
-  blurred copy of themselves, and the checkerboard is now shown only for
-  formats that can carry transparency. The format, aspect ratio and video
-  duration are printed in the corners of the frame, read from the file that
-  actually loaded.
-- **Access level, pinning and rename live in the `⋯` menu.** The access row is
-  no longer a permanent line in the card; a pinned link is marked with a badge
-  on the preview instead of a hover button.
-- **Five accent palettes** — the default sunset gradient plus indigo,
-  terracotta, sage and graphite — switched from the settings menu and stored in
-  `localStorage`. Each palette is defined for both themes and keeps white text
-  on the gradient and the accent on a card at ≥ 4.5:1.
-- **Tiles are the default view.** The list view is unchanged and one click
-  away; the choice is still remembered per browser.
-- **One icon family everywhere.** Every glyph in the panel — toolbar, search,
-  sorting, card footer, `⋯` menu, dialogs, the link panel headings — is a
-  single 24×24 stroke set (1.85 px, round caps and joins) and answers on hover:
-  menu items slide, the sort chevron and the plus in *New link* turn, the gear
-  turns while the settings menu is closed, the pin pops in, badges fade in and
-  long operations (creating a link, regenerating previews) spin the button
-  icon. Every animation is `transform`-only and switched off under
-  `prefers-reduced-motion`.
-- **The whole panel is translated.** All six languages carry the same 151 keys;
-  the file-kind label, the date, the image alternative text, the pin button
-  and the sorting/settings menus now follow the selected language, and changing
-  the language re-renders the cards in place instead of only re-labelling the
-  static markup. A new `tests/i18n.test.cjs` keeps the six files in step and
-  guards the `{{placeholder}}` names.
-- **Nothing is clipped.** Dropdowns and menus are anchored to the card, open
-  upward, and are capped at `min(70vh, 460px)` / `calc(100vw - 24px)` with
-  their own scroll; on phones the card menus turn into bottom sheets above the
-  safe-area inset. Long translations shrink their label with an ellipsis rather
-  than pushing the `⋯` button out of the tile.
-- The service worker cache generation bumps to `lanpaper-static-v7`, so
-  installed PWAs pick up the new stylesheet on the next launch.
-- Performance stays where it was: the hover, badge and pin animations are
-  `transform`-only, previews are decoded with `decoding="async"`, the blur
-  placeholder is skipped for formats that cannot carry transparency, and the
-  two badges per card no longer use `backdrop-filter`.
+- **The 0.13.0 admin redesign is rolled back.** The tile grid, the card footer
+  (`Change ▾ · Panel · ⋯`), the fitted previews, the five accent palettes and
+  the animated icon set visibly broke the panel, so `admin.html`,
+  `static/css/style.css`, `static/js/app.js`, `static/js/settings-menu.js`,
+  `static/sw.js` and the six translation files are back to their 0.12.0 state
+  and the service worker cache generation is `lanpaper-static-v6` again.
+  `VERSION` returns to `0.12.0`. The redesign had already been tagged and
+  published as 0.13.0, so `ptabi/lanpaper:0.13.0` still contains it; `latest`
+  is rebuilt from `main` and no longer does. Only the presentation is affected:
+  the API, the stored data and every URL behave as they did in 0.12.0.
+
+### Added
+
+- `design/` keeps the UI/UX audit, the design tokens and the clickable
+  prototypes produced for the redesign, so a second attempt starts from them.
+  They are static files: nothing under `design/` is served by the application.
+- `tests/i18n.test.cjs` keeps the six translations in step — the same key set
+  in every language, no empty or untranslated values, every key referenced by
+  `admin.html` and the scripts present, `{{placeholder}}` names preserved.
 
 ## [0.12.0] – 2026-10-03
 
