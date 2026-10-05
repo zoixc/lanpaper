@@ -96,6 +96,44 @@ func TestStoreCommitsAtomicallyAndReturnsCopies(t *testing.T) {
 	}
 }
 
+// A snapshot that shares its Items or History backing array with the live
+// record is not a snapshot: mutating what the caller was handed would rewrite
+// the store behind its back.
+func TestStoreSnapshotsDoNotShareSlices(t *testing.T) {
+	testStorageDir(t)
+	s := &Store{}
+	created := &Wallpaper{
+		ID: "p", LinkName: "p", Category: "other", AccessLevel: config.AccessPublic,
+		Items:   []PlaylistItem{{ID: 1, Ext: "jpg"}, {ID: 2, Ext: "png"}},
+		History: []HistoryEntry{{Version: 1, Ext: "jpg", SizeBytes: 10}},
+	}
+	if err := s.Create(created); err != nil {
+		t.Fatal(err)
+	}
+
+	read, ok := s.Get("p")
+	if !ok {
+		t.Fatal("created record is missing")
+	}
+	read.Items[0].Ext = "tampered"
+	read.History[0].Ext = "tampered"
+
+	snap := s.GetAll()
+	if len(snap) != 1 {
+		t.Fatalf("unexpected snapshot size: %d", len(snap))
+	}
+	snap[0].Items[1].ID = 99
+	snap[0].Items = append(snap[0].Items, PlaylistItem{ID: 3, Ext: "gif"})
+
+	fresh, _ := s.Get("p")
+	if len(fresh.Items) != 2 || fresh.Items[0].Ext != "jpg" || fresh.Items[1].ID == 99 {
+		t.Fatalf("playlist items escaped the store: %+v", fresh.Items)
+	}
+	if len(fresh.History) != 1 || fresh.History[0].Ext != "jpg" {
+		t.Fatalf("history escaped the store: %+v", fresh.History)
+	}
+}
+
 func TestStoreLoadRefusesCorruptAndUnsafeData(t *testing.T) {
 	testStorageDir(t)
 	s := &Store{}

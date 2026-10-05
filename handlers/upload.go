@@ -580,6 +580,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
+		if clientGone(r) {
+			return
+		}
 		// Even in lossless mode, fully decode before storing: malformed files
 		// must not be published just because their first 512 bytes look valid.
 		img, release, err := decodeImage(source, ext)
@@ -594,6 +597,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer release()
+		// Decoding a large image takes seconds; the client may be long gone.
+		if clientGone(r) {
+			return
+		}
 		if !lossless {
 			img = scaleImage(img, config.Current.Compression.Scale)
 		}
@@ -749,6 +756,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(toResponse(updated))
+}
+
+// clientGone reports whether the client cancelled the request while the upload
+// was being processed. Decoding and encoding would otherwise run to completion
+// for a response nobody is waiting for, holding a slot of the decode budget.
+func clientGone(r *http.Request) bool {
+	return r.Context().Err() != nil
 }
 
 // errInvalidLinkDefaults rejects an auto-created link whose requested access

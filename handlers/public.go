@@ -109,19 +109,17 @@ func Public(w http.ResponseWriter, r *http.Request) {
 }
 
 // publicLinkName maps a request path to a link name. Besides the canonical
-// /{name} it accepts two cosmetic forms that clients insisting on a file
-// extension need (some e-ink frames, TV apps and feed readers refuse a URL
-// without one):
+// /{name} it accepts two cosmetic forms that e-ink frames, TV apps and feed
+// readers need because they refuse a URL without a file extension:
 //
 //	/{name}.{ext}   the extension is ignored — the stored media type decides
 //	/{name}/latest  an explicit "give me the current file" alias
 //
-// Neither form widens what is reachable: the extension has to be on the media
-// allow-list, so /manifest.json, /favicon.ico, /robots.txt and /sw.js keep
-// resolving exactly as before, and the result is still validated as a link
-// name, so a path containing a slash or a traversal segment never becomes a
-// file path. A bare /latest is not an alias, which keeps a link actually named
-// "latest" working.
+// Neither widens what is reachable: the extension has to be on the media
+// allow-list, so /manifest.json, /favicon.ico, /robots.txt and /sw.js still
+// reach their own handlers, and the result is validated as a link name, so a
+// slash or a traversal segment never becomes a file path. A bare /latest is not
+// an alias, which keeps a link actually named "latest" working.
 func publicLinkName(path string) (string, bool) {
 	name := strings.TrimSuffix(path, "/")
 	if len(name) < 2 {

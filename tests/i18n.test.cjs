@@ -8,8 +8,16 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
-const LANGS = ['en', 'ru', 'de', 'fr', 'it', 'es'];
 const ROOT = path.join(__dirname, '..');
+
+// The panel's language list has exactly one definition, in settings-menu.js.
+// Parse it instead of keeping a second copy here that can drift.
+const menuSource = fs.readFileSync(path.join(ROOT, 'static/js/settings-menu.js'), 'utf8');
+const declaration = menuSource.match(/window\.LANPAPER_LANGS\s*=\s*(\[[^\]]*\]);/);
+assert.ok(declaration, 'settings-menu.js no longer declares window.LANPAPER_LANGS');
+// The declaration is a JS array literal with single quotes; the codes are
+// plain ASCII, so quoting them for JSON is enough to parse it.
+const LANGS = JSON.parse(declaration[1].replace(/'/g, '"'));
 
 const translations = {};
 for (const lang of LANGS) {

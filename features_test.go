@@ -475,10 +475,26 @@ func TestAppPublicAliasesCORSEmbedAndStats(t *testing.T) {
 		}
 	}
 	// Reserved names and non-media extensions keep resolving exactly as before.
-	// /robots.txt is the single exception: no link can ever claim that name, so
-	// it answers the crawler policy instead of a 404 (see production_test.go).
-	for _, path := range []string{"/manifest.json", "/favicon.ico", "/sitemap.xml", "/photo.txt", "/photo/other", "/api/nope", "/static/photo.png"} {
+	// /robots.txt, /favicon.ico and the manifest are the exceptions: no link can
+	// ever claim those names, so they answer the crawler policy or redirect to
+	// the file under /static/ instead of a 404.
+	for _, path := range []string{"/sitemap.xml", "/photo.txt", "/photo/other", "/api/nope", "/static/photo.png"} {
 		a.expect(http.StatusNotFound, "GET", path, nil, false, nil)
+	}
+	noRedirect := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	for path, want := range map[string]string{
+		"/favicon.ico":          "/static/favicon.svg",
+		"/manifest.json":        "/static/manifest.json",
+		"/manifest.webmanifest": "/static/manifest.json",
+	} {
+		resp, err := noRedirect.Get(a.server.URL + path)
+		if err != nil {
+			t.Fatalf("GET %s: %v", path, err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusFound || resp.Header.Get("Location") != want {
+			t.Fatalf("%s = %d -> %q, want 302 -> %q", path, resp.StatusCode, resp.Header.Get("Location"), want)
+		}
 	}
 	// An alias cannot bypass the access level of the link it resolves to.
 	a.expect(http.StatusOK, "PATCH", "/api/link/photo", []byte(`{"accessLevel":"auth"}`), true, jsonHeaders())

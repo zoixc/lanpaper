@@ -328,6 +328,17 @@ its address, keep `data/` on a volume that is actually backed up, use a long
 random `ADMIN_PASS`, set `HISTORY_MAX_MB` to what the volume can spare, and
 read every `Warning:` the process prints at startup.
 
+Two properties worth knowing before sizing a host:
+
+- **Authentication is stateless.** There are no sessions or cookies: the admin
+  password is sent with every request as HTTP Basic Auth, so TLS in front (or
+  `TLS_CERT_FILE`/`TLS_KEY_FILE`) is what keeps it private. Failed logins are
+  counted per client and locked out for a while.
+- **Image work is bounded.** One image may hold 36 M pixels and at most 48 M
+  decoded pixels may be in flight, so a burst of uploads queues instead of
+  growing the process without limit. A 36 M pixel upload peaks at about 174 MB
+  of memory with the pure Go WebP encoder.
+
 ## Backups and upgrades
 
 Back up the whole persistent `data/` directory: `wallpapers.json`, `media/`,

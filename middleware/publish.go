@@ -11,22 +11,17 @@ import (
 	"lanpaper/config"
 )
 
-// Publish keys let an automation (a webhook, a script on a phone, a home
-// assistant routine) replace the media behind a link without holding the admin
-// password. They are deliberately narrower than admin credentials:
+// Publish keys let an automation push media without the admin password. They
+// are deliberately narrow: POST /api/upload (replace or append) and POST
+// /api/link (create the link to upload into). Renaming, re-scoping access,
+// deleting, pinning, history and rotation settings still require the admin
+// login, so a leaked key can push content but neither expose nor destroy the
+// library.
 //
-//	POST /api/upload — replace or append the media of an existing link
-//	POST /api/link   — create a link to upload into
-//
-// Everything else (renaming, re-scoping access, deleting, pinning, history,
-// rotation settings) still requires the admin login, so a leaked publish key
-// can push content but can neither expose nor destroy the library.
-//
-// Failed key guesses share the admin brute-force policy: after authMaxFailures
-// wrong keys from one client (IPv6: one /64) within authFailWindow the client
-// is locked out, and while it is locked out even a correct key is rejected so
-// the lockout cannot be used as an oracle. A request without a key is never
-// counted, so the admin panel and public links are unaffected.
+// Wrong guesses share the admin brute-force policy: after authMaxFailures from
+// one client (IPv6: one /64) inside authFailWindow even a correct key is
+// rejected, so the lockout cannot be used as an oracle. Requests without a key
+// are never counted, which keeps the admin panel and public links unaffected.
 type publishKeyContextKey struct{}
 
 // PublisherFingerprint returns the log fingerprint of the publish key that

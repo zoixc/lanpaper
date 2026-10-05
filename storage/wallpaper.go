@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -87,8 +88,7 @@ func (s *Store) Get(id string) (*Wallpaper, bool) {
 	if !ok || wp == nil {
 		return nil, false
 	}
-	clone := *wp
-	return &clone, true
+	return cloneWallpaper(wp), true
 }
 
 // Set is for the one-time startup media migration. Request handlers must use
@@ -253,10 +253,19 @@ func (s *Store) GetAll() []*Wallpaper {
 func cloneSnap(original []*Wallpaper) []*Wallpaper {
 	snap := make([]*Wallpaper, len(original))
 	for i, wp := range original {
-		clone := *wp
-		snap[i] = &clone
+		snap[i] = cloneWallpaper(wp)
 	}
 	return snap
+}
+
+// cloneWallpaper copies a record, slice fields included, so a caller can read
+// and modify what it was handed without reaching into the live store. A plain
+// struct copy would share the Items and History backing arrays.
+func cloneWallpaper(wp *Wallpaper) *Wallpaper {
+	clone := *wp
+	clone.Items = slices.Clone(wp.Items)
+	clone.History = slices.Clone(wp.History)
+	return &clone
 }
 
 // atomicWrite marshals data to a temp file, flushes it to stable storage and

@@ -6,7 +6,8 @@
 
 
 // STATE & CONFIG
-const SUPPORTED_LANGS = new Set(['en', 'ru', 'de', 'fr', 'it', 'es']);
+// Declared once in settings-menu.js, which loads first.
+const SUPPORTED_LANGS = new Set(window.LANPAPER_LANGS || ['en']);
 const STATE = {
     translations: {},
     lang: localStorage.getItem('lang') || navigator.language.slice(0, 2) || 'en',

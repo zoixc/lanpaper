@@ -158,6 +158,13 @@ func newMux() *http.ServeMux {
 	// bandwidth and an indexed URL outlives the access level it was public
 	// under. The name is reserved, so no link can ever be shadowed by it.
 	mux.HandleFunc("/robots.txt", serveRobotsTxt)
+	// Browsers and PWA installers probe these root paths even though the panel
+	// links /static/...; the names are reserved, so no link can be shadowed by
+	// the alias. A temporary redirect keeps the URL usable without caching the
+	// alias forever.
+	mux.HandleFunc("/favicon.ico", redirectToStaticAsset("favicon.svg"))
+	mux.HandleFunc("/manifest.json", redirectToStaticAsset("manifest.json"))
+	mux.HandleFunc("/manifest.webmanifest", redirectToStaticAsset("manifest.json"))
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/health/ready", readyHandler)
 	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Admin)))
@@ -189,6 +196,14 @@ func newMux() *http.ServeMux {
 	mux.HandleFunc("/", middleware.WithPublicSecurity(middleware.PublicRateLimit(handlers.Public)))
 
 	return mux
+}
+
+// redirectToStaticAsset answers a reserved root path with a redirect to the
+// file under /static/ that actually holds it.
+func redirectToStaticAsset(name string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/static/"+name, http.StatusFound)
+	}
 }
 
 // handleLinkRoutes dispatches the sub-resources of /api/link/{name}. Every
