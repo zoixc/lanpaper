@@ -6,141 +6,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"image"
-	"image/draw"
-	"image/gif"
-	"image/jpeg"
-	"image/png"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
-	"runtime/debug"
 	"strings"
-	"sync"
 	"time"
-
-	"github.com/chai2010/webp"
-	_ "golang.org/x/image/bmp"
-	xdraw "golang.org/x/image/draw"
-	"golang.org/x/image/math/f64"
-	_ "golang.org/x/image/tiff"
-	xwebp "golang.org/x/image/webp"
 
 	"lanpaper/config"
 	"lanpaper/middleware"
 	"lanpaper/storage"
 	"lanpaper/utils"
 )
-
-// WebP is explicitly decoded with the streaming x/image/webp decoder below.
-// The WebP encoder dependency also registers a decoder that buffers the
-// entire compressed file; never use image.Decode for WebP uploads.
-var uploadSem = make(chan struct{}, config.DefaultMaxConcurrentUploads)
-
-func InitUploadSemaphore(n int) {
-	if n <= 0 || n > config.MaxConcurrentUploadsLimit {
-		n = config.DefaultMaxConcurrentUploads
-	}
-	uploadSem = make(chan struct{}, n)
-}
-
-var (
-	errMediaTooLarge   = errors.New("media exceeds upload limit")
-	errImageBudgetBusy = errors.New("image processing capacity reached")
-	decodedPixels      = struct {
-		sync.Mutex
-		inFlight int64
-	}{}
-)
-
-// Enforce a shared memory budget for uploads AND preview regeneration. The
-// upload semaphore alone allows many near-limit images to decode at once.
-func reserveDecodedPixels(pixels int64) (func(), error) {
-	if pixels <= 0 || pixels > config.MaxDecodedPixelsInFlight {
-		return nil, errImageBudgetBusy
-	}
-	decodedPixels.Lock()
-	if decodedPixels.inFlight+pixels > config.MaxDecodedPixelsInFlight {
-		decodedPixels.Unlock()
-		return nil, errImageBudgetBusy
-	}
-	decodedPixels.inFlight += pixels
-	decodedPixels.Unlock()
-	return func() {
-		decodedPixels.Lock()
-		decodedPixels.inFlight -= pixels
-		idle := decodedPixels.inFlight == 0
-		decodedPixels.Unlock()
-		// A large decode leaves tens of MB of garbage that the runtime would
-		// keep resident for minutes. Hand it back once no image work is left.
-		if idle && pixels >= freeOSMemoryMinPixels {
-			go debug.FreeOSMemory()
-		}
-	}, nil
-}
-
-// freeOSMemoryMinPixels is the decode size (~4 MP) from which returning
-// memory to the OS is worth a forced GC cycle.
-const freeOSMemoryMinPixels = 4_000_000
-
-// copyFile writes to a temporary sibling and renames it into place. io.Copy
-// can use optimized file-to-file copies; a bounded reader still protects
-// against a local source growing after its initial size check.
-func copyFile(dst string, src io.Reader, limit int64) error {
-	return writeFileAtomic(dst, func(out *os.File) error {
-		n, err := io.Copy(out, io.LimitReader(src, limit+1))
-		if err == nil && n > limit {
-			err = errMediaTooLarge
-		}
-		return err
-	})
-}
-
-// writeFileAtomic writes a temporary sibling of dst, flushes it to stable
-// storage and renames it into place. A failed or interrupted write can never
-// truncate an existing file at dst.
-func writeFileAtomic(dst string, write func(*os.File) error) error {
-	out, err := os.CreateTemp(filepath.Dir(dst), ".tmp-*"+filepath.Ext(dst))
-	if err != nil {
-		return err
-	}
-	tmp := out.Name()
-	defer os.Remove(tmp)
-	writeErr := write(out)
-	if writeErr == nil {
-		writeErr = out.Sync()
-	}
-	closeErr := out.Close()
-	if writeErr != nil {
-		return writeErr
-	}
-	if closeErr != nil {
-		return closeErr
-	}
-	return os.Rename(tmp, dst)
-}
-
-var mimeToExt = map[string]string{
-	"image/jpeg": "jpg", "image/png": "png", "image/gif": "gif",
-	"image/webp": "webp", "image/bmp": "bmp", "image/tiff": "tiff",
-	"video/mp4": "mp4", "video/webm": "webm",
-}
-
-func isVideo(ext string) bool { return config.IsVideoExt(ext) }
-
-func storedExt(ext string, lossless bool) string {
-	if !lossless && (ext == "bmp" || ext == "tiff") {
-		return "jpg"
-	}
-	return ext
-}
-
-func canUseLosslessMode() bool {
-	return config.Current.Compression.Quality == 100 && config.Current.Compression.Scale == 100
-}
 
 // Upload modes for the optional "mode" form field.
 const (
@@ -171,213 +50,6 @@ func formFlag(raw string) bool {
 		return true
 	}
 	return false
-}
-
-// inspectMediaFile validates a bounded file's type using magic bytes, not a
-// user-provided extension or Content-Type. The reader is reset on return.
-func inspectMediaFile(r io.ReadSeeker, name string, size, maxBytes int64) (string, error) {
-	if size > maxBytes {
-		return "", errMediaTooLarge
-	}
-	if size < 16 {
-		return "", errors.New("file too small")
-	}
-	head := make([]byte, 512)
-	n, err := r.Read(head)
-	if err != nil && err != io.EOF {
-		return "", err
-	}
-	if _, err := r.Seek(0, io.SeekStart); err != nil {
-		return "", err
-	}
-	head = head[:n]
-	// ISO-BMFF/MP4: accept ANY ftyp brand before consulting DetectContentType.
-	// The WHATWG sniffer in net/http only matches ftyp boxes containing an
-	// "mp4*" brand, so real-world camera/phone videos (isom/iso2/avc1/M4V...)
-	// were rejected — especially URL downloads, which land in a nameless
-	// temp file with no extension to fall back to.
-	if len(head) >= 12 && string(head[4:8]) == "ftyp" {
-		return "mp4", utils.ValidateFileType(head, "mp4")
-	}
-	ext, ok := mimeToExt[http.DetectContentType(head)]
-	if !ok {
-		// TIFF/BMP/WebM are not detected on some Go versions. Fall back to
-		// a supported extension, then demand its exact magic bytes below.
-		ext = strings.TrimPrefix(strings.ToLower(filepath.Ext(name)), ".")
-		if ext == "jpeg" {
-			ext = "jpg"
-		} else if ext == "tif" {
-			ext = "tiff"
-		}
-	}
-	if err := utils.ValidateFileType(head, ext); err != nil {
-		return "", err
-	}
-	return ext, nil
-}
-
-// checkImageDimensions runs before any full image decode, including lossless
-// uploads and thumbnail regeneration. A width/height cap alone still allows
-// a 16k x 16k image to allocate >1 GB per decoded copy.
-func checkImageDimensions(r io.ReadSeeker, ext string) (int64, error) {
-	var cfg image.Config
-	var err error
-	if ext == "webp" {
-		cfg, err = xwebp.DecodeConfig(r)
-	} else {
-		cfg, _, err = image.DecodeConfig(r)
-	}
-	if err != nil {
-		return 0, fmt.Errorf("could not read image config: %w", err)
-	}
-	pixels := int64(cfg.Width) * int64(cfg.Height)
-	if cfg.Width < 1 || cfg.Height < 1 || cfg.Width > config.MaxImageDimension ||
-		cfg.Height > config.MaxImageDimension || pixels > config.MaxImagePixels {
-		return 0, fmt.Errorf("image %dx%d exceeds limits", cfg.Width, cfg.Height)
-	}
-	return pixels, nil
-}
-
-// The returned release function must be called after all resizing/encoding
-// is finished, even on failure. Reserve BEFORE allocating a decoded image.
-func decodeImage(r io.ReadSeeker, ext string) (image.Image, func(), error) {
-	pixels, err := checkImageDimensions(r, ext)
-	if err != nil {
-		return nil, nil, err
-	}
-	release, err := reserveDecodedPixels(pixels)
-	if err != nil {
-		return nil, nil, err
-	}
-	if _, err := r.Seek(0, io.SeekStart); err != nil {
-		release()
-		return nil, nil, err
-	}
-	var img image.Image
-	if ext == "webp" {
-		img, err = xwebp.Decode(r)
-	} else {
-		img, _, err = image.Decode(r)
-	}
-	if err != nil {
-		release()
-		return nil, nil, fmt.Errorf("invalid image: %w", err)
-	}
-	return img, release, nil
-}
-
-// thumbnail fits src into maxW x maxH, never upscaling.
-func thumbnail(src image.Image, maxW, maxH int) image.Image {
-	b := src.Bounds()
-	return resize(src, min(float64(maxW)/float64(b.Dx()), float64(maxH)/float64(b.Dy())))
-}
-
-// scaleImage applies the configured COMPRESSION_SCALE percentage.
-func scaleImage(src image.Image, scalePercent int) image.Image {
-	return resize(src, float64(scalePercent)/100)
-}
-
-// resize downscales src by scale with a bilinear kernel widened to the scale
-// factor (so every source pixel contributes). It uses Kernel.Transform, not
-// Kernel.Scale: Scale allocates a dstWidth x srcHeight float64 buffer (575 MB
-// to halve a 36 MP photo), while Transform needs no temporary memory and
-// produces the same pixels to within one level of rounding (resize_test.go).
-func resize(src image.Image, scale float64) image.Image {
-	if scale >= 1 {
-		return src
-	}
-	b := src.Bounds()
-	w := max(1, int(float64(b.Dx())*scale))
-	h := max(1, int(float64(b.Dy())*scale))
-	dst := image.NewRGBA(image.Rect(0, 0, w, h))
-	sx := float64(w) / float64(b.Dx())
-	sy := float64(h) / float64(b.Dy())
-	s2d := f64.Aff3{sx, 0, -float64(b.Min.X) * sx, 0, sy, -float64(b.Min.Y) * sy}
-	xdraw.BiLinear.Transform(dst, s2d, src, b, draw.Src, nil)
-	return dst
-}
-
-// extendDeadline lifts the server-wide read/write timeouts for a long-running
-// admin request. It is only reached after authentication; public requests
-// keep the short server defaults.
-func extendDeadline(w http.ResponseWriter, d time.Duration) {
-	rc := http.NewResponseController(w)
-	deadline := time.Now().Add(d)
-	_ = rc.SetReadDeadline(deadline)
-	_ = rc.SetWriteDeadline(deadline)
-}
-
-func stagePath(dir, ext string) (string, error) {
-	f, err := os.CreateTemp(dir, ".upload-*."+ext)
-	if err != nil {
-		return "", err
-	}
-	name := f.Name()
-	if err := f.Close(); err != nil {
-		os.Remove(name)
-		return "", err
-	}
-	return name, nil
-}
-
-// publishStaged atomically replaces a destination while retaining a hardlink
-// to its previous contents. On a failed metadata commit, Rollback restores
-// the previous file even if the extension/path was unchanged. Hardlinks are
-// constant-time; the copy fallback supports filesystems without hardlinks.
-type publishedFile struct{ dst, backup string }
-
-func publishStaged(stage, dst string, maxBytes int64) (publishedFile, error) {
-	p := publishedFile{dst: dst}
-	fi, err := os.Lstat(dst)
-	if err == nil {
-		if !fi.Mode().IsRegular() {
-			return p, errors.New("existing media is not a regular file")
-		}
-		p.backup, err = stagePath(filepath.Dir(dst), filepath.Ext(dst)[1:])
-		if err != nil {
-			return p, err
-		}
-		os.Remove(p.backup)
-		if err = os.Link(dst, p.backup); err != nil {
-			f, openErr := storage.OpenMedia(dst)
-			if openErr != nil {
-				return p, openErr
-			}
-			err = copyFile(p.backup, f, maxBytes)
-			f.Close()
-			if err != nil {
-				os.Remove(p.backup)
-				return p, err
-			}
-		}
-	} else if !os.IsNotExist(err) {
-		return p, err
-	}
-	if err := os.Rename(stage, dst); err != nil {
-		if p.backup != "" {
-			os.Remove(p.backup)
-		}
-		return p, err
-	}
-	return p, nil
-}
-
-func (p publishedFile) rollback() {
-	if p.backup != "" {
-		if err := os.Rename(p.backup, p.dst); err != nil {
-			log.Printf("Critical: could not restore media %s: %v", p.dst, err)
-		}
-	} else if err := os.Remove(p.dst); err != nil && !os.IsNotExist(err) {
-		log.Printf("Error removing failed upload %s: %v", p.dst, err)
-	}
-}
-
-func (p publishedFile) finish() {
-	if p.backup != "" {
-		if err := os.Remove(p.backup); err != nil && !os.IsNotExist(err) {
-			log.Printf("Error removing media backup %s: %v", p.backup, err)
-		}
-	}
 }
 
 func Upload(w http.ResponseWriter, r *http.Request) {
@@ -436,6 +108,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	unlock := storage.LockLinks(name)
 	defer unlock()
 	prev, exists := storage.Global.Get(name)
+	createdLink := false
 	if !exists {
 		if !autoCreate {
 			http.Error(w, "Link does not exist", http.StatusBadRequest)
@@ -451,6 +124,18 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		prev = created
+		createdLink = true
+	}
+	// The link is in the store before a single byte of media is decoded, so a
+	// rejected file would otherwise leave an empty link in the panel. The link
+	// lock is already held here, so the rollback must not take it again.
+	linkCommitted := false
+	if createdLink {
+		defer func() {
+			if !linkCommitted {
+				rollbackCreatedLink(name)
+			}
+		}()
 	}
 	// A playlist item lives next to the live file, so the item count and the
 	// target directory are settled before any media is downloaded or decoded.
@@ -567,6 +252,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
+		if clientGone(r) {
+			return
+		}
 		// Even in lossless mode, fully decode before storing: malformed files
 		// must not be published just because their first 512 bytes look valid.
 		img, release, err := decodeImage(source, ext)
@@ -581,6 +269,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer release()
+		// Decoding a large image takes seconds; the client may be long gone.
+		if clientGone(r) {
+			return
+		}
 		if !lossless {
 			img = scaleImage(img, config.Current.Compression.Scale)
 		}
@@ -656,6 +348,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		imagePub.finish()
+		linkCommitted = true
 		log.Printf("Appended playlist item #%d to %s (%s, %d KB)", itemID, name, saveExt, fi.Size()/1024)
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(toResponse(appended))
@@ -710,6 +403,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			updated = archived
 		}
 	}
+	// The upload is published and stored: from here on the link is a real one
+	// and the deferred rollback must not run.
+	linkCommitted = true
 	imagePub.finish()
 	if previewStage != "" {
 		previewPub.finish()
@@ -732,6 +428,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(toResponse(updated))
+}
+
+// clientGone reports whether the client cancelled the request while the upload
+// was being processed. Decoding and encoding would otherwise run to completion
+// for a response nobody is waiting for, holding a slot of the decode budget.
+func clientGone(r *http.Request) bool {
+	return r.Context().Err() != nil
 }
 
 // errInvalidLinkDefaults rejects an auto-created link whose requested access
@@ -766,9 +469,25 @@ func createLinkForUpload(name string, r *http.Request) (*storage.Wallpaper, erro
 	}
 	created, exists := storage.Global.Get(name)
 	if !exists {
+		// The store accepted the entry but cannot read it back: drop it rather
+		// than fail the upload with a link nobody asked for left behind.
+		_, _ = storage.Global.DeleteEntry(name)
 		return nil, storage.ErrNotFound
 	}
 	return created, nil
+}
+
+// rollbackCreatedLink deletes a link that autoCreate had to create for an
+// upload that then failed. The caller holds the link lock; taking it again here
+// would deadlock, so the cleanup is limited to the store, the per-link
+// directories and the counters of a link that never served a byte.
+func rollbackCreatedLink(name string) {
+	if _, err := storage.Global.DeleteEntry(name); err != nil {
+		log.Printf("Upload: could not roll back the auto-created link %s: %v", name, err)
+		return
+	}
+	storage.RemoveLinkExtraDirs(name)
+	storage.ForgetStats(name)
 }
 
 func writeUploadError(w http.ResponseWriter, err error) {
@@ -777,33 +496,5 @@ func writeUploadError(w http.ResponseWriter, err error) {
 		http.Error(w, "File too large", http.StatusRequestEntityTooLarge)
 	} else {
 		http.Error(w, "Failed to save media", http.StatusInternalServerError)
-	}
-}
-
-// saveImage encodes to a temporary sibling; a failed encode cannot truncate
-// either an existing stage file or a previously published image.
-func saveImage(img image.Image, format, path string, quality int) error {
-	return writeFileAtomic(path, func(out *os.File) error {
-		return encodeImage(out, img, format, quality)
-	})
-}
-
-// savePreview writes the WebP thumbnail shown in the admin panel.
-func savePreview(img image.Image, path string) error {
-	return saveImage(thumbnail(img, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight), "webp", path, config.ThumbnailQuality)
-}
-
-func encodeImage(w io.Writer, img image.Image, format string, quality int) error {
-	switch format {
-	case "jpg", "jpeg":
-		return jpeg.Encode(w, img, &jpeg.Options{Quality: quality})
-	case "png":
-		return png.Encode(w, img)
-	case "gif":
-		return gif.Encode(w, img, &gif.Options{NumColors: config.GIFColors})
-	case "webp":
-		return webp.Encode(w, img, &webp.Options{Quality: float32(quality)})
-	default:
-		return fmt.Errorf("unsupported output format %q", format)
 	}
 }

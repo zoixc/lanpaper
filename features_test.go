@@ -426,6 +426,20 @@ func TestAppUploadAutoCreate(t *testing.T) {
 	if body := a.expect(http.StatusOK, "GET", "/hook", nil, false, nil); !bytes.Equal(body, red) {
 		t.Fatal("auto-created link does not serve its media")
 	}
+	// A link created for this request must not survive a failed upload: the
+	// media is validated after the link exists, and an empty link left behind
+	// would be visible in the panel until someone deleted it by hand.
+	a.uploadFields(http.StatusBadRequest, "husk", []byte("not an image"), map[string]string{"autoCreate": "1"})
+	if _, exists := storage.Global.Get("husk"); exists {
+		t.Fatal("a rejected image left the auto-created link behind")
+	}
+	// Same for a request that cannot be honoured at all.
+	a.uploadFields(http.StatusBadRequest, "husk-append", red,
+		map[string]string{"autoCreate": "1", "mode": "append"})
+	if _, exists := storage.Global.Get("husk-append"); exists {
+		t.Fatal("an empty append left the auto-created link behind")
+	}
+
 	// The requested access level and category are validated, not trusted.
 	a.uploadFields(http.StatusBadRequest, "scoped", red, map[string]string{"autoCreate": "1", "accessLevel": "root"})
 	a.uploadFields(http.StatusBadRequest, "scoped", red, map[string]string{"autoCreate": "1", "category": "nope"})
@@ -461,10 +475,26 @@ func TestAppPublicAliasesCORSEmbedAndStats(t *testing.T) {
 		}
 	}
 	// Reserved names and non-media extensions keep resolving exactly as before.
-	// /robots.txt is the single exception: no link can ever claim that name, so
-	// it answers the crawler policy instead of a 404 (see production_test.go).
-	for _, path := range []string{"/manifest.json", "/favicon.ico", "/sitemap.xml", "/photo.txt", "/photo/other", "/api/nope", "/static/photo.png"} {
+	// /robots.txt, /favicon.ico and the manifest are the exceptions: no link can
+	// ever claim those names, so they answer the crawler policy or redirect to
+	// the file under /static/ instead of a 404.
+	for _, path := range []string{"/sitemap.xml", "/photo.txt", "/photo/other", "/api/nope", "/static/photo.png"} {
 		a.expect(http.StatusNotFound, "GET", path, nil, false, nil)
+	}
+	noRedirect := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	for path, want := range map[string]string{
+		"/favicon.ico":          "/static/favicon.svg",
+		"/manifest.json":        "/static/manifest.json",
+		"/manifest.webmanifest": "/static/manifest.json",
+	} {
+		resp, err := noRedirect.Get(a.server.URL + path)
+		if err != nil {
+			t.Fatalf("GET %s: %v", path, err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusFound || resp.Header.Get("Location") != want {
+			t.Fatalf("%s = %d -> %q, want 302 -> %q", path, resp.StatusCode, resp.Header.Get("Location"), want)
+		}
 	}
 	// An alias cannot bypass the access level of the link it resolves to.
 	a.expect(http.StatusOK, "PATCH", "/api/link/photo", []byte(`{"accessLevel":"auth"}`), true, jsonHeaders())

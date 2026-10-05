@@ -57,12 +57,12 @@ func RefreshDerived() {
 		sum := sha256.Sum256([]byte(key))
 		full := hex.EncodeToString(sum[:])
 		if seen[full] {
-			log.Printf("Warning: ignoring a duplicate PUBLISH_KEYS entry (%s)", full[:KeyFingerprintLen])
+			log.Printf("Warning: ignoring a duplicate PUBLISH_KEYS entry (%s)", fingerprint(full))
 			continue
 		}
 		seen[full] = true
 		keys.digests = append(keys.digests, sum[:])
-		keys.fingerprints = append(keys.fingerprints, full[:KeyFingerprintLen])
+		keys.fingerprints = append(keys.fingerprints, fingerprint(full))
 	}
 	publishKeyPtr.Store(keys)
 
@@ -86,15 +86,14 @@ func RefreshDerived() {
 	corsPtr.Store(cors)
 }
 
-// KeyFingerprint returns the log-safe identifier of a key digest: the first
-// KeyFingerprintLen hex characters of its SHA-256. It is not reversible, but it
-// ties log lines to one configured key.
-func KeyFingerprint(digest []byte) string {
-	full := hex.EncodeToString(digest)
-	if len(full) < KeyFingerprintLen {
-		return full
+// fingerprint is the log-safe identifier of a key: the first KeyFingerprintLen
+// hex characters of its SHA-256. It is not reversible, but it ties log lines to
+// one configured key.
+func fingerprint(hexDigest string) string {
+	if len(hexDigest) < KeyFingerprintLen {
+		return hexDigest
 	}
-	return full[:KeyFingerprintLen]
+	return hexDigest[:KeyFingerprintLen]
 }
 
 // MatchPublishKey reports whether candidate matches a configured publish key

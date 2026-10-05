@@ -5,6 +5,11 @@
  * Outside clicks and Escape are handled centrally in app.js.
  */
 
+// The languages the panel ships, in menu order. app.js and the i18n test read
+// this one list, so a new translation means adding the file in static/i18n/
+// and the code here — nowhere else.
+window.LANPAPER_LANGS = ['en', 'ru', 'de', 'fr', 'it', 'es'];
+
 (function() {
     'use strict';
 
@@ -40,7 +45,7 @@
         const langOptions = document.getElementById('langOptions');
         if (!langOptions) return;
 
-        const LANGS = ['en', 'ru', 'de', 'fr', 'it', 'es'];
+        const LANGS = window.LANPAPER_LANGS || [];
         const currentLang = localStorage.getItem('lang') || 'en';
 
         LANGS.forEach((code) => {

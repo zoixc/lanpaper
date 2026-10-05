@@ -1,0 +1,10 @@
+/target/
+*.test
+.DS_Store
+*.prof
+/webpprofile
+
+# Extracted from the docs by glitterate, see .github/workflows/ci.yml
+/docs_readme_test.go
+/docs_std_test.go
+/docs_codec_api_test.go

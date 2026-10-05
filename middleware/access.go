@@ -19,9 +19,9 @@ import (
 //	token  — ?token= or X-Access-Token matches the stored secret
 //	auth   — requires valid admin Basic Auth
 //
-// Admin credentials are checked through the same brute-force protection as
-// the admin API. Returns true when access is granted. On denial it writes the
-// appropriate status and returns false; the caller must not write further.
+// Admin credentials go through the same brute-force protection as the admin
+// API. On denial the status is written here and false is returned; the caller
+// must not write further.
 func AuthorizeLinkAccess(w http.ResponseWriter, r *http.Request, wp *storage.Wallpaper) bool {
 	switch storage.NormalizeAccessLevel(wp.AccessLevel) {
 	case config.AccessPublic:

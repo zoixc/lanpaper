@@ -3,6 +3,23 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
+## [Unreleased]
+
+### Changed
+
+- **WebP encoding is pure Go.** `github.com/chai2010/webp` (CGO, a vendored
+  libwebp 1.4.0) is replaced by `github.com/SeriousBug/webp-go-pure` v1.2.0
+  (MIT, no C toolchain, no shared library). Go 1.26+ can build the project
+  without a C compiler, the Docker image needs no `gcc`/`musl-dev` and sets
+  `CGO_ENABLED=0`. Memory at the 36 MP limit drops from 350 MB to 174 MB peak
+  (283 MB → 100 MB resident) and uploads finish ~28 % faster; thumbnails are
+  about 14 % larger and re-encoded media about 9 % larger at the same quality
+  setting.
+- **A failed upload no longer leaves an empty link behind.** `autoCreate`
+  created the link before the media was validated, so a rejected file (or an
+  append to a link that has no media yet) kept the new link in the panel until
+  it was deleted by hand. The link is now rolled back when the request fails.
+
 ## [0.12.1] – 2026-10-04
 
 A rollback release. The admin redesign published as 0.13.0 broke the panel

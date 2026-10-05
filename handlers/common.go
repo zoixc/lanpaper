@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"lanpaper/config"
 	"lanpaper/storage"
@@ -82,4 +83,14 @@ func generateAccessToken() string {
 	b := make([]byte, 32)
 	_, _ = rand.Read(b)
 	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+// extendDeadline lifts the server-wide read/write timeouts for a long-running
+// admin request. It is only reached after authentication; public requests
+// keep the short server defaults.
+func extendDeadline(w http.ResponseWriter, d time.Duration) {
+	rc := http.NewResponseController(w)
+	deadline := time.Now().Add(d)
+	_ = rc.SetReadDeadline(deadline)
+	_ = rc.SetWriteDeadline(deadline)
 }

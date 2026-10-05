@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chai2010/webp"
+	"github.com/SeriousBug/webp-go-pure/std"
 
 	"lanpaper/config"
 	"lanpaper/storage"

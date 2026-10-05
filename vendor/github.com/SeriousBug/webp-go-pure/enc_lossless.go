@@ -1,0 +1,378 @@
+package webp
+
+// Shared state, constants, and search profiles for the lossless VP8L encoder.
+// Ported from src/encoder/lossless/mod.rs.
+
+const (
+	elosslessMaxWebpDimension                     = 1 << 14
+	elosslessMaxCacheBits                         = 11
+	elosslessMinLength                            = 4
+	elosslessMaxLength                            = 4096
+	elosslessMinTransformBits                     = 2
+	elosslessGlobalCrossColorTransformBits        = 9
+	elosslessGlobalPredictorTransformBits         = 9
+	elosslessGlobalPredictorMode           uint8  = 11
+	elosslessCrossColorTransformBits              = 5
+	elosslessPredictorTransformBits               = 5
+	elosslessMaxOptimizationLevel          uint8  = 6
+	elosslessDefaultOptimizationLevel      uint8  = 6
+	elosslessNumPredictorModes             uint8  = 14
+	elosslessNumLiteralCodes                      = 256
+	elosslessNumLengthCodes                       = 24
+	elosslessNumDistanceCodes                     = 40
+	elosslessNumCodeLengthCodes                   = 19
+	elosslessNumHistogramPartitions               = 4
+	elosslessMinHuffmanBits                       = 2
+	elosslessNumHuffmanBits                       = 3
+	elosslessColorCacheHashMul             uint32 = 0x1e35_a7bd
+	elosslessMinMatchHashBits                     = 15
+	elosslessMaxMatchHashBits                     = 20
+	elosslessMatchChainDepthLevel1                = 4
+	elosslessMatchChainDepthLevel2                = 8
+	elosslessMatchChainDepthLevel3                = 16
+	elosslessMatchChainDepthLevel4                = 32
+	elosslessMaxFallbackDistance                  = (1 << 20) - 120
+	// Match scoring works in elosslessCostScale-ths of a bit so that costs read
+	// off a histogram keep their fractional part through the parse.
+	elosslessCostScale                    = 16
+	elosslessApproxLiteralCostBits        = 32
+	elosslessApproxCacheCostBits          = 8
+	elosslessApproxCopyLengthSymbolBits   = 8
+	elosslessApproxCopyDistanceSymbolBits = 8
+
+	elosslessIntMax = int(^uint(0) >> 1)
+)
+
+var elosslessCodeLengthCodeOrder = [elosslessNumCodeLengthCodes]int{
+	17, 18, 0, 1, 2, 3, 4, 5, 16, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+}
+
+var elosslessPlaneToCodeLut = [128]uint8{
+	96, 73, 55, 39, 23, 13, 5, 1, 255, 255, 255, 255, 255, 255, 255, 255, 101, 78, 58, 42, 26, 16,
+	8, 2, 0, 3, 9, 17, 27, 43, 59, 79, 102, 86, 62, 46, 32, 20, 10, 6, 4, 7, 11, 21, 33, 47, 63,
+	87, 105, 90, 70, 52, 37, 28, 18, 14, 12, 15, 19, 29, 38, 53, 71, 91, 110, 99, 82, 66, 48, 35,
+	30, 24, 22, 25, 31, 36, 49, 67, 83, 100, 115, 108, 94, 76, 64, 50, 44, 40, 34, 41, 45, 51, 65,
+	77, 95, 109, 118, 113, 103, 92, 80, 68, 60, 56, 54, 57, 61, 69, 81, 93, 104, 114, 119, 116,
+	111, 106, 97, 88, 84, 74, 72, 75, 85, 89, 98, 107, 112, 117,
+}
+
+const (
+	elosslessTokLiteral = iota
+	elosslessTokCache
+	elosslessTokCopy
+)
+
+// The token stream is allocated at one token per pixel, so every byte here costs
+// 4 MB per megapixel of source and the encoder holds more than one stream at a
+// time. Fields are therefore both sized to the VP8L limits and overlapped: a
+// token is exactly one of a literal, a cache reference or a copy, so the pixel
+// value and the copy distance share a word, and the copy length and the cache
+// key share a half-word. That packs a token into 8 bytes instead of 16.
+type elosslessToken struct {
+	value uint32
+	aux   uint16
+	kind  uint8
+}
+
+func elosslessLiteralToken(argb uint32) elosslessToken {
+	return elosslessToken{kind: elosslessTokLiteral, value: argb}
+}
+
+func elosslessCacheToken(key uint16) elosslessToken {
+	return elosslessToken{kind: elosslessTokCache, aux: key}
+}
+
+func elosslessCopyToken(distance int32, length uint16) elosslessToken {
+	return elosslessToken{kind: elosslessTokCopy, value: uint32(distance), aux: length}
+}
+
+func (t elosslessToken) argb() uint32    { return t.value }
+func (t elosslessToken) distance() int32 { return int32(t.value) }
+func (t elosslessToken) length() uint16  { return t.aux }
+func (t elosslessToken) key() uint16     { return t.aux }
+
+type elosslessPrefixCode struct {
+	symbol     int
+	extraBits  int
+	extraValue int
+}
+
+type elosslessCrossColorTransform struct {
+	greenToRed  int8
+	greenToBlue int8
+	redToBlue   int8
+}
+
+type elosslessColorCache struct {
+	colors    []uint32
+	hashShift uint32
+}
+
+type elosslessTransformPlan struct {
+	useSubtractGreen bool
+	crossBits        int
+	crossBitsSet     bool
+	crossWidth       int
+	crossImage       []uint32
+	predictorBits    int
+	predictorBitsSet bool
+	predictorWidth   int
+	predictorImage   []uint32
+	predicted        []uint32
+}
+
+type elosslessPaletteCandidate struct {
+	palette       []uint32
+	packedWidth   int
+	packedIndices []uint32
+}
+
+type elosslessTokenBuildOptions struct {
+	colorCacheBits int
+	// costCacheBits is the color cache size the match cost model assumes when
+	// the cache is applied to the token stream after the parse instead of during
+	// it. It only affects scoring, never what the tokenizer emits.
+	costCacheBits int
+	// symbolCosts, when set, replaces the flat per-symbol cost constants in the
+	// match scoring with code lengths measured from a previous tokenization of
+	// the same image.
+	symbolCosts       *elosslessSymbolCosts
+	matchChainDepth   int
+	useWindowOffsets  bool
+	windowOffsetLimit int
+	lazyMatching      bool
+}
+
+// elosslessHistogramSet mirrors the Rust [Vec<u32>; 5].
+type elosslessHistogramSet [5][]uint32
+
+type elosslessHuffmanGroupCodes struct {
+	green elosslessHuffmanCode
+	red   elosslessHuffmanCode
+	blue  elosslessHuffmanCode
+	alpha elosslessHuffmanCode
+	dist  elosslessHuffmanCode
+}
+
+type elosslessMetaHuffmanPlan struct {
+	huffmanBits  int
+	huffmanXsize int
+	assignments  []int
+	groups       []elosslessHuffmanGroupCodes
+}
+
+type elosslessHistogramCandidate struct {
+	histograms elosslessHistogramSet
+	weight     int
+}
+
+type elosslessLosslessSearchProfile struct {
+	transformSearchLevel uint8
+	// matchSearchLevel widens the LZ77 match search from the row and previous-row
+	// matches at level 0 up to deep hash chains with lazy matching at level 4.
+	// Every effort sits at 0: once the parse scores matches against measured
+	// symbol costs, the extra matches the deeper levels find are ones a greedy
+	// parse cannot spend well, and they cost size on both graphics and photos.
+	matchSearchLevel      uint8
+	entropySearchLevel    uint8
+	useColorCache         bool
+	shortlistKeep         int
+	earlyStopRatioPercent int
+	// fixedColorCacheBits, when non-zero, uses a color cache of exactly this
+	// many bits instead of running elosslessSelectBestColorCacheBits. The search
+	// costs one estimate pass per candidate size and, up to effort 5, picks a
+	// size no better than the largest one for the time it spends.
+	fixedColorCacheBits int
+	// tokenCostPasses is how many times the LZ77 parse is re-run against
+	// per-symbol costs measured from the previous parse's own token stream. Each
+	// pass costs roughly one tokenization; zero leaves the parse on the flat cost
+	// constants.
+	tokenCostPasses int
+	// predictorTileBits lists the tile sizes to build tiled predictor plans at.
+	// The lowest profiles use it for the one pre-picked plan that stands in for
+	// the transform search they do not run; the highest profiles search every
+	// listed size, because the best tile size is content-dependent.
+	predictorTileBits []int
+}
+
+// Predictor tile sizes each effort tries. Sharing one scorer makes each extra
+// size cheap to score, and only the best-scoring size is encoded, so the higher
+// efforts widen the range rather than replacing it.
+var elosslessPredictorTileBitsByEffort = [][]int{
+	{6},
+	{5, 6},
+	{5, 6},
+	{5, 6},
+	{4, 5, 6},
+	{3, 4, 5, 6},
+	{3, 4, 5, 6},
+}
+
+func elosslessDefaultOptions() LosslessOptions {
+	return LosslessOptions{Effort: elosslessDefaultOptimizationLevel}
+}
+
+func elosslessColorCacheNew(hashBits int) (elosslessColorCache, error) {
+	if hashBits < 1 || hashBits > elosslessMaxCacheBits {
+		return elosslessColorCache{}, encInvalidParam("invalid VP8L color cache size")
+	}
+	size := 1 << hashBits
+	return elosslessColorCache{
+		colors:    make([]uint32, size),
+		hashShift: uint32(32 - hashBits),
+	}, nil
+}
+
+func (c *elosslessColorCache) key(argb uint32) int {
+	return int((argb * elosslessColorCacheHashMul) >> c.hashShift)
+}
+
+func (c *elosslessColorCache) lookup(argb uint32) (int, bool) {
+	key := c.key(argb)
+	if c.colors[key] == argb {
+		return key, true
+	}
+	return 0, false
+}
+
+func (c *elosslessColorCache) insert(argb uint32) {
+	c.colors[c.key(argb)] = argb
+}
+
+func elosslessValidateRgba(width, height int, rgba []byte) error {
+	if width == 0 || height == 0 {
+		return encInvalidParam("image dimensions must be non-zero")
+	}
+	if width > elosslessMaxWebpDimension || height > elosslessMaxWebpDimension {
+		return encInvalidParam("image dimensions exceed VP8L limits")
+	}
+
+	expectedLen := width * height * 4
+	if len(rgba) != expectedLen {
+		return encInvalidParam("RGBA buffer length does not match dimensions")
+	}
+	return nil
+}
+
+// Effort 7..=9 are accepted for API compatibility with the lossy encoder's
+// 0..=9 range, but clamp to 6: the extra search tiers they used to select cost
+// upwards of 25x the encode time of effort 6 for ~1% smaller output.
+func elosslessEffectiveEffort(effort uint8) uint8 {
+	if effort > elosslessMaxOptimizationLevel {
+		return elosslessMaxOptimizationLevel
+	}
+	return effort
+}
+
+func elosslessValidateOptions(options *LosslessOptions) error {
+	if options.Effort > 9 {
+		return encInvalidParam("lossless optimization level must be in 0..=9")
+	}
+	return nil
+}
+
+func elosslessSearchProfile(optimizationLevel uint8) elosslessLosslessSearchProfile {
+	switch optimizationLevel {
+	case 0:
+		return elosslessLosslessSearchProfile{0, 0, 0, false, 1, 100, elosslessMaxCacheBits, 0, elosslessPredictorTileBitsByEffort[optimizationLevel]}
+	case 1:
+		return elosslessLosslessSearchProfile{1, 0, 0, false, 2, 101, elosslessMaxCacheBits, 0, elosslessPredictorTileBitsByEffort[optimizationLevel]}
+	case 2:
+		return elosslessLosslessSearchProfile{2, 0, 1, true, 2, 101, elosslessMaxCacheBits, 2, elosslessPredictorTileBitsByEffort[optimizationLevel]}
+	case 3:
+		return elosslessLosslessSearchProfile{3, 0, 2, true, 3, 101, elosslessMaxCacheBits, 2, elosslessPredictorTileBitsByEffort[optimizationLevel]}
+	case 4:
+		return elosslessLosslessSearchProfile{4, 0, 2, true, 3, 101, elosslessMaxCacheBits, 2, elosslessPredictorTileBitsByEffort[optimizationLevel]}
+	case 5:
+		return elosslessLosslessSearchProfile{5, 0, 2, true, 4, 101, elosslessMaxCacheBits, 3, elosslessPredictorTileBitsByEffort[optimizationLevel]}
+	default:
+		return elosslessLosslessSearchProfile{6, 0, 3, true, 4, 101, 0, 3, elosslessPredictorTileBitsByEffort[elosslessMaxOptimizationLevel]}
+	}
+}
+
+func elosslessCandidateProfiles(optimizationLevel uint8) []elosslessLosslessSearchProfile {
+	return []elosslessLosslessSearchProfile{elosslessSearchProfile(elosslessEffectiveEffort(optimizationLevel))}
+}
+
+func elosslessRgbaHasAlpha(rgba []byte) bool {
+	for i := 0; i+4 <= len(rgba); i += 4 {
+		if rgba[i+3] != 0xff {
+			return true
+		}
+	}
+	return false
+}
+
+func elosslessRgbaToArgb(rgba []byte) []uint32 {
+	out := make([]uint32, 0, len(rgba)/4)
+	for i := 0; i+4 <= len(rgba); i += 4 {
+		out = append(out,
+			(uint32(rgba[i+3])<<24)|
+				(uint32(rgba[i])<<16)|
+				(uint32(rgba[i+1])<<8)|
+				uint32(rgba[i+2]))
+	}
+	return out
+}
+
+// Small shared numeric helpers.
+
+func elosslessIlog2(value int) int {
+	// Equivalent to usize::BITS - 1 - value.leading_zeros() for value > 0.
+	r := -1
+	for value > 0 {
+		r++
+		value >>= 1
+	}
+	return r
+}
+
+func elosslessDivCeil(a, b int) int {
+	return (a + b - 1) / b
+}
+
+func elosslessSatAdd(a, b int) int {
+	if a == elosslessIntMax || b == elosslessIntMax {
+		return elosslessIntMax
+	}
+	s := a + b
+	if s < a {
+		return elosslessIntMax
+	}
+	return s
+}
+
+func elosslessAbsI32(v int32) int32 {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
+func elosslessSlicesEqualU32(a, b []uint32) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func elosslessCloneHistogramSet(src *elosslessHistogramSet) elosslessHistogramSet {
+	var dst elosslessHistogramSet
+	for i := 0; i < 5; i++ {
+		dst[i] = make([]uint32, len(src[i]))
+		copy(dst[i], src[i])
+	}
+	return dst
+}
+
+func elosslessTokenLen(token elosslessToken) int {
+	if token.kind == elosslessTokCopy {
+		return int(token.length())
+	}
+	return 1
+}
