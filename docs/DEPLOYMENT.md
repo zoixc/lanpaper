@@ -113,9 +113,9 @@ LimitNOFILE=8192
 WantedBy=multi-user.target
 ```
 
-`MemoryDenyWriteExecute` is safe here: the WebP encoder is compiled C, not a
-JIT. If a future dependency needs writable-executable memory, drop that one
-line rather than the rest.
+`MemoryDenyWriteExecute` is safe here: the binary is pure Go — no JIT, no cgo,
+no shared libraries — so it never asks for writable-executable memory. If a
+future dependency needs it, drop that one line rather than the rest.
 
 ### Shutdown and upgrades
 
