@@ -92,8 +92,8 @@ named volumes or Docker Desktop.
 
 ### Build from source
 
-You need Go 1.26 or newer (preferably the latest patch release) and a C
-compiler (CGO is used for WebP encoding).
+You need Go 1.26 or newer (preferably the latest patch release). No C compiler
+is required: WebP encoding is pure Go.
 
 ```sh
 go build -trimpath -o lanpaper .

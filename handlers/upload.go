@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/chai2010/webp"
+	"github.com/SeriousBug/webp-go-pure/std"
 	_ "golang.org/x/image/bmp"
 	xdraw "golang.org/x/image/draw"
 	"golang.org/x/image/math/f64"
@@ -36,8 +36,8 @@ import (
 )
 
 // WebP is explicitly decoded with the streaming x/image/webp decoder below.
-// The WebP encoder dependency also registers a decoder that buffers the
-// entire compressed file; never use image.Decode for WebP uploads.
+// The WebP encoder dependency also registers a decoder that reads the entire
+// compressed file into memory; never use image.Decode for WebP uploads.
 var uploadSem = make(chan struct{}, config.DefaultMaxConcurrentUploads)
 
 func InitUploadSemaphore(n int) {
@@ -436,6 +436,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	unlock := storage.LockLinks(name)
 	defer unlock()
 	prev, exists := storage.Global.Get(name)
+	createdLink := false
 	if !exists {
 		if !autoCreate {
 			http.Error(w, "Link does not exist", http.StatusBadRequest)
@@ -451,6 +452,18 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		prev = created
+		createdLink = true
+	}
+	// The link is in the store before a single byte of media is decoded, so a
+	// rejected file would otherwise leave an empty link in the panel. The link
+	// lock is already held here, so the rollback must not take it again.
+	linkCommitted := false
+	if createdLink {
+		defer func() {
+			if !linkCommitted {
+				rollbackCreatedLink(name)
+			}
+		}()
 	}
 	// A playlist item lives next to the live file, so the item count and the
 	// target directory are settled before any media is downloaded or decoded.
@@ -656,6 +669,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		imagePub.finish()
+		linkCommitted = true
 		log.Printf("Appended playlist item #%d to %s (%s, %d KB)", itemID, name, saveExt, fi.Size()/1024)
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(toResponse(appended))
@@ -710,6 +724,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			updated = archived
 		}
 	}
+	// The upload is published and stored: from here on the link is a real one
+	// and the deferred rollback must not run.
+	linkCommitted = true
 	imagePub.finish()
 	if previewStage != "" {
 		previewPub.finish()
@@ -766,9 +783,25 @@ func createLinkForUpload(name string, r *http.Request) (*storage.Wallpaper, erro
 	}
 	created, exists := storage.Global.Get(name)
 	if !exists {
+		// The store accepted the entry but cannot read it back: drop it rather
+		// than fail the upload with a link nobody asked for left behind.
+		_, _ = storage.Global.DeleteEntry(name)
 		return nil, storage.ErrNotFound
 	}
 	return created, nil
+}
+
+// rollbackCreatedLink deletes a link that autoCreate had to create for an
+// upload that then failed. The caller holds the link lock; taking it again here
+// would deadlock, so the cleanup is limited to the store, the per-link
+// directories and the counters of a link that never served a byte.
+func rollbackCreatedLink(name string) {
+	if _, err := storage.Global.DeleteEntry(name); err != nil {
+		log.Printf("Upload: could not roll back the auto-created link %s: %v", name, err)
+		return
+	}
+	storage.RemoveLinkExtraDirs(name)
+	storage.ForgetStats(name)
 }
 
 func writeUploadError(w http.ResponseWriter, err error) {
@@ -793,6 +826,11 @@ func savePreview(img image.Image, path string) error {
 	return saveImage(thumbnail(img, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight), "webp", path, config.ThumbnailQuality)
 }
 
+// webpEffort trades WebP encode time for file size (0..9). Preset 3 is the
+// fastest one that enables the full lossy search; the default, 0, produces
+// previews roughly a third larger for no visible gain.
+const webpEffort = 3
+
 func encodeImage(w io.Writer, img image.Image, format string, quality int) error {
 	switch format {
 	case "jpg", "jpeg":
@@ -802,7 +840,7 @@ func encodeImage(w io.Writer, img image.Image, format string, quality int) error
 	case "gif":
 		return gif.Encode(w, img, &gif.Options{NumColors: config.GIFColors})
 	case "webp":
-		return webp.Encode(w, img, &webp.Options{Quality: float32(quality)})
+		return webp.Encode(w, img, &webp.Options{Quality: quality, Effort: webpEffort})
 	default:
 		return fmt.Errorf("unsupported output format %q", format)
 	}

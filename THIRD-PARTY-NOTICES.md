@@ -14,8 +14,7 @@ BSD-3-Clause, not using a contributor's name to endorse a derived product.
 
 | Component | Version | License | Used for | Present in |
 | --- | --- | --- | --- | --- |
-| [chai2010/webp](https://github.com/chai2010/webp) | v1.4.0 | BSD-3-Clause | WebP **encoding** (admin-panel thumbnails) | linked into the binary |
-| libwebp (vendored inside chai2010/webp as `z_libwebp_src_*.c`) | as shipped with v1.4.0 | BSD-3-Clause | the WebP codec itself | linked into the binary |
+| [SeriousBug/webp-go-pure](https://github.com/SeriousBug/webp-go-pure) | v1.2.0 | MIT | WebP **encoding** (thumbnails and re-encoded media) | linked into the binary |
 | [golang.org/x/image](https://github.com/golang/image) | v0.46.0 | BSD-3-Clause | BMP/TIFF decoding, WebP **decoding**, bilinear resizing | linked into the binary |
 | [joho/godotenv](https://github.com/joho/godotenv) | v1.5.1 | MIT | loading an optional `.env` file at startup | linked into the binary |
 | Go standard library | per the build toolchain | BSD-3-Clause | HTTP server, JSON, crypto, image codecs | linked into the binary |
@@ -50,10 +49,12 @@ as "Lanpaper" without permission.
 
 ## License texts
 
-### MIT License (joho/godotenv)
+### MIT License (joho/godotenv, SeriousBug/webp-go-pure)
 
 ```
-Copyright (c) 2013 John Barton
+Copyright (c) 2013 John Barton                                  (godotenv)
+Copyright (c) 2026 MITH@mmk                                     (webp-go-pure)
+Copyright (c) 2026 Kaan Barmore-Genc                            (webp-go-pure)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -74,11 +75,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### BSD 3-Clause License (chai2010/webp, vendored libwebp, golang.org/x/image, Go standard library)
+### BSD 3-Clause License (golang.org/x/image, Go standard library)
 
 ```
-Copyright (c) 2014 chaishushan{AT}gmail.com.            (chai2010/webp)
-Copyright (c) 2010, Google Inc. All rights reserved.    (libwebp)
 Copyright 2009 The Go Authors.                          (x/image, Go stdlib)
 All rights reserved.
 

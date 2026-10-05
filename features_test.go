@@ -426,6 +426,20 @@ func TestAppUploadAutoCreate(t *testing.T) {
 	if body := a.expect(http.StatusOK, "GET", "/hook", nil, false, nil); !bytes.Equal(body, red) {
 		t.Fatal("auto-created link does not serve its media")
 	}
+	// A link created for this request must not survive a failed upload: the
+	// media is validated after the link exists, and an empty link left behind
+	// would be visible in the panel until someone deleted it by hand.
+	a.uploadFields(http.StatusBadRequest, "husk", []byte("not an image"), map[string]string{"autoCreate": "1"})
+	if _, exists := storage.Global.Get("husk"); exists {
+		t.Fatal("a rejected image left the auto-created link behind")
+	}
+	// Same for a request that cannot be honoured at all.
+	a.uploadFields(http.StatusBadRequest, "husk-append", red,
+		map[string]string{"autoCreate": "1", "mode": "append"})
+	if _, exists := storage.Global.Get("husk-append"); exists {
+		t.Fatal("an empty append left the auto-created link behind")
+	}
+
 	// The requested access level and category are validated, not trusted.
 	a.uploadFields(http.StatusBadRequest, "scoped", red, map[string]string{"autoCreate": "1", "accessLevel": "root"})
 	a.uploadFields(http.StatusBadRequest, "scoped", red, map[string]string{"autoCreate": "1", "category": "nope"})

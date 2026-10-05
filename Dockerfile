@@ -2,9 +2,6 @@
 # --- Stage 1: Builder ---
 FROM golang:1.27-alpine AS builder
 
-# gcc/musl-dev: CGO is required by the WebP encoder (github.com/chai2010/webp).
-RUN apk add --no-cache gcc musl-dev
-
 WORKDIR /src
 
 COPY go.mod go.sum ./
@@ -15,11 +12,13 @@ COPY . .
 
 ARG VERSION=dev
 
-# Static binary: no shared libraries are needed at runtime.
+# Static binary built with CGO off: no C toolchain is needed in the builder and
+# no shared library is needed at runtime. WebP encoding is pure Go
+# (github.com/SeriousBug/webp-go-pure).
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=1 GOOS=linux go build -trimpath -buildvcs=false \
-    -ldflags="-s -w -X main.Version=${VERSION} -extldflags '-static'" \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
+    -ldflags="-s -w -X main.Version=${VERSION}" \
     -o /out/lanpaper .
 
 # --- Stage 2: Runner ---
