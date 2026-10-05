@@ -10,6 +10,9 @@
 docs/
 tests/
 
+# Design prototypes: notes and mockups, never part of the image.
+design/
+
 # Go test artifacts
 *_test.go
 *.test
