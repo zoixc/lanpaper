@@ -30,7 +30,7 @@ Notable changes to Lanpaper. Docker images are published as
   dark themes and a touch-sized mobile layout. `design/v2/screens.html` shows the
   same screen in live 1440 / 834 / 390 px frames, and
   `design/06-redesign-v2.md` holds the audit of 0.12.1, the contrast table and
-  the file-by-file migration plan. `design/v2/standalone.html` (794 KB,
+  the file-by-file migration plan. `design/v2/standalone.html` (799 KB,
   `tools/build-standalone.py`) is the same mock-up as one file with the styles,
   scripts, fonts and demo frames inlined, for viewers that show a single file.
   **Nothing in the application changed**: `admin.html`, `static/` and the Go code
@@ -68,6 +68,28 @@ Notable changes to Lanpaper. Docker images are published as
   is animated except the tile lift, which is off on touch screens where hover
   sticks after a tap. Tokens: `--shadow-card`, `--shadow-card-hover`,
   `--shadow-bar`, overridden per theme like the rest.
+- **The stand was re-read line by line before any of it moves into the app, and
+  eleven bugs came out of it.** Eight would have shipped invisibly: the panel
+  renderer closed *any* overlay instead of its own (so opening settings while the
+  panel was open silently killed the panel, and switching language in the
+  settings closed the panel it lived in); translation placeholders were
+  substituted with `String.replace`, so a link name containing `$&` or `$'` would
+  print a fragment of the template; `Intl` formatters were built on every call —
+  320 constructions per 20 list redraws, now zero, cached per language; size units
+  and the type/size/changed/version labels were Russian literals shown even in the
+  English interface; the chip row was rebuilt wholesale, dropping keyboard focus
+  and `scrollLeft`; renaming a link lost its selection and desynchronised the bulk
+  counter; an evicted toast kept its timer and touched a removed node; and
+  `dismiss` could run twice. The last two came from the harness itself. The same
+  pass measured the result — 4–15 ms, typically ~8, of work per 12-card redraw, zero node growth
+  over 30 open/close cycles — and confirmed the application needs no security
+  rework: SSRF is closed by `ResolvePublicURL` plus a pinned transport, paths go
+  through `os.OpenRoot`, public media carry `nosniff` / `X-Frame-Options: DENY` /
+  `Referrer-Policy: no-referrer`, tokens are compared in constant time and never
+  exported. Two things must change in the app during the port: `formatBytes`
+  (`static/js/app.js:2339`) hard-codes `KB/MB/GB` regardless of language, and
+  `static/i18n/*.json` has no keys for the panel's Type / Size / Changed /
+  Version labels. Details in section 11-тер of `design/06-redesign-v2.md`.
 - **The mock-up survives a narrow screen and a wide list view.** On a phone the
   header keeps the application name (it used to vanish, leaving a row of icons
   with no clue what panel this is) and the link counter moves to the page title
