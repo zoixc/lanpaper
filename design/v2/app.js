@@ -110,14 +110,17 @@
     };
 
     /* Форматирование */
-    const UNITS = ['Б', 'КБ', 'МБ', 'ГБ'];
+    const UNIT_KEYS = ['unit_b', 'unit_kb', 'unit_mb', 'unit_gb'];
     function formatBytes(bytes) {
         if (!bytes) return '—';
         let i = 0;
         let v = bytes;
-        while (v >= 1024 && i < UNITS.length - 1) { v /= 1024; i++; }
+        while (v >= 1024 && i < UNIT_KEYS.length - 1) { v /= 1024; i++; }
         const digits = v < 10 && i > 0 ? 1 : 0;
-        return v.toFixed(digits).replace('.', ',') + ' ' + UNITS[i];
+        /* Разделитель разрядов — по языку: в русском запятая, в английском
+           точка. Число форматируем Intl, единицу берём из словаря. */
+        const value = i === 0 ? String(Math.round(v)) : fmt(state.lang).num.format(Number(v.toFixed(digits)));
+        return value + ' ' + t(UNIT_KEYS[i]);
     }
     function formatDuration(sec) {
         if (!sec) return '';
@@ -134,19 +137,34 @@
         const h = s / 3600;
         return (h < 10 ? h.toFixed(1).replace('.', ',') : Math.round(h)) + ' ' + t('unit_hour');
     }
+    /* Форматтеры Intl дорого СОЗДАВАТЬ, а не использовать: на 12 карточках
+       их набиралось 16 штук на каждую перерисовку (замер: 320 созданий на
+       20 перерисовок). Держим по одному на язык — ключ кеша и есть язык,
+       поэтому сбрасывать при смене языка ничего не нужно. */
+    const FMT = {};
+    function fmt(lang) {
+        if (!FMT[lang]) {
+            const ru = lang === 'ru';
+            FMT[lang] = {
+                date: new Intl.DateTimeFormat(ru ? 'ru-RU' : 'en-GB', { day: 'numeric', month: 'short' }),
+                rtf: new Intl.RelativeTimeFormat(ru ? 'ru' : 'en', { numeric: 'auto' }),
+                num: new Intl.NumberFormat(ru ? 'ru-RU' : 'en-US')
+            };
+        }
+        return FMT[lang];
+    }
     function formatDate(ts) {
-        return new Intl.DateTimeFormat(state.lang === 'ru' ? 'ru-RU' : 'en-GB',
-            { day: 'numeric', month: 'short' }).format(new Date(ts * 1000));
+        return fmt(state.lang).date.format(new Date(ts * 1000));
     }
     function formatRelative(ts) {
         const diff = Math.floor(Date.now() / 1000 - ts);
-        const rtf = new Intl.RelativeTimeFormat(state.lang === 'ru' ? 'ru' : 'en', { numeric: 'auto' });
+        const rtf = fmt(state.lang).rtf;
         if (diff < 90) return rtf.format(-Math.max(1, Math.round(diff / 60)), 'minute');
         if (diff < 3600 * 22) return rtf.format(-Math.round(diff / 3600), 'hour');
         if (diff < 86400 * 6) return rtf.format(-Math.round(diff / 86400), 'day');
         return formatDate(ts);
     }
-    const num = (n) => new Intl.NumberFormat(state.lang === 'ru' ? 'ru-RU' : 'en-US').format(n);
+    const num = (n) => fmt(state.lang).num.format(n);
 
     /* Узкий экран: на телефоне строка списка слишком коротка для отдельного
        переключателя доступа — там о доступе говорит метка на карточке. */
@@ -223,7 +241,13 @@
         const dict = (window.LP_I18N && window.LP_I18N[state.lang]) || window.LP_I18N.ru;
         let str = dict[key] || (window.LP_I18N.ru[key] || key);
         if (vars) {
-            for (const k of Object.keys(vars)) str = str.replace(new RegExp('\\{\\{' + k + '\\}\\}', 'g'), vars[k]);
+            for (const k of Object.keys(vars)) {
+                /* Замена через функцию: иначе имя ссылки, содержащее $& или
+                   $', подставилось бы по правилам String.replace и текст
+                   поехал бы. Имена приходят из имён файлов. */
+                const value = String(vars[k]);
+                str = str.replace(new RegExp('\\{\\{' + k + '\\}\\}', 'g'), () => value);
+            }
         }
         return str;
     }
@@ -293,6 +317,8 @@
         applyPalette();
         renderChips();
         render();
+        /* Панель открыта — её содержимое тоже на новом языке */
+        if (currentOverlay) renderPanel();
         const sel = $('#langSelect');
         if (sel) sel.value = lang;
     }
@@ -642,6 +668,15 @@
 
     function renderChips() {
         const row = $('#filterRow');
+        /* Чипы пересобираются целиком, а вместе с ними теряются фокус
+           клавиатуры и прокрутка строки: на телефоне нажатие чипа
+           возвращало список к началу, а с клавиатуры фокус улетал в body.
+           Запоминаем «кто в фокусе» по устойчивой примете и возвращаем. */
+        const focus = document.activeElement;
+        const focusKey = (focus && row.contains(focus))
+            ? (focus.dataset.key || focus.dataset.tip || (focus.getAttribute('aria-haspopup') ? 'popup:' + (focus.textContent || '').trim() : ''))
+            : null;
+        const scrollLeft = row.scrollLeft;
         row.innerHTML = '';
 
         /* Где искать. По умолчанию — имя и тип файла, как в приложении;
@@ -681,6 +716,16 @@
             onclick: function (e) { openSortMenu(e.currentTarget); }
         }));
         hydrateIcons(row);
+
+        row.scrollLeft = scrollLeft;
+        if (focusKey) {
+            const again = $$('.chip', row).find(function (b) {
+                const key = b.dataset.key || b.dataset.tip ||
+                    (b.getAttribute('aria-haspopup') ? 'popup:' + (b.textContent || '').trim() : '');
+                return key === focusKey;
+            });
+            if (again) again.focus({ preventScroll: true });
+        }
     }
 
     /* ========================================================
@@ -798,7 +843,7 @@
         lastFocused = (origin && origin !== document.body) ? origin : lastFocused;
         const scrim = h('div', { class: 'scrim', onclick: () => { if (!(opts && opts.persistent)) closeOverlay(); } });
         host().append(scrim, node);
-        currentOverlay = { node: node, scrim: scrim };
+        currentOverlay = { node: node, scrim: scrim, kind: (opts && opts.kind) || 'other' };
         document.body.style.overflow = 'hidden';
         hydrateIcons(node);
         const target = (opts && opts.focus) || node.querySelector('[autofocus], input, button');
@@ -864,11 +909,18 @@
         const container = $('#toasts');
         container.append(box);
         hydrateIcons(box);
-        while (container.children.length > 3) container.firstElementChild.remove();
+        /* Старшие тосты уходят сразу: таймер снимаем, иначе он ещё четыре
+           секунды держит ссылку на удалённый узел. */
+        while (container.children.length > 3) {
+            const oldest = container.firstElementChild;
+            if (oldest.dismissToast) oldest.dismissToast();
+            oldest.remove();
+        }
         const timer = setTimeout(dismiss, o.duration || 4200);
+        box.dismissToast = dismiss;
         function dismiss() {
             clearTimeout(timer);
-            if (!box.isConnected) return;
+            if (!box.isConnected || box.classList.contains('is-out')) return;
             box.classList.add('is-out');
             setTimeout(() => box.remove(), 200);
         }
@@ -1069,12 +1121,15 @@
             deleteLink(link);
         });
 
-        openOverlay(node, { focus: node.querySelector('[data-tab][aria-selected="true"]') });
+        openOverlay(node, { kind: 'panel', focus: node.querySelector('[data-tab][aria-selected="true"]') });
         renderPanel();
     }
 
     function renderPanel() {
-        if (!currentOverlay) return;
+        /* Только для пульта ссылки: диалог создания и настройки — тоже
+           оверлеи, и перерисовка «панелью» закрывала бы их (так смена языка
+           закрывала настройки). */
+        if (!currentOverlay || currentOverlay.kind !== 'panel') return;
         const node = currentOverlay.node;
         const link = findLink(node.dataset.name);
         if (!link) { closeOverlay(); return; }
@@ -1139,10 +1194,11 @@
         /* Сведения о файле */
         const info = h('div', { class: 'card-block card-block--soft stack stack--tight' });
         const rows = [
-            ['Тип', (link.mimeType || '—') + (link.width ? ' · ' + link.width + '×' + link.height : '')],
-            ['Размер', link.hasImage ? formatBytes(link.sizeBytes) : t('no_image')],
-            ['Изменён', formatRelative(link.modTime)],
-            ['Версия', 'v' + link.currentVersion + (link.history.length ? ' · ' + link.history.length + ' в архиве' : '')]
+            [t('file_type'), (link.mimeType || '—') + (link.width ? ' · ' + link.width + '×' + link.height : '')],
+            [t('file_size'), link.hasImage ? formatBytes(link.sizeBytes) : t('no_image')],
+            [t('file_changed'), formatRelative(link.modTime)],
+            [t('file_version'), 'v' + link.currentVersion + (link.history.length
+                ? ' · ' + t('in_archive', { count: link.history.length }) : '')]
         ];
         rows.forEach(function (row) {
             info.append(h('div', { class: 'split' },
@@ -1669,6 +1725,9 @@
                 const oldName = o.rename.linkName;
                 o.rename.linkName = name;
                 if (state.panelName === oldName) state.panelName = name;
+                /* Иначе в режиме выбора выделение осталось бы под старым
+                   именем: галочка пропала бы, а массовые действия — нет. */
+                if (state.selected.delete(oldName)) state.selected.add(name);
                 toast(t('renamed', { name: name }));
                 closeOverlay();
                 revealLinks([name]);

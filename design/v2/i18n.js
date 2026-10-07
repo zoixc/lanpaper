@@ -225,6 +225,17 @@ window.LP_I18N = {
         unit_sec: 'с',
         unit_min: 'мин',
         unit_hour: 'ч',
+        /* Единицы размера файла. В приложении они зашиты английскими (KB/MB)
+           даже в русском интерфейсе — при переносе это стоит поправить. */
+        unit_b: 'Б',
+        unit_kb: 'КБ',
+        unit_mb: 'МБ',
+        unit_gb: 'ГБ',
+        file_type: 'Тип',
+        file_size: 'Размер',
+        file_changed: 'Изменён',
+        file_version: 'Версия',
+        in_archive: '{{count}} в архиве',
         animation: 'анимация'
     },
 
@@ -434,6 +445,15 @@ window.LP_I18N = {
         unit_sec: 's',
         unit_min: 'min',
         unit_hour: 'h',
+        unit_b: 'B',
+        unit_kb: 'KB',
+        unit_mb: 'MB',
+        unit_gb: 'GB',
+        file_type: 'Type',
+        file_size: 'Size',
+        file_changed: 'Changed',
+        file_version: 'Version',
+        in_archive: '{{count}} archived',
         animation: 'animation'
     }
 };

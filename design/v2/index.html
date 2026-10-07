@@ -24,11 +24,17 @@
        screens.html показывает несколько состояний в одном документе,
        ничего не записывая в localStorage. */
     var q = new URLSearchParams(location.search);
+    /* Только известные значения: в адрес легко подставить что угодно, а
+       неизвестное оставило бы панель без акцента или без языка. */
+    function pick(name, allowed) {
+        var value = q.get(name);
+        return value && allowed.indexOf(value) >= 0 ? value : null;
+    }
     window.LP_FORCED = {
-        theme: q.get('theme'),
-        palette: q.get('palette'),
-        view: q.get('view'),
-        lang: q.get('lang'),
+        theme: pick('theme', ['light', 'dark', 'auto']),
+        palette: pick('palette', ['indigo', 'sage', 'clay', 'graphite', 'ocean']),
+        view: pick('view', ['grid', 'list']),
+        lang: pick('lang', ['ru', 'en']),
         instant: q.get('embedded') === '1',
         fail: q.get('fail') === '1'
     };
