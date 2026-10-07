@@ -160,9 +160,15 @@
        2. СОСТОЯНИЕ
        ======================================================== */
     const STORE_KEY = 'lp-ui';
+    /* Порция рендера: список из сотен ссылок не рисуем целиком — сначала
+       первая порция, остальное по кнопке. Это самая дорогая часть работы
+       (кадр + картинка + слушатели на каждую карточку). */
+    const CHUNK = 12;
+
     const state = {
         links: [],
         query: '',
+        scope: 'name',          /* name — имя и файл, как в приложении; all — плюс доступ и вес */
         filter: 'all',
         access: 'any',
         sort: 'date_desc',
@@ -173,6 +179,11 @@
         selecting: false,
         selected: new Set(),
         loading: true,
+        loadError: false,
+        shown: CHUNK,
+        reveal: null,          /* ссылки, которые нужно оставить на виду */
+        scrolledReveal: null,
+        pendingScroll: null,
         lastDeleted: null,
         panelTab: 'media'
     };
@@ -185,6 +196,7 @@
         state.lang = saved.lang || (document.documentElement.lang || 'ru');
         state.view = saved.view || 'grid';   /* плитка — вид по умолчанию на всех ширинах */
         state.sort = saved.sort || 'date_desc';
+        state.scope = saved.scope || 'name';
         /* Переопределения из адреса (витрина и прямые ссылки на состояние) */
         const forced = window.LP_FORCED || {};
         ['theme', 'palette', 'lang', 'view'].forEach(function (key) {
@@ -195,7 +207,7 @@
         try {
             localStorage.setItem(STORE_KEY, JSON.stringify({
                 theme: state.theme, palette: state.palette, lang: state.lang,
-                view: state.view, sort: state.sort
+                view: state.view, sort: state.sort, scope: state.scope
             }));
         } catch (e) { /* приватный режим — настройки просто не запомнятся */ }
     }
@@ -285,9 +297,11 @@
        5. ДАННЫЕ (заглушка вместо /api/wallpapers)
        ======================================================== */
     function fetchLinks() {
-        return new Promise(function (resolve) {
-            /* В витрине скелетон не нужен: кадры должны показать готовый вид */
+        return new Promise(function (resolve, reject) {
+            /* В витрине скелетон не нужен: кадры должны показать готовый вид.
+               fail=1 в адресе показывает состояние «сервер не ответил». */
             setTimeout(function () {
+                if (window.LP_FORCED && window.LP_FORCED.fail) { reject(new Error('offline')); return; }
                 state.links = window.LP_DATA.map(l => Object.assign({}, l, { history: (l.history || []).slice(), items: (l.items || []).slice() }));
                 resolve(state.links);
             }, (window.LP_FORCED && window.LP_FORCED.instant) ? 0 : 420);
@@ -313,16 +327,34 @@
         pinned: (l) => l.pinned
     };
 
+    /* Что попадает в поиск. «Имя и файл» — как в приложении 0.12.1:
+       имя ссылки и тип файла. «Везде» добавляет уровень доступа, вес,
+       версию и размеры — так ищут, когда помнят не имя, а примету:
+       «локальная», «2 МБ», «png». */
     function matchesQuery(link) {
         const q = state.query.trim().toLowerCase();
         if (!q) return true;
-        return link.linkName.toLowerCase().includes(q) || (link.mimeType || '').toLowerCase().includes(q);
+        const parts = [link.linkName, link.mimeType, link.category];
+        if (state.scope === 'all') {
+            parts.push(t(accessMeta(link.accessLevel).key), formatBytes(link.sizeBytes),
+                String(link.sizeBytes), 'v' + link.currentVersion, String(link.width || ''),
+                String(link.height || ''), (link.items || []).length ? 'плейлист playlist' : '');
+        }
+        return parts.some(part => String(part || '').toLowerCase().includes(q));
     }
     function filterCount(key) {
         return state.links.filter(l => matchesQuery(l)
             && FILTERS[key](l)
             && (state.access === 'any' || l.accessLevel === state.access)).length;
     }
+    /* Смена выборки возвращает список к первой порции: иначе «Показать ещё»
+       относилось бы к прошлой выдаче. */
+    function resetShown() {
+        state.shown = CHUNK;
+        state.reveal = null;
+        state.scrolledReveal = null;
+    }
+
     function visibleLinks() {
         let list = state.links.filter(matchesQuery).filter(FILTERS[state.filter]);
         if (state.access !== 'any') list = list.filter(l => l.accessLevel === state.access);
@@ -436,6 +468,23 @@
         }
         if (!tags.children.length) tags.remove();
 
+        /* В режиме списка строка широкая, и справа остаётся место — там
+           помещается переключатель доступа. В приложении 0.12.1 он был в
+           каждой карточке, из-за чего карточка росла в высоту; здесь он
+           появляется только там, где место действительно есть. */
+        if (state.view === 'list') {
+            const select = h('select', {
+                class: 'select select--mini', 'aria-label': t('access_label') + ': ' + link.linkName,
+                onchange: function () { setAccessLevel(link, select.value); }
+            });
+            ['public', 'local', 'token', 'auth'].forEach(function (level) {
+                select.append(h('option', {
+                    value: level, text: t(accessMeta(level).key), selected: link.accessLevel === level
+                }));
+            });
+            $('.card__body', node).append(select);
+        }
+
         return node;
     }
 
@@ -443,7 +492,9 @@
         const grid = $('#grid');
         const list = visibleLinks();
         const total = state.links.length;
+        const narrowed = !!state.query.trim() || state.filter !== 'all' || state.access !== 'any';
 
+        applyReveal(list);
         grid.setAttribute('aria-busy', String(state.loading));
         grid.innerHTML = '';
 
@@ -456,22 +507,86 @@
             }
         } else {
             const frag = document.createDocumentFragment();
-            list.forEach(link => frag.append(cardFor(link)));
+            list.slice(0, state.shown).forEach(link => frag.append(cardFor(link)));
             grid.append(frag);
         }
 
         document.body.classList.toggle('is-selecting', state.selecting);
-        const searching = !!state.query.trim() || state.filter !== 'all' || state.access !== 'any';
-        $('#noResults').classList.toggle('is-hidden', !( !state.loading && !list.length && total > 0 && searching ));
-        $('#emptyState').classList.toggle('is-hidden', !(!state.loading && total === 0));
+        $('#noResults').classList.toggle('is-hidden', !(!state.loading && !list.length && total > 0 && narrowed));
+        $('#emptyState').classList.toggle('is-hidden', !(!state.loading && !state.loadError && total === 0));
+        $('#errorState').classList.toggle('is-hidden', !(!state.loading && state.loadError));
         $('#pageTitle').textContent = t('links');
-        $('#pageCount').textContent = state.query || state.filter !== 'all' || state.access !== 'any'
+        $('#pageCount').textContent = narrowed
             ? t('found', { shown: list.length, total: total })
             : String(total);
         $('#brandCount').textContent = String(total);
         $('#selectAllBtn').hidden = !state.selecting;
+        renderLoadMore(list);
         updateBulkbar();
         hydrateIcons(grid);
+        jumpToRevealed();
+    }
+
+    /* «Показать ещё»: длинная библиотека дорисовывается порциями. Кнопка
+       говорит, сколько именно осталось, вместо безымянного «ещё», а рядом
+       видно, сколько из найденного уже на экране. */
+    function renderLoadMore(list) {
+        const box = $('#loadMore');
+        const left = Math.max(0, list.length - state.shown);
+        box.classList.toggle('is-hidden', state.loading || left === 0);
+        if (!left) return;
+        $('#loadMoreBtn').textContent = t('loading_more', { count: Math.min(CHUNK, left) });
+        box.querySelector('[data-left]').textContent = t('shown_of', { shown: state.shown, total: list.length });
+    }
+
+    /* Только что созданная ссылка должна быть видна: иначе тост сказал
+       «создана», а найти её в длинной библиотеке нельзя. Запоминаем имя и
+       раскрываем порцию ровно на время одного рендера — не раньше, чтобы
+       позиция считалась по актуальному порядку. */
+    function revealLinks(names) {
+        const keep = state.reveal || [];
+        state.reveal = keep.concat(names.filter(n => !keep.includes(n)));
+    }
+    function applyReveal(list) {
+        if (!state.reveal || !state.reveal.length) return;
+        let need = state.shown;
+        let last = null;
+        state.reveal.forEach(function (name) {
+            const idx = list.findIndex(l => l.linkName === name);
+            if (idx < 0) return;
+            last = name;
+            if (idx >= need) need = idx + 1;
+        });
+        if (need > state.shown) state.shown = need;
+        /* Прокручиваем один раз — к последней созданной, а не к каждой. */
+        if (last && last !== state.scrolledReveal) {
+            state.pendingScroll = last;
+            state.scrolledReveal = last;
+        }
+    }
+
+    /* Прокрутка к только что созданной ссылке: подсвечиваем и подводим
+       экран — иначе в длинном списке непонятно, где она. */
+    function jumpToRevealed() {
+        if (!state.pendingScroll) return;
+        const name = state.pendingScroll;
+        state.pendingScroll = null;
+        const card = $('#grid .card[data-name="' + name + '"]');
+        if (!card) return;
+        card.classList.add('is-new');
+        card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+
+    function showMore() {
+        const list = visibleLinks();
+        const before = state.shown;
+        state.shown = Math.min(list.length, state.shown + CHUNK);
+        const grid = $('#grid');
+        const frag = document.createDocumentFragment();
+        list.slice(before, state.shown).forEach(link => frag.append(cardFor(link)));
+        grid.append(frag);
+        hydrateIcons(grid);
+        renderLoadMore(list);
     }
 
     /* ========================================================
@@ -486,19 +601,43 @@
             onclick: o.onclick
         }, o.icon ? icon(o.icon) : null, h('span', { text: label }));
         if (count !== undefined) b.append(h('span', { class: 'chip__count', text: String(count) }));
+        if (o.key) b.dataset.key = o.key;
         if (o.tip) b.dataset.tip = o.tip;
         if (o.haspopup) b.setAttribute('aria-haspopup', 'menu');
         return b;
     }
 
+    /* Счётчики на чипах зависят от запроса, поэтому обновляются при каждом
+       нажатии. Пересобирать всю строку чипов ради шести чисел незачем —
+       меняем только текст, DOM остаётся на месте. */
+    function updateChipCounts() {
+        $$('#filterRow .chip[data-key]').forEach(function (b) {
+            const count = b.querySelector('.chip__count');
+            if (count) count.textContent = String(filterCount(b.dataset.key));
+        });
+    }
+
     function renderChips() {
         const row = $('#filterRow');
         row.innerHTML = '';
+
+        /* Где искать. По умолчанию — имя и тип файла, как в приложении;
+           «Везде» добавляет уровень доступа, вес, версию и размеры, чтобы
+           можно было найти ссылку по примете, а не по имени. */
+        row.append(chip(t('search_scope') + ': ' + t(state.scope === 'all' ? 'search_in_all' : 'search_in_name'),
+            undefined, {
+                ghost: true, icon: 'search', haspopup: true, tip: t('search_scope'),
+                pressed: state.scope === 'all',
+                onclick: function (e) { openScopeMenu(e.currentTarget); }
+            }));
+        row.append(h('span', { class: 'chip-row__sep' }));
+
         [['all', 'filter_all'], ['image', 'filter_photo'], ['video', 'filter_video'],
          ['playlist', 'filter_playlist'], ['pinned', 'filter_pinned']].forEach(function (pair) {
             row.append(chip(t(pair[1]), filterCount(pair[0]), {
+                key: pair[0],
                 pressed: state.filter === pair[0],
-                onclick: function () { state.filter = pair[0]; renderChips(); render(); }
+                onclick: function () { state.filter = pair[0]; renderChips(); resetShown(); render(); }
             }));
         });
 
@@ -576,11 +715,25 @@
         ]);
     }
     function setSort(sort) {
+        resetShown();
         state.sort = sort;
         savePrefs();
         renderChips();
         render();
     }
+    function openScopeMenu(anchor) {
+        showMenu(anchor, [
+            {
+                icon: 'search', text: t('search_in_name'), checked: state.scope === 'name',
+                onclick: function () { state.scope = 'name'; savePrefs(); renderChips(); resetShown(); render(); }
+            },
+            {
+                icon: 'sliders', text: t('search_in_all'), checked: state.scope === 'all',
+                onclick: function () { state.scope = 'all'; savePrefs(); renderChips(); resetShown(); render(); }
+            }
+        ], { align: 'start' });
+    }
+
     function openAccessMenu(anchor) {
         const items = [{ label: t('access_label') }, { text: t('filter_access_any'), checked: state.access === 'any', onclick: () => setAccess('any') }];
         ['public', 'local', 'token', 'auth'].forEach(function (level) {
@@ -594,6 +747,7 @@
         showMenu(anchor, items);
     }
     function setAccess(level) {
+        resetShown();
         state.access = level;
         renderChips();
         render();
@@ -715,10 +869,11 @@
         toast(t(link.pinned ? 'pinned_toast' : 'unpinned_toast'), { type: 'info', duration: 2200 });
         render();
     }
-    function setAccessLevel(link, level) {
+    function setAccessLevel(link, level, quiet) {
+        if (link.accessLevel === level && !(level === 'token' && !link.accessToken)) return;
         link.accessLevel = level;
         if (level === 'token' && !link.accessToken) link.accessToken = Math.random().toString(36).slice(2, 10);
-        toast(t('access_updated'));
+        if (!quiet) toast(t('access_updated'));
         render();
         /* Панель перерисовываем сами, сохраняя прокрутку и фокус: иначе
            переключение уровня отбрасывает пользователя в начало списка. */
@@ -833,6 +988,19 @@
                 toast(t('bulk_copied', { count: state.selected.size }));
             }
         }, icon('copy'), h('span', { text: t('bulk_copy') })));
+        /* Уровень доступа меняется пачкой: в списке из полусотни ссылок
+           это самая частая правка после закрепления. */
+        bar.append(h('button', {
+            class: 'btn btn--sm', type: 'button', 'aria-haspopup': 'menu',
+            onclick: function (e) {
+                showMenu(e.currentTarget, [
+                    { icon: 'globe', text: t('access_public'), checked: false, onclick: () => bulkAccess('public') },
+                    { icon: 'lock', text: t('access_local'), checked: false, onclick: () => bulkAccess('local') },
+                    { icon: 'key', text: t('access_token'), checked: false, onclick: () => bulkAccess('token') },
+                    { icon: 'user', text: t('access_auth'), checked: false, onclick: () => bulkAccess('auth') }
+                ], { align: 'start' });
+            }
+        }, icon('lock'), h('span', { text: t('bulk_access') })));
         bar.append(h('button', {
             class: 'btn btn--sm btn--danger', type: 'button', onclick: function () {
                 const count = state.selected.size;
@@ -859,6 +1027,15 @@
     /* ========================================================
        13. ПАНЕЛЬ ССЫЛКИ («пульт»)
        ======================================================== */
+    /* Уровень доступа для всех выбранных ссылок */
+    function bulkAccess(level) {
+        const count = state.selected.size;
+        selectedLinks().forEach(function (l) {
+            setAccessLevel(l, level, true);
+        });
+        toast(t('bulk_access_set', { level: t(accessMeta(level).key), count: count }));
+    }
+
     function openPanel(link, tab) {
         state.panelName = link.linkName;
         state.panelTab = tab || 'media';
@@ -967,30 +1144,54 @@
                     h('span', { class: 'row__title', text: t('upload_file') }),
                     h('span', { class: 'row__sub', text: t('dropzone_hint') })),
                 h('span', { class: 'row__aside' }, icon('external'))),
-            h('button', { class: 'row', type: 'button', onclick: () => mockInfo(t('upload_url')) },
+            h('button', { class: 'row', type: 'button', onclick: () => openUrlDialog(link) },
                 h('span', { class: 'row__thumb', style: 'display:grid;place-items:center' }, icon('globe')),
-                h('span', { class: 'row__body' }, h('span', { class: 'row__title', text: t('upload_url') })),
-                h('span', { class: 'row__aside' }, icon('external'))),
-            h('button', { class: 'row', type: 'button', onclick: () => mockInfo(t('upload_server')) },
-                h('span', { class: 'row__thumb', style: 'display:grid;place-items:center' }, icon('folder')),
-                h('span', { class: 'row__body' }, h('span', { class: 'row__title', text: t('upload_server') })),
-                h('span', { class: 'row__aside' }, icon('external'))),
-            h('button', { class: 'row', type: 'button', onclick: () => appendDemo(link) },
-                h('span', { class: 'row__thumb', style: 'display:grid;place-items:center' }, icon('playlist')),
                 h('span', { class: 'row__body' },
-                    h('span', { class: 'row__title', text: t('upload_append') }),
-                    h('span', { class: 'row__sub', text: link.items.length ? t('playlist_count', { count: link.items.length }) : t('playlist_empty') })),
-                h('span', { class: 'row__aside' }, icon('external')))));
+                    h('span', { class: 'row__title', text: t('upload_url') }),
+                    h('span', { class: 'row__sub', text: t('url_hint', { mb: window.LP_CONFIG.maxUploadMB }) })),
+                h('span', { class: 'row__aside' }, icon('external'))),
+            h('button', { class: 'row', type: 'button', onclick: () => openServerPicker(link) },
+                h('span', { class: 'row__thumb', style: 'display:grid;place-items:center' }, icon('folder')),
+                h('span', { class: 'row__body' },
+                    h('span', { class: 'row__title', text: t('upload_server') }),
+                    h('span', { class: 'row__sub', text: t('server_hint') })),
+                h('span', { class: 'row__aside' }, icon('external'))),
+            (function () {
+                /* Лимит сервера (PLAYLIST_MAX) виден заранее: в приложении
+                   панель узнаёт о нём только из отказа. */
+                const max = window.LP_CONFIG.playlistMax;
+                const full = link.items.length >= max;
+                const btn = h('button', {
+                    class: 'row', type: 'button',
+                    onclick: () => appendDemo(link)
+                },
+                    h('span', { class: 'row__thumb', style: 'display:grid;place-items:center' }, icon('playlist')),
+                    h('span', { class: 'row__body' },
+                        h('span', { class: 'row__title', text: t('upload_append') }),
+                        h('span', { class: 'row__sub', text: full
+                            ? t('playlist_full', { max: max })
+                            : (link.items.length ? t('playlist_count', { count: link.items.length }) : t('playlist_empty')) })),
+                    h('span', { class: 'row__aside' }, icon(full ? 'x' : 'external')));
+                if (full) btn.disabled = true;
+                return btn;
+            })()));
 
-        /* Статистика — мелким шрифтом, чтобы не тянуть внимание */
-        if (link.stats && link.stats.hits) {
-            wrap.append(h('section', { class: 'section' },
-                h('div', { class: 'section__head' }, h('span', { class: 'section__title', text: t('stats_title') })),
-                h('div', { class: 'card-block card-block--soft split' },
-                    h('span', { class: 'num', style: 'font-size:var(--t-lg);font-weight:600', text: num(link.stats.hits) }),
-                    h('span', { class: 'label', text: formatBytes(link.stats.bytes) })),
-                h('p', { class: 'field-hint', text: t('stats_reset_hint') })));
-        }
+        /* Статистика: раздел на месте всегда. Пустой блок честнее
+           исчезающего — видно, что счётчики есть, но обращений не было. */
+        const hits = link.stats && link.stats.hits ? link.stats.hits : 0;
+        const held = link.stats && link.stats.bytes ? link.stats.bytes : 0;
+        const last = link.stats && link.stats.last ? formatRelative(link.stats.last) : '';
+        wrap.append(h('section', { class: 'section' },
+            h('div', { class: 'section__head' },
+                h('span', { class: 'section__title', text: t('stats_title') })),
+            h('div', { class: 'card-block card-block--soft stack stack--tight' },
+                h('div', { class: 'split' },
+                    h('span', { class: 'num', style: 'font-size:var(--t-lg);font-weight:600', text: num(hits) }),
+                    h('span', { class: 'label', text: formatBytes(held) })),
+                h('span', { class: 'field-hint', text: hits
+                    ? t('stats_last', { when: last })
+                    : t('stats_none_hint') })),
+            h('p', { class: 'field-hint', text: t('stats_reset_hint') })));
         return wrap;
     }
 
@@ -998,9 +1199,22 @@
         const wrap = h('div', { class: 'stack' });
         const config = window.LP_CONFIG;
         const used = (link.history || []).reduce((sum, v) => sum + (v.sizeBytes || 0), 0);
-        wrap.append(h('p', { class: 'field-hint', text: t('versions_hint', { limit: config.historyLimit, size: formatBytes(used) }) }));
-        wrap.append(h('div', { class: 'meter' },
-            h('div', { class: 'meter__fill', style: 'width:' + Math.min(100, Math.round(used / config.historyBudgetBytes * 100) + 4) + '%' })));
+        const off = config.historyLimit === 0;
+        /* История может быть выключена ручкой HISTORY_LIMIT=0 — тогда это
+           не «пустой архив», а другое состояние, и говорит оно другое. */
+        wrap.append(h('p', {
+            class: 'field-hint',
+            text: off ? t('versions_disabled')
+                : t('versions_hint', { limit: config.historyLimit, size: formatBytes(used) })
+        }));
+        if (!off) {
+            const pct = Math.min(100, Math.round(used / config.historyBudgetBytes * 100));
+            wrap.append(h('div', { class: 'meter' },
+                h('div', { class: 'meter__fill', style: 'width:' + Math.max(2, pct) + '%' })),
+                h('p', { class: 'field-hint', text: t('versions_budget', {
+                    size: formatBytes(used), total: formatBytes(config.historyBudgetBytes)
+                }) }));
+        }
 
         const list = h('div', { class: 'stack stack--tight' });
         list.append(versionRow(link, { version: link.currentVersion, sizeBytes: link.sizeBytes, mtime: link.modTime, mimeType: link.mimeType }, true));
@@ -1110,8 +1324,16 @@
             list.append(playlistRow(link, item, false));
         });
         if (!link.items.length) list.append(h('p', { class: 'field-hint', text: t('playlist_empty') }));
-        list.append(h('button', { class: 'btn btn--soft btn--block', type: 'button', onclick: () => appendDemo(link) },
-            icon('plus'), h('span', { text: t('upload_append') })));
+        /* Предел сервера (PLAYLIST_MAX) виден до нажатия: в приложении 0.12.1
+           о нём сообщал только отказ на запрос. Когда файлов уже максимум,
+           вместо кнопки стоит объяснение. */
+        const max = window.LP_CONFIG.playlistMax;
+        if (link.items.length >= max) {
+            list.append(h('p', { class: 'field-hint', text: t('playlist_full', { max: max }) }));
+        } else {
+            list.append(h('button', { class: 'btn btn--soft btn--block', type: 'button', onclick: () => appendDemo(link) },
+                icon('plus'), h('span', { text: t('upload_append') })));
+        }
         wrap.append(h('section', { class: 'section' },
             h('div', { class: 'section__head' }, h('span', { class: 'section__title', text: t('panel_playlist') })),
             list));
@@ -1183,20 +1405,50 @@
     }
 
     /* Заглушки «серверных» операций */
-    function mockInfo(what) { toast(what + ' — ' + t('loading'), { type: 'info', duration: 1800 }); }
     function uploadDemo(link) {
         toast(t('uploading'), { type: 'info', duration: 1200 });
         setTimeout(function () {
-            link.currentVersion += 1;
-            link.history.unshift({ version: link.currentVersion - 1, sizeBytes: link.sizeBytes, mtime: link.modTime, mimeType: link.mimeType });
-            link.modTime = Math.floor(Date.now() / 1000);
-            link.sizeBytes = Math.round(link.sizeBytes * (0.9 + Math.random() * 0.3));
-            toast(t('uploaded'));
-            render();
-            renderPanel();
+            applyMedia(link, {
+                mimeType: link.mimeType, sizeBytes: Math.round(link.sizeBytes * (0.9 + Math.random() * 0.3)),
+                width: link.width, height: link.height, durationSec: link.durationSec,
+                src: link.imageUrl
+            }, true);
         }, 900);
     }
+
+    /* Одна точка, где медиа ссылки заменяется: архив версии, новая версия,
+       обновление карточки и пульта. В приложении то же самое делает сервер
+       (он сохраняет предыдущий файл в историю), а панель только принимает
+       ответ — здесь мы повторяем его поведение ровно один раз, чтобы все
+       три способа замены (файл, URL, галерея) не расходились. */
+    function applyMedia(link, media, keepToast) {
+        link.history.unshift({
+            version: link.currentVersion, sizeBytes: link.sizeBytes,
+            mtime: link.modTime, mimeType: link.mimeType
+        });
+        const limit = window.LP_CONFIG.historyLimit;
+        if (limit >= 0) link.history = link.history.slice(0, limit);
+        link.currentVersion += 1;
+        link.hasImage = true;
+        link.mimeType = media.mimeType || link.mimeType;
+        link.category = (media.mimeType || '').startsWith('video') ? 'video'
+            : (/gif/.test(media.mimeType || '') ? 'gif' : 'image');
+        link.sizeBytes = media.sizeBytes || link.sizeBytes;
+        link.width = media.width || link.width;
+        link.height = media.height || link.height;
+        link.durationSec = media.durationSec || 0;
+        link.imageUrl = media.src || link.imageUrl;
+        link.preview = media.src || link.preview;
+        link.modTime = Math.floor(Date.now() / 1000);
+        if (!keepToast) toast(t('uploaded') + (media.name ? ': ' + media.name : ''));
+        render();
+        renderPanel();
+    }
+
     function appendDemo(link) {
+        const max = window.LP_CONFIG.playlistMax;
+        if (!link.hasImage) { toast(t('append_needs_media'), { type: 'error' }); return; }
+        if (link.items.length >= max) { toast(t('playlist_full', { max: max }), { type: 'error' }); return; }
         link.items.push({
             id: String(link.items.length + 1),
             mimeType: 'image/jpeg',
@@ -1206,6 +1458,120 @@
         toast(t('append_success'));
         render();
         renderPanel();
+    }
+
+    /* ========================================================
+       13-бис. ЗАГРУЗКА ПО URL И ВЫБОР ФАЙЛА С СЕРВЕРА
+       Оба пути есть в приложении: сервер скачивает URL сам
+       (и падает с ошибкой, если это не медиа), а «галерея» —
+       это файл из настроенной папки на сервере.
+       ======================================================== */
+    const MEDIA_EXT = /\.(jpe?g|png|gif|webp|bmp|tiff?|avif|mp4|webm|m4v|mov)([?#]|$)/i;
+    const VIDEO_EXT = /\.(mp4|webm|m4v|mov)([?#]|$)/i;
+
+    function openUrlDialog(link) {
+        const node = $('#tplUrl').content.firstElementChild.cloneNode(true);
+        const input = $('#urlInput', node);
+        const status = $('#urlStatus', node);
+        const submit = $('[data-submit]', node);
+        $$('[data-close]', node).forEach(b => b.addEventListener('click', () => closeOverlay()));
+        openOverlay(node, { focus: input });
+        applyTranslations(node);
+        /* Подсказку собираем после перевода: в ней подставляется лимит
+           сервера (MAX_UPLOAD_MB), а не только статичный текст. */
+        $('.dialog__text', node).textContent = t('url_hint', { mb: window.LP_CONFIG.maxUploadMB });
+
+        let timer = 0;
+        /* Проверка до отправки повторяет серверную: адрес, длина, тип файла.
+           Ошибку лучше увидеть здесь, чем после скачивания десятков мегабайт. */
+        function setStatus(text, ok) {
+            status.textContent = text || '';
+            status.classList.toggle('field-hint--error', !!text && !ok);
+            status.classList.toggle('field-hint--ok', !!ok);
+            input.setAttribute('aria-invalid', String(!!text && !ok));
+            submit.disabled = !ok;
+        }
+        function check() {
+            const value = input.value.trim();
+            clearTimeout(timer);
+            if (!value) { setStatus('', false); return; }
+            if (value.length > 2048) { setStatus(t('url_too_long'), false); return; }
+            if (!/^https?:\/\/[^\s]+$/i.test(value)) { setStatus(t('url_invalid'), false); return; }
+            setStatus(t('url_checking'), false);
+            timer = setTimeout(function () {
+                setStatus(MEDIA_EXT.test(value) ? t('url_ready') : t('url_not_media'), MEDIA_EXT.test(value));
+            }, 420);
+        }
+        input.addEventListener('input', check);
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !submit.disabled) { e.preventDefault(); commit(); }
+        });
+        function commit() {
+            const value = input.value.trim();
+            const isVideo = VIDEO_EXT.test(value);
+            closeOverlay(true);
+            toast(t('uploading'), { type: 'info', duration: 1000 });
+            /* Сервер скачивает файл и делает превью. В макете кадр берётся из
+               демонстрационного набора: размеры и вес приходят от сервера. */
+            setTimeout(function () {
+                applyMedia(link, isVideo
+                    ? { mimeType: 'video/mp4', sizeBytes: 6_400_000, width: 1280, height: 720, durationSec: 12, src: MEDIA_DEMO.video }
+                    : { mimeType: 'image/jpeg', sizeBytes: 480_000, width: 1600, height: 900, src: MEDIA_DEMO.image });
+            }, 700);
+        }
+        submit.addEventListener('click', commit);
+    }
+
+    /* Демонстрационные кадры для «скачанного» медиа — те же файлы, что в
+       демо-библиотеке, чтобы макет не ходил в сеть. */
+    const MEDIA_DEMO = {
+        image: '../prototypes/media/wp-abstract.jpg',
+        video: '../prototypes/media/wp-mono.jpg'
+    };
+
+    function openServerPicker(link) {
+        const node = $('#tplServer').content.firstElementChild.cloneNode(true);
+        const list = $('#serverList', node);
+        const empty = $('#serverEmpty', node);
+        const filter = $('#serverFilter', node);
+        $$('[data-close]', node).forEach(b => b.addEventListener('click', () => closeOverlay()));
+        openOverlay(node);
+        applyTranslations(node);
+
+        function draw() {
+            const q = filter.value.trim().toLowerCase();
+            const files = (window.LP_CONFIG.serverFiles || []).filter(f => f.name.toLowerCase().includes(q));
+            list.replaceChildren();
+            empty.classList.toggle('is-hidden', files.length > 0);
+            files.forEach(function (file) {
+                const isVideo = (file.mimeType || '').startsWith('video');
+                const thumb = file.img
+                    ? h('img', { class: 'picker__thumb', src: file.img, alt: '', loading: 'lazy' })
+                    : h('span', { class: 'picker__thumb picker__thumb--icon' }, icon('image'));
+                list.append(h('button', {
+                    class: 'picker__item', type: 'button',
+                    onclick: function () {
+                        closeOverlay(true);
+                        applyMedia(link, {
+                            mimeType: file.mimeType, sizeBytes: file.sizeBytes, width: file.width,
+                            height: file.height, durationSec: file.durationSec || 0,
+                            src: file.img, name: file.name
+                        });
+                    }
+                }, thumb,
+                    h('span', { class: 'picker__body' },
+                        h('span', { class: 'picker__name truncate', text: file.name }),
+                        h('span', { class: 'picker__meta label' },
+                            h('span', { text: (file.width || 0) + '×' + (file.height || 0) }),
+                            h('span', { text: formatBytes(file.sizeBytes) }),
+                            isVideo ? h('span', { class: 'badge', text: 'MP4' }) : null)),
+                    h('span', { class: 'picker__take', text: t('upload_file') })));
+            });
+            hydrateIcons(list);
+        }
+        filter.addEventListener('input', draw);
+        draw();
+        filter.focus();
     }
 
     /* ========================================================
@@ -1238,13 +1604,30 @@
             setError('');
             return value;
         }
-        function setError(text) {
+        function setError(text, ok) {
             hint.textContent = text || (o.rename ? '' : t('create_hint'));
-            hint.classList.toggle('field-hint--error', !!text);
-            input.setAttribute('aria-invalid', String(!!text));
-            submit.disabled = !!text;
+            hint.classList.toggle('field-hint--error', !!text && !ok);
+            hint.classList.toggle('field-hint--ok', !!ok);
+            input.setAttribute('aria-invalid', String(!!text && !ok));
+            submit.disabled = !!text && !ok;
+            if (ok) submit.disabled = false;
         }
-        input.addEventListener('input', function () { if (input.value.trim()) setError(''); });
+        /* Пока печатают — молчим. Через 250 мс после последней буквы
+           показываем, свободен ли ID: обычно он свободен, и это заметно
+           экономит одно нажатие на создание. */
+        let checkTimer = 0;
+        input.addEventListener('input', function () {
+            clearTimeout(checkTimer);
+            if (!input.value.trim()) { setError(''); return; }
+            setError('', false);
+            checkTimer = setTimeout(function () {
+                const value = input.value.trim();
+                if (!/^[a-zA-Z0-9_-]{1,64}$/.test(value)) return;   /* об этом скажет submit */
+                const busy = state.links.some(l => l.linkName === value && (!o.rename || l !== o.rename));
+                if (busy) setError(t('link_taken'));
+                else if (value !== (o.rename && o.rename.linkName) || !o.rename) setError(t('id_available'), true);
+            }, 250);
+        });
 
         function commit() {
             const name = validate();
@@ -1255,6 +1638,7 @@
                 if (state.panelName === oldName) state.panelName = name;
                 toast(t('renamed', { name: name }));
                 closeOverlay();
+                revealLinks([name]);
                 render();
                 return;
             }
@@ -1269,17 +1653,15 @@
             closeOverlay();
             state.query = '';
             $('#searchInput').value = '';
+            revealLinks([name]);
             render();
             toast(t('link_created', { name: name }), {
                 action: t('upload_file'),
                 duration: 8000,
                 onAction: () => openPanel(link)
             });
-            const card = $('#grid .card[data-name="' + name + '"]');
-            if (card) {
-                card.classList.add('is-new');
-                card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-            }
+            /* Подсветка и прокрутка — в jumpToRevealed(): она нужна и после
+               загрузки файлов, и после переименования, а не только здесь. */
         }
 
         submit.addEventListener('click', commit);
@@ -1325,7 +1707,7 @@
         PALETTES.forEach(function (name) {
             const label = t('palette_' + name);
             const swatch = h('label', {
-                class: 'swatch', 'data-tip': label, dataset: { palette: name }
+                class: 'swatch', 'data-tip': label, 'data-palette': name
             },
                 h('input', {
                     type: 'radio', name: 'palette', value: name, 'aria-label': label,
@@ -1363,13 +1745,16 @@
             });
         });
 
-        /* Горячие клавиши */
+        /* Горячие клавиши: и однобуквенные, и старые сочетания с Ctrl/⌘ —
+           панель не отбирает привычку, а добавляет к ней короткие клавиши. */
         const list = $('#shortcutList', node);
-        [['/', 'sc_search'], ['n', 'sc_new'], ['t', 'sc_theme'], ['g', 'sc_view'], ['s', 'sc_select']].forEach(function (pair) {
+        [['/', 'sc_search'], ['n', 'sc_new'], ['t', 'sc_theme'], ['g', 'sc_view'],
+         ['s', 'sc_select'], ['Esc', 'sc_close']].forEach(function (pair) {
             list.append(h('div', { class: 'split' },
                 h('span', { class: 'label', text: t(pair[1]) }),
                 h('span', { class: 'kbd', text: pair[0] })));
         });
+        list.append(h('p', { class: 'field-hint', text: t('sc_extra') }));
 
         openOverlay(node);
     }
@@ -1416,22 +1801,36 @@
                 uploadDemo(openLink);
                 return;
             }
-            files.forEach(function (file, i) {
-                const name = sanitizeId(file.name);
-                if (state.links.some(l => l.linkName === name)) return;
-                state.links.unshift({
-                    id: 'u' + Date.now() + i, linkName: name, category: file.type.startsWith('video') ? 'video' : 'image',
-                    hasImage: true, imageUrl: '', preview: '', mimeType: file.type || 'image/jpeg',
-                    width: 0, height: 0, sizeBytes: file.size,
-                    created: Math.floor(Date.now() / 1000), modTime: Math.floor(Date.now() / 1000),
-                    pinned: false, accessLevel: 'public', accessToken: '', currentVersion: 1,
-                    history: [], items: [], rotate: null, stats: null
-                });
-            });
-            render();
-            toast(t('link_created', { name: files.map(f => sanitizeId(f.name)).join(', ') }), { duration: 5000 });
+            createLinksFromFiles(files);
         });
     }
+    /* Имена файлов становятся адресами ссылок. Занятые имена пропускаем,
+       повторы внутри одной пачки — тоже: две ссылки с одним адресом создать
+       нельзя, а молча получить одну из двух — неприятно. */
+    function createLinksFromFiles(files) {
+        const created = [];
+        const skipped = [];
+        files.forEach(function (file, i) {
+            const name = sanitizeId(file.name);
+            if (state.links.some(l => l.linkName === name) || created.includes(name)) { skipped.push(name); return; }
+            created.push(name);
+            state.links.unshift({
+                id: 'u' + Date.now() + i, linkName: name,
+                category: file.type.startsWith('video') ? 'video' : 'image',
+                hasImage: true, imageUrl: '', preview: '', mimeType: file.type || 'image/jpeg',
+                width: 0, height: 0, sizeBytes: file.size,
+                created: Math.floor(Date.now() / 1000), modTime: Math.floor(Date.now() / 1000),
+                pinned: false, accessLevel: 'public', accessToken: '', currentVersion: 1,
+                history: [], items: [], rotate: null, stats: null
+            });
+        });
+        if (!created.length) return;
+        revealLinks(created);
+        render();
+        toast(t('link_created', { name: created.join(', ') }), { duration: 5000 });
+        if (skipped.length) toast(t('link_taken') + ': ' + skipped.join(', '), { type: 'info', duration: 4500 });
+    }
+
     function showDropScrim() {
         if ($('#dropScrim')) return;
         const openLink = currentOverlay && currentOverlay.node.dataset.name
@@ -1456,8 +1855,19 @@
         document.addEventListener('keydown', function (e) {
             const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)
                 || document.activeElement.isContentEditable;
+            const mod = e.ctrlKey || e.metaKey;
+            /* Старые сочетания панели работают как раньше: Ctrl/⌘ + N, F, G, T.
+               Однобуквенные добавлены рядом — они быстрее, но не отменяют
+               привычку, и на них не срабатывает ввод в поле. */
+            if (mod && !e.altKey && !e.shiftKey && !typing) {
+                const combo = e.key.toLowerCase();
+                if (combo === 'n') { e.preventDefault(); openCreateDialog({}); return; }
+                if (combo === 'f') { e.preventDefault(); $('#searchInput').focus(); $('#searchInput').select(); return; }
+                if (combo === 'g') { e.preventDefault(); setView(state.view === 'grid' ? 'list' : 'grid'); return; }
+                if (combo === 't') { e.preventDefault(); cycleTheme(); return; }
+            }
             if (e.key === '/' && !typing) { e.preventDefault(); $('#searchInput').focus(); return; }
-            if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+            if (typing || mod || e.altKey) return;
             const key = e.key.toLowerCase();
             if (key === 'n') { e.preventDefault(); openCreateDialog({}); }
             else if (key === 't') { e.preventDefault(); cycleTheme(); }
@@ -1474,6 +1884,10 @@
         state.view = view;
         savePrefs();
         applyView();
+        /* В режиме списка в строке появляется переключатель доступа, в плитке
+           его нет: это часть карточки, поэтому вид перерисовывает выдачу.
+           Показанную порцию при этом не сбрасываем. */
+        render();
     }
 
     /* ========================================================
@@ -1529,7 +1943,29 @@
         $('#newLinkBtn').addEventListener('click', () => openCreateDialog({}));
         $('#fabBtn').addEventListener('click', () => openCreateDialog({}));
         $('#emptyCreateBtn').addEventListener('click', () => openCreateDialog({}));
-        $('#emptyDropBtn').addEventListener('click', () => toast(t('drop_hint'), { type: 'info' }));
+        /* Пустое состояние: «перетащить файлы» открывает обычный выбор файлов
+           — на телефоне перетаскивать нечего, а раньше кнопка только
+           показывала подсказку. */
+        $('#emptyDropBtn').addEventListener('click', () => $('#filePicker').click());
+        $('#filePicker').addEventListener('change', function (e) {
+            createLinksFromFiles(Array.from(e.target.files || []));
+            e.target.value = '';
+        });
+        $('#loadMoreBtn').addEventListener('click', showMore);
+        $('#retryBtn').addEventListener('click', function () {
+            state.loading = true;
+            state.loadError = false;
+            render();
+            fetchLinks().then(function () {
+                state.loading = false;
+                render();
+                renderChips();
+            }).catch(function () {
+                state.loading = false;
+                state.loadError = true;
+                render();
+            });
+        });
         $('#resetFiltersBtn').addEventListener('click', function () {
             state.query = ''; state.filter = 'all'; state.access = 'any';
             $('#searchInput').value = '';
@@ -1538,19 +1974,37 @@
         });
 
         /* Поиск */
+        /* Поиск: счётчики и состояние «ничего не найдено» отзываются сразу,
+           а перерисовка сетки откладывается на 80 мс. На длинной библиотеке
+           это экономит три перерисовки из четырёх при обычном наборе и
+           незаметно на глаз. */
         const search = $('#searchInput');
         const searchField = search.closest('.field');
+        let searchTimer = 0;
         search.addEventListener('input', function () {
             state.query = search.value;
             searchField.classList.toggle('has-value', !!search.value);
-            renderChips();
-            render();
+            resetShown();
+            updateChipCounts();
+            updateSearchStateNow();
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(render, 80);
         });
+        /* Мгновенная часть: счётчики, пустое состояние и подписи —
+           без перерисовки карточек. */
+        function updateSearchStateNow() {
+            const list = visibleLinks();
+            const total = state.links.length;
+            const narrowed = !!state.query.trim() || state.filter !== 'all' || state.access !== 'any';
+            $('#noResults').classList.toggle('is-hidden', !(!state.loading && !list.length && total > 0 && narrowed));
+            $('#pageCount').textContent = narrowed ? t('found', { shown: list.length, total }) : String(total);
+        }
         $('#searchClear').addEventListener('click', function () {
             search.value = '';
             state.query = '';
             searchField.classList.remove('has-value');
             search.focus();
+            resetShown();
             renderChips();
             render();
         });
@@ -1569,6 +2023,12 @@
             state.loading = false;
             render();
             renderChips();
+        }).catch(function () {
+            /* Список не пришёл: показываем состояние с кнопкой «Повторить»,
+               а не пустую библиотеку — иначе кажется, что всё удалилось. */
+            state.loading = false;
+            state.loadError = true;
+            render();
         });
     }
 

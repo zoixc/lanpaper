@@ -30,12 +30,28 @@ Notable changes to Lanpaper. Docker images are published as
   dark themes and a touch-sized mobile layout. `design/v2/screens.html` shows the
   same screen in live 1440 / 834 / 390 px frames, and
   `design/06-redesign-v2.md` holds the audit of 0.12.1, the contrast table and
-  the file-by-file migration plan. `design/v2/standalone.html` (742 KB,
+  the file-by-file migration plan. `design/v2/standalone.html` (785 KB,
   `tools/build-standalone.py`) is the same mock-up as one file with the styles,
   scripts, fonts and demo frames inlined, for viewers that show a single file.
   **Nothing in the application changed**: `admin.html`, `static/` and the Go code
   are untouched, and the panel still behaves exactly as in 0.12.1. Contrast of
   every palette pair is checked by `node design/v2/tools/check.mjs`.
+- **The prototype also answers what 0.12.1 does not do.** The library is drawn in
+  chunks of 12 with a "Show more" button and a "showing 12 of 20" counter instead
+  of rendering every tile at once; a failed `/api/wallpapers` request gets its own
+  error state with a "Retry" button instead of an empty library; media can be
+  replaced from a URL (validated: `https?://`, 2048 characters, known
+  extensions) or from the files already on the server, not only by uploading;
+  every replacement archives the previous file into the version history up to
+  `HISTORY_LIMIT`; the playlist stops at `PLAYLIST_MAX` with the limit spelled
+  out before the click; the selection panel can change the access level for many
+  links at once; the version tab shows the history budget and disables deletion
+  when there is nothing to delete; the link id is checked 250 ms after typing;
+  filter chips carry counts; hotkeys gained `t`, `g` and `s` next to the existing
+  ones; and a newly created, renamed or uploaded link is revealed and highlighted
+  instead of landing past the rendered window. The list of behaviour changes —
+  and what deliberately stays as it is — is section 11-бис of
+  `design/06-redesign-v2.md`.
 
 ## [0.12.1] – 2026-10-04
 

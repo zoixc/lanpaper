@@ -29,7 +29,8 @@
         palette: q.get('palette'),
         view: q.get('view'),
         lang: q.get('lang'),
-        instant: q.get('embedded') === '1'
+        instant: q.get('embedded') === '1',
+        fail: q.get('fail') === '1'
     };
     try {
         var s = JSON.parse(localStorage.getItem('lp-ui') || '{}');
@@ -132,6 +133,26 @@
 
         <div class="grid" id="grid" aria-live="polite" aria-busy="true"></div>
 
+        <!-- Длинная библиотека показывается порциями: сорок карточек рисуются
+             по двадцать четыре. Кнопка говорит, сколько осталось. -->
+        <div class="load-more is-hidden" id="loadMore">
+            <button class="btn" id="loadMoreBtn" type="button">Показать ещё</button>
+            <span class="load-more__count label" data-left></span>
+        </div>
+
+        <!-- Сервер не ответил: отдельное состояние с повтором, чтобы пустой
+             экран не выглядел как пустая библиотека -->
+        <div class="empty is-hidden" id="errorState">
+            <div class="empty__icon"><svg data-icon="alert"></svg></div>
+            <p class="empty__title" data-i18n="load_error">Не удалось загрузить список</p>
+            <p class="empty__text" data-i18n="offline_hint">Проверьте связь с сервером и попробуйте снова.</p>
+            <div class="empty__actions">
+                <button class="btn btn--primary" id="retryBtn" type="button">
+                    <svg data-icon="refresh"></svg><span data-i18n="retry">Повторить</span>
+                </button>
+            </div>
+        </div>
+
         <!-- Ничего не найдено: отдельное состояние, чтобы пустота поиска
              не выглядела как пустая библиотека -->
         <div class="empty is-hidden" id="noResults">
@@ -187,6 +208,11 @@
 
 <!-- Слой оверлеев: затемнение + панель/диалог кладутся сюда -->
 <div id="overlayHost"></div>
+
+<!-- Тот же выбор файлов, что открывает кнопка «Перетащить файлы» и меню
+     «Файл с устройства» — одно поле на всю страницу -->
+<input type="file" id="filePicker" class="visually-hidden" multiple
+       accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/tiff,video/mp4,video/webm">
 
 
 <!-- ============================================================
@@ -327,6 +353,7 @@
             <div class="section">
                 <div class="section__head"><span class="section__title" data-i18n="settings_language">Язык</span></div>
                 <select class="select select--block" id="langSelect"></select>
+                <p class="field-hint" data-i18n="settings_mockup_note"></p>
             </div>
 
             <div class="section">
@@ -354,6 +381,63 @@
         <div class="sheet__foot">
             <span class="spacer"></span>
             <button class="btn btn--primary" type="button" data-close data-i18n="close">Закрыть</button>
+        </div>
+    </div>
+</template>
+
+
+<!-- ============================================================
+     МЕДИА ПО ССЫЛКЕ (URL)
+     Адрес проверяется до отправки: сервер скачивает файл сам, и
+     ошибку лучше увидеть здесь, а не после загрузки.
+     ============================================================ -->
+<template id="tplUrl">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="urlTitle">
+        <h2 class="dialog__title" id="urlTitle" data-i18n="upload_url">По ссылке (URL)</h2>
+        <p class="dialog__text" data-i18n="url_hint">Сервер скачает файл сам. Годится прямая ссылка на картинку или видео.</p>
+        <div class="dialog__body">
+            <label class="field-label" for="urlInput" data-i18n="url_label">Адрес файла</label>
+            <div class="field field--plain field--lg has-value">
+                <input id="urlInput" type="url" inputmode="url" autocomplete="off" spellcheck="false"
+                       placeholder="https://…" aria-describedby="urlStatus">
+            </div>
+            <p class="field-hint" id="urlStatus" role="status"></p>
+        </div>
+        <div class="dialog__foot">
+            <button class="btn" type="button" data-close data-i18n="cancel">Отмена</button>
+            <button class="btn btn--primary" type="button" data-submit disabled data-i18n="url_submit">Загрузить</button>
+        </div>
+    </div>
+</template>
+
+
+<!-- ============================================================
+     ФАЙЛЫ НА СЕРВЕРЕ
+     Вместо загрузки с телефона можно взять уже лежащий на сервере
+     файл — он копируется в ссылку.
+     ============================================================ -->
+<template id="tplServer">
+    <div class="sheet sheet--picker" role="dialog" aria-modal="true" aria-labelledby="serverTitle" data-sheet>
+        <div class="sheet__grip"></div>
+        <div class="sheet__head">
+            <div class="grow">
+                <div class="eyebrow" data-i18n="upload_server">Из галереи сервера</div>
+                <h2 class="sheet__title" id="serverTitle" data-i18n="server_title">Файлы на сервере</h2>
+                <div class="sheet__sub" data-i18n="server_hint">Файл будет скопирован в ссылку</div>
+            </div>
+            <button class="icon-btn" type="button" data-close aria-label="Закрыть" data-i18n-aria="close">
+                <svg data-icon="x"></svg>
+            </button>
+        </div>
+        <div class="sheet__body">
+            <div class="field">
+                <svg class="field__icon" data-icon="search"></svg>
+                <input id="serverFilter" type="search" autocomplete="off" spellcheck="false"
+                       placeholder="Имя файла" data-i18n-placeholder="server_filter"
+                       aria-label="Имя файла" data-i18n-aria="server_filter">
+            </div>
+            <div class="picker" id="serverList"></div>
+            <p class="field-hint is-hidden" id="serverEmpty" data-i18n="nothing_found">Ничего не найдено</p>
         </div>
     </div>
 </template>

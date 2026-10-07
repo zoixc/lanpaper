@@ -266,11 +266,10 @@
     .grid--list { grid-template-columns: minmax(0, 1fr); gap: var(--s-2); }
     .grid--list .card__frame { width: 92px; }
 
-    .card__body { padding: 8px 10px 9px; gap: 2px; }
+    .card__body { padding: 9px 10px; gap: 2px; }
     .card__name { font-size: var(--t-xs); }
     .card__meta { font-size: var(--t-2xs); }
     .card__frame { border-bottom: 0; }
-    .card__body { padding-top: 9px; }
 
     .page-head__count { display: none; }
 }

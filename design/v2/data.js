@@ -141,13 +141,65 @@
         })
     ];
 
+    /* Ещё восемь ссылок: библиотека из двадцати карточек показывает то, чего
+       не видно на десяти — порционный рендер, счётчики фильтров и то, как
+       выглядит список, когда он длиннее экрана. Кадры те же: на стенде
+       других нет. */
+    [
+        ['hall-left', 'wp-dawn.jpg', 'image/jpeg', 1376, 768, 76_800, -3 * DAY, 'public', false],
+        ['hall-right', 'wp-panorama.jpg', 'image/jpeg', 1600, 560, 92_193, -3 * DAY, 'public', false],
+        ['kitchen-menu', 'wp-forest.jpg', 'image/jpeg', 1600, 900, 222_941, -8 * DAY, 'local', true],
+        ['archive-wall', 'wp-city.jpg', 'image/jpeg', 1600, 900, 118_022, -14 * DAY, 'public', false],
+        ['warehouse-2', 'wp-mono.jpg', 'image/jpeg', 1600, 900, 106_064, -21 * DAY, 'public', false],
+        ['meeting-room', 'wp-square.jpg', 'image/jpeg', 1080, 1080, 135_807, -30 * DAY, 'auth', false],
+        ['lift-screen', 'wp-vertical.jpg', 'image/jpeg', 720, 1280, 70_169, -35 * DAY, 'public', true],
+        ['brand-loop', 'wp-abstract.jpg', 'image/gif', 800, 450, 412_000, -41 * DAY, 'public', false]
+    ].forEach(function (row, i) {
+        window.LP_DATA.push(link({
+            id: 'x' + i, linkName: row[0], category: row[2] === 'image/gif' ? 'gif' : 'image',
+            imageUrl: MEDIA + row[1], preview: MEDIA + row[1],
+            mimeType: row[2], width: row[3], height: row[4], sizeBytes: row[5],
+            created: now + row[6], modTime: now + row[6],
+            pinned: row[8], accessLevel: row[7],
+            currentVersion: i % 3 === 0 ? 2 : 1,
+            history: i % 3 === 0 ? [{ version: 1, sizeBytes: Math.round(row[5] * 0.9), mtime: now + row[6] - DAY, mimeType: row[2] }] : []
+        }));
+    });
+
+    /* Файлы, лежащие на сервере: их отдаёт /api/external-images, а превью —
+       /api/external-image-preview?path=… Пользователь выбирает один вместо
+       загрузки с телефона. Кадры те же, что в демо-библиотеке. */
+    window.LP_SERVER_FILES = [
+        { name: 'wp-dawn.jpg', img: MEDIA + 'wp-dawn.jpg', sizeBytes: 76_800, width: 1376, height: 768, mimeType: 'image/jpeg' },
+        { name: 'wp-panorama.jpg', img: MEDIA + 'wp-panorama.jpg', sizeBytes: 92_193, width: 1600, height: 560, mimeType: 'image/jpeg' },
+        { name: 'wp-vertical.jpg', img: MEDIA + 'wp-vertical.jpg', sizeBytes: 70_169, width: 720, height: 1280, mimeType: 'image/jpeg' },
+        { name: 'wp-square.jpg', img: MEDIA + 'wp-square.jpg', sizeBytes: 135_807, width: 1080, height: 1080, mimeType: 'image/jpeg' },
+        { name: 'wp-forest.jpg', img: MEDIA + 'wp-forest.jpg', sizeBytes: 222_941, width: 1600, height: 900, mimeType: 'image/jpeg' },
+        { name: 'wp-city.jpg', img: MEDIA + 'wp-city.jpg', sizeBytes: 118_022, width: 1600, height: 900, mimeType: 'image/jpeg' },
+        { name: 'wp-mono.jpg', img: MEDIA + 'wp-mono.jpg', sizeBytes: 106_064, width: 1600, height: 900, mimeType: 'image/jpeg' },
+        { name: 'wp-abstract.jpg', img: MEDIA + 'wp-abstract.jpg', sizeBytes: 65_915, width: 1600, height: 900, mimeType: 'image/jpeg' },
+        { name: 'app-icon.png', img: MEDIA + 'app-icon.png', sizeBytes: 10_909, width: 512, height: 512, mimeType: 'image/png' },
+        { name: 'menu-board.mp4', img: MEDIA + 'wp-mono.jpg', sizeBytes: 18_400_000, width: 1920, height: 1080, mimeType: 'video/mp4', durationSec: 18 },
+        { name: 'loop.mp4', img: MEDIA + 'wp-city.jpg', sizeBytes: 7_300_000, width: 1280, height: 720, mimeType: 'video/mp4', durationSec: 12 }
+    ];
+
     /* Конфигурация сервера — из тех же ручек, что читает админка. */
     window.LP_CONFIG = {
         historyLimit: 3,
         historyBudgetBytes: 536_870_912,
+        /* Ручки сервера, которые видит интерфейс: MAX_UPLOAD_MB, PLAYLIST_MAX */
+        maxUploadMB: 50,
+        playlistMax: 8,
         compression: { quality: 82, scale: 100 },
         maxPixels: 36_000_000,
         schemes: ['public', 'local', 'token', 'auth'],
-        langs: ['ru', 'en', 'de', 'fr', 'it', 'es']
+        /* Шесть языков, как в приложении. В самом макете переведены ru и en:
+           для остальных четырёх строки уже есть в static/i18n приложения, и
+           перенос их подхватит — см. 06-redesign-v2.md, раздел переноса. */
+        langs: ['ru', 'en', 'de', 'fr', 'it', 'es'],
+        mockupLangs: ['ru', 'en'],
+        serverFiles: window.LP_SERVER_FILES,
+        /* Сколько живут счётчики статистики на сервере: в памяти до перезапуска */
+        statsVolatile: true
     };
 })();

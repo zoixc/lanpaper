@@ -79,8 +79,26 @@ def main():
     # заменяем ссылкой на карту, которую кладём в начало скрипта.
     js = re.sub(r"const MEDIA = '[^']*';", "const MEDIA = '';", js)
     names = sorted(frames)
+    # Имя файла встречается в данных дважды по смыслу: как путь к кадру
+    # (MEDIA + 'x.jpg', элемент массива) и как подпись файла на сервере
+    # (name: 'x.jpg'). Подпись трогать нельзя — иначе в списке файлов
+    # вместо имени окажется data-URI. Поэтому прячем подписи, а потом
+    # заменяем пути: сначала в склейке с MEDIA, затем одиночные литералы.
+    hidden = {}
+
+    def hide(match):
+        key = "\x00NAME%d\x00" % len(hidden)
+        hidden[key] = match.group(0)
+        return key
+
+    js = re.sub(r"\bname:\s*'([^']+)'", hide, js)
+    js = re.sub(r"MEDIA \+ '([^']+)'", lambda m: "window.LP_IMG[%r]" % m.group(1), js)
     for name in names:
         js = js.replace("'" + name + "'", "window.LP_IMG['" + name + "']")
+    for key, value in hidden.items():
+        js = js.replace(key, value)
+    if "\x00NAME" in js:
+        sys.exit("Не удалось вернуть подписи файлов на место")
     prelude = "window.LP_IMG = {\n" + ",\n".join(
         "  %r: %r" % (name, frames[name]) for name in names) + "\n};\n"
     js = prelude + js
@@ -95,6 +113,11 @@ def main():
     html = html.replace("</body>", "<script>\n" + js + "\n</script>\n</body>", 1)
     # Знак в шапке — тот же favicon: вклеиваем, чтобы файл не тянул ничего извне.
     html = html.replace("../../static/favicon.svg", data_uri(os.path.join(REPO, "static", "favicon.svg"), "image/svg+xml"))
+    # Ссылки в шапке и подвале ведут на соседние файлы стенда — рядом с
+    # одностраничной сборкой их нет, поэтому в ней они ведут наверх.
+    html = html.replace('<a class="brand" href="index.html">', '<a class="brand" href="#top">')
+    html = html.replace('<a href="../index.html">', '<a href="#top">')
+    html = html.replace("<body>", '<body id="top">', 1)
     html = html.replace("<title>", "<!-- Собрано tools/build-standalone.py: один файл, без внешних запросов -->\n<title>", 1)
 
     with open(OUT, "w", encoding="utf-8") as fh:

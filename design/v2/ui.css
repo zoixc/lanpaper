@@ -275,6 +275,9 @@
 }
 .field-hint { margin-top: 6px; font-size: var(--t-xs); color: var(--text-3); }
 .field-hint--error { color: var(--danger); }
+/* Успех тоже подписываем: «свободно» рядом с полем снимает вопрос,
+   свободен ли ID, не заставляя отправлять форму. */
+.field-hint--ok { color: var(--success); }
 
 /* Нативный select в стиле кнопки */
 .select {
@@ -295,6 +298,9 @@
 }
 .select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.16); }
 .select--block { width: 100%; }
+/* Компактный вариант — для строки списка, где нужен переключатель доступа,
+   но не нужна высота формы: он не должен растягивать строку. */
+.select--mini { height: 26px; padding: 0 24px 0 9px; font-size: var(--t-2xs); background-size: 10px; background-position: right 7px center; }
 
 /* Мини-переключатель (как чип) */
 .switch {
@@ -668,6 +674,8 @@
     transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 .row:hover { border-color: var(--border-2); background: var(--surface-hover); }
+.row:disabled { opacity: 0.55; cursor: not-allowed; }
+.row:disabled:hover { border-color: var(--border); background: var(--surface); }
 .row__thumb {
     flex: none;
     width: 52px; height: 32px;
@@ -727,7 +735,15 @@
 }
 .sheet__grip { display: none; }
 .sheet__title { font-size: var(--t-lg); font-weight: var(--fw-bold); letter-spacing: -0.01em; }
-.sheet__sub { margin-top: 2px; font-size: var(--t-xs); color: var(--text-3); }
+.sheet__sub {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-top: 2px;
+    font-size: var(--t-xs);
+    color: var(--text-3);
+}
 .sheet__tabs { flex: none; padding: 10px 16px 0; }
 .sheet__body {
     flex: 1;
@@ -802,10 +818,15 @@
 .dialog__foot .btn { flex: 1; }
 
 @media (max-width: 520px) {
-    .dialog { top: auto; bottom: 0; left: 0; transform: none; width: 100%; max-width: none; border-radius: var(--r-xl) var(--r-xl) 0 0; padding-bottom: calc(20px + env(safe-area-inset-bottom)); animation: sheet-up var(--dur-slow) var(--ease-out); }
-
-    @keyframes dialog-in-sm { from { transform: translateY(20px); opacity: 0.6; } }
-    .dialog { animation: dialog-in-sm var(--dur-slow) var(--ease-out); }
+    /* На телефоне диалог становится шторкой снизу: до верхних кнопок
+       не дотянуться одной рукой, а нижняя шторка закрывается жестом. */
+    .dialog {
+        top: auto; bottom: 0; left: 0; transform: none;
+        width: 100%; max-width: none;
+        border-radius: var(--r-xl) var(--r-xl) 0 0;
+        padding-bottom: calc(20px + env(safe-area-inset-bottom));
+        animation: sheet-up var(--dur-slow) var(--ease-out);
+    }
 }
 
 
@@ -1103,7 +1124,6 @@
 
 /* Разделитель внутри строки-подписи */
 .sep { opacity: 0.5; }
-.sheet__sub { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 
 /* Только что созданная ссылка подсвечивается и не даёт себя потерять */
 .card.is-new { animation: card-new 1.8s var(--ease-out); }
@@ -1142,6 +1162,52 @@
 
 /* Пояснение под пустым состоянием и счётчиком */
 .empty__hint svg { width: 13px; height: 13px; }
+
+/* ============================================================
+   ПОРЦИЯ СПИСКА И ВЫБОР ФАЙЛА С СЕРВЕРА
+   ============================================================ */
+/* «Показать ещё» — под сеткой, по центру: это продолжение списка,
+   а не ещё одно действие страницы, поэтому кнопка тихая. */
+.load-more {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    margin-top: var(--s-5);
+}
+.load-more__count { color: var(--text-3); }
+
+.picker { display: grid; gap: 8px; margin-top: var(--s-3); }
+.picker__item {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    text-align: left;
+    transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.picker__item:hover { border-color: var(--accent); background: var(--surface-hover); }
+.picker__thumb {
+    flex: none;
+    width: 64px; height: 40px;
+    border-radius: var(--r-xs);
+    background: var(--matte);
+    object-fit: cover;
+    overflow: hidden;
+}
+.picker__thumb--icon { display: grid; place-items: center; color: var(--text-3); }
+.picker__thumb--icon svg { width: 16px; height: 16px; }
+.picker__body { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.picker__name { font-size: var(--t-sm); font-weight: var(--fw-semibold); }
+.picker__meta { display: flex; align-items: center; gap: 6px; }
+.picker__take { flex: none; font-size: var(--t-xs); font-weight: var(--fw-semibold); color: var(--accent-text); }
+
+/* Панель выбора файлов чуть шире обычной: в ней список с кадрами */
+.sheet--picker { width: min(520px, 100%); }
+
 
 /* Тултип для иконочных кнопок — только на десктопе */
 @media (hover: hover) and (min-width: 900px) {
