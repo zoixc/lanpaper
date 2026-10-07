@@ -30,7 +30,7 @@ Notable changes to Lanpaper. Docker images are published as
   dark themes and a touch-sized mobile layout. `design/v2/screens.html` shows the
   same screen in live 1440 / 834 / 390 px frames, and
   `design/06-redesign-v2.md` holds the audit of 0.12.1, the contrast table and
-  the file-by-file migration plan. `design/v2/standalone.html` (786 KB,
+  the file-by-file migration plan. `design/v2/standalone.html` (790 KB,
   `tools/build-standalone.py`) is the same mock-up as one file with the styles,
   scripts, fonts and demo frames inlined, for viewers that show a single file.
   **Nothing in the application changed**: `admin.html`, `static/` and the Go code
@@ -56,6 +56,21 @@ Notable changes to Lanpaper. Docker images are published as
   the API has no batch endpoint, and one button over many links can open more
   than intended. The list of behaviour changes — and what deliberately stays as
   it is — is section 11-бис of `design/06-redesign-v2.md`.
+- **The mock-up survives a narrow screen and a wide list view.** On a phone the
+  header keeps the application name (it used to vanish, leaving a row of icons
+  with no clue what panel this is) and the link counter moves to the page title
+  instead of disappearing, while the floating "New link" button no longer covers
+  the last row — the content reserves 96 px for it. The list view is a single
+  column at every width now: the rule was `.grid--list`, one class, and the
+  `.grid` column rules in the media queries below it won on specificity, so on a
+  wide desktop "list" stayed a grid with the cards merely turned into rows. It
+  is `.grid.grid--list` and a real row now — thumbnail on the left, name, meta
+  and badges on one line, and the access switch pinned to the right edge at
+  176 px instead of stretching across the row. That switch is drawn only where
+  the row is wide (≥ 721 px) and replaces the access badge there rather than
+  sitting next to it, so the same fact is no longer stated twice; on a phone the
+  badge speaks and the switch is gone. A frame whose file fails to load is shown
+  as "no file" instead of a torn-image icon.
 
 ## [0.12.1] – 2026-10-04
 

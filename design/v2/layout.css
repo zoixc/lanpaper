@@ -57,7 +57,10 @@
     display: inline-flex;
     align-items: center;
     gap: 10px;
-    flex: none;
+    /* Может сжиматься: на узком телефоне имя укорачивается многоточием,
+       а значки действий остаются на месте */
+    flex: 0 1 auto;
+    min-width: 0;
     text-decoration: none;
     color: var(--text);
 }
@@ -74,6 +77,10 @@
     font-size: 0.9375rem;
     font-weight: 500;
     letter-spacing: -0.01em;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .brand__badge {
     margin-left: 2px;
@@ -138,21 +145,42 @@
     align-content: start;
 }
 
-/* Список: та же карточка, но кадр слева и в четыре раза меньше */
-.grid--list { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+/* Список: одна колонка на любой ширине.
+   Селектор из двух классов, а не `.grid--list`: ниже медиазапросы задают
+   колонки `.grid` и, стоя позже в файле, перебивали список — на широком
+   десктопе он оставался сеткой, а карточки просто разворачивались в строку. */
+.grid.grid--list { grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .grid--list .card { flex-direction: row; align-items: stretch; }
 .grid--list .card__frame {
     flex: none;
     width: 124px;
+    min-height: 72px;            /* строка списка не тоньше удобного кадра */
     aspect-ratio: auto;
     border-bottom: 0;
     border-right: 1px solid var(--border);
 }
-.grid--list .card__body { justify-content: center; padding: 10px 14px; }
 .grid--list .card__play { width: 32px; height: 32px; }
 .grid--list .card__play svg { width: 13px; height: 13px; }
 .grid--list .card__open { opacity: 1; transform: none; }
 .grid--list .card:hover { transform: none; }
+
+/* Широкая строка: имя, мета, метки и доступ — в одну линию, как в списке
+   файлов. Только там, где для этого есть место; на телефоне строка узкая,
+   и тело остаётся колонкой. */
+@media (min-width: 721px) {
+    .grid--list .card__body {
+        flex-direction: row;
+        align-items: center;
+        gap: var(--s-4);
+        padding: 10px 16px;
+    }
+    .grid--list .card__head { flex: 1 1 auto; min-width: 0; }
+    .grid--list .card__meta { flex: 0 1 auto; min-width: 0; }
+    .grid--list .card__tags { margin-top: 0; flex: none; }
+    /* Доступ — компактный переключатель у правого края: он не тянется на всю
+       строку и не дублирует метку (метка в этом виде не рисуется). */
+    .grid--list .card__access { flex: none; width: 176px; }
+}
 
 /* ============================================================
    ПОДВАЛ
@@ -233,13 +261,18 @@
 
     .appbar__row { min-height: 52px; gap: var(--s-2); }
     .appbar__row--tools { padding-bottom: 8px; }
-    .brand__name { display: none; }
+    /* Имя приложения остаётся: без него шапка — набор значков, и непонятно,
+       что это за панель. Счётчик при этом убираем — он дублирует число в
+       заголовке «Ссылки», а место в строке дорогое. */
+    .brand__name { font-size: 0.875rem; }
     .brand__badge { display: none; }
     /* «Новая ссылка» уезжает в плавающую кнопку: основное действие
        на телефоне должно быть под большим пальцем, а не в шапке */
     .appbar__actions .btn--primary { display: none; }
 
-    .content { padding-top: var(--s-4); padding-bottom: var(--s-8); }
+    /* Плавающая кнопка «висит» поверх содержимого: без запаса снизу она
+       закрывает последнюю строку списка. */
+    .content { padding-top: var(--s-4); padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
     .page-head__title { font-size: var(--t-xl); }
     .page-head { margin-bottom: var(--s-3); }
 
@@ -261,17 +294,19 @@
 
 /* --- Телефон: две колонки-«плитки», как в галерее фото --- */
 @media (max-width: 560px) {
+    .appbar__row { gap: 6px; }
+    .appbar__actions { gap: 6px; }
     .search { flex: 0 1 144px; }
     .grid { grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 10px; }
-    .grid--list { grid-template-columns: minmax(0, 1fr); gap: var(--s-2); }
+    .grid.grid--list { gap: var(--s-2); }
     .grid--list .card__frame { width: 92px; }
+    .grid--list .card__body { padding: 9px 12px; }
 
     .card__body { padding: 9px 10px; gap: 2px; }
     .card__name { font-size: var(--t-xs); }
     .card__meta { font-size: var(--t-2xs); }
     .card__frame { border-bottom: 0; }
 
-    .page-head__count { display: none; }
 }
 
 /* --- Очень узкий телефон: одна колонка, крупные элементы --- */

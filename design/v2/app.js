@@ -148,6 +148,10 @@
     }
     const num = (n) => new Intl.NumberFormat(state.lang === 'ru' ? 'ru-RU' : 'en-US').format(n);
 
+    /* Узкий экран: на телефоне строка списка слишком коротка для отдельного
+       переключателя доступа — там о доступе говорит метка на карточке. */
+    function isPhone() { return window.matchMedia('(max-width: 720px)').matches; }
+
     function sanitizeId(name) {
         return name.replace(/\.[a-z0-9]+$/i, '')
             .toLowerCase()
@@ -406,6 +410,9 @@
                 img.classList.add('card__media--contain');
                 if (link.mimeType === 'image/png') frame.classList.add('card__frame--checker');
             }
+            /* Файл не пришёл — показываем тот же знак «нет кадра», что и у
+               ссылки без медиа: пустая рамка честнее битой картинки. */
+            img.addEventListener('error', function () { showEmptyFrame(frame, img); });
         }
 
         if (link.category === 'video') {
@@ -456,9 +463,13 @@
             meta.append(h('span', { class: i === parts.length - 1 ? 'meta-hide-sm' : '', text: part }));
         });
 
+        /* В широкой строке списка уровень доступа показывает переключатель
+           справа — метка в теле была бы вторым ответом на тот же вопрос. */
+        const rowSelect = state.view === 'list' && !isPhone();
+
         /* Теги: доступ (если не публичный) и ротация */
         const tags = $('.card__tags', node);
-        if (link.accessLevel !== 'public') {
+        if (link.accessLevel !== 'public' && !rowSelect) {
             const acc = accessMeta(link.accessLevel);
             tags.append(h('span', { class: 'badge' }, icon(acc.icon), h('span', { text: t(acc.key) })));
         }
@@ -472,9 +483,9 @@
            помещается переключатель доступа. В приложении 0.12.1 он был в
            каждой карточке, из-за чего карточка росла в высоту; здесь он
            появляется только там, где место действительно есть. */
-        if (state.view === 'list') {
+        if (rowSelect) {
             const select = h('select', {
-                class: 'select select--mini', 'aria-label': t('access_label') + ': ' + link.linkName,
+                class: 'select select--mini card__access', 'aria-label': t('access_label') + ': ' + link.linkName,
                 onchange: function () { setAccessLevel(link, select.value); }
             });
             ['public', 'local', 'token', 'auth'].forEach(function (level) {
@@ -486,6 +497,18 @@
         }
 
         return node;
+    }
+
+    /* Кадр, который не загрузился, приводим к виду «нет файла» */
+    function showEmptyFrame(frame, img) {
+        if (img && img.isConnected) img.remove();
+        frame.classList.add('card__frame--empty', 'card__frame--failed');
+        /* Своя проверка на конкретный значок: в кадре уже есть svg кнопок
+           («выбрать», «открыть в новой вкладке», «играть»). */
+        if (!$('svg[data-icon="imageOff"]', frame)) {
+            frame.append(icon('imageOff'));
+            hydrateIcons(frame);
+        }
     }
 
     function render() {
@@ -812,6 +835,13 @@
     });
     window.addEventListener('resize', closeMenu);
     window.addEventListener('scroll', closeMenu, true);
+    /* От ширины зависит состав строки списка: на телефоне нет переключателя
+       доступа, на десктопе есть. Пересекли границу — перерисовываем. */
+    let wasPhone = isPhone();
+    window.addEventListener('resize', function () {
+        const now = isPhone();
+        if (now !== wasPhone) { wasPhone = now; render(); }
+    });
 
     /* ========================================================
        10. ТОСТЫ
@@ -1101,6 +1131,7 @@
                 src: link.preview || link.imageUrl, alt: ''
             });
             if (fit === 'contain' && link.mimeType === 'image/png') frame.classList.add('card__frame--checker');
+            img.addEventListener('error', function () { showEmptyFrame(frame, img); });
             frame.append(img);
         }
         wrap.append(frame);
