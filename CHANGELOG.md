@@ -30,7 +30,9 @@ Notable changes to Lanpaper. Docker images are published as
   dark themes and a touch-sized mobile layout. `design/v2/screens.html` shows the
   same screen in live 1440 / 834 / 390 px frames, and
   `design/06-redesign-v2.md` holds the audit of 0.12.1, the contrast table and
-  the file-by-file migration plan.
+  the file-by-file migration plan. `design/v2/standalone.html` (742 KB,
+  `tools/build-standalone.py`) is the same mock-up as one file with the styles,
+  scripts, fonts and demo frames inlined, for viewers that show a single file.
   **Nothing in the application changed**: `admin.html`, `static/` and the Go code
   are untouched, and the panel still behaves exactly as in 0.12.1. Contrast of
   every palette pair is checked by `node design/v2/tools/check.mjs`.

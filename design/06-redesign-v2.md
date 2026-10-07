@@ -401,6 +401,7 @@ cd design && python3 preview.py        # http://localhost:8000/design/v2/index.h
 
 #   /design/index.html         — шапка стенда со ссылками на всё остальное
 #   /design/v2/screens.html    — тот же экран на 1440 / 834 / 390 px рядом
+#   /design/v2/standalone.html — макет одним файлом, без внешних запросов (742 КБ)
 ```
 
 Из подвала макета есть ссылка обратно на `/design/index.html`: оттуда видно
