@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: MIT -->
+<html lang="ru" data-theme="light" data-palette="indigo">
+<head>
+<meta charset="utf-8">
+<title>Lanpaper 2.0 — макет админки</title>
+<meta name="description" content="Макет улучшенного интерфейса админ-панели Lanpaper.">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F5F6F9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14161B" media="(prefers-color-scheme: dark)">
+<link rel="icon" type="image/svg+xml" href="../../static/favicon.svg">
+<link rel="apple-touch-icon" href="../../static/icons/apple-touch-icon.png">
+<link rel="preload" href="../../static/fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="ui.css">
+<link rel="stylesheet" href="layout.css">
+
+<!-- Тема, акцент и язык применяются до первой отрисовки: иначе при
+     загрузке мигает светлый вариант. -->
+<script>
+(function () {
+    /* Параметры адреса перебивают сохранённые настройки: так витрина
+       screens.html показывает несколько состояний в одном документе,
+       ничего не записывая в localStorage. */
+    var q = new URLSearchParams(location.search);
+    window.LP_FORCED = {
+        theme: q.get('theme'),
+        palette: q.get('palette'),
+        view: q.get('view'),
+        lang: q.get('lang'),
+        instant: q.get('embedded') === '1'
+    };
+    try {
+        var s = JSON.parse(localStorage.getItem('lp-ui') || '{}');
+        var root = document.documentElement;
+        var theme = window.LP_FORCED.theme || s.theme || 'auto';
+        var dark = theme === 'dark' || (theme === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+        root.dataset.theme = dark ? 'dark' : 'light';
+        root.dataset.themeMode = theme;
+        // Замаплено на готовые iOS/Android-шрифты без лишних файлов
+        if (window.LP_FORCED.palette || s.palette) root.dataset.palette = window.LP_FORCED.palette || s.palette;
+        if (window.LP_FORCED.view || s.view) root.dataset.view = window.LP_FORCED.view || s.view;
+        else root.dataset.view = 'grid';
+        if (window.LP_FORCED.lang || s.lang) root.lang = window.LP_FORCED.lang || s.lang;
+    } catch (e) { /* приватный режим — просто светлая тема */ }
+})();
+</script>
+</head>
+
+<body>
+<a class="skip-link" href="#library" data-i18n="links">Ссылки</a>
+
+<div class="shell">
+
+    <!-- ============================================================
+         ШАПКА: липкая, две строки. Сверху — «кто я и что могу»,
+         снизу — «что я сейчас вижу» (поиск, фильтры, сортировка).
+         ============================================================ -->
+    <header class="appbar">
+        <div class="appbar__inner">
+
+            <div class="appbar__row appbar__row--top">
+                <a class="brand" href="index.html">
+                    <span class="brand__mark"><img src="../../static/favicon.svg" alt="" width="30" height="30"></span>
+                    <span class="brand__name">Lanpaper</span>
+                    <span class="brand__badge" id="brandCount">0</span>
+                </a>
+
+                <span class="appbar__spacer"></span>
+
+                <div class="appbar__actions">
+                    <button class="icon-btn" id="selectBtn" type="button" aria-pressed="false" aria-label="Режим выбора"
+                            data-tip-key="select_mode" data-i18n-aria="select_mode">
+                        <svg data-icon="select"></svg>
+                    </button>
+
+                    <div class="btn-group" role="group" aria-label="Вид">
+                        <button class="icon-btn" id="viewGridBtn" type="button" aria-pressed="true" aria-label="Плитка"
+                                data-tip-key="view_grid" data-i18n-aria="view_grid"><svg data-icon="grid"></svg></button>
+                        <button class="icon-btn" id="viewListBtn" type="button" aria-pressed="false" aria-label="Список"
+                                data-tip-key="view_list" data-i18n-aria="view_list"><svg data-icon="list"></svg></button>
+                    </div>
+
+                    <button class="icon-btn" id="themeBtn" type="button" aria-label="Переключить тему"
+                            data-tip-key="aria_toggle_theme" data-i18n-aria="aria_toggle_theme">
+                        <svg data-icon="moon"></svg>
+                    </button>
+
+                    <button class="icon-btn" id="settingsBtn" type="button" aria-label="Настройки"
+                            data-tip-key="aria_settings" data-i18n-aria="aria_settings"><svg data-icon="gear"></svg></button>
+
+                    <button class="btn btn--primary" id="newLinkBtn" type="button">
+                        <svg data-icon="plus"></svg><span data-i18n="new_link">Новая ссылка</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="appbar__row appbar__row--tools">
+                <div class="search">
+                    <div class="field">
+                        <svg class="field__icon" data-icon="search"></svg>
+                        <input id="searchInput" type="search" autocomplete="off" spellcheck="false"
+                               placeholder="Поиск по имени или файлу" data-i18n-placeholder="search_placeholder"
+                               aria-label="Поиск ссылок" data-i18n-aria="aria_search">
+                        <button class="field__clear" id="searchClear" type="button"
+                                aria-label="Очистить поиск" data-i18n-aria="search_clear"><svg data-icon="x"></svg></button>
+                    </div>
+                </div>
+
+                <div class="tools">
+                    <div class="chip-row" id="filterRow" role="group" aria-label="Фильтры"></div>
+                </div>
+            </div>
+
+        </div>
+    </header>
+
+    <!-- ============================================================
+         БИБЛИОТЕКА
+         ============================================================ -->
+    <main class="content" id="library">
+        <div class="page-head">
+            <h1 class="page-head__title" id="pageTitle" data-i18n="links">Ссылки</h1>
+            <span class="page-head__count" id="pageCount">0</span>
+            <div class="page-head__aside">
+                <button class="chip" id="selectAllBtn" type="button" hidden>
+                    <svg data-icon="check"></svg><span data-i18n="select_all">Выбрать все</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="grid" id="grid" aria-live="polite" aria-busy="true"></div>
+
+        <!-- Ничего не найдено: отдельное состояние, чтобы пустота поиска
+             не выглядела как пустая библиотека -->
+        <div class="empty is-hidden" id="noResults">
+            <div class="empty__icon"><svg data-icon="search"></svg></div>
+            <p class="empty__title" data-i18n="nothing_found">Ничего не найдено</p>
+            <p class="empty__text" data-i18n="nothing_found_hint">Попробуйте другой запрос или снимите фильтры.</p>
+            <div class="empty__actions">
+                <button class="btn" id="resetFiltersBtn" type="button" data-i18n="filter_all">Все</button>
+            </div>
+        </div>
+
+        <!-- Библиотека пуста: здесь уместно объяснить, что такое ссылка -->
+        <div class="empty is-hidden" id="emptyState">
+            <div class="empty__icon"><svg data-icon="image"></svg></div>
+            <p class="empty__title" data-i18n="empty_title">Пока ни одной ссылки</p>
+            <p class="empty__text" data-i18n="empty_text">Ссылка — это постоянный адрес, за которым лежит файл.</p>
+            <div class="empty__actions">
+                <button class="btn btn--primary" id="emptyCreateBtn" type="button">
+                    <svg data-icon="plus"></svg><span data-i18n="empty_create">Создать ссылку</span>
+                </button>
+                <button class="btn" id="emptyDropBtn" type="button">
+                    <svg data-icon="upload"></svg><span data-i18n="empty_drop">Перетащить файлы</span>
+                </button>
+            </div>
+            <p class="empty__hint"><svg data-icon="info"></svg>
+                <span data-i18n="empty_hint">Файлы можно просто перетащить в окно.</span></p>
+        </div>
+    </main>
+
+    <footer class="foot">
+        <div class="foot__inner">
+            <a href="https://github.com/zoixc/lanpaper" target="_blank" rel="noopener noreferrer">
+                <svg data-icon="github"></svg>
+                <span>GitHub</span>
+            </a>
+            <span class="display" id="appVersion">v0.12.1</span>
+            <span class="foot__spacer"></span>
+            <a href="../index.html">
+                <svg data-icon="info"></svg>
+                <span>Дизайн-стенд: витрина, документы, прежние прототипы</span>
+            </a>
+        </div>
+    </footer>
+
+</div>
+
+<!-- Быстрое создание на телефоне: та же кнопка, что в шапке на десктопе -->
+<button class="fab" id="fabBtn" type="button">
+    <svg data-icon="plus"></svg><span data-i18n="new_link">Новая ссылка</span>
+</button>
+
+<div class="toasts" id="toasts" role="status" aria-label="Уведомления"></div>
+
+<!-- Слой оверлеев: затемнение + панель/диалог кладутся сюда -->
+<div id="overlayHost"></div>
+
+
+<!-- ============================================================
+     ШАБЛОН КАРТОЧКИ
+     ============================================================ -->
+<template id="tplCard">
+    <article class="card">
+        <div class="card__frame">
+            <img class="card__media" alt="" loading="lazy" decoding="async"
+                 src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
+            <button class="card__check" type="button" tabindex="-1" hidden aria-label="Выбрать">
+                <svg data-icon="check"></svg><span class="visually-hidden" data-i18n="select_mode">Выбрать несколько</span>
+            </button>
+            <div class="card__badges">
+                <div class="card__badges-left"></div>
+                <div class="card__badges-right">
+                    <button class="card__open" type="button" tabindex="-1" aria-label="Открыть в новой вкладке"
+                            data-i18n-aria="open_media"><svg data-icon="external"></svg></button>
+                </div>
+            </div>
+            <span class="card__play" hidden><svg data-icon="play"></svg></span>
+        </div>
+        <div class="card__body">
+            <div class="card__head">
+                <button class="card__name truncate" type="button">Ссылка</button>
+                <button class="card__menu-btn" type="button" aria-haspopup="menu" aria-expanded="false"
+                        aria-label="Действия ссылки" data-i18n-aria="more"><svg data-icon="more"></svg></button>
+            </div>
+            <div class="card__meta"></div>
+            <div class="card__tags"></div>
+        </div>
+    </article>
+</template>
+
+
+<!-- ============================================================
+     ШАБЛОН ПАНЕЛИ ССЫЛКИ («пульт»)
+     Десктоп — выезжает справа, телефон — снизу во весь экран.
+     Одна панель на все задачи ссылки: медиа, версии, плейлист,
+     доступ и статистика.
+     ============================================================ -->
+<template id="tplPanel">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="panelTitle" data-sheet>
+        <div class="sheet__grip"></div>
+        <div class="sheet__head">
+            <div class="grow">
+                <div class="eyebrow" data-i18n="panel_title">Пульт ссылки</div>
+                <h2 class="sheet__title truncate" id="panelTitle">Ссылка</h2>
+                <div class="sheet__sub" data-sub></div>
+            </div>
+            <button class="icon-btn" type="button" data-close aria-label="Закрыть" data-i18n-aria="close">
+                <svg data-icon="x"></svg>
+            </button>
+        </div>
+        <div class="sheet__tabs">
+            <div class="segment segment--full" role="tablist" aria-label="Разделы ссылки">
+                <button class="segment__item" role="tab" type="button" id="tab-media"  aria-selected="true"  data-tab="media"    data-i18n="panel_media">Медиа</button>
+                <button class="segment__item" role="tab" type="button" id="tab-vers"   aria-selected="false" data-tab="versions" data-i18n="panel_versions">Версии</button>
+                <button class="segment__item" role="tab" type="button" id="tab-items"  aria-selected="false" data-tab="playlist" data-i18n="panel_playlist">Плейлист</button>
+                <button class="segment__item" role="tab" type="button" id="tab-access" aria-selected="false" data-tab="access"   data-i18n="panel_access">Доступ</button>
+            </div>
+        </div>
+        <div class="sheet__body" data-body role="tabpanel" id="panelBody" aria-labelledby="tab-media"></div>
+        <div class="sheet__foot">
+            <button class="btn btn--danger" type="button" data-delete><svg data-icon="trash"></svg><span data-i18n="delete">Удалить</span></button>
+            <span class="spacer"></span>
+            <button class="btn btn--primary" type="button" data-close data-i18n="panel_close">Готово</button>
+        </div>
+    </div>
+</template>
+
+
+<!-- ============================================================
+     ДИАЛОГ СОЗДАНИЯ ССЫЛКИ
+     ============================================================ -->
+<template id="tplCreate">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="createTitle">
+        <h2 class="dialog__title" id="createTitle" data-i18n="create_title">Новая ссылка</h2>
+        <p class="dialog__text" data-i18n="create_hint">Латиница, цифры, дефис и подчёркивание — до 64 символов.</p>
+        <div class="dialog__body">
+            <label class="field-label" for="createInput" data-i18n="create_label">ID ссылки</label>
+            <div class="field field--plain field--lg has-value">
+                <span class="url-line__host" id="createHost"></span>
+                <input id="createInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+                       maxlength="64" pattern="[a-zA-Z0-9_\-]+" placeholder="tv-lobby" data-i18n-placeholder="create_placeholder">
+            </div>
+            <p class="field-hint" id="createHint"></p>
+        </div>
+        <div class="dialog__foot">
+            <button class="btn" type="button" data-close data-i18n="cancel">Отмена</button>
+            <button class="btn btn--primary" type="button" data-submit data-i18n="create_submit">Создать</button>
+        </div>
+    </div>
+</template>
+
+
+<!-- ============================================================
+     НАСТРОЙКИ: тема, акцент, язык, данные, обслуживание, клавиши
+     ============================================================ -->
+<template id="tplSettings">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" data-sheet>
+        <div class="sheet__grip"></div>
+        <div class="sheet__head">
+            <div class="grow">
+                <div class="eyebrow" data-i18n="settings_appearance">Оформление</div>
+                <h2 class="sheet__title" id="settingsTitle" data-i18n="settings_title">Настройки</h2>
+            </div>
+            <button class="icon-btn" type="button" data-close aria-label="Закрыть" data-i18n-aria="close"><svg data-icon="x"></svg></button>
+        </div>
+        <div class="sheet__body">
+
+            <div class="section">
+                <div class="section__head"><span class="section__title" data-i18n="theme">Тема</span></div>
+                <div class="segment segment--full" role="radiogroup" aria-label="Тема">
+                    <label class="segment__opt">
+                        <input type="radio" name="theme" value="light" data-theme-opt="light">
+                        <span class="segment__item" data-i18n="theme_light">Светлая</span>
+                    </label>
+                    <label class="segment__opt">
+                        <input type="radio" name="theme" value="dark" data-theme-opt="dark">
+                        <span class="segment__item" data-i18n="theme_dark">Тёмная</span>
+                    </label>
+                    <label class="segment__opt">
+                        <input type="radio" name="theme" value="auto" data-theme-opt="auto" checked>
+                        <span class="segment__item" data-i18n="theme_auto">Как в системе</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section__head">
+                    <span class="section__title" id="paletteLabel" data-i18n="palette">Акцент</span>
+                    <span class="label num" id="paletteName"></span>
+                </div>
+                <div class="swatches" role="radiogroup" aria-labelledby="paletteLabel" id="paletteRow"></div>
+            </div>
+
+            <div class="section">
+                <div class="section__head"><span class="section__title" data-i18n="settings_language">Язык</span></div>
+                <select class="select select--block" id="langSelect"></select>
+            </div>
+
+            <div class="section">
+                <div class="section__head"><span class="section__title" data-i18n="settings_data">Данные</span></div>
+                <div class="stack stack--tight">
+                    <button class="menu__item" type="button" data-act="export"><svg data-icon="download"></svg><span data-i18n="export_json">Экспорт списка ссылок</span></button>
+                    <button class="menu__item" type="button" data-act="import"><svg data-icon="upload"></svg><span data-i18n="import_json">Импорт списка ссылок</span></button>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section__head"><span class="section__title" data-i18n="settings_maintenance">Обслуживание</span></div>
+                <div class="stack stack--tight">
+                    <button class="menu__item" type="button" data-act="regen"><svg data-icon="refresh"></svg><span data-i18n="regen_previews">Перегенерировать превью</span></button>
+                    <button class="menu__item" type="button" data-act="install"><svg data-icon="download"></svg><span data-i18n="install_app">Установить приложение</span></button>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section__head"><span class="section__title" data-i18n="settings_shortcuts">Горячие клавиши</span></div>
+                <div class="stack stack--tight" id="shortcutList"></div>
+            </div>
+
+        </div>
+        <div class="sheet__foot">
+            <span class="spacer"></span>
+            <button class="btn btn--primary" type="button" data-close data-i18n="close">Закрыть</button>
+        </div>
+    </div>
+</template>
+
+
+<!-- ============================================================
+     ПОДТВЕРЖДЕНИЕ УДАЛЕНИЯ
+     ============================================================ -->
+<template id="tplConfirm">
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+        <h2 class="dialog__title" id="confirmTitle">Удалить ссылку?</h2>
+        <p class="dialog__text" data-text></p>
+        <div class="dialog__foot">
+            <button class="btn" type="button" data-close data-i18n="cancel">Отмена</button>
+            <button class="btn btn--primary" type="button" data-confirm data-i18n="delete">Удалить</button>
+        </div>
+    </div>
+</template>
+
+
+<script src="i18n.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

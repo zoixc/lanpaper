@@ -1,0 +1,296 @@
+/* SPDX-License-Identifier: MIT */
+/* ============================================================
+   LANPAPER 2.0 — КАРКАС И РАСКЛАДКА
+   Одна колонка, ширина ограничена, всё липкое — сверху.
+   Никаких сайдбаров: в приложении один экран, и место лучше
+   отдать медиа. Переключение между телефоном и десктопом —
+   только через медиазапросы, разметка одна и та же.
+   ============================================================ */
+
+.shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+}
+
+/* ============================================================
+   ШАПКА
+   Верхняя строка — «кто я и что могу», нижняя — «что я вижу».
+   Обе липкие и едут вместе: тема, вид и настройки не исчезают
+   при прокрутке длинной библиотеки.
+   ============================================================ */
+.appbar {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-appbar);
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(18px) saturate(1.6);
+    backdrop-filter: blur(18px) saturate(1.6);
+    border-bottom: 1px solid var(--border);
+}
+/* Если backdrop-filter не поддержан — фон должен быть плотным */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .appbar { background: var(--bg); }
+}
+
+.appbar__inner {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 0 var(--gutter);
+}
+
+.appbar__row {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    min-height: 56px;
+}
+.appbar__row--tools {
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    padding-bottom: 10px;
+    min-height: 0;
+}
+.appbar__row--top { padding-top: 4px; }
+
+.brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex: none;
+    text-decoration: none;
+    color: var(--text);
+}
+.brand:hover { text-decoration: none; }
+.brand__mark {
+    width: 30px; height: 30px;
+    border-radius: 9px;
+    overflow: hidden;
+    box-shadow: var(--shadow-xs);
+    flex: none;
+}
+.brand__name {
+    font-family: var(--font-display);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+}
+.brand__badge {
+    margin-left: 2px;
+    padding: 2px 6px;
+    border-radius: var(--r-xs);
+    background: var(--surface-2);
+    color: var(--text-3);
+    font-size: var(--t-2xs);
+    font-weight: var(--fw-semibold);
+    font-variant-numeric: tabular-nums;
+}
+.appbar__spacer { flex: 1; min-width: 0; }
+.appbar__actions { display: flex; align-items: center; gap: var(--s-2); flex: none; }
+
+/* Поиск: занимает строку целиком, пока не появится место рядом с чипами */
+.search { flex: 1 1 260px; max-width: 380px; min-width: 0; }
+.search .field { height: 36px; }
+
+/* Строка фильтров: чипы прокручиваются, «сортировка» уезжает вместе с ними */
+.tools { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--s-2); }
+.tools .chip-row { flex: 1; min-width: 0; }
+
+/* ============================================================
+   СОДЕРЖИМОЕ
+   ============================================================ */
+.content {
+    flex: 1;
+    width: 100%;
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: var(--s-5) var(--gutter) var(--s-7);
+}
+
+.page-head {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    margin-bottom: var(--s-4);
+}
+.page-head__title {
+    font-size: var(--t-2xl);
+    font-weight: var(--fw-bold);
+    line-height: var(--leading-tight);
+    letter-spacing: -0.025em;
+}
+.page-head__count {
+    padding: 3px 9px;
+    border-radius: var(--r-full);
+    background: var(--surface-2);
+    color: var(--text-2);
+    font-size: var(--t-xs);
+    font-weight: var(--fw-semibold);
+    font-variant-numeric: tabular-nums;
+}
+.page-head__aside { margin-left: auto; display: flex; align-items: center; gap: var(--s-2); }
+
+/* Плитка: карточка не бывает уже 236 px на десктопе и 136 px на телефоне */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(236px, 1fr));
+    gap: var(--s-4);
+    align-content: start;
+}
+
+/* Список: та же карточка, но кадр слева и в четыре раза меньше */
+.grid--list { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.grid--list .card { flex-direction: row; align-items: stretch; }
+.grid--list .card__frame {
+    flex: none;
+    width: 124px;
+    aspect-ratio: auto;
+    border-bottom: 0;
+    border-right: 1px solid var(--border);
+}
+.grid--list .card__body { justify-content: center; padding: 10px 14px; }
+.grid--list .card__play { width: 32px; height: 32px; }
+.grid--list .card__play svg { width: 13px; height: 13px; }
+.grid--list .card__open { opacity: 1; transform: none; }
+.grid--list .card:hover { transform: none; }
+
+/* ============================================================
+   ПОДВАЛ
+   ============================================================ */
+.foot {
+    border-top: 1px solid var(--border);
+    color: var(--text-3);
+    font-size: var(--t-xs);
+}
+.foot__inner {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 14px var(--gutter) calc(14px + env(safe-area-inset-bottom));
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--s-2) var(--s-4);
+}
+.foot a { color: var(--text-3); display: inline-flex; align-items: center; gap: 6px; }
+.foot a:hover { color: var(--text); text-decoration: none; }
+.foot__spacer { flex: 1; min-width: 0; }
+.foot__hint { display: inline-flex; align-items: center; gap: 5px; }
+.foot a svg { width: 14px; height: 14px; }
+.foot__hint svg { width: 12px; height: 12px; }
+
+/* В подвале макета намеренно написано, что это макет */
+.foot .display { font-size: var(--t-2xs); color: var(--text-3); }
+
+/* ============================================================
+   ПЛАВАЮЩАЯ КНОПКА «НОВАЯ ССЫЛКА»
+   Только на телефоне: на десктопе ту же роль играет кнопка в
+   шапке. В режиме выбора её заменяет панель массовых действий.
+   ============================================================ */
+.fab {
+    position: fixed;
+    z-index: var(--z-fab);
+    right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 50px;
+    padding: 0 20px 0 18px;
+    border-radius: var(--r-full);
+    background: var(--accent);
+    color: var(--text-on-accent);
+    font-size: var(--t-sm);
+    font-weight: var(--fw-semibold);
+    box-shadow: 0 6px 20px -6px rgba(var(--accent-rgb), 0.65), 0 2px 6px rgba(0, 0, 0, 0.12);
+    transition: transform var(--dur) var(--ease-out), background var(--dur-fast) var(--ease), opacity var(--dur) var(--ease);
+}
+.fab svg { width: 18px; height: 18px; }
+.fab:hover { background: var(--accent-hover); }
+.fab:active { transform: scale(0.96); }
+.fab.is-hidden { opacity: 0; pointer-events: none; transform: scale(0.9); }
+
+/* На десктопе «новая ссылка» живёт в шапке — плавающая кнопка лишняя */
+@media (min-width: 721px) { .fab { display: none; } }
+
+
+/* ============================================================
+   АДАПТИВНОСТЬ
+   Четыре ступени: широкий десктоп (≥1280), десктоп (≥1024),
+   планшет (≥720), телефон (<720). Ломается только каркас —
+   компоненты одни и те же.
+   ============================================================ */
+
+/* --- Планшет: меньше воздуха, плитка плотнее --- */
+@media (max-width: 1080px) {
+    :root { --gutter: 20px; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--s-3); }
+    .page-head { margin-bottom: var(--s-3); }
+}
+
+/* --- Телефон и узкий планшет --- */
+@media (max-width: 720px) {
+    :root { --gutter: 14px; }
+
+    .appbar__row { min-height: 52px; gap: var(--s-2); }
+    .appbar__row--tools { padding-bottom: 8px; }
+    .brand__name { display: none; }
+    .brand__badge { display: none; }
+    /* «Новая ссылка» уезжает в плавающую кнопку: основное действие
+       на телефоне должно быть под большим пальцем, а не в шапке */
+    .appbar__actions .btn--primary { display: none; }
+
+    .content { padding-top: var(--s-4); padding-bottom: var(--s-8); }
+    .page-head__title { font-size: var(--t-xl); }
+    .page-head { margin-bottom: var(--s-3); }
+
+    /* Поиск и фильтры стоят в одной строке: поиск занимает фиксированную
+       долю, чипы прокручиваются. Так липкая шапка на телефоне не съедает
+       треть экрана — вместо трёх полос остаётся две. */
+    .search { flex: 0 1 168px; min-width: 116px; max-width: none; }
+    .tools { flex: 1 1 auto; min-width: 0; }
+    .tools .chip-row { flex: 1; }
+
+    .grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--s-3); }
+    .grid--list .card__frame { width: 108px; }
+    .grid--list .card__body { padding: 8px 12px; }
+
+    /* Плашка «Открыть» на телефоне не нужна: жест — тап по карточке */
+    .card__play { width: 38px; height: 38px; }
+    .card__play svg { width: 15px; height: 15px; }
+}
+
+/* --- Телефон: две колонки-«плитки», как в галерее фото --- */
+@media (max-width: 560px) {
+    .search { flex: 0 1 144px; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 10px; }
+    .grid--list { grid-template-columns: minmax(0, 1fr); gap: var(--s-2); }
+    .grid--list .card__frame { width: 92px; }
+
+    .card__body { padding: 8px 10px 9px; gap: 2px; }
+    .card__name { font-size: var(--t-xs); }
+    .card__meta { font-size: var(--t-2xs); }
+    .card__frame { border-bottom: 0; }
+    .card__body { padding-top: 9px; }
+
+    .page-head__count { display: none; }
+}
+
+/* --- Очень узкий телефон: одна колонка, крупные элементы --- */
+@media (max-width: 340px) {
+    .grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* --- Широкий десктоп: больше воздуха по краям, 5 колонок --- */
+@media (min-width: 1280px) {
+    :root { --gutter: 32px; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(252px, 1fr)); }
+}
+
+/* Планшет в альбомной ориентации: строка фильтров и поиск в одну линию */
+@media (min-width: 721px) and (max-width: 1023px) {
+    .search { flex: 1 1 200px; max-width: 280px; }
+    .tools { flex: 1 1 280px; }
+}
+
+/* Скрытие элементов массовых действий и режима выбора */
+body.is-selecting .grid .card__open { display: none; }

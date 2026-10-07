@@ -20,6 +20,21 @@ Notable changes to Lanpaper. Docker images are published as
   append to a link that has no media yet) kept the new link in the panel until
   it was deleted by hand. The link is now rolled back when the request fails.
 
+### Added
+
+- **A second admin redesign stand: `design/v2/`.** A clickable prototype of the
+  panel rebuilt from its tasks rather than patched from the previous mock-up: a
+  sticky header with search and filter chips (type, pinned, access, sorting), a
+  compact media tile with two controls instead of six, a permanent link panel
+  with media/versions/playlist/access tabs, five muted accent palettes, light and
+  dark themes and a touch-sized mobile layout. `design/v2/screens.html` shows the
+  same screen in live 1440 / 834 / 390 px frames, and
+  `design/06-redesign-v2.md` holds the audit of 0.12.1, the contrast table and
+  the file-by-file migration plan.
+  **Nothing in the application changed**: `admin.html`, `static/` and the Go code
+  are untouched, and the panel still behaves exactly as in 0.12.1. Contrast of
+  every palette pair is checked by `node design/v2/tools/check.mjs`.
+
 ## [0.12.1] – 2026-10-04
 
 A rollback release. The admin redesign published as 0.13.0 broke the panel

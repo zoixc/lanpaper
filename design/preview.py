@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Локальный предпросмотр прототипов редизайна.
+"""Локальный предпросмотр дизайн-стенда.
 
     python3 design/preview.py [порт]
 
-Открывает /design/prototypes/index.html на корне: так относительные пути
-к ../tokens.css и ../../static/fonts/ остаются рабочими.
+Открывает на корне актуальный макет (/design/v2/index.html): так
+относительные пути к ../../static/fonts/ и ../prototypes/media/ остаются
+рабочими. Из подвала макета есть ссылка на стенд — /design/index.html,
+откуда видны витрина на трёх ширинах, документы и прежние прототипы.
 """
 
 import http.server
@@ -13,7 +15,7 @@ import os
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-START = "/design/prototypes/index.html"
+START = "/design/v2/index.html"
 REDIRECT_FROM = {"/", "/index.html", "/design", "/design/", "/prototypes"}
 
 
@@ -42,7 +44,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
     with http.server.ThreadingHTTPServer(("0.0.0.0", port), Handler) as httpd:
-        print(f"Прототипы редизайна: http://localhost:{port}{START}")
+        print(f"Макет Lanpaper 2.0: http://localhost:{port}{START}")
         print("Ctrl+C — остановить")
         httpd.serve_forever()
 

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: MIT -->
+<html lang="ru" data-theme="light" data-palette="indigo">
+<head>
+<meta charset="utf-8">
+<title>Lanpaper — дизайн-стенд</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="../static/favicon.svg">
+<link rel="stylesheet" href="v2/tokens.css">
+<style>
+/* Стенд собран на тех же токенах, что и макет: если палитра или
+   типографика поедут, это будет видно и здесь. */
+body { padding: 40px 24px 64px; }
+.wrap { max-width: 1080px; margin: 0 auto; }
+
+.head { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+.head__mark { width: 40px; height: 40px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-sm); }
+.head h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
+.lead { max-width: 68ch; color: var(--text-2); font-size: var(--t-md); }
+.lead + .lead { margin-top: 8px; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 16px; margin-top: 28px; }
+
+.tile {
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 18px; border: 1px solid var(--border); border-radius: var(--r-lg);
+    background: var(--surface); color: var(--text); text-decoration: none;
+    transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease);
+}
+.tile:hover { border-color: var(--border-2); transform: translateY(-2px); box-shadow: var(--shadow-sm); text-decoration: none; }
+.tile--main { border-color: var(--accent); background: var(--accent-soft); }
+.tile--muted { background: var(--surface-2); border-style: dashed; }
+.tile__tag {
+    align-self: flex-start;
+    padding: 2px 8px; border-radius: var(--r-full);
+    background: var(--surface-2); border: 1px solid var(--border);
+    font-size: var(--t-2xs); font-weight: 600; color: var(--text-3);
+}
+.tile--main .tile__tag { background: var(--surface); border-color: transparent; color: var(--accent-text); }
+.tile__title { font-size: 1rem; font-weight: 650; letter-spacing: -0.01em; }
+.tile__text { font-size: var(--t-sm); color: var(--text-2); }
+.tile__meta { margin-top: auto; font-size: var(--t-2xs); color: var(--text-3); display: flex; gap: 8px; align-items: center; }
+
+.section-title { margin: 38px 0 0; font-size: var(--t-xs); font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-3); }
+.note { margin-top: 34px; padding: 16px 18px; border-left: 3px solid var(--accent); border-radius: var(--r-md); background: var(--surface-2); font-size: var(--t-sm); color: var(--text-2); }
+.note code { font-family: var(--font-mono); font-size: .85em; }
+.note strong { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+    <div class="head">
+        <span class="head__mark"><img src="../static/favicon.svg" alt="" width="40" height="40"></span>
+        <div>
+            <h1>Lanpaper — дизайн-стенд</h1>
+            <div class="eyebrow">Админ-панель · прототипы и решения</div>
+        </div>
+    </div>
+
+    <p class="lead">
+        Здесь лежит работа над интерфейсом панели. Ничего отсюда не отдаётся сервером
+        и не собирается в Docker — это стенд для просмотра макетов.
+    </p>
+    <p class="lead">
+        Актуальное — «Lanpaper 2.0». Прежние прототипы оставлены как история решений:
+        на них видно, откуда взялись компактная плитка, пульт ссылки и палитры.
+    </p>
+
+    <h2 class="section-title">Актуальный макет</h2>
+    <div class="grid">
+
+        <a class="tile tile--main" href="v2/index.html">
+            <span class="tile__tag">Lanpaper 2.0</span>
+            <span class="tile__title">Макет админ-панели</span>
+            <span class="tile__text">
+                Липкая шапка с поиском и фильтрами, компактная плитка, «пульт ссылки»
+                на четыре вкладки, пять спокойных палитр, светлая и тёмная темы.
+                Всё кликается.
+            </span>
+            <span class="tile__meta">v2/index.html</span>
+        </a>
+
+        <a class="tile" href="v2/screens.html">
+            <span class="tile__tag">Адаптивность</span>
+            <span class="tile__title">Тот же экран на трёх ширинах</span>
+            <span class="tile__text">
+                1440, 834 и 390 px рядом, в живых кадрах: сетка, шапка и пульт
+                перестраиваются настоящими медиазапросами. Общий переключатель темы,
+                акцента и вида.
+            </span>
+            <span class="tile__meta">v2/screens.html</span>
+        </a>
+
+        <a class="tile" href="06-redesign-v2.md" target="_blank" rel="noopener">
+            <span class="tile__tag">Документ</span>
+            <span class="tile__title">Разбор и решение</span>
+            <span class="tile__text">
+                Что не так в 0.12.x (P1–P12), принципы, спецификация компонентов,
+                доступность, таблица контраста, план переноса и чек-лист проверки.
+            </span>
+            <span class="tile__meta">06-redesign-v2.md</span>
+        </a>
+
+        <a class="tile" href="v2/README.md" target="_blank" rel="noopener">
+            <span class="tile__tag">Инструкция</span>
+            <span class="tile__title">Как пользоваться макетом</span>
+            <span class="tile__text">
+                Файлы, горячие клавиши, состояние через параметры адреса,
+                проверки контраста и правила правки.
+            </span>
+            <span class="tile__meta">v2/README.md</span>
+        </a>
+    </div>
+
+    <h2 class="section-title">История: первые прототипы</h2>
+    <div class="grid">
+
+        <a class="tile tile--muted" href="prototypes/index.html">
+            <span class="tile__tag">0.13.0 · откат</span>
+            <span class="tile__title">Четыре варианта и финал</span>
+            <span class="tile__text">
+                A «Библиотека», B «Потоки», C «Пульт», D «Разделы» и два финальных
+                сведения. Редизайн был перенесён в панель, сломал раскладку и
+                откатан в 0.12.1 — макеты сохранены.
+            </span>
+            <span class="tile__meta">prototypes/index.html</span>
+        </a>
+
+        <a class="tile tile--muted" href="prototypes/palettes.html">
+            <span class="tile__tag">Палитры</span>
+            <span class="tile__title">Обзор прежних цветов</span>
+            <span class="tile__text">
+                «Закат», «Индиго», «Терракота», «Шалфей», «Графит» — четыре из них
+                были перенесены в 0.13.0 и откачены вместе с остальным.
+            </span>
+            <span class="tile__meta">prototypes/palettes.html</span>
+        </a>
+
+        <a class="tile tile--muted" href="01-audit.md" target="_blank" rel="noopener">
+            <span class="tile__tag">Документ</span>
+            <span class="tile__title">Аудит 0.12.x</span>
+            <span class="tile__text">Разбор интерфейса, проблемы P1–P8, предложение по палитре и разбор присланного макета.</span>
+            <span class="tile__meta">01-audit.md</span>
+        </a>
+
+        <a class="tile tile--muted" href="04-final.md" target="_blank" rel="noopener">
+            <span class="tile__tag">Документ</span>
+            <span class="tile__title">Финальный макет 1.0</span>
+            <span class="tile__text">Что вошло в «final2»: компактность, пульт на виду, вписывание превью, четыре палитры.</span>
+            <span class="tile__meta">04-final.md</span>
+        </a>
+
+        <a class="tile tile--muted" href="05-app.md" target="_blank" rel="noopener">
+            <span class="tile__tag">Документ</span>
+            <span class="tile__title">Перенос, который откатили</span>
+            <span class="tile__text">
+                Что именно переносилось в 0.13.0 и почему проверки в песочнице
+                не заменили просмотр в браузере.
+            </span>
+            <span class="tile__meta">05-app.md</span>
+        </a>
+    </div>
+
+    <div class="note">
+        <strong>Внешний вид смотреть глазами.</strong> jsdom и разбор CSS не рисуют
+        пиксели — макет нужно открыть в браузере: на десктопе, планшете и телефоне,
+        в обеих темах, с длинной библиотекой и пустой. Прошлый перенос сломался
+        именно на этом шаге.
+        <br><br>
+        Живая панель приложения: <code>go run .</code> в корне репозитория, затем
+        <code>/admin</code>.
+    </div>
+
+</div>
+</body>
+</html>
