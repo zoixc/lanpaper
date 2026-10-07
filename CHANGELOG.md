@@ -30,7 +30,7 @@ Notable changes to Lanpaper. Docker images are published as
   dark themes and a touch-sized mobile layout. `design/v2/screens.html` shows the
   same screen in live 1440 / 834 / 390 px frames, and
   `design/06-redesign-v2.md` holds the audit of 0.12.1, the contrast table and
-  the file-by-file migration plan. `design/v2/standalone.html` (790 KB,
+  the file-by-file migration plan. `design/v2/standalone.html` (794 KB,
   `tools/build-standalone.py`) is the same mock-up as one file with the styles,
   scripts, fonts and demo frames inlined, for viewers that show a single file.
   **Nothing in the application changed**: `admin.html`, `static/` and the Go code
@@ -56,6 +56,18 @@ Notable changes to Lanpaper. Docker images are published as
   the API has no batch endpoint, and one button over many links can open more
   than intended. The list of behaviour changes — and what deliberately stays as
   it is — is section 11-бис of `design/06-redesign-v2.md`.
+- **The mock-up has some depth back.** Cards were flat: a hairline border and
+  nothing else, which read as stickers on the page. Each surface now has its own
+  height — the tile rests on a soft shadow along its bottom edge, lifts 2 px and
+  widens it under the cursor, the loading skeleton wears the same shadow so the
+  grid does not "sink" while it loads, and the sticky header casts a soft shadow
+  downwards so the content reads as passing under it rather than being cut by a
+  line. In the dark theme a shadow is nearly invisible, so height there is shown
+  by a 1 px light lip (`inset 0 1px 0 rgba(255,255,255,.05)`) instead. Accent
+  buttons keep a soft shadow of their own colour; nothing glows, and no shadow
+  is animated except the tile lift, which is off on touch screens where hover
+  sticks after a tap. Tokens: `--shadow-card`, `--shadow-card-hover`,
+  `--shadow-bar`, overridden per theme like the rest.
 - **The mock-up survives a narrow screen and a wide list view.** On a phone the
   header keeps the application name (it used to vanish, leaving a row of icons
   with no clue what panel this is) and the link counter moves to the page title

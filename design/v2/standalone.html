@@ -52,7 +52,8 @@
    Принципы, из которых выведены значения:
    1. Медиа — главное, интерфейс — фон. Отсюда приглушённые
       нейтральные поверхности и ровно один акцент на экран.
-   2. Границы вместо теней: тень остаётся только у оверлеев.
+   2. Границы задают форму, тень — высоту. Тень мягкая и однослойная;
+      в тёмной теме высоту показывает светлая кромка, а не чёрный разлёт.
    3. Контраст проверяемый, а не «на глаз»: tools/check.mjs
       считает WCAG для каждой палитры в обеих темах.
    ============================================================ */
@@ -209,11 +210,19 @@ ul, ol { list-style: none; }
     --checker-b:     #E7E9ED;
     --shade:         rgba(16, 17, 20, 0.62); /* подписи на кадре */
 
-    /* Тени: только оверлеи и «поднятые» элементы */
+    /* Тени. У каждой поверхности — своя высота, и это видно без «парения»:
+       мягкий разлёт с отрицательным spread держит тень под элементом, а не
+       вокруг него. Свечения и цветных градиентов нет ни у одной. */
     --shadow-xs: 0 1px 2px rgba(20, 22, 32, 0.05);
     --shadow-sm: 0 1px 2px rgba(20, 22, 32, 0.05), 0 2px 6px -2px rgba(20, 22, 32, 0.07);
     --shadow-md: 0 2px 6px rgba(20, 22, 32, 0.06), 0 12px 28px -12px rgba(20, 22, 32, 0.18);
     --shadow-lg: 0 4px 12px rgba(20, 22, 32, 0.08), 0 28px 60px -24px rgba(20, 22, 32, 0.30);
+    /* Плитка. На светлом фоне сама поверхность белее фона, поэтому хватает
+       одной мягкой тени по нижнему краю — карточка перестаёт быть наклейкой. */
+    --shadow-card: 0 1px 2px rgba(20, 22, 32, 0.05), 0 6px 16px -10px rgba(20, 22, 32, 0.18);
+    --shadow-card-hover: 0 2px 4px rgba(20, 22, 32, 0.06), 0 14px 28px -12px rgba(20, 22, 32, 0.24);
+    /* Липкая шапка: тень уходит вниз, отделяя её от содержимого */
+    --shadow-bar: 0 10px 22px -18px rgba(20, 22, 32, 0.42);
     --shadow-focus: 0 0 0 3px rgba(var(--accent-rgb), 0.22);
 
     /* Радиусы */
@@ -324,6 +333,12 @@ html[data-theme="dark"] {
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 6px -2px rgba(0, 0, 0, 0.4);
     --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.45), 0 14px 30px -14px rgba(0, 0, 0, 0.6);
     --shadow-lg: 0 6px 16px rgba(0, 0, 0, 0.5), 0 32px 64px -28px rgba(0, 0, 0, 0.75);
+    /* В темноте тень почти не читается, поэтому высоту показывает светлая
+       кромка сверху: одна прозрачная линия в 1 px — и поверхность отделяется
+       от фона, не превращаясь в «свечение». */
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.45), 0 8px 20px -12px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.5), 0 16px 30px -14px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --shadow-bar: 0 10px 24px -18px rgba(0, 0, 0, 0.8);
 }
 
 
@@ -552,7 +567,9 @@ html[data-palette="ocean"][data-theme="dark"] {
     background: var(--accent);
     border-color: transparent;
     color: var(--text-on-accent);
-    box-shadow: 0 1px 2px rgba(var(--accent-rgb), 0.28);
+    /* Тот же приём, что у плавающей кнопки, но слабее: акцентная кнопка
+       отбрасывает тень своего цвета — она читается нажимаемой. */
+    box-shadow: 0 1px 2px rgba(var(--accent-rgb), 0.28), 0 8px 18px -10px rgba(var(--accent-rgb), 0.5);
 }
 .btn--primary:hover { background: var(--accent-hover); border-color: transparent; }
 .btn--primary:active { background: var(--accent-active); }
@@ -977,15 +994,22 @@ html[data-palette="ocean"][data-theme="dark"] {
     border: 1px solid var(--border);
     border-radius: var(--r-lg);
     overflow: hidden;
+    box-shadow: var(--shadow-card);
     transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease-out);
 }
 .card:hover {
     border-color: var(--border-2);
-    box-shadow: var(--shadow-sm);
-    transform: translateY(-1px);
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
 }
-.card:focus-within { border-color: var(--border-2); }
-.card.is-selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft-2); }
+.card:focus-within { border-color: var(--border-2); box-shadow: var(--shadow-card-hover); }
+/* На тач-экране «наведение» залипает после касания: карточка осталась бы
+   приподнятой, пока не коснёшься другой. Там подъём только по фокусу. */
+@media (hover: none) {
+    .card:hover { transform: none; box-shadow: var(--shadow-card); }
+}
+/* Кольцо выбора и тень вместе: одно не отменяет другое */
+.card.is-selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft-2), var(--shadow-card-hover); }
 .card.is-pinned .card__frame::after {
     /* Тонкая акцентная линия слева — «закреплено» без отдельного чипа */
     content: '';
@@ -1364,6 +1388,9 @@ html[data-palette="ocean"][data-theme="dark"] {
     border: 1px solid var(--border);
     border-radius: var(--r-lg);
     background: var(--surface);
+    /* На листе блоки лежат поверх поверхности — волосяная тень отделяет их,
+       не превращая пульт в стопку карточек. */
+    box-shadow: var(--shadow-xs);
 }
 .card-block--soft { background: var(--surface-2); border-color: transparent; }
 .stack { display: flex; flex-direction: column; gap: var(--s-2); }
@@ -1495,7 +1522,14 @@ html[data-palette="ocean"][data-theme="dark"] {
     display: inline-flex; align-items: center; gap: 6px;
 }
 
-.skeleton { border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--border); background: var(--surface); }
+.skeleton {
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    /* Скелетон — будущая плитка: тень та же, иначе загрузка «проваливается» */
+    box-shadow: var(--shadow-card);
+}
 .skeleton__frame { aspect-ratio: 16 / 9; background: var(--surface-2); }
 .skeleton__line { height: 10px; margin: 12px; border-radius: var(--r-full); background: var(--surface-2); }
 .skeleton__line--short { width: 45%; }
@@ -1651,6 +1685,7 @@ html[data-palette="ocean"][data-theme="dark"] {
     border: 1px solid var(--border-2);
     border-radius: 50%;
     background: var(--surface);
+    box-shadow: var(--shadow-xs);
     transition: box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease);
 }
 .swatch:hover { transform: translateY(-1px); }
@@ -1771,6 +1806,9 @@ html[data-palette="ocean"][data-theme="dark"] {
     -webkit-backdrop-filter: blur(18px) saturate(1.6);
     backdrop-filter: blur(18px) saturate(1.6);
     border-bottom: 1px solid var(--border);
+    /* Шапка липкая: тень вниз показывает, что содержимое уходит под неё,
+       а не обрезается границей */
+    box-shadow: var(--shadow-bar);
 }
 /* Если backdrop-filter не поддержан — фон должен быть плотным */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {

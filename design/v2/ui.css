@@ -44,7 +44,9 @@
     background: var(--accent);
     border-color: transparent;
     color: var(--text-on-accent);
-    box-shadow: 0 1px 2px rgba(var(--accent-rgb), 0.28);
+    /* Тот же приём, что у плавающей кнопки, но слабее: акцентная кнопка
+       отбрасывает тень своего цвета — она читается нажимаемой. */
+    box-shadow: 0 1px 2px rgba(var(--accent-rgb), 0.28), 0 8px 18px -10px rgba(var(--accent-rgb), 0.5);
 }
 .btn--primary:hover { background: var(--accent-hover); border-color: transparent; }
 .btn--primary:active { background: var(--accent-active); }
@@ -469,15 +471,22 @@
     border: 1px solid var(--border);
     border-radius: var(--r-lg);
     overflow: hidden;
+    box-shadow: var(--shadow-card);
     transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease-out);
 }
 .card:hover {
     border-color: var(--border-2);
-    box-shadow: var(--shadow-sm);
-    transform: translateY(-1px);
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
 }
-.card:focus-within { border-color: var(--border-2); }
-.card.is-selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft-2); }
+.card:focus-within { border-color: var(--border-2); box-shadow: var(--shadow-card-hover); }
+/* На тач-экране «наведение» залипает после касания: карточка осталась бы
+   приподнятой, пока не коснёшься другой. Там подъём только по фокусу. */
+@media (hover: none) {
+    .card:hover { transform: none; box-shadow: var(--shadow-card); }
+}
+/* Кольцо выбора и тень вместе: одно не отменяет другое */
+.card.is-selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft-2), var(--shadow-card-hover); }
 .card.is-pinned .card__frame::after {
     /* Тонкая акцентная линия слева — «закреплено» без отдельного чипа */
     content: '';
@@ -856,6 +865,9 @@
     border: 1px solid var(--border);
     border-radius: var(--r-lg);
     background: var(--surface);
+    /* На листе блоки лежат поверх поверхности — волосяная тень отделяет их,
+       не превращая пульт в стопку карточек. */
+    box-shadow: var(--shadow-xs);
 }
 .card-block--soft { background: var(--surface-2); border-color: transparent; }
 .stack { display: flex; flex-direction: column; gap: var(--s-2); }
@@ -987,7 +999,14 @@
     display: inline-flex; align-items: center; gap: 6px;
 }
 
-.skeleton { border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--border); background: var(--surface); }
+.skeleton {
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    /* Скелетон — будущая плитка: тень та же, иначе загрузка «проваливается» */
+    box-shadow: var(--shadow-card);
+}
 .skeleton__frame { aspect-ratio: 16 / 9; background: var(--surface-2); }
 .skeleton__line { height: 10px; margin: 12px; border-radius: var(--r-full); background: var(--surface-2); }
 .skeleton__line--short { width: 45%; }
@@ -1143,6 +1162,7 @@
     border: 1px solid var(--border-2);
     border-radius: 50%;
     background: var(--surface);
+    box-shadow: var(--shadow-xs);
     transition: box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease);
 }
 .swatch:hover { transform: translateY(-1px); }
