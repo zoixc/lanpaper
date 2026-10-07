@@ -179,8 +179,6 @@ window.LP_I18N = {
         bulk_deleted: 'Удалено ссылок: {{count}}',
         bulk_delete_title: 'Удалить {{count}} ссылок?',
         bulk_delete_msg: 'Файлы, версии и плейлисты этих ссылок будут удалены безвозвратно.',
-        bulk_access: 'Доступ',
-        bulk_access_set: 'Уровень «{{level}}» у {{count}} ссылок',
 
         /* Настройки */
         settings_title: 'Настройки',
@@ -213,6 +211,7 @@ window.LP_I18N = {
         sc_close: 'закрыть',
         sc_extra: 'Ctrl/⌘ + N, F, G, T работают как раньше',
         settings_mockup_note: 'В макете переведены русский и английский. Немецкий, французский, итальянский и испанский уже есть в приложении — перенос подхватит их из static/i18n.',
+        lang_mock_only: '{{lang}} пока без перевода: строки придут при переносе из static/i18n.',
         close: 'Закрыть',
 
         /* Подвал */
@@ -392,8 +391,6 @@ window.LP_I18N = {
         bulk_deleted: '{{count}} links deleted',
         bulk_delete_title: 'Delete {{count}} links?',
         bulk_delete_msg: 'Files, versions and playlists of these links are removed for good.',
-        bulk_access: 'Access',
-        bulk_access_set: 'Level "{{level}}" set for {{count}} links',
 
         settings_title: 'Settings',
         settings_appearance: 'Appearance',
@@ -425,6 +422,7 @@ window.LP_I18N = {
         sc_close: 'close',
         sc_extra: 'Ctrl/⌘ + N, F, G, T work as well',
         settings_mockup_note: 'This mock-up ships Russian and English. German, French, Italian and Spanish already exist in the app — the port picks them up from static/i18n.',
+        lang_mock_only: '{{lang}} has no translation yet: the strings arrive with the port from static/i18n.',
         close: 'Close',
 
         drop_files: 'Drop the files — links appear by themselves',

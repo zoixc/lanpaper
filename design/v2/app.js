@@ -652,8 +652,9 @@
             onclick: function (e) { openAccessMenu(e.currentTarget); }
         }));
 
-        row.append(chip(t(state.sort), undefined, {
+        row.append(chip(t('sort_by') + ': ' + t(SORT_LABELS[state.sort]), undefined, {
             ghost: true, icon: 'sliders', haspopup: true,
+            pressed: state.sort !== 'date_desc',
             onclick: function (e) { openSortMenu(e.currentTarget); }
         }));
         hydrateIcons(row);
@@ -702,6 +703,13 @@
         if (opts && opts.focusFirst !== false) $('.menu__item', menu)?.focus();
         return menu;
     }
+
+    /* Ключи состояния и ключи перевода не совпадают по имени — держим
+       соответствие в одном месте, чтобы чип не показывал 'date_desc'. */
+    const SORT_LABELS = {
+        name_asc: 'name_asc', name_desc: 'name_desc',
+        date_desc: 'date_new', date_asc: 'date_old', size_desc: 'size_desc'
+    };
 
     function openSortMenu(anchor) {
         showMenu(anchor, [
@@ -869,11 +877,11 @@
         toast(t(link.pinned ? 'pinned_toast' : 'unpinned_toast'), { type: 'info', duration: 2200 });
         render();
     }
-    function setAccessLevel(link, level, quiet) {
+    function setAccessLevel(link, level) {
         if (link.accessLevel === level && !(level === 'token' && !link.accessToken)) return;
         link.accessLevel = level;
         if (level === 'token' && !link.accessToken) link.accessToken = Math.random().toString(36).slice(2, 10);
-        if (!quiet) toast(t('access_updated'));
+        toast(t('access_updated'));
         render();
         /* Панель перерисовываем сами, сохраняя прокрутку и фокус: иначе
            переключение уровня отбрасывает пользователя в начало списка. */
@@ -988,19 +996,6 @@
                 toast(t('bulk_copied', { count: state.selected.size }));
             }
         }, icon('copy'), h('span', { text: t('bulk_copy') })));
-        /* Уровень доступа меняется пачкой: в списке из полусотни ссылок
-           это самая частая правка после закрепления. */
-        bar.append(h('button', {
-            class: 'btn btn--sm', type: 'button', 'aria-haspopup': 'menu',
-            onclick: function (e) {
-                showMenu(e.currentTarget, [
-                    { icon: 'globe', text: t('access_public'), checked: false, onclick: () => bulkAccess('public') },
-                    { icon: 'lock', text: t('access_local'), checked: false, onclick: () => bulkAccess('local') },
-                    { icon: 'key', text: t('access_token'), checked: false, onclick: () => bulkAccess('token') },
-                    { icon: 'user', text: t('access_auth'), checked: false, onclick: () => bulkAccess('auth') }
-                ], { align: 'start' });
-            }
-        }, icon('lock'), h('span', { text: t('bulk_access') })));
         bar.append(h('button', {
             class: 'btn btn--sm btn--danger', type: 'button', onclick: function () {
                 const count = state.selected.size;
@@ -1027,15 +1022,6 @@
     /* ========================================================
        13. ПАНЕЛЬ ССЫЛКИ («пульт»)
        ======================================================== */
-    /* Уровень доступа для всех выбранных ссылок */
-    function bulkAccess(level) {
-        const count = state.selected.size;
-        selectedLinks().forEach(function (l) {
-            setAccessLevel(l, level, true);
-        });
-        toast(t('bulk_access_set', { level: t(accessMeta(level).key), count: count }));
-    }
-
     function openPanel(link, tab) {
         state.panelName = link.linkName;
         state.panelTab = tab || 'media';
@@ -1422,13 +1408,18 @@
        ответ — здесь мы повторяем его поведение ровно один раз, чтобы все
        три способа замены (файл, URL, галерея) не расходились. */
     function applyMedia(link, media, keepToast) {
-        link.history.unshift({
-            version: link.currentVersion, sizeBytes: link.sizeBytes,
-            mtime: link.modTime, mimeType: link.mimeType
-        });
-        const limit = window.LP_CONFIG.historyLimit;
-        if (limit >= 0) link.history = link.history.slice(0, limit);
-        link.currentVersion += 1;
+        /* Архивируем только то, что было: у ссылки без файла архивировать
+           нечего, и первая версия остаётся первой — как в приложении, где
+           история появляется только после замены. */
+        if (link.hasImage) {
+            link.history.unshift({
+                version: link.currentVersion, sizeBytes: link.sizeBytes,
+                mtime: link.modTime, mimeType: link.mimeType
+            });
+            const limit = window.LP_CONFIG.historyLimit;
+            if (limit >= 0) link.history = link.history.slice(0, limit);
+            link.currentVersion += 1;
+        }
         link.hasImage = true;
         link.mimeType = media.mimeType || link.mimeType;
         link.category = (media.mimeType || '').startsWith('video') ? 'video'
@@ -1467,7 +1458,14 @@
        это файл из настроенной папки на сервере.
        ======================================================== */
     const MEDIA_EXT = /\.(jpe?g|png|gif|webp|bmp|tiff?|avif|mp4|webm|m4v|mov)([?#]|$)/i;
-    const VIDEO_EXT = /\.(mp4|webm|m4v|mov)([?#]|$)/i;
+    /* Тип файла из адреса: сервер сохраняет расширение, поэтому и в макете
+       PNG остаётся PNG, а не превращается в JPEG «по умолчанию». */
+    const EXT_MIME = {
+        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif',
+        webp: 'image/webp', bmp: 'image/bmp', tif: 'image/tiff', tiff: 'image/tiff',
+        avif: 'image/avif', mp4: 'video/mp4', webm: 'video/webm',
+        m4v: 'video/x-m4v', mov: 'video/quicktime'
+    };
 
     function openUrlDialog(link) {
         const node = $('#tplUrl').content.firstElementChild.cloneNode(true);
@@ -1508,15 +1506,17 @@
         });
         function commit() {
             const value = input.value.trim();
-            const isVideo = VIDEO_EXT.test(value);
+            const ext = (value.split(/[?#]/)[0].match(/\.([a-z0-9]+)$/i) || [null, ''])[1].toLowerCase();
+            const mime = EXT_MIME[ext] || 'image/jpeg';
+            const isVideo = mime.indexOf('video/') === 0;
             closeOverlay(true);
             toast(t('uploading'), { type: 'info', duration: 1000 });
             /* Сервер скачивает файл и делает превью. В макете кадр берётся из
                демонстрационного набора: размеры и вес приходят от сервера. */
             setTimeout(function () {
                 applyMedia(link, isVideo
-                    ? { mimeType: 'video/mp4', sizeBytes: 6_400_000, width: 1280, height: 720, durationSec: 12, src: MEDIA_DEMO.video }
-                    : { mimeType: 'image/jpeg', sizeBytes: 480_000, width: 1600, height: 900, src: MEDIA_DEMO.image });
+                    ? { mimeType: mime, sizeBytes: 6_400_000, width: 1280, height: 720, durationSec: 12, src: MEDIA_DEMO.video }
+                    : { mimeType: mime, sizeBytes: 480_000, width: 1600, height: 900, src: MEDIA_DEMO.image });
             }, 700);
         }
         submit.addEventListener('click', commit);
@@ -1618,11 +1618,13 @@
         let checkTimer = 0;
         input.addEventListener('input', function () {
             clearTimeout(checkTimer);
-            if (!input.value.trim()) { setError(''); return; }
+            const value = input.value.trim();
+            if (!value) { setError(''); return; }
+            /* Формат проверяется локально и сразу: ждать «сервер» незачем,
+               а кнопка не должна выглядеть готовой к негодному имени. */
+            if (!/^[a-zA-Z0-9_-]{1,64}$/.test(value)) { setError(t('invalid_id')); return; }
             setError('', false);
             checkTimer = setTimeout(function () {
-                const value = input.value.trim();
-                if (!/^[a-zA-Z0-9_-]{1,64}$/.test(value)) return;   /* об этом скажет submit */
                 const busy = state.links.some(l => l.linkName === value && (!o.rename || l !== o.rename));
                 if (busy) setError(t('link_taken'));
                 else if (value !== (o.rename && o.rename.linkName) || !o.rename) setError(t('id_available'), true);
@@ -1729,7 +1731,18 @@
             const label = { ru: 'Русский', en: 'English', de: 'Deutsch', fr: 'Français', it: 'Italiano', es: 'Español' }[code] || code;
             langSelect.append(h('option', { value: code, text: label, selected: code === state.lang }));
         });
-        langSelect.addEventListener('change', function () { setLang(langSelect.value); savePrefs(); });
+        langSelect.addEventListener('change', function () {
+            const code = langSelect.value;
+            const label = (langSelect.options[langSelect.selectedIndex] || {}).textContent || code;
+            setLang(code);
+            savePrefs();
+            /* Шесть языков, как в приложении, но переведены в макете два.
+               Выбор «Deutsch» не должен выглядеть поломкой — говорим прямо,
+               что строки придут при переносе из static/i18n. */
+            if (!window.LP_I18N[code]) {
+                toast(t('lang_mock_only', { lang: label }), { type: 'info', duration: 5000 });
+            }
+        });
 
         /* Данные и обслуживание */
         $$('[data-act]', node).forEach(function (btn) {
