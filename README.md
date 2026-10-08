@@ -34,11 +34,15 @@ link, which is handy for digital frames, smart TVs, kiosks and other displays.
 - **Per-link access levels:** `public`, `local` (LAN only), `token` (secret
   URL) and `auth` (admin only). Media is stored outside the static web root.
 - **Admin panel** (installable PWA) with gallery-style previews, search,
-  sorting, pinning, drag-and-drop, dark mode, export/import of the link list
-  and six languages (EN, RU, DE, FR, IT, ES). App icons, portrait and
-  panoramic images are shown whole instead of cropped; video previews play
-  only while visible. A per-link dialog manages versions, playlist items,
-  rotation and access counters.
+  filter chips with counts, sorting, pinning, drag-and-drop, five muted accent
+  palettes, light and dark themes, export/import of the link list and six
+  languages (EN, RU, DE, FR, IT, ES). The library is drawn in chunks of 12 with
+  a "Show more" button, and a failed request gets its own state with a retry
+  button instead of an empty list. App icons, portrait and panoramic images are
+  shown whole instead of cropped; video previews play only while visible. A
+  per-link panel manages media (a file from the device — pre-compressed in the
+  browser — a remote URL or a file already on the server), versions with
+  rollback, playlist items with rotation, and access levels with counters.
 - **Light on resources:** about 10 MB of RAM when idle, gzip for text
   responses, media revalidated with `304` instead of downloaded again, and
   about 50 KB of self-hosted WOFF2 fonts. Archived versions are moved, not

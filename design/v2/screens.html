@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: MIT -->
+<html lang="ru" data-theme="light" data-palette="indigo">
+<head>
+<meta charset="utf-8">
+<title>Lanpaper 2.0 — макет на трёх ширинах</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="../../static/favicon.svg">
+<link rel="stylesheet" href="tokens.css">
+<style>
+/* ============================================================
+   Витрина макета: три настоящих iframe в рамке устройств.
+   Ширина кадра задаёт медиазапросы, поэтому это честный
+   адаптив, а не картинка.
+   ============================================================ */
+body { padding: 28px 24px 64px; }
+
+.board-head {
+    max-width: 1500px; margin: 0 auto 22px;
+    display: flex; align-items: flex-start; flex-wrap: wrap; gap: 16px 24px;
+}
+.board-head__text { flex: 1 1 340px; min-width: 0; }
+.board-head h1 { font-size: 1.375rem; font-weight: 700; letter-spacing: -0.02em; }
+.board-head p { margin-top: 6px; font-size: var(--t-sm); color: var(--text-2); max-width: 70ch; }
+.board-head code {
+    font-family: var(--font-mono); font-size: 0.75rem;
+    background: var(--surface-2); border: 1px solid var(--border);
+    padding: 1px 5px; border-radius: var(--r-xs);
+}
+
+.controls {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+    padding: 10px; border: 1px solid var(--border); border-radius: var(--r-lg);
+    background: var(--surface);
+}
+.controls__group { display: flex; align-items: center; gap: 6px; }
+.controls__label { font-size: var(--t-xs); font-weight: 600; color: var(--text-3); }
+.controls .chip { height: 30px; }
+.controls .swatch { width: 26px; height: 26px; padding: 2px; }
+
+.board {
+    max-width: 1500px; margin: 0 auto;
+    display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start;
+}
+.device { display: flex; flex-direction: column; gap: 10px; }
+.device__label {
+    display: flex; align-items: baseline; gap: 8px;
+    font-size: var(--t-xs); font-weight: 600; color: var(--text-2);
+}
+.device__label span { color: var(--text-3); font-weight: 500; }
+.device__frame {
+    position: relative;
+    border-radius: 18px;
+    border: 1px solid var(--border-2);
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+}
+.device__frame iframe {
+    border: 0; display: block; background: var(--bg);
+}
+/* Масштаб меняется переменной --scale у обёртки */
+.device__viewport { position: relative; overflow: hidden; }
+.device__viewport iframe {
+    transform: scale(var(--scale));
+    transform-origin: top left;
+}
+.device--desktop { --w: 1440px; --h: 900px; --scale: 0.60; }
+.device--tablet  { --w: 834px;  --h: 1060px; --scale: 0.52; }
+.device--phone   { --w: 390px;  --h: 844px; --scale: 0.72; }
+.device__viewport {
+    width: calc(var(--w) * var(--scale));
+    height: calc(var(--h) * var(--scale));
+}
+.device__viewport iframe { width: var(--w); height: var(--h); }
+
+@media (max-width: 1100px) {
+    .device--desktop { --scale: 0.46; }
+    .device--tablet  { --scale: 0.46; }
+}
+@media (max-width: 700px) {
+    body { padding: 18px 14px 48px; }
+    .device--desktop { --scale: 0.34; }
+    .device--tablet  { --scale: 0.42; }
+    .device--phone   { --scale: 0.62; }
+}
+.board-foot {
+    max-width: 1500px; margin: 34px auto 0;
+    font-size: var(--t-xs); color: var(--text-3);
+    display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center;
+}
+</style>
+</head>
+<body>
+
+<div class="board-head">
+    <div class="board-head__text">
+        <div class="eyebrow">Lanpaper 2.0 · макет</div>
+        <h1>Один и тот же экран на трёх ширинах</h1>
+        <p>
+            Кадры — живые: это <code>index.html</code> внутри iframe шириной 1440, 834 и 390 px,
+            поэтому сетка, шапка и карточки перестраиваются настоящими медиазапросами.
+            Внутри кадров можно кликать: открывать пульт ссылки, менять доступ, искать.
+        </p>
+    </div>
+    <div class="controls" id="controls">
+        <div class="controls__group">
+            <span class="controls__label">Тема</span>
+            <div class="segment" role="radiogroup" aria-label="Тема">
+                <button class="segment__item" type="button" data-theme="light" aria-checked="true">Светлая</button>
+                <button class="segment__item" type="button" data-theme="dark" aria-checked="false">Тёмная</button>
+            </div>
+        </div>
+        <div class="controls__group" id="paletteRow">
+            <span class="controls__label">Акцент</span>
+        </div>
+        <div class="controls__group">
+            <span class="controls__label">Вид</span>
+            <div class="segment" role="radiogroup" aria-label="Вид">
+                <button class="segment__item" type="button" data-view="grid" aria-checked="true">Плитка</button>
+                <button class="segment__item" type="button" data-view="list" aria-checked="false">Список</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="board" id="board">
+    <figure class="device device--desktop">
+        <figcaption class="device__label">Десктоп <span>1440 px</span></figcaption>
+        <div class="device__frame"><div class="device__viewport">
+            <iframe src="index.html" title="Макет на десктопе" loading="lazy"></iframe>
+        </div></div>
+    </figure>
+
+    <figure class="device device--tablet">
+        <figcaption class="device__label">Планшет <span>834 px</span></figcaption>
+        <div class="device__frame"><div class="device__viewport">
+            <iframe src="index.html" title="Макет на планшете" loading="lazy"></iframe>
+        </div></div>
+    </figure>
+
+    <figure class="device device--phone">
+        <figcaption class="device__label">Телефон <span>390 px</span></figcaption>
+        <div class="device__frame"><div class="device__viewport">
+            <iframe src="index.html" title="Макет на телефоне" loading="lazy"></iframe>
+        </div></div>
+    </figure>
+</div>
+
+<div class="board-foot">
+    <span>Кадры листаются и кликаются независимо — состояние внутри каждого своё.</span>
+    <span>Панель ссылки на телефоне открывается снизу, на (десктопе) — справа.</span>
+</div>
+
+<script>
+(function () {
+    const PALETTES = [
+        ['indigo', 'Индиго', '#5A66B5', '#9AA4E8'],
+        ['sage', 'Шалфей', '#4F7C68', '#93C7B2'],
+        ['clay', 'Глина', '#A25D44', '#E0A489'],
+        ['graphite', 'Графит', '#4E5763', '#AAB4C2'],
+        ['ocean', 'Океан', '#2F7C88', '#7CC6D2']
+    ];
+    const state = { theme: 'light', palette: 'indigo', view: 'grid' };
+
+    const row = document.getElementById('paletteRow');
+    PALETTES.forEach(([id, name, light, dark]) => {
+        const b = document.createElement('button');
+        b.className = 'swatch';
+        b.type = 'button';
+        b.role = 'radio';
+        b.dataset.palette = id;
+        b.setAttribute('aria-label', name);
+        b.title = name;
+        b.setAttribute('aria-checked', String(id === state.palette));
+        b.innerHTML = '<span class="swatch__dot"></span>';
+        b.addEventListener('click', () => { state.palette = id; sync(); });
+        row.append(b);
+    });
+
+    document.querySelectorAll('[data-theme]').forEach((b) => b.addEventListener('click', () => {
+        state.theme = b.dataset.theme; sync();
+    }));
+    document.querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => {
+        state.view = b.dataset.view; sync();
+    }));
+
+    function sync() {
+        document.documentElement.dataset.theme = state.theme;
+        document.documentElement.dataset.palette = state.palette;
+        document.querySelectorAll('[data-theme]').forEach((b) =>
+            b.setAttribute('aria-checked', String(b.dataset.theme === state.theme)));
+        document.querySelectorAll('[data-view]').forEach((b) =>
+            b.setAttribute('aria-checked', String(b.dataset.view === state.view)));
+        document.querySelectorAll('.swatch').forEach((b) => {
+            b.setAttribute('aria-checked', String(b.dataset.palette === state.palette));
+            const p = PALETTES.find((x) => x[0] === b.dataset.palette);
+            b.firstElementChild.style.background = state.theme === 'dark' ? p[3] : p[2];
+        });
+        const query = `?theme=${state.theme}&palette=${state.palette}&view=${state.view}&embedded=1`;
+        document.querySelectorAll('.device__viewport iframe').forEach((frame) => {
+            frame.src = 'index.html' + query + '#' + Date.now();
+        });
+    }
+    sync();
+})();
+</script>
+</body>
+</html>

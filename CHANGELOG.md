@@ -3,10 +3,45 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
-## [Unreleased]
+## [0.14.0] – 2026-10-08
+
+The admin panel is rebuilt on the `design/v2` stand: the same capabilities as
+0.12.1 in a quieter, denser interface, plus replacing media from a URL or from
+the files already on the server, version rollback without leaving the panel,
+five muted accents and six fully translated languages. The Go side carries the
+two changes that were already waiting in `main`: WebP encoding in pure Go (no
+CGO, no C toolchain in the image) and a rollback for links that `autoCreate`
+made before an upload failed.
 
 ### Changed
 
+- **The admin panel is rebuilt on the `design/v2` layout.** `admin.html`,
+  `static/css/style.css`, `static/js/app.js`, `static/js/export-import.js` and
+  `static/js/settings-menu.js` are the port of the second stand: a sticky
+  two-line header, filter chips with counts, a 12-tile grid with "Show more", a
+  permanent link panel with media/versions/playlist/access tabs, five muted
+  accents, light and dark themes and a touch-sized phone layout. Every request
+  goes to the same API as before — `GET /api/wallpapers`, `POST /api/link`,
+  `PATCH /api/link/{id}` (`newLinkName`, `accessLevel`, `rotate`, `rotateToken`,
+  `removeItem`), `DELETE /api/link/{id}`, `/pin`, `/rollback`,
+  `/history/{v}`, `POST /api/upload` (device file, remote URL or a file already
+  on the server), `/api/external-images`, `/api/preview/{id}`,
+  `/api/compression-config`, `/api/regenerate-previews`. The six
+  `static/i18n/*.json` files now carry the panel's 197 keys — the same set in
+  every language, checked by `tests/i18n.test.cjs`.
+- **The panel still lives under the strict CSP.** The inline pre-paint script
+  became `static/js/prepaint.js`, and no markup carries a `style` attribute any
+  more: `script-src 'self'; style-src 'self'` keeps working without
+  `'unsafe-inline'`, and dynamic values (meter fill, accent samples) are set
+  through the CSSOM. `static/sw.js` moves to `lanpaper-static-v7` and precaches
+  the new file; caches of older versions are still deleted on activation.
+- **Three details of the mock-up are done differently, because the API does not
+  carry the data.** The version tab shows the link's own archive size and
+  `HISTORY_LIMIT` instead of a share of the global `HISTORY_MAX_MB` budget (the
+  server does not publish it); the tile metadata shows a frame's real pixel size
+  once its preview has loaded, and no video duration (neither is in
+  `/api/wallpapers`); the server-file gallery lists names with previews rather
+  than dimensions and file sizes (`/api/external-images` returns names only).
 - **WebP encoding is pure Go.** `github.com/chai2010/webp` (CGO, a vendored
   libwebp 1.4.0) is replaced by `github.com/SeriousBug/webp-go-pure` v1.2.0
   (MIT, no C toolchain, no shared library). Go 1.26+ can build the project
@@ -19,6 +54,130 @@ Notable changes to Lanpaper. Docker images are published as
   created the link before the media was validated, so a rejected file (or an
   append to a link that has no media yet) kept the new link in the panel until
   it was deleted by hand. The link is now rolled back when the request fails.
+
+### Added
+
+- **A second admin redesign stand: `design/v2/`.** A clickable prototype of the
+  panel rebuilt from its tasks rather than patched from the previous mock-up: a
+  sticky header with search and filter chips (type, pinned, access, sorting), a
+  compact media tile with two controls instead of six, a permanent link panel
+  with media/versions/playlist/access tabs, five muted accent palettes, light and
+  dark themes and a touch-sized mobile layout. `design/v2/screens.html` shows the
+  same screen in live 1440 / 834 / 390 px frames, and
+  `design/06-redesign-v2.md` holds the audit of 0.12.1, the contrast table and
+  the file-by-file migration plan. `design/v2/standalone.html` (799 KB,
+  `tools/build-standalone.py`) is the same mock-up as one file with the styles,
+  scripts, fonts and demo frames inlined, for viewers that show a single file.
+  The Go code and the panel's own files stay untouched by the stand itself: the
+  port to `admin.html` and `static/` is the change listed above, on top of the
+  same audit. Contrast of every palette pair is checked by
+  `node design/v2/tools/check.mjs`.
+- **The prototype also answers what 0.12.1 does not do.** The library is drawn in
+  chunks of 12 with a "Show more" button and a "showing 12 of 20" counter instead
+  of rendering every tile at once; a failed `/api/wallpapers` request gets its own
+  error state with a "Retry" button instead of an empty library; media can be
+  replaced from a URL (validated: `https?://`, 2048 characters, known
+  extensions) or from the files already on the server, not only by uploading;
+  every replacement archives the previous file into the version history up to
+  `HISTORY_LIMIT`; the playlist stops at `PLAYLIST_MAX` with the limit spelled
+  out before the click; the version tab shows the history budget and disables
+  deletion when there is nothing to delete; the link id format is reported as
+  you type and the id is checked for availability 250 ms later;
+  filter chips carry counts; hotkeys gained `t`, `g` and `s` next to the existing
+  ones; and a newly created, renamed or uploaded link is revealed and highlighted
+  instead of landing past the rendered window; the sort chip is labelled with
+  the chosen order instead of the raw state key; and picking one of the four
+  languages the mock-up does not translate yet says so out loud instead of
+  silently keeping Russian. Bulk access changes were considered and dropped:
+  the API has no batch endpoint, and one button over many links can open more
+  than intended. The list of behaviour changes — and what deliberately stays as
+  it is — is section 11-бис of `design/06-redesign-v2.md`.
+- **The mock-up has some depth back.** Cards were flat: a hairline border and
+  nothing else, which read as stickers on the page. Each surface now has its own
+  height — the tile rests on a soft shadow along its bottom edge, lifts 2 px and
+  widens it under the cursor, the loading skeleton wears the same shadow so the
+  grid does not "sink" while it loads, and the sticky header casts a soft shadow
+  downwards so the content reads as passing under it rather than being cut by a
+  line. In the dark theme a shadow is nearly invisible, so height there is shown
+  by a 1 px light lip (`inset 0 1px 0 rgba(255,255,255,.05)`) instead. Accent
+  buttons keep a soft shadow of their own colour; nothing glows, and no shadow
+  is animated except the tile lift, which is off on touch screens where hover
+  sticks after a tap. Tokens: `--shadow-card`, `--shadow-card-hover`,
+  `--shadow-bar`, overridden per theme like the rest.
+- **The stand was re-read line by line before any of it moves into the app, and
+  eleven bugs came out of it.** Eight would have shipped invisibly: the panel
+  renderer closed *any* overlay instead of its own (so opening settings while the
+  panel was open silently killed the panel, and switching language in the
+  settings closed the panel it lived in); translation placeholders were
+  substituted with `String.replace`, so a link name containing `$&` or `$'` would
+  print a fragment of the template; `Intl` formatters were built on every call —
+  320 constructions per 20 list redraws, now zero, cached per language; size units
+  and the type/size/changed/version labels were Russian literals shown even in the
+  English interface; the chip row was rebuilt wholesale, dropping keyboard focus
+  and `scrollLeft`; renaming a link lost its selection and desynchronised the bulk
+  counter; an evicted toast kept its timer and touched a removed node; and
+  `dismiss` could run twice. The last two came from the harness itself. The same
+  pass measured the result — 4–15 ms, typically ~8, of work per 12-card redraw, zero node growth
+  over 30 open/close cycles — and confirmed the application needs no security
+  rework: SSRF is closed by `ResolvePublicURL` plus a pinned transport, paths go
+  through `os.OpenRoot`, public media carry `nosniff` / `X-Frame-Options: DENY` /
+  `Referrer-Policy: no-referrer`, tokens are compared in constant time and never
+  exported. Two things must change in the app during the port: `formatBytes`
+  (`static/js/app.js:2339`) hard-codes `KB/MB/GB` regardless of language, and
+  `static/i18n/*.json` has no keys for the panel's Type / Size / Changed /
+  Version labels. Details in section 11-тер of `design/06-redesign-v2.md`.
+- **Three bugs the mock-up showed only on screen.** Wrapper elements
+  (`.choice__body`, `.row__body`, `.vrow__body`) were flex children without a
+  `display`, so the `span`s inside stayed inline and the bold title ran straight
+  into its description — "PublicAvailable to anyone with the link" — in the
+  access options, the "Replace media" rows and the version rows. The panel's
+  tabs switch `aria-selected`, but only `aria-pressed` and `aria-checked` were
+  styled, so the active tab was never highlighted. And the tab strip had no
+  surface or edge of its own while the scrollable body started flush against it,
+  so on scroll the content was cut off right under the pill, full-bleed next to
+  it. All three are `ui.css` only: wrappers became columns, the selector gained
+  `aria-selected`, and the strip got its own bottom border, an 8 px gap and the
+  header shadow, with the line under the panel title removed via
+  `.sheet__head:has(+ .sheet__tabs)`. A sweep of every container built in
+  `app.js` (looking for wrappers whose CSS sets no `display`) and of every
+  attribute the script writes found no other case.
+- **The mock-up no longer needs `:has()`, and twelve dead rules are gone.**
+  It turned out the selected access level and its focus ring hung on
+  `:has(input:checked)` — while the application's own stylesheet does not use
+  `:has()` even once. Ported as it was, that would have smuggled a new browser
+  requirement into the panel, silently: an unsupported selector just shows
+  nothing. The state now lives in the `is-checked` class the script was already
+  writing (the list re-renders on every change, so the class tracks the radio),
+  and the focus ring moved to the sibling selector
+  `input:focus-visible + .choice__mark`, the same trick the mock-up's other
+  native fields use. The tab strip's `:has(+ .sheet__tabs)` went the same way —
+  the strip now covers the header's hairline with its own surface
+  (`margin-top: -1px`). A runtime class audit — the sweep opens every state and
+  collects the classes actually present, 192 of them — found twelve rules from
+  earlier iterations with no markup behind them: five `.badge--*` variants
+  (`badge--accent` is the one in use), `.btn--ghost`, the `.dropzone` block with
+  its captions, `.foot__hint`, `.is-active` and `.is-over`; all removed, along
+  with the dead half of `.icon-btn.is-active`. The audit is repeatable: it also
+  catches names built by concatenation, so it cannot mistake a live rule for a
+  dead one. Harness grown to match: layout rules jsdom cannot compute (40),
+  build checks (30), state checks (33), flow checks (25), all run over the page
+  and the single-file build. Measured after the changes: ~8 ms per 12-card
+  redraw, zero `Intl` constructions, no node growth over 30 open/close cycles.
+- **The mock-up survives a narrow screen and a wide list view.** On a phone the
+  header keeps the application name (it used to vanish, leaving a row of icons
+  with no clue what panel this is) and the link counter moves to the page title
+  instead of disappearing, while the floating "New link" button no longer covers
+  the last row — the content reserves 96 px for it. The list view is a single
+  column at every width now: the rule was `.grid--list`, one class, and the
+  `.grid` column rules in the media queries below it won on specificity, so on a
+  wide desktop "list" stayed a grid with the cards merely turned into rows. It
+  is `.grid.grid--list` and a real row now — thumbnail on the left, name, meta
+  and badges on one line, and the access switch pinned to the right edge at
+  176 px instead of stretching across the row. That switch is drawn only where
+  the row is wide (≥ 721 px) and replaces the access badge there rather than
+  sitting next to it, so the same fact is no longer stated twice; on a phone the
+  badge speaks and the switch is gone. A frame whose file fails to load is shown
+  as "no file" instead of a torn-image icon.
 
 ## [0.12.1] – 2026-10-04
 

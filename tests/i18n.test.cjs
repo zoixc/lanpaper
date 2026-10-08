@@ -88,7 +88,7 @@ test('placeholders such as {{n}} survive translation', () => {
 
 test('each non-English language actually translates the interface', () => {
   // A handful of strings that must not stay English in a translated panel.
-  const mustDiffer = ['create_btn', 'delete_btn', 'settings_language', 'upload_file', 'search_placeholder'];
+  const mustDiffer = ['create_submit', 'delete', 'settings_shortcuts', 'upload_file', 'search_placeholder'];
   for (const lang of LANGS.filter(l => l !== 'en')) {
     const identical = mustDiffer.filter(key => translations[lang][key] === translations.en[key]);
     // A word may legitimately coincide (Italian "Video", French "Photo"), so

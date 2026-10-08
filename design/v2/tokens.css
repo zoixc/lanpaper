@@ -1,0 +1,477 @@
+/* SPDX-License-Identifier: MIT */
+/* ============================================================
+   LANPAPER 2.0 — ТОКЕНЫ ОФОРМЛЕНИЯ
+   Один файл на всё «до компонентов»: сброс, шрифты, палитры,
+   темы, типографика и служебные утилиты.
+
+   Принципы, из которых выведены значения:
+   1. Медиа — главное, интерфейс — фон. Отсюда приглушённые
+      нейтральные поверхности и ровно один акцент на экран.
+   2. Границы задают форму, тень — высоту. Тень мягкая и однослойная;
+      в тёмной теме высоту показывает светлая кромка, а не чёрный разлёт.
+   3. Контраст проверяемый, а не «на глаз»: tools/check.mjs
+      считает WCAG для каждой палитры в обеих темах.
+   ============================================================ */
+
+
+/* ============================================================
+   1. СБРОС И БАЗА
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+
+* { margin: 0; padding: 0; }
+
+html {
+    -webkit-text-size-adjust: 100%;
+    color-scheme: light;
+    scrollbar-color: var(--border-2) transparent;
+    scrollbar-width: thin;
+}
+
+body {
+    min-height: 100vh;
+    min-height: 100dvh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: var(--t-md);
+    font-weight: var(--fw-normal);
+    line-height: var(--leading);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+img, svg, video, canvas { display: block; max-width: 100%; }
+
+button, input, select, textarea {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+}
+
+button { cursor: pointer; }
+
+a { color: var(--accent-text); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+ul, ol { list-style: none; }
+
+[hidden], .is-hidden { display: none !important; }
+
+::selection { background: var(--accent-soft-2); color: var(--text); }
+
+/* Тонкий скроллбар поверх фона — чтобы не «резал» стеклянные панели */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: var(--border-2);
+    border: 3px solid transparent;
+    border-radius: var(--r-full);
+    background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background-color: var(--text-3); background-clip: content-box; }
+
+
+/* ============================================================
+   2. ШРИФТЫ (самостоятельный хостинг, SIL OFL 1.1)
+   Manrope — весь интерфейс. Unbounded 500 — только логотип,
+   ID ссылок и крупные числа: он даёт характер, но в тексте
+   непригоден.
+   ============================================================ */
+@font-face {
+    font-family: Manrope;
+    font-style: normal;
+    font-weight: 400 800;
+    font-display: swap;
+    src: url('../../static/fonts/manrope-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+                   U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191,
+                   U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: Manrope;
+    font-style: normal;
+    font-weight: 400 800;
+    font-display: swap;
+    src: url('../../static/fonts/manrope-cyrillic.woff2') format('woff2');
+    unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+    font-family: Unbounded;
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('../../static/fonts/unbounded-latin-500.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2074, U+20AC, U+2122;
+}
+
+
+/* ============================================================
+   3. ПАЛИТРА ПО УМОЛЧАНИЮ — светлая, «Индиго»
+   Нейтральные поверхности: почти серые, с самым слабым
+   подтоном. Так фотографии на плитках не спорят с фоном.
+   ============================================================ */
+:root {
+    /* Фон и поверхности */
+    --bg:            #F5F6F9;
+    --bg-2:          #EDEFF4;
+    --surface:       #FFF;
+    --surface-2:     #F1F3F7;
+    --surface-3:     #E7EAF1;
+    --surface-hover: #F7F8FB;
+    --glass:         rgba(255, 255, 255, 0.78);
+    --overlay:       rgba(22, 24, 30, 0.42);
+
+    /* Текст */
+    --text:          #1B1C1E;
+    --text-2:        #575A5E;
+    --text-3:        #6B6E73;
+    --text-on-accent:#FFF;
+
+    /* Границы */
+    --border:        #E2E5EC;
+    --border-2:      #D3D7E1;
+    --border-strong: #BFC4D1;
+
+    /* Акцент */
+    --accent:        #5A66B5;
+    --accent-rgb:    90, 102, 181;
+    --accent-hover:  #4E5AA9;
+    --accent-active: #46529C;
+    --accent-soft:   rgba(90, 102, 181, 0.09);
+    --accent-soft-2: rgba(90, 102, 181, 0.16);
+    --accent-text:   #4C57A2;
+
+    /* Статусы */
+    --success:       #2F7C5F;
+    --success-soft:  rgba(47, 124, 95, 0.11);
+    --warning:       #93661A;
+    --warning-soft:  rgba(147, 102, 26, 0.12);
+    --danger:        #B04A45;
+    --danger-soft:   rgba(176, 74, 69, 0.10);
+    --info:          #3D6E92;
+    --info-soft:     rgba(61, 110, 146, 0.11);
+
+    /* Матование превью: поля вокруг вписанного кадра */
+    --matte:         #ECEEF2;
+    --matte-line:    rgba(27, 28, 30, 0.06);
+    --checker-a:     #F4F5F7;
+    --checker-b:     #E7E9ED;
+    --shade:         rgba(16, 17, 20, 0.62); /* подписи на кадре */
+
+    /* Тени. У каждой поверхности — своя высота, и это видно без «парения»:
+       мягкий разлёт с отрицательным spread держит тень под элементом, а не
+       вокруг него. Свечения и цветных градиентов нет ни у одной. */
+    --shadow-xs: 0 1px 2px rgba(20, 22, 32, 0.05);
+    --shadow-sm: 0 1px 2px rgba(20, 22, 32, 0.05), 0 2px 6px -2px rgba(20, 22, 32, 0.07);
+    --shadow-md: 0 2px 6px rgba(20, 22, 32, 0.06), 0 12px 28px -12px rgba(20, 22, 32, 0.18);
+    --shadow-lg: 0 4px 12px rgba(20, 22, 32, 0.08), 0 28px 60px -24px rgba(20, 22, 32, 0.30);
+    /* Плитка. На светлом фоне сама поверхность белее фона, поэтому хватает
+       одной мягкой тени по нижнему краю — карточка перестаёт быть наклейкой. */
+    --shadow-card: 0 1px 2px rgba(20, 22, 32, 0.05), 0 6px 16px -10px rgba(20, 22, 32, 0.18);
+    --shadow-card-hover: 0 2px 4px rgba(20, 22, 32, 0.06), 0 14px 28px -12px rgba(20, 22, 32, 0.24);
+    /* Липкая шапка: тень уходит вниз, отделяя её от содержимого */
+    --shadow-bar: 0 10px 22px -18px rgba(20, 22, 32, 0.42);
+    --shadow-focus: 0 0 0 3px rgba(var(--accent-rgb), 0.22);
+
+    /* Радиусы */
+    --r-xs: 6px;
+    --r-sm: 9px;
+    --r-md: 12px;
+    --r-lg: 16px;
+    --r-xl: 22px;
+    --r-full: 999px;
+
+    /* Шаги отступов */
+    --s-1: 4px;   --s-2: 8px;   --s-3: 12px;  --s-4: 16px;
+    --s-5: 20px;  --s-6: 24px;  --s-7: 32px;  --s-8: 44px;  --s-9: 64px;
+
+    /* Высоты элементов */
+    --h-sm: 30px;
+    --h-md: 36px;
+    --h-lg: 44px;
+    --tap:  44px;   /* минимальная зона нажатия на тач-экране */
+
+    /* Типографика */
+    --font-ui:      'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Unbounded', 'Manrope', system-ui, sans-serif;
+    --font-mono:    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
+    --t-2xs: 0.6875rem;  /* 11 — бейджи */
+    --t-xs:  0.75rem;    /* 12 — мета */
+    --t-sm:  0.8125rem;  /* 13 — вторичный текст, кнопки в карточке */
+    --t-md:  0.875rem;   /* 14 — база интерфейса */
+    --t-lg:  1rem;       /* 16 — акцентные подписи */
+    --t-xl:  1.25rem;    /* 20 — заголовок страницы (телефон) */
+    --t-2xl: 1.5rem;     /* 24 — заголовок страницы (десктоп) */
+    --t-3xl: 1.875rem;   /* 30 — заголовок пустоты */
+
+    --fw-normal: 400; --fw-medium: 500; --fw-semibold: 600; --fw-bold: 700;
+
+    --leading-tight: 1.25;
+    --leading:       1.5;
+
+    /* Движение */
+    --ease:      cubic-bezier(0.22, 0.61, 0.36, 1);
+    --ease-out:  cubic-bezier(0.16, 1, 0.3, 1);
+    --dur-fast:  120ms;
+    --dur:       180ms;
+    --dur-slow:  260ms;
+
+    /* Слои */
+    --z-sticky:   20;
+    --z-appbar:   30;
+    --z-fab:      35;
+    --z-dropdown: 60;
+    --z-scrim:    80;
+    --z-sheet:    90;
+    --z-toast:    120;
+
+    /* Каркас */
+    --maxw: 1440px;
+    --gutter: 28px;
+}
+
+
+/* ============================================================
+   4. ТЁМНАЯ ТЕМА — глубокий грифельный, не чёрный
+   ============================================================ */
+html[data-theme="dark"] {
+    color-scheme: dark;
+
+    --bg:            #14161B;
+    --bg-2:          #0F1114;
+    --surface:       #1B1E24;
+    --surface-2:     #22262E;
+    --surface-3:     #2A2F38;
+    --surface-hover: #1F232A;
+    --glass:         rgba(23, 26, 32, 0.76);
+    --overlay:       rgba(6, 7, 9, 0.62);
+
+    --text:          #E9EAEC;
+    --text-2:        #A4A7AC;
+    --text-3:        #898C91;
+    --text-on-accent:#12141A;
+
+    --border:        #2A2F37;
+    --border-2:      #3A404A;
+    --border-strong: #4A5260;
+
+    --accent:        #9AA4E8;
+    --accent-rgb:    154, 164, 232;
+    --accent-hover:  #AAB3EE;
+    --accent-active: #8C97E2;
+    --accent-soft:   rgba(154, 164, 232, 0.13);
+    --accent-soft-2: rgba(154, 164, 232, 0.22);
+    --accent-text:   #AAB3EE;
+
+    --success:       #7FCBB0;
+    --success-soft:  rgba(127, 203, 176, 0.14);
+    --warning:       #E0BC7E;
+    --warning-soft:  rgba(224, 188, 126, 0.14);
+    --danger:        #E79A96;
+    --danger-soft:   rgba(231, 154, 150, 0.14);
+    --info:          #8CC0DC;
+    --info-soft:     rgba(140, 192, 220, 0.14);
+
+    --matte:         #23262C;
+    --matte-line:    rgba(255, 255, 255, 0.05);
+    --checker-a:     #22262E;
+    --checker-b:     #2A2F38;
+    --shade:         rgba(8, 9, 11, 0.66);
+
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 6px -2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.45), 0 14px 30px -14px rgba(0, 0, 0, 0.6);
+    --shadow-lg: 0 6px 16px rgba(0, 0, 0, 0.5), 0 32px 64px -28px rgba(0, 0, 0, 0.75);
+    /* В темноте тень почти не читается, поэтому высоту показывает светлая
+       кромка сверху: одна прозрачная линия в 1 px — и поверхность отделяется
+       от фона, не превращаясь в «свечение». */
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.45), 0 8px 20px -12px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.5), 0 16px 30px -14px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --shadow-bar: 0 10px 24px -18px rgba(0, 0, 0, 0.8);
+}
+
+
+/* ============================================================
+   5. ПАЛИТРЫ
+   Меняется только фон-подложка и группа акцента: текст,
+   границы и статусы остаются общими, поэтому контраст не
+   зависит от выбора пользователя.
+   Переключатель: <html data-palette="sage">.
+   ============================================================ */
+
+/* --- Индиго (значения по умолчанию, см. :root) — спокойный синий --- */
+html[data-palette="indigo"] { --bg: #F5F6F9; --bg-2: #EDEFF4; --surface-2: #F1F3F7; --surface-3: #E7EAF1; --matte: #ECEEF2; }
+html[data-palette="indigo"][data-theme="dark"] { --bg: #14161B; --bg-2: #0F1114; --surface: #1B1E24; --surface-2: #22262E; --surface-3: #2A2F38; --matte: #23262C; }
+
+/* --- Шалфей — приглушённая зелень --- */
+html[data-palette="sage"] {
+    --bg: #F4F7F5; --bg-2: #EBF1ED; --surface-2: #F0F4F1; --surface-3: #E5EBE7;
+    --border: #E0E7E2; --border-2: #CFD9D3; --border-strong: #B9C6BE;
+    --matte: #EAEFEB;
+    --accent: #4F7C68; --accent-rgb: 79, 124, 104;
+    --accent-hover: #45705D; --accent-active: #3D6654;
+    --accent-soft: rgba(79, 124, 104, 0.10); --accent-soft-2: rgba(79, 124, 104, 0.18);
+    --accent-text: #42705C;
+}
+html[data-palette="sage"][data-theme="dark"] {
+    --bg: #131715; --bg-2: #0E1211; --surface: #1A1F1D; --surface-2: #212725; --surface-3: #29302D;
+    --border: #29302D; --border-2: #39423E; --border-strong: #4B564F; --matte: #222724;
+    --accent: #93C7B2; --accent-rgb: 147, 199, 178;
+    --accent-hover: #A3D2BF; --accent-active: #84BAA5;
+    --accent-soft: rgba(147, 199, 178, 0.13); --accent-soft-2: rgba(147, 199, 178, 0.22);
+    --accent-text: #A3D2BF;
+}
+
+/* --- Глина — тёплая, «бумага и терракота» --- */
+html[data-palette="clay"] {
+    --bg: #F8F5F3; --bg-2: #F1EAE6; --surface-2: #F4EFEB; --surface-3: #EAE2DC;
+    --border: #E7DFD9; --border-2: #D8CCC4; --border-strong: #C4B4A9;
+    --matte: #EFE9E4;
+    --accent: #A25D44; --accent-rgb: 162, 93, 68;
+    --accent-hover: #94533C; --accent-active: #874B35;
+    --accent-soft: rgba(162, 93, 68, 0.10); --accent-soft-2: rgba(162, 93, 68, 0.18);
+    --accent-text: #95533C;
+}
+html[data-palette="clay"][data-theme="dark"] {
+    --bg: #171512; --bg-2: #111010; --surface: #1E1B17; --surface-2: #26221D; --surface-3: #2F2A24;
+    --border: #2E2923; --border-2: #3F382F; --border-strong: #524A3E; --matte: #262320;
+    --accent: #E0A489; --accent-rgb: 224, 164, 137;
+    --accent-hover: #E9B199; --accent-active: #D5987D;
+    --accent-soft: rgba(224, 164, 137, 0.13); --accent-soft-2: rgba(224, 164, 137, 0.22);
+    --accent-text: #E9B199;
+}
+
+/* --- Графит — почти монохром, для тех, кто не любит цвет --- */
+html[data-palette="graphite"] {
+    --bg: #F5F5F6; --bg-2: #EDEDEF; --surface-2: #F1F1F3; --surface-3: #E6E7E9;
+    --border: #E3E3E6; --border-2: #D2D3D7; --border-strong: #BCBDC3;
+    --matte: #EDEDEF;
+    --accent: #4E5763; --accent-rgb: 78, 87, 99;
+    --accent-hover: #444C57; --accent-active: #3C434D;
+    --accent-soft: rgba(78, 87, 99, 0.09); --accent-soft-2: rgba(78, 87, 99, 0.17);
+    --accent-text: #454D58;
+}
+html[data-palette="graphite"][data-theme="dark"] {
+    --bg: #151617; --bg-2: #101112; --surface: #1C1D1F; --surface-2: #242628; --surface-3: #2D2F32;
+    --border: #2C2E31; --border-2: #3C3F43; --border-strong: #4E5257; --matte: #242628;
+    --accent: #AAB4C2; --accent-rgb: 170, 180, 194;
+    --accent-hover: #BAC3CF; --accent-active: #9BA6B5;
+    --accent-soft: rgba(170, 180, 194, 0.13); --accent-soft-2: rgba(170, 180, 194, 0.22);
+    --accent-text: #BAC3CF;
+}
+
+/* --- Океан — холодный бирюзовый --- */
+html[data-palette="ocean"] {
+    --bg: #F3F6F7; --bg-2: #E9F0F2; --surface-2: #EFF4F5; --surface-3: #E3ECEE;
+    --border: #DFE8EA; --border-2: #CDD9DC; --border-strong: #B6C6CA;
+    --matte: #E9EFF1;
+    --accent: #2F7C88; --accent-rgb: 47, 124, 136;
+    --accent-hover: #296E79; --accent-active: #24616B;
+    --accent-soft: rgba(47, 124, 136, 0.10); --accent-soft-2: rgba(47, 124, 136, 0.18);
+    --accent-text: #2A6F7A;
+}
+html[data-palette="ocean"][data-theme="dark"] {
+    --bg: #131618; --bg-2: #0E1113; --surface: #1A1E20; --surface-2: #212628; --surface-3: #293033;
+    --border: #293032; --border-2: #384144; --border-strong: #4A5458; --matte: #222729;
+    --accent: #7CC6D2; --accent-rgb: 124, 198, 210;
+    --accent-hover: #90D1DB; --accent-active: #6BB8C5;
+    --accent-soft: rgba(124, 198, 210, 0.13); --accent-soft-2: rgba(124, 198, 210, 0.22);
+    --accent-text: #90D1DB;
+}
+
+
+/* ============================================================
+   6. ТИПОГРАФИКА И УТИЛИТЫ
+   ============================================================ */
+/* Заголовок над группой: тише, чем содержимое под ним */
+.eyebrow {
+    font-size: var(--t-2xs);
+    font-weight: var(--fw-semibold);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-3);
+}
+
+/* Подпись раздела: «Ссылки · 12» */
+.label {
+    font-size: var(--t-sm);
+    font-weight: var(--fw-semibold);
+    color: var(--text-2);
+}
+
+.mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+}
+
+.display {
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+}
+
+.num { font-variant-numeric: tabular-nums; }
+
+.truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Иконки: размер по умолчанию, который перебивает любой класс
+   компонента (нулевая специфичность у :where). */
+:where(svg[data-icon]) { width: 16px; height: 16px; flex: none; }
+
+.visually-hidden {
+    position: absolute !important;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.skip-link {
+    position: absolute;
+    left: 50%;
+    top: -60px;
+    transform: translateX(-50%);
+    z-index: 999;
+    padding: 10px 16px;
+    border-radius: var(--r-full);
+    background: var(--surface);
+    border: 1px solid var(--border-2);
+    box-shadow: var(--shadow-md);
+    font-weight: var(--fw-semibold);
+    transition: top var(--dur) var(--ease);
+}
+.skip-link:focus { top: 12px; text-decoration: none; }
+
+/* Фокус — только для клавиатуры, всегда видимый */
+:focus-visible {
+    /* Контур сам повторяет радиус элемента — подменять его не нужно */
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+:focus:not(:focus-visible) { outline: none; }
+
+
+/* Уважение к системным настройкам */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+@media (prefers-contrast: more) {
+    :root { --border: var(--border-2); --text-3: var(--text-2); }
+}

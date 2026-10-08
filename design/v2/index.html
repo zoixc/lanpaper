@@ -1,33 +1,58 @@
 <!DOCTYPE html>
 <!-- SPDX-License-Identifier: MIT -->
-<!-- Разметка панели — порт макета design/v2 (см. design/06-redesign-v2.md).
-     Классы, состояния и шаблоны совпадают с макетом; отличия только в
-     источниках данных и путях: /static/... вместо относительных. -->
-<html lang="en" data-theme="light" data-palette="indigo" data-view="grid">
+<html lang="ru" data-theme="light" data-palette="indigo">
 <head>
-  <meta charset="utf-8">
-  <title>Lanpaper</title>
-  <meta name="description" content="Self-hosted wallpaper and media link server for your network.">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="color-scheme" content="light dark">
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Lanpaper">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <!-- theme-color: respects system preference before JS loads -->
-  <meta name="theme-color" content="#F5F6F9" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#14161B" media="(prefers-color-scheme: dark)">
-  <link rel="manifest" href="/static/manifest.json">
-  <link rel="preload" href="/static/fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/static/css/style.css">
+<meta charset="utf-8">
+<title>Lanpaper 2.0 — макет админки</title>
+<meta name="description" content="Макет улучшенного интерфейса админ-панели Lanpaper.">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F5F6F9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14161B" media="(prefers-color-scheme: dark)">
+<link rel="icon" type="image/svg+xml" href="../../static/favicon.svg">
+<link rel="apple-touch-icon" href="../../static/icons/apple-touch-icon.png">
+<link rel="preload" href="../../static/fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="ui.css">
+<link rel="stylesheet" href="layout.css">
 
-  <!-- Тема, акцент, вид и язык применяются до первой отрисовки: иначе при
-       загрузке мигает светлый вариант. Настройки читаются из localStorage;
-       для панелей, поставленных до 2.0, ключи прежние (theme, viewMode,
-       sortBy) — их читает app.js, чтобы выбор не потерялся при обновлении. -->
-  <script src="/static/js/prepaint.js"></script>
+<!-- Тема, акцент и язык применяются до первой отрисовки: иначе при
+     загрузке мигает светлый вариант. -->
+<script>
+(function () {
+    /* Параметры адреса перебивают сохранённые настройки: так витрина
+       screens.html показывает несколько состояний в одном документе,
+       ничего не записывая в localStorage. */
+    var q = new URLSearchParams(location.search);
+    /* Только известные значения: в адрес легко подставить что угодно, а
+       неизвестное оставило бы панель без акцента или без языка. */
+    function pick(name, allowed) {
+        var value = q.get(name);
+        return value && allowed.indexOf(value) >= 0 ? value : null;
+    }
+    window.LP_FORCED = {
+        theme: pick('theme', ['light', 'dark', 'auto']),
+        palette: pick('palette', ['indigo', 'sage', 'clay', 'graphite', 'ocean']),
+        view: pick('view', ['grid', 'list']),
+        lang: pick('lang', ['ru', 'en']),
+        instant: q.get('embedded') === '1',
+        fail: q.get('fail') === '1'
+    };
+    try {
+        var s = JSON.parse(localStorage.getItem('lp-ui') || '{}');
+        var root = document.documentElement;
+        var theme = window.LP_FORCED.theme || s.theme || 'auto';
+        var dark = theme === 'dark' || (theme === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+        root.dataset.theme = dark ? 'dark' : 'light';
+        root.dataset.themeMode = theme;
+        // Замаплено на готовые iOS/Android-шрифты без лишних файлов
+        if (window.LP_FORCED.palette || s.palette) root.dataset.palette = window.LP_FORCED.palette || s.palette;
+        if (window.LP_FORCED.view || s.view) root.dataset.view = window.LP_FORCED.view || s.view;
+        else root.dataset.view = 'grid';
+        if (window.LP_FORCED.lang || s.lang) root.lang = window.LP_FORCED.lang || s.lang;
+    } catch (e) { /* приватный режим — просто светлая тема */ }
+})();
+</script>
 </head>
 
 <body>
@@ -43,8 +68,8 @@
         <div class="appbar__inner">
 
             <div class="appbar__row appbar__row--top">
-                <a class="brand" href="/admin">
-                    <span class="brand__mark"><img src="/static/favicon.svg" alt="" width="30" height="30"></span>
+                <a class="brand" href="index.html">
+                    <span class="brand__mark"><img src="../../static/favicon.svg" alt="" width="30" height="30"></span>
                     <span class="brand__name">Lanpaper</span>
                     <span class="brand__badge" id="brandCount">0</span>
                 </a>
@@ -52,30 +77,25 @@
                 <span class="appbar__spacer"></span>
 
                 <div class="appbar__actions">
-                    <button class="icon-btn" id="selectBtn" type="button" aria-pressed="false"
-                            data-tip-key="select_mode" data-i18n-aria="select_mode"
-                            aria-label="Select several">
+                    <button class="icon-btn" id="selectBtn" type="button" aria-pressed="false" aria-label="Режим выбора"
+                            data-tip-key="select_mode" data-i18n-aria="select_mode">
                         <svg data-icon="select"></svg>
                     </button>
 
-                    <div class="btn-group" role="group" aria-label="View">
-                        <button class="icon-btn" id="viewGridBtn" type="button" aria-pressed="true"
-                                data-tip-key="view_grid" data-i18n-aria="view_grid" aria-label="Grid">
-                            <svg data-icon="grid"></svg></button>
-                        <button class="icon-btn" id="viewListBtn" type="button" aria-pressed="false"
-                                data-tip-key="view_list" data-i18n-aria="view_list" aria-label="List">
-                            <svg data-icon="list"></svg></button>
+                    <div class="btn-group" role="group" aria-label="Вид">
+                        <button class="icon-btn" id="viewGridBtn" type="button" aria-pressed="true" aria-label="Плитка"
+                                data-tip-key="view_grid" data-i18n-aria="view_grid"><svg data-icon="grid"></svg></button>
+                        <button class="icon-btn" id="viewListBtn" type="button" aria-pressed="false" aria-label="Список"
+                                data-tip-key="view_list" data-i18n-aria="view_list"><svg data-icon="list"></svg></button>
                     </div>
 
-                    <button class="icon-btn" id="themeBtn" type="button"
-                            data-tip-key="aria_toggle_theme" data-i18n-aria="aria_toggle_theme"
-                            aria-label="Toggle theme">
+                    <button class="icon-btn" id="themeBtn" type="button" aria-label="Переключить тему"
+                            data-tip-key="aria_toggle_theme" data-i18n-aria="aria_toggle_theme">
                         <svg data-icon="moon"></svg>
                     </button>
 
-                    <button class="icon-btn" id="settingsBtn" type="button"
-                            data-tip-key="aria_settings" data-i18n-aria="aria_settings"
-                            aria-label="Settings"><svg data-icon="gear"></svg></button>
+                    <button class="icon-btn" id="settingsBtn" type="button" aria-label="Настройки"
+                            data-tip-key="aria_settings" data-i18n-aria="aria_settings"><svg data-icon="gear"></svg></button>
 
                     <button class="btn btn--primary" id="newLinkBtn" type="button">
                         <svg data-icon="plus"></svg><span data-i18n="new_link">Новая ссылка</span>
@@ -88,15 +108,15 @@
                     <div class="field">
                         <svg class="field__icon" data-icon="search"></svg>
                         <input id="searchInput" type="search" autocomplete="off" spellcheck="false"
-                               data-i18n-placeholder="search_placeholder" placeholder="Search by name or file"
-                               data-i18n-aria="aria_search" aria-label="Search links">
+                               placeholder="Поиск по имени или файлу" data-i18n-placeholder="search_placeholder"
+                               aria-label="Поиск ссылок" data-i18n-aria="aria_search">
                         <button class="field__clear" id="searchClear" type="button"
-                                data-i18n-aria="search_clear" aria-label="Clear search"><svg data-icon="x"></svg></button>
+                                aria-label="Очистить поиск" data-i18n-aria="search_clear"><svg data-icon="x"></svg></button>
                     </div>
                 </div>
 
                 <div class="tools">
-                    <div class="chip-row" id="filterRow" role="group" aria-label="Filters"></div>
+                    <div class="chip-row" id="filterRow" role="group" aria-label="Фильтры"></div>
                 </div>
             </div>
 
@@ -120,7 +140,7 @@
         <div class="grid" id="grid" aria-live="polite" aria-busy="true"></div>
 
         <!-- Длинная библиотека показывается порциями: сорок карточек рисуются
-             по двенадцать. Кнопка говорит, сколько осталось. -->
+             по двадцать четыре. Кнопка говорит, сколько осталось. -->
         <div class="load-more is-hidden" id="loadMore">
             <button class="btn" id="loadMoreBtn" type="button">Показать ещё</button>
             <span class="load-more__count label" data-left></span>
@@ -146,7 +166,7 @@
             <p class="empty__title" data-i18n="nothing_found">Ничего не найдено</p>
             <p class="empty__text" data-i18n="nothing_found_hint">Попробуйте другой запрос или снимите фильтры.</p>
             <div class="empty__actions">
-                <button class="btn" id="resetFiltersBtn" type="button" data-i18n="reset_filters">Снять фильтры</button>
+                <button class="btn" id="resetFiltersBtn" type="button" data-i18n="filter_all">Все</button>
             </div>
         </div>
 
@@ -174,7 +194,12 @@
                 <svg data-icon="github"></svg>
                 <span>GitHub</span>
             </a>
-            <span class="display" id="appVersion">v...</span>
+            <span class="display" id="appVersion">v0.12.1</span>
+            <span class="foot__spacer"></span>
+            <a href="../index.html">
+                <svg data-icon="info"></svg>
+                <span>Дизайн-стенд: витрина, документы, прежние прототипы</span>
+            </a>
         </div>
     </footer>
 
@@ -185,16 +210,13 @@
     <svg data-icon="plus"></svg><span data-i18n="new_link">Новая ссылка</span>
 </button>
 
-<!-- Полоса действий над выбранными ссылками и подсказка при перетаскивании
-     файлов создаются скриптом: они существуют, только пока нужны. -->
-
-<div class="toasts" id="toasts" role="status" aria-label="Notifications"></div>
+<div class="toasts" id="toasts" role="status" aria-label="Уведомления"></div>
 
 <!-- Слой оверлеев: затемнение + панель/диалог кладутся сюда -->
 <div id="overlayHost"></div>
 
-<!-- Одно поле выбора файлов на всю страницу: его открывают кнопки
-     «Файл с устройства», «Перетащить файлы» и быстрое создание -->
+<!-- Тот же выбор файлов, что открывает кнопка «Перетащить файлы» и меню
+     «Файл с устройства» — одно поле на всю страницу -->
 <input type="file" id="filePicker" class="visually-hidden" multiple
        accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/tiff,video/mp4,video/webm">
 
@@ -207,13 +229,14 @@
         <div class="card__frame">
             <img class="card__media" alt="" loading="lazy" decoding="async"
                  src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
-            <button class="card__check" type="button" tabindex="-1" hidden
-                    data-i18n-aria="select_mode" aria-label="Select"><svg data-icon="check"></svg></button>
+            <button class="card__check" type="button" tabindex="-1" hidden aria-label="Выбрать">
+                <svg data-icon="check"></svg><span class="visually-hidden" data-i18n="select_mode">Выбрать несколько</span>
+            </button>
             <div class="card__badges">
                 <div class="card__badges-left"></div>
                 <div class="card__badges-right">
-                    <button class="card__open" type="button" tabindex="-1"
-                            data-i18n-aria="open_media" aria-label="Open in new tab"><svg data-icon="external"></svg></button>
+                    <button class="card__open" type="button" tabindex="-1" aria-label="Открыть в новой вкладке"
+                            data-i18n-aria="open_media"><svg data-icon="external"></svg></button>
                 </div>
             </div>
             <span class="card__play" hidden><svg data-icon="play"></svg></span>
@@ -222,7 +245,7 @@
             <div class="card__head">
                 <button class="card__name truncate" type="button">Ссылка</button>
                 <button class="card__menu-btn" type="button" aria-haspopup="menu" aria-expanded="false"
-                        data-i18n-aria="more" aria-label="Link actions"><svg data-icon="more"></svg></button>
+                        aria-label="Действия ссылки" data-i18n-aria="more"><svg data-icon="more"></svg></button>
             </div>
             <div class="card__meta"></div>
             <div class="card__tags"></div>
@@ -246,11 +269,12 @@
                 <h2 class="sheet__title truncate" id="panelTitle">Ссылка</h2>
                 <div class="sheet__sub" data-sub></div>
             </div>
-            <button class="icon-btn" type="button" data-close
-                    data-i18n-aria="close" aria-label="Close"><svg data-icon="x"></svg></button>
+            <button class="icon-btn" type="button" data-close aria-label="Закрыть" data-i18n-aria="close">
+                <svg data-icon="x"></svg>
+            </button>
         </div>
         <div class="sheet__tabs">
-            <div class="segment segment--full" role="tablist" aria-label="Link sections">
+            <div class="segment segment--full" role="tablist" aria-label="Разделы ссылки">
                 <button class="segment__item" role="tab" type="button" id="tab-media"  aria-selected="true"  data-tab="media"    data-i18n="panel_media">Медиа</button>
                 <button class="segment__item" role="tab" type="button" id="tab-vers"   aria-selected="false" data-tab="versions" data-i18n="panel_versions">Версии</button>
                 <button class="segment__item" role="tab" type="button" id="tab-items"  aria-selected="false" data-tab="playlist" data-i18n="panel_playlist">Плейлист</button>
@@ -259,8 +283,7 @@
         </div>
         <div class="sheet__body" data-body role="tabpanel" id="panelBody" aria-labelledby="tab-media"></div>
         <div class="sheet__foot">
-            <button class="btn btn--danger" type="button" data-delete>
-                <svg data-icon="trash"></svg><span data-i18n="delete">Удалить</span></button>
+            <button class="btn btn--danger" type="button" data-delete><svg data-icon="trash"></svg><span data-i18n="delete">Удалить</span></button>
             <span class="spacer"></span>
             <button class="btn btn--primary" type="button" data-close data-i18n="panel_close">Готово</button>
         </div>
@@ -280,8 +303,7 @@
             <div class="field field--plain field--lg has-value">
                 <span class="url-line__host" id="createHost"></span>
                 <input id="createInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
-                       maxlength="64" pattern="[a-zA-Z0-9_\-]+" data-i18n-placeholder="create_placeholder"
-                       placeholder="tv-lobby">
+                       maxlength="64" pattern="[a-zA-Z0-9_\-]+" placeholder="tv-lobby" data-i18n-placeholder="create_placeholder">
             </div>
             <p class="field-hint" id="createHint"></p>
         </div>
@@ -304,14 +326,13 @@
                 <div class="eyebrow" data-i18n="settings_appearance">Оформление</div>
                 <h2 class="sheet__title" id="settingsTitle" data-i18n="settings_title">Настройки</h2>
             </div>
-            <button class="icon-btn" type="button" data-close
-                    data-i18n-aria="close" aria-label="Close"><svg data-icon="x"></svg></button>
+            <button class="icon-btn" type="button" data-close aria-label="Закрыть" data-i18n-aria="close"><svg data-icon="x"></svg></button>
         </div>
         <div class="sheet__body">
 
             <div class="section">
                 <div class="section__head"><span class="section__title" data-i18n="theme">Тема</span></div>
-                <div class="segment segment--full" role="radiogroup" aria-label="Theme">
+                <div class="segment segment--full" role="radiogroup" aria-label="Тема">
                     <label class="segment__opt">
                         <input type="radio" name="theme" value="light" data-theme-opt="light">
                         <span class="segment__item" data-i18n="theme_light">Светлая</span>
@@ -337,26 +358,23 @@
 
             <div class="section">
                 <div class="section__head"><span class="section__title" data-i18n="settings_language">Язык</span></div>
-                <select class="select select--block" id="langSelect" aria-label="Language"></select>
+                <select class="select select--block" id="langSelect"></select>
+                <p class="field-hint" data-i18n="settings_mockup_note"></p>
             </div>
 
             <div class="section">
                 <div class="section__head"><span class="section__title" data-i18n="settings_data">Данные</span></div>
                 <div class="stack stack--tight">
-                    <button class="menu__item" type="button" data-act="export" id="exportBtn">
-                        <svg data-icon="download"></svg><span data-i18n="export_json">Экспорт списка ссылок</span></button>
-                    <button class="menu__item" type="button" data-act="import" id="importBtn">
-                        <svg data-icon="upload"></svg><span data-i18n="import_json">Импорт списка ссылок</span></button>
+                    <button class="menu__item" type="button" data-act="export"><svg data-icon="download"></svg><span data-i18n="export_json">Экспорт списка ссылок</span></button>
+                    <button class="menu__item" type="button" data-act="import"><svg data-icon="upload"></svg><span data-i18n="import_json">Импорт списка ссылок</span></button>
                 </div>
             </div>
 
             <div class="section">
                 <div class="section__head"><span class="section__title" data-i18n="settings_maintenance">Обслуживание</span></div>
                 <div class="stack stack--tight">
-                    <button class="menu__item" type="button" data-act="regen" id="regenPreviewsBtn">
-                        <svg data-icon="refresh"></svg><span data-i18n="regen_previews">Перегенерировать превью</span></button>
-                    <button class="menu__item" type="button" data-act="install" id="installBtn" hidden>
-                        <svg data-icon="download"></svg><span data-i18n="install_app">Установить приложение</span></button>
+                    <button class="menu__item" type="button" data-act="regen"><svg data-icon="refresh"></svg><span data-i18n="regen_previews">Перегенерировать превью</span></button>
+                    <button class="menu__item" type="button" data-act="install"><svg data-icon="download"></svg><span data-i18n="install_app">Установить приложение</span></button>
                 </div>
             </div>
 
@@ -413,8 +431,7 @@
                 <h2 class="sheet__title" id="serverTitle" data-i18n="server_title">Файлы на сервере</h2>
                 <div class="sheet__sub" data-i18n="server_hint">Файл будет скопирован в ссылку</div>
             </div>
-            <button class="icon-btn" type="button" data-close
-                    data-i18n-aria="close" aria-label="Close">
+            <button class="icon-btn" type="button" data-close aria-label="Закрыть" data-i18n-aria="close">
                 <svg data-icon="x"></svg>
             </button>
         </div>
@@ -422,8 +439,8 @@
             <div class="field">
                 <svg class="field__icon" data-icon="search"></svg>
                 <input id="serverFilter" type="search" autocomplete="off" spellcheck="false"
-                       data-i18n-placeholder="server_filter" placeholder="Имя файла"
-                       data-i18n-aria="server_filter" aria-label="File name">
+                       placeholder="Имя файла" data-i18n-placeholder="server_filter"
+                       aria-label="Имя файла" data-i18n-aria="server_filter">
             </div>
             <div class="picker" id="serverList"></div>
             <p class="field-hint is-hidden" id="serverEmpty" data-i18n="nothing_found">Ничего не найдено</p>
@@ -433,7 +450,7 @@
 
 
 <!-- ============================================================
-     ПОДТВЕРЖДЕНИЕ
+     ПОДТВЕРЖДЕНИЕ УДАЛЕНИЯ
      ============================================================ -->
 <template id="tplConfirm">
     <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
@@ -447,9 +464,8 @@
 </template>
 
 
-<script src="/static/js/settings-menu.js" defer></script>
-<script src="/static/js/compressor.js" defer></script>
-<script src="/static/js/app.js" defer></script>
-<script src="/static/js/export-import.js" defer></script>
+<script src="i18n.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
