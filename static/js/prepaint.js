@@ -32,7 +32,7 @@
             var ring = dark ? '#14161B' : '#F5F6F9';
             var metas = document.querySelectorAll('meta[name="theme-color"]');
             for (var i = 0; i < metas.length; i++) metas[i].setAttribute('content', ring);
-            root.dataset.palette = saved.palette || 'indigo';
+            root.dataset.palette = saved.palette || 'mono';
             root.dataset.view = saved.view || legacyView || 'grid';
             if (saved.lang || legacyLang) root.lang = saved.lang || legacyLang;
         } catch (e) { /* приватный режим: остаются значения по умолчанию */ }

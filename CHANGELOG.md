@@ -3,6 +3,23 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
+## [Unreleased]
+
+### Changed
+
+- **The panel is monochrome by default.** The accent, the status colours and
+  the card accents are neutral; colour now comes only from the Accent palettes
+  in Settings (Mono is the default, the previous palettes remain selectable).
+- **Softer shadows** on cards, the header and the buttons.
+- **Header controls share one height**: the grid/list switch, the theme and
+  settings buttons and "New link" sit on the same line.
+- **The list/grid switch animates**: a sliding highlight under the active view
+  and a short fade of the cards.
+- **The card menu (⋯) is always visible** as a bordered button at the end of
+  the card's title row.
+- **List rows are aligned in columns**: metadata, tags, access and the menu sit
+  on the same vertical lines in every row.
+
 ## [0.14.1] – 2026-10-08
 
 A fix release for the 2.0 panel: the strings it looked up but never had, the
