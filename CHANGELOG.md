@@ -7,6 +7,33 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **The admin panel is rebuilt on the `design/v2` layout.** `admin.html`,
+  `static/css/style.css`, `static/js/app.js`, `static/js/export-import.js` and
+  `static/js/settings-menu.js` are the port of the second stand: a sticky
+  two-line header, filter chips with counts, a 12-tile grid with "Show more", a
+  permanent link panel with media/versions/playlist/access tabs, five muted
+  accents, light and dark themes and a touch-sized phone layout. Every request
+  goes to the same API as before — `GET /api/wallpapers`, `POST /api/link`,
+  `PATCH /api/link/{id}` (`newLinkName`, `accessLevel`, `rotate`, `rotateToken`,
+  `removeItem`), `DELETE /api/link/{id}`, `/pin`, `/rollback`,
+  `/history/{v}`, `POST /api/upload` (device file, remote URL or a file already
+  on the server), `/api/external-images`, `/api/preview/{id}`,
+  `/api/compression-config`, `/api/regenerate-previews`. The six
+  `static/i18n/*.json` files now carry the panel's 197 keys — the same set in
+  every language, checked by `tests/i18n.test.cjs`.
+- **The panel still lives under the strict CSP.** The inline pre-paint script
+  became `static/js/prepaint.js`, and no markup carries a `style` attribute any
+  more: `script-src 'self'; style-src 'self'` keeps working without
+  `'unsafe-inline'`, and dynamic values (meter fill, accent samples) are set
+  through the CSSOM. `static/sw.js` moves to `lanpaper-static-v7` and precaches
+  the new file; caches of older versions are still deleted on activation.
+- **Three details of the mock-up are done differently, because the API does not
+  carry the data.** The version tab shows the link's own archive size and
+  `HISTORY_LIMIT` instead of a share of the global `HISTORY_MAX_MB` budget (the
+  server does not publish it); the tile metadata shows a frame's real pixel size
+  once its preview has loaded, and no video duration (neither is in
+  `/api/wallpapers`); the server-file gallery lists names with previews rather
+  than dimensions and file sizes (`/api/external-images` returns names only).
 - **WebP encoding is pure Go.** `github.com/chai2010/webp` (CGO, a vendored
   libwebp 1.4.0) is replaced by `github.com/SeriousBug/webp-go-pure` v1.2.0
   (MIT, no C toolchain, no shared library). Go 1.26+ can build the project
@@ -33,9 +60,10 @@ Notable changes to Lanpaper. Docker images are published as
   the file-by-file migration plan. `design/v2/standalone.html` (799 KB,
   `tools/build-standalone.py`) is the same mock-up as one file with the styles,
   scripts, fonts and demo frames inlined, for viewers that show a single file.
-  **Nothing in the application changed**: `admin.html`, `static/` and the Go code
-  are untouched, and the panel still behaves exactly as in 0.12.1. Contrast of
-  every palette pair is checked by `node design/v2/tools/check.mjs`.
+  The Go code and the panel's own files stay untouched by the stand itself: the
+  port to `admin.html` and `static/` is the change listed above, on top of the
+  same audit. Contrast of every palette pair is checked by
+  `node design/v2/tools/check.mjs`.
 - **The prototype also answers what 0.12.1 does not do.** The library is drawn in
   chunks of 12 with a "Show more" button and a "showing 12 of 20" counter instead
   of rendering every tile at once; a failed `/api/wallpapers` request gets its own

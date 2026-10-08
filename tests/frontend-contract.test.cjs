@@ -33,13 +33,20 @@ function normalizeTemplatePath(url) {
 }
 
 test('every element id the scripts use exists in the panel', () => {
+  // The panel looks elements up through the $() helper, which takes a plain
+  // CSS selector ("#id", optionally with a scope), so match that convention
+  // as well as the direct DOM calls.
   const used = new Set([
     ...matches(scriptSource, /getElementById\(\s*'([^']+)'\s*\)/g),
     ...matches(scriptSource, /querySelector\(\s*'#([^']+)'\s*\)/g),
+    ...matches(scriptSource, /\$\(\s*'#([a-zA-Z0-9_-]+)'\s*(?=[,)])/g),
   ]);
   const defined = new Set([
     ...matches(adminHtml, /\bid="([^"]+)"/g),
     ...matches(scriptSource, /\.id\s*=\s*'([^']+)'/g),
+    // Elements the panel builds itself declare their id in the attribute
+    // object passed to h(), e.g. h('div', { id: 'bulkbar' }).
+    ...matches(scriptSource, /\bid:\s*'([^']+)'/g),
   ]);
   const missing = [...used].filter((id) => !defined.has(id));
   assert.deepEqual(missing, [], `ids used by the scripts but missing from admin.html: ${missing.join(', ')}`);

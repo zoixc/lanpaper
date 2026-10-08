@@ -1,6 +1,9 @@
-<!doctype html>
+<!DOCTYPE html>
 <!-- SPDX-License-Identifier: MIT -->
-<html lang="en">
+<!-- Разметка панели — порт макета design/v2 (см. design/06-redesign-v2.md).
+     Классы, состояния и шаблоны совпадают с макетом; отличия только в
+     источниках данных и путях: /static/... вместо относительных. -->
+<html lang="en" data-theme="light" data-palette="indigo" data-view="grid">
 <head>
   <meta charset="utf-8">
   <title>Lanpaper</title>
@@ -14,405 +17,439 @@
   <meta name="apple-mobile-web-app-title" content="Lanpaper">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <!-- theme-color: respects system preference before JS loads -->
-  <meta name="theme-color" content="#f3f2f7" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0b0c10" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#F5F6F9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#14161B" media="(prefers-color-scheme: dark)">
   <link rel="manifest" href="/static/manifest.json">
   <link rel="preload" href="/static/fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="/static/fonts/unbounded-latin-500.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/css/style.css">
+
+  <!-- Тема, акцент, вид и язык применяются до первой отрисовки: иначе при
+       загрузке мигает светлый вариант. Настройки читаются из localStorage;
+       для панелей, поставленных до 2.0, ключи прежние (theme, viewMode,
+       sortBy) — их читает app.js, чтобы выбор не потерялся при обновлении. -->
+  <script src="/static/js/prepaint.js"></script>
 </head>
+
 <body>
-  <div class="network-bg" aria-hidden="true"></div>
+<a class="skip-link" href="#library" data-i18n="links">Ссылки</a>
 
-  <!-- Drop Overlay -->
-  <div id="dropOverlay" class="drop-overlay hidden" aria-hidden="true">
-    <div class="drop-overlay-content">
-      <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-        <polyline points="17 8 12 3 7 8"/>
-        <line x1="12" y1="3" x2="12" y2="15"/>
-      </svg>
-      <div class="drop-overlay-title" data-i18n="drop_files_here">Drop files here</div>
-      <div class="drop-overlay-hint" data-i18n="drop_hint">Links will be created automatically</div>
-    </div>
-  </div>
+<div class="shell">
 
-  <div class="container">
+    <!-- ============================================================
+         ШАПКА: липкая, две строки. Сверху — «кто я и что могу»,
+         снизу — «что я сейчас вижу» (поиск, фильтры, сортировка).
+         ============================================================ -->
+    <header class="appbar">
+        <div class="appbar__inner">
 
-    <!-- Header -->
-    <header class="header-row">
-      <div class="logo-wrapper">
-        <img src="/static/logo.svg" alt="Lanpaper" class="logo" width="160" height="40">
-      </div>
-      <div class="controls">
-        <div id="settingsDropdown" class="settings-dropdown">
-          <button id="settingsBtn" class="icon-btn" aria-label="Settings" data-i18n-aria="aria_settings" aria-expanded="false" aria-haspopup="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-            </svg>
-          </button>
-          <div class="settings-menu">
-            <div class="settings-section">
-              <div class="settings-section-title" data-i18n="settings_language">Language</div>
-              <div class="lang-options" id="langOptions"></div>
+            <div class="appbar__row appbar__row--top">
+                <a class="brand" href="/admin">
+                    <span class="brand__mark"><img src="/static/favicon.svg" alt="" width="30" height="30"></span>
+                    <span class="brand__name">Lanpaper</span>
+                    <span class="brand__badge" id="brandCount">0</span>
+                </a>
+
+                <span class="appbar__spacer"></span>
+
+                <div class="appbar__actions">
+                    <button class="icon-btn" id="selectBtn" type="button" aria-pressed="false"
+                            data-tip-key="select_mode" data-i18n-aria="select_mode"
+                            aria-label="Select several">
+                        <svg data-icon="select"></svg>
+                    </button>
+
+                    <div class="btn-group" role="group" aria-label="View">
+                        <button class="icon-btn" id="viewGridBtn" type="button" aria-pressed="true"
+                                data-tip-key="view_grid" data-i18n-aria="view_grid" aria-label="Grid">
+                            <svg data-icon="grid"></svg></button>
+                        <button class="icon-btn" id="viewListBtn" type="button" aria-pressed="false"
+                                data-tip-key="view_list" data-i18n-aria="view_list" aria-label="List">
+                            <svg data-icon="list"></svg></button>
+                    </div>
+
+                    <button class="icon-btn" id="themeBtn" type="button"
+                            data-tip-key="aria_toggle_theme" data-i18n-aria="aria_toggle_theme"
+                            aria-label="Toggle theme">
+                        <svg data-icon="moon"></svg>
+                    </button>
+
+                    <button class="icon-btn" id="settingsBtn" type="button"
+                            data-tip-key="aria_settings" data-i18n-aria="aria_settings"
+                            aria-label="Settings"><svg data-icon="gear"></svg></button>
+
+                    <button class="btn btn--primary" id="newLinkBtn" type="button">
+                        <svg data-icon="plus"></svg><span data-i18n="new_link">Новая ссылка</span>
+                    </button>
+                </div>
             </div>
-            <div class="settings-section">
-              <div class="settings-section-title" data-i18n="settings_data">Data</div>
-              <button class="settings-menu-item" id="exportBtn" type="button">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-                <span data-i18n="export_json">Export</span>
-              </button>
-              <button class="settings-menu-item" id="importBtn" type="button">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="17 8 12 3 7 8"/>
-                  <line x1="12" y1="3" x2="12" y2="15"/>
-                </svg>
-                <span data-i18n="import_json">Import</span>
-              </button>
+
+            <div class="appbar__row appbar__row--tools">
+                <div class="search">
+                    <div class="field">
+                        <svg class="field__icon" data-icon="search"></svg>
+                        <input id="searchInput" type="search" autocomplete="off" spellcheck="false"
+                               data-i18n-placeholder="search_placeholder" placeholder="Search by name or file"
+                               data-i18n-aria="aria_search" aria-label="Search links">
+                        <button class="field__clear" id="searchClear" type="button"
+                                data-i18n-aria="search_clear" aria-label="Clear search"><svg data-icon="x"></svg></button>
+                    </div>
+                </div>
+
+                <div class="tools">
+                    <div class="chip-row" id="filterRow" role="group" aria-label="Filters"></div>
+                </div>
             </div>
-            <div class="settings-section">
-              <div class="settings-section-title" data-i18n="settings_maintenance">Maintenance</div>
-              <button class="settings-menu-item" id="regenPreviewsBtn" type="button">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <polyline points="23 4 23 10 17 10"/>
-                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-                </svg>
-                <span data-i18n="regen_previews">Regenerate Previews</span>
-              </button>
-              <button class="settings-menu-item" id="installBtn" type="button" hidden>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <rect x="3" y="3" width="18" height="18" rx="4"/>
-                  <line x1="12" y1="8" x2="12" y2="14"/>
-                  <polyline points="9 11 12 14 15 11"/>
-                  <line x1="8" y1="17" x2="16" y2="17"/>
-                </svg>
-                <span data-i18n="install_app">Install app</span>
-              </button>
-            </div>
-          </div>
+
         </div>
-
-        <button id="viewToggle" class="icon-btn" aria-label="Toggle view" data-i18n-aria="aria_toggle_view">
-          <svg class="view-icon list-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="3" y="3" width="7" height="7" rx="1.5"/>
-            <rect x="14" y="3" width="7" height="7" rx="1.5"/>
-            <rect x="14" y="14" width="7" height="7" rx="1.5"/>
-            <rect x="3" y="14" width="7" height="7" rx="1.5"/>
-          </svg>
-          <svg class="view-icon grid-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <line x1="8" y1="6" x2="21" y2="6"/>
-            <line x1="8" y1="12" x2="21" y2="12"/>
-            <line x1="8" y1="18" x2="21" y2="18"/>
-            <line x1="3" y1="6" x2="3.01" y2="6"/>
-            <line x1="3" y1="12" x2="3.01" y2="12"/>
-            <line x1="3" y1="18" x2="3.01" y2="18"/>
-          </svg>
-        </button>
-
-        <button id="themeToggle" class="icon-btn" aria-label="Toggle dark mode" data-i18n-aria="aria_toggle_theme">
-          <svg class="theme-icon" data-icon="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="4.5"/>
-            <line x1="12" y1="1.5" x2="12" y2="3.5"/>
-            <line x1="12" y1="20.5" x2="12" y2="22.5"/>
-            <line x1="4.6" y1="4.6" x2="6" y2="6"/>
-            <line x1="18" y1="18" x2="19.4" y2="19.4"/>
-            <line x1="1.5" y1="12" x2="3.5" y2="12"/>
-            <line x1="20.5" y1="12" x2="22.5" y2="12"/>
-            <line x1="4.6" y1="19.4" x2="6" y2="18"/>
-            <line x1="18" y1="6" x2="19.4" y2="4.6"/>
-          </svg>
-          <svg class="theme-icon" data-icon="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-          </svg>
-        </button>
-      </div>
     </header>
 
-    <!-- Create + Search/Sort toolbar -->
-    <div class="toolbar-section">
-      <form class="create-row" id="createForm">
-        <input type="text" id="newLinkId" class="input-field"
-               data-i18n-placeholder="input_placeholder"
-               placeholder="Link ID (letters, numbers, - or _)"
-               autocomplete="off"
-               autocapitalize="off"
-               spellcheck="false"
-               pattern="[a-zA-Z0-9_\-]+"
-               maxlength="64"
-               aria-label="Link ID"
-               data-i18n-aria="aria_link_input">
-        <button type="submit" id="createLinkBtn" class="btn btn--primary">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          <span data-i18n="create_btn">Create</span>
-        </button>
-      </form>
-
-      <div class="toolbar-divider"></div>
-
-      <div class="search-sort-bar">
-        <div class="search-container">
-          <input
-            type="text"
-            id="searchInput"
-            class="search-input"
-            data-i18n-placeholder="search_placeholder"
-            placeholder="Search by link name or file..."
-            autocomplete="off"
-            aria-label="Search wallpapers"
-            data-i18n-aria="aria_search"
-          >
-          <div id="searchStats" class="search-stats">Total: 0</div>
-        </div>
-        <div class="sort-container">
-          <label class="sort-label" data-i18n="sort_by">Sort by:</label>
-          <div class="custom-select" id="customSortSelect">
-            <button class="custom-select-btn" aria-haspopup="listbox" aria-expanded="false">
-              <span id="customSortLabel" data-i18n="date_new">Newest first</span>
-              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M1 1l4 4 4-4"/>
-              </svg>
-            </button>
-            <div class="custom-select-menu" role="listbox">
-              <div class="custom-select-option" data-value="name_asc" data-i18n="name_asc">Name (A-Z)</div>
-              <div class="custom-select-option" data-value="name_desc" data-i18n="name_desc">Name (Z-A)</div>
-              <div class="custom-select-option selected" data-value="date_desc" data-i18n="date_new">Newest first</div>
-              <div class="custom-select-option" data-value="date_asc" data-i18n="date_old">Oldest first</div>
+    <!-- ============================================================
+         БИБЛИОТЕКА
+         ============================================================ -->
+    <main class="content" id="library">
+        <div class="page-head">
+            <h1 class="page-head__title" id="pageTitle" data-i18n="links">Ссылки</h1>
+            <span class="page-head__count" id="pageCount">0</span>
+            <div class="page-head__aside">
+                <button class="chip" id="selectAllBtn" type="button" hidden>
+                    <svg data-icon="check"></svg><span data-i18n="select_all">Выбрать все</span>
+                </button>
             </div>
-          </div>
-          <select id="sortSelect" class="sort-select" aria-hidden="true" tabindex="-1">
-            <option value="name_asc" data-i18n="name_asc">Name (A-Z)</option>
-            <option value="name_desc" data-i18n="name_desc">Name (Z-A)</option>
-            <option value="date_desc" selected data-i18n="date_new">Newest first</option>
-            <option value="date_asc" data-i18n="date_old">Oldest first</option>
-          </select>
         </div>
-      </div>
-    </div>
 
-    <!-- Links -->
-    <section class="section">
-      <h2 data-i18n="existing_links">Existing links</h2>
-      <div class="links-list" id="linksList"></div>
-      <div class="empty-state d-none" id="emptyState">
-        <svg class="empty-state-icon" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <!-- Folder -->
-          <path d="M20 30 H50 L58 38 H100 V90 H20 Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round" fill="none" opacity="0.6"/>
-          <!-- Image icon inside -->
-          <rect x="35" y="50" width="50" height="32" rx="2" stroke="currentColor" stroke-width="2.5" fill="none"/>
-          <path d="M40 74 L50 62 L58 70 L65 63 L80 74 Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
-          <circle cx="72" cy="58" r="3" fill="currentColor"/>
-        </svg>
-        <div class="empty-state-text" data-i18n="no_links">No links yet. Create one above!</div>
-      </div>
-    </section>
+        <div class="grid" id="grid" aria-live="polite" aria-busy="true"></div>
 
-    <footer class="footer">
-      <a href="https://github.com/zoixc/lanpaper" target="_blank" rel="noopener noreferrer" class="github-link">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
-        </svg>
-        GitHub | <span id="appVersion">v...</span>
-      </a>
+        <!-- Длинная библиотека показывается порциями: сорок карточек рисуются
+             по двенадцать. Кнопка говорит, сколько осталось. -->
+        <div class="load-more is-hidden" id="loadMore">
+            <button class="btn" id="loadMoreBtn" type="button">Показать ещё</button>
+            <span class="load-more__count label" data-left></span>
+        </div>
+
+        <!-- Сервер не ответил: отдельное состояние с повтором, чтобы пустой
+             экран не выглядел как пустая библиотека -->
+        <div class="empty is-hidden" id="errorState">
+            <div class="empty__icon"><svg data-icon="alert"></svg></div>
+            <p class="empty__title" data-i18n="load_error">Не удалось загрузить список</p>
+            <p class="empty__text" data-i18n="offline_hint">Проверьте связь с сервером и попробуйте снова.</p>
+            <div class="empty__actions">
+                <button class="btn btn--primary" id="retryBtn" type="button">
+                    <svg data-icon="refresh"></svg><span data-i18n="retry">Повторить</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Ничего не найдено: отдельное состояние, чтобы пустота поиска
+             не выглядела как пустая библиотека -->
+        <div class="empty is-hidden" id="noResults">
+            <div class="empty__icon"><svg data-icon="search"></svg></div>
+            <p class="empty__title" data-i18n="nothing_found">Ничего не найдено</p>
+            <p class="empty__text" data-i18n="nothing_found_hint">Попробуйте другой запрос или снимите фильтры.</p>
+            <div class="empty__actions">
+                <button class="btn" id="resetFiltersBtn" type="button" data-i18n="reset_filters">Снять фильтры</button>
+            </div>
+        </div>
+
+        <!-- Библиотека пуста: здесь уместно объяснить, что такое ссылка -->
+        <div class="empty is-hidden" id="emptyState">
+            <div class="empty__icon"><svg data-icon="image"></svg></div>
+            <p class="empty__title" data-i18n="empty_title">Пока ни одной ссылки</p>
+            <p class="empty__text" data-i18n="empty_text">Ссылка — это постоянный адрес, за которым лежит файл.</p>
+            <div class="empty__actions">
+                <button class="btn btn--primary" id="emptyCreateBtn" type="button">
+                    <svg data-icon="plus"></svg><span data-i18n="empty_create">Создать ссылку</span>
+                </button>
+                <button class="btn" id="emptyDropBtn" type="button">
+                    <svg data-icon="upload"></svg><span data-i18n="empty_drop">Перетащить файлы</span>
+                </button>
+            </div>
+            <p class="empty__hint"><svg data-icon="info"></svg>
+                <span data-i18n="empty_hint">Файлы можно просто перетащить в окно.</span></p>
+        </div>
+    </main>
+
+    <footer class="foot">
+        <div class="foot__inner">
+            <a href="https://github.com/zoixc/lanpaper" target="_blank" rel="noopener noreferrer">
+                <svg data-icon="github"></svg>
+                <span>GitHub</span>
+            </a>
+            <span class="display" id="appVersion">v...</span>
+        </div>
     </footer>
-  </div>
 
-  <!-- Toast -->
-  <div id="toastContainer" class="toast-container"></div>
+</div>
 
-  <!-- Modal -->
-  <div id="modalOverlay" class="modal-overlay hidden" aria-modal="true" role="dialog" aria-hidden="true">
-    <div class="modal">
-      <h3 id="modalTitle" data-i18n="modal_default_title">Input</h3>
-      <div class="modal-body" id="modalBody">
-        <input type="text" id="modalInput" class="input-field d-none" placeholder="https://..." data-i18n-placeholder="url_placeholder">
-        <div id="modalList" class="modal-list hidden"></div>
-      </div>
-      <div class="modal-actions">
-        <button id="modalCancelBtn" class="btn" data-i18n="modal_cancel">Cancel</button>
-        <button id="modalConfirmBtn" class="btn btn--primary" data-i18n="modal_ok">OK</button>
-      </div>
-    </div>
-  </div>
+<!-- Быстрое создание на телефоне: та же кнопка, что в шапке на десктопе -->
+<button class="fab" id="fabBtn" type="button">
+    <svg data-icon="plus"></svg><span data-i18n="new_link">Новая ссылка</span>
+</button>
 
-  <!-- Confirm Delete Modal -->
-  <div id="confirmOverlay" class="modal-overlay hidden" aria-modal="true" role="alertdialog" aria-hidden="true">
-    <div class="modal">
-      <h3 id="confirmTitle" data-i18n="confirm_delete_title">Delete link?</h3>
-      <div class="modal-body">
-        <p id="confirmMessage"></p>
-      </div>
-      <div class="modal-actions">
-        <button id="confirmCancelBtn" class="btn" data-i18n="modal_cancel">Cancel</button>
-        <button id="confirmDeleteBtn" class="btn btn--danger" data-i18n="delete_btn">Delete</button>
-      </div>
-    </div>
-  </div>
+<!-- Полоса действий над выбранными ссылками и подсказка при перетаскивании
+     файлов создаются скриптом: они существуют, только пока нужны. -->
 
-  <!-- Versions & Playlist Modal -->
-  <div id="versionsOverlay" class="modal-overlay hidden" aria-modal="true" role="dialog" aria-hidden="true" aria-labelledby="versionsTitle">
-    <div class="modal modal--wide">
-      <h3 id="versionsTitle" data-i18n="versions_title">Versions and playlist</h3>
-      <div class="modal-body">
-        <p id="versionsLinkName" class="versions-link"></p>
-        <p id="versionsHint" class="versions-hint"></p>
+<div class="toasts" id="toasts" role="status" aria-label="Notifications"></div>
 
-        <section class="versions-section">
-          <h4 data-i18n="versions_history">Version history</h4>
-          <div id="versionsList" class="versions-list"></div>
-        </section>
+<!-- Слой оверлеев: затемнение + панель/диалог кладутся сюда -->
+<div id="overlayHost"></div>
 
-        <section class="versions-section">
-          <h4 data-i18n="versions_playlist">Playlist</h4>
-          <div id="playlistList" class="versions-list"></div>
-          <div class="rotate-controls">
-            <label class="rotate-check">
-              <input type="checkbox" id="rotateEnabled">
-              <span data-i18n="rotate_enabled">Rotate automatically</span>
-            </label>
-            <label class="rotate-field">
-              <span data-i18n="rotate_interval">Every (s)</span>
-              <input type="number" id="rotateInterval" min="5" max="86400" step="5" inputmode="numeric">
-            </label>
-            <label class="rotate-field">
-              <span data-i18n="rotate_order">Order</span>
-              <select id="rotateOrder">
-                <option value="sequential" data-i18n="rotate_order_sequential">Sequential</option>
-                <option value="random" data-i18n="rotate_order_random">Random</option>
-              </select>
-            </label>
-            <button id="rotateSaveBtn" class="btn btn--primary" data-i18n="rotate_save">Save</button>
-          </div>
-        </section>
+<!-- Одно поле выбора файлов на всю страницу: его открывают кнопки
+     «Файл с устройства», «Перетащить файлы» и быстрое создание -->
+<input type="file" id="filePicker" class="visually-hidden" multiple
+       accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/tiff,video/mp4,video/webm">
 
-        <section class="versions-section" id="statsSection">
-          <h4 data-i18n="stats_title">Access statistics</h4>
-          <p id="statsBody" class="versions-hint"></p>
-        </section>
-      </div>
-      <div class="modal-actions">
-        <button id="versionsCloseBtn" class="btn" data-i18n="modal_close">Close</button>
-      </div>
-    </div>
-  </div>
 
-  <!-- Link Card Template -->
-  <template id="linkCardTemplate">
-    <article class="link-card" role="article">
-
-      <a class="preview-link" target="_blank" rel="noopener noreferrer" aria-label="Open image">
-        <div class="preview-wrapper">
-          <!-- Pin button -->
-          <button class="pin-btn" aria-label="Pin this link" data-i18n-aria="aria_pin" title="Pin">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
-            </svg>
-          </button>
-          <!-- Shown only when no image is set -->
-          <div class="no-image">
-            <svg class="no-image-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M8 48 L24 24 L36 38 L44 28 L56 48 Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
-              <circle cx="46" cy="18" r="5" stroke="currentColor" stroke-width="2" fill="none"/>
-              <rect x="6" y="8" width="52" height="44" rx="4" stroke="currentColor" stroke-width="2" fill="none"/>
-            </svg>
-          </div>
+<!-- ============================================================
+     ШАБЛОН КАРТОЧКИ
+     ============================================================ -->
+<template id="tplCard">
+    <article class="card">
+        <div class="card__frame">
+            <img class="card__media" alt="" loading="lazy" decoding="async"
+                 src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
+            <button class="card__check" type="button" tabindex="-1" hidden
+                    data-i18n-aria="select_mode" aria-label="Select"><svg data-icon="check"></svg></button>
+            <div class="card__badges">
+                <div class="card__badges-left"></div>
+                <div class="card__badges-right">
+                    <button class="card__open" type="button" tabindex="-1"
+                            data-i18n-aria="open_media" aria-label="Open in new tab"><svg data-icon="external"></svg></button>
+                </div>
+            </div>
+            <span class="card__play" hidden><svg data-icon="play"></svg></span>
         </div>
-      </a>
-
-      <div class="link-info">
-        <div class="link-id-row">
-          <div class="link-id" aria-label="Link ID"></div>
-          <button class="copy-url-btn" aria-label="Copy URL" title="Copy URL">
-            <span class="copy-icon">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="9" y="9" width="13" height="13" rx="2"/>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-              </svg>
-            </span>
-            <span class="copy-text" data-i18n="copy_url">Copy URL</span>
-          </button>
+        <div class="card__body">
+            <div class="card__head">
+                <button class="card__name truncate" type="button">Ссылка</button>
+                <button class="card__menu-btn" type="button" aria-haspopup="menu" aria-expanded="false"
+                        data-i18n-aria="more" aria-label="Link actions"><svg data-icon="more"></svg></button>
+            </div>
+            <div class="card__meta"></div>
+            <div class="card__tags"></div>
         </div>
-        <div class="link-meta" aria-label="File info"></div>
-      </div>
-
-      <div class="actions-row">
-        <div class="upload-dropdown">
-          <button class="btn btn--upload upload-toggle-btn" aria-haspopup="true" aria-expanded="false">
-            <span data-i18n="set_image">Upload</span>
-            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M1 1l4 4 4-4"/>
-            </svg>
-          </button>
-          <div class="upload-menu">
-            <button class="upload-menu-item upload-file-btn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/>
-                <line x1="12" y1="3" x2="12" y2="15"/>
-              </svg>
-              <span data-i18n="upload_file">File</span>
-            </button>
-            <input type="file" class="file-input d-none" accept="image/*,video/mp4,video/webm">
-            <button class="upload-menu-item paste-url-btn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-              </svg>
-              <span data-i18n="upload_url">URL</span>
-            </button>
-            <button class="upload-menu-item select-server-btn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="2" y="2" width="20" height="8" rx="2"/>
-                <rect x="2" y="14" width="20" height="8" rx="2"/>
-                <line x1="6" y1="6" x2="6.01" y2="6"/>
-                <line x1="6" y1="18" x2="6.01" y2="18"/>
-              </svg>
-              <span data-i18n="upload_server">Server</span>
-            </button>
-            <!-- Adds a second file behind the same URL; the live file is untouched. -->
-            <button class="upload-menu-item append-file-btn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <line x1="12" y1="5" x2="12" y2="19"/>
-                <line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-              <span data-i18n="upload_append">Add to playlist</span>
-            </button>
-            <input type="file" class="append-file-input d-none" accept="image/*,video/mp4,video/webm">
-            <button class="upload-menu-item versions-btn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="9"/>
-                <polyline points="12 7 12 12 15 14"/>
-              </svg>
-              <span data-i18n="versions_btn">Versions</span>
-            </button>
-          </div>
-        </div>
-
-        <button class="btn btn--danger delete-btn" aria-label="Delete" title="Delete" data-i18n-aria="delete_btn">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <polyline points="3 6 5 6 21 6"/>
-            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-            <path d="M10 11v6"/>
-            <path d="M14 11v6"/>
-            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-          </svg>
-        </button>
-      </div>
-
     </article>
-  </template>
+</template>
 
-  <script src="/static/js/settings-menu.js" defer></script>
-  <script src="/static/js/compressor.js" defer></script>
-  <script src="/static/js/app.js" defer></script>
-  <script src="/static/js/export-import.js" defer></script>
+
+<!-- ============================================================
+     ШАБЛОН ПАНЕЛИ ССЫЛКИ («пульт»)
+     Десктоп — выезжает справа, телефон — снизу во весь экран.
+     Одна панель на все задачи ссылки: медиа, версии, плейлист,
+     доступ и статистика.
+     ============================================================ -->
+<template id="tplPanel">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="panelTitle" data-sheet>
+        <div class="sheet__grip"></div>
+        <div class="sheet__head">
+            <div class="grow">
+                <div class="eyebrow" data-i18n="panel_title">Пульт ссылки</div>
+                <h2 class="sheet__title truncate" id="panelTitle">Ссылка</h2>
+                <div class="sheet__sub" data-sub></div>
+            </div>
+            <button class="icon-btn" type="button" data-close
+                    data-i18n-aria="close" aria-label="Close"><svg data-icon="x"></svg></button>
+        </div>
+        <div class="sheet__tabs">
+            <div class="segment segment--full" role="tablist" aria-label="Link sections">
+                <button class="segment__item" role="tab" type="button" id="tab-media"  aria-selected="true"  data-tab="media"    data-i18n="panel_media">Медиа</button>
+                <button class="segment__item" role="tab" type="button" id="tab-vers"   aria-selected="false" data-tab="versions" data-i18n="panel_versions">Версии</button>
+                <button class="segment__item" role="tab" type="button" id="tab-items"  aria-selected="false" data-tab="playlist" data-i18n="panel_playlist">Плейлист</button>
+                <button class="segment__item" role="tab" type="button" id="tab-access" aria-selected="false" data-tab="access"   data-i18n="panel_access">Доступ</button>
+            </div>
+        </div>
+        <div class="sheet__body" data-body role="tabpanel" id="panelBody" aria-labelledby="tab-media"></div>
+        <div class="sheet__foot">
+            <button class="btn btn--danger" type="button" data-delete>
+                <svg data-icon="trash"></svg><span data-i18n="delete">Удалить</span></button>
+            <span class="spacer"></span>
+            <button class="btn btn--primary" type="button" data-close data-i18n="panel_close">Готово</button>
+        </div>
+    </div>
+</template>
+
+
+<!-- ============================================================
+     ДИАЛОГ СОЗДАНИЯ ССЫЛКИ
+     ============================================================ -->
+<template id="tplCreate">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="createTitle">
+        <h2 class="dialog__title" id="createTitle" data-i18n="create_title">Новая ссылка</h2>
+        <p class="dialog__text" data-i18n="create_hint">Латиница, цифры, дефис и подчёркивание — до 64 символов.</p>
+        <div class="dialog__body">
+            <label class="field-label" for="createInput" data-i18n="create_label">ID ссылки</label>
+            <div class="field field--plain field--lg has-value">
+                <span class="url-line__host" id="createHost"></span>
+                <input id="createInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+                       maxlength="64" pattern="[a-zA-Z0-9_\-]+" data-i18n-placeholder="create_placeholder"
+                       placeholder="tv-lobby">
+            </div>
+            <p class="field-hint" id="createHint"></p>
+        </div>
+        <div class="dialog__foot">
+            <button class="btn" type="button" data-close data-i18n="cancel">Отмена</button>
+            <button class="btn btn--primary" type="button" data-submit data-i18n="create_submit">Создать</button>
+        </div>
+    </div>
+</template>
+
+
+<!-- ============================================================
+     НАСТРОЙКИ: тема, акцент, язык, данные, обслуживание, клавиши
+     ============================================================ -->
+<template id="tplSettings">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" data-sheet>
+        <div class="sheet__grip"></div>
+        <div class="sheet__head">
+            <div class="grow">
+                <div class="eyebrow" data-i18n="settings_appearance">Оформление</div>
+                <h2 class="sheet__title" id="settingsTitle" data-i18n="settings_title">Настройки</h2>
+            </div>
+            <button class="icon-btn" type="button" data-close
+                    data-i18n-aria="close" aria-label="Close"><svg data-icon="x"></svg></button>
+        </div>
+        <div class="sheet__body">
+
+            <div class="section">
+                <div class="section__head"><span class="section__title" data-i18n="theme">Тема</span></div>
+                <div class="segment segment--full" role="radiogroup" aria-label="Theme">
+                    <label class="segment__opt">
+                        <input type="radio" name="theme" value="light" data-theme-opt="light">
+                        <span class="segment__item" data-i18n="theme_light">Светлая</span>
+                    </label>
+                    <label class="segment__opt">
+                        <input type="radio" name="theme" value="dark" data-theme-opt="dark">
+                        <span class="segment__item" data-i18n="theme_dark">Тёмная</span>
+                    </label>
+                    <label class="segment__opt">
+                        <input type="radio" name="theme" value="auto" data-theme-opt="auto" checked>
+                        <span class="segment__item" data-i18n="theme_auto">Как в системе</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section__head">
+                    <span class="section__title" id="paletteLabel" data-i18n="palette">Акцент</span>
+                    <span class="label num" id="paletteName"></span>
+                </div>
+                <div class="swatches" role="radiogroup" aria-labelledby="paletteLabel" id="paletteRow"></div>
+            </div>
+
+            <div class="section">
+                <div class="section__head"><span class="section__title" data-i18n="settings_language">Язык</span></div>
+                <select class="select select--block" id="langSelect" aria-label="Language"></select>
+            </div>
+
+            <div class="section">
+                <div class="section__head"><span class="section__title" data-i18n="settings_data">Данные</span></div>
+                <div class="stack stack--tight">
+                    <button class="menu__item" type="button" data-act="export" id="exportBtn">
+                        <svg data-icon="download"></svg><span data-i18n="export_json">Экспорт списка ссылок</span></button>
+                    <button class="menu__item" type="button" data-act="import" id="importBtn">
+                        <svg data-icon="upload"></svg><span data-i18n="import_json">Импорт списка ссылок</span></button>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section__head"><span class="section__title" data-i18n="settings_maintenance">Обслуживание</span></div>
+                <div class="stack stack--tight">
+                    <button class="menu__item" type="button" data-act="regen" id="regenPreviewsBtn">
+                        <svg data-icon="refresh"></svg><span data-i18n="regen_previews">Перегенерировать превью</span></button>
+                    <button class="menu__item" type="button" data-act="install" id="installBtn" hidden>
+                        <svg data-icon="download"></svg><span data-i18n="install_app">Установить приложение</span></button>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section__head"><span class="section__title" data-i18n="settings_shortcuts">Горячие клавиши</span></div>
+                <div class="stack stack--tight" id="shortcutList"></div>
+            </div>
+
+        </div>
+        <div class="sheet__foot">
+            <span class="spacer"></span>
+            <button class="btn btn--primary" type="button" data-close data-i18n="close">Закрыть</button>
+        </div>
+    </div>
+</template>
+
+
+<!-- ============================================================
+     МЕДИА ПО ССЫЛКЕ (URL)
+     Адрес проверяется до отправки: сервер скачивает файл сам, и
+     ошибку лучше увидеть здесь, а не после загрузки.
+     ============================================================ -->
+<template id="tplUrl">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="urlTitle">
+        <h2 class="dialog__title" id="urlTitle" data-i18n="upload_url">По ссылке (URL)</h2>
+        <p class="dialog__text" data-i18n="url_hint">Сервер скачает файл сам. Годится прямая ссылка на картинку или видео.</p>
+        <div class="dialog__body">
+            <label class="field-label" for="urlInput" data-i18n="url_label">Адрес файла</label>
+            <div class="field field--plain field--lg has-value">
+                <input id="urlInput" type="url" inputmode="url" autocomplete="off" spellcheck="false"
+                       placeholder="https://…" aria-describedby="urlStatus">
+            </div>
+            <p class="field-hint" id="urlStatus" role="status"></p>
+        </div>
+        <div class="dialog__foot">
+            <button class="btn" type="button" data-close data-i18n="cancel">Отмена</button>
+            <button class="btn btn--primary" type="button" data-submit disabled data-i18n="url_submit">Загрузить</button>
+        </div>
+    </div>
+</template>
+
+
+<!-- ============================================================
+     ФАЙЛЫ НА СЕРВЕРЕ
+     Вместо загрузки с телефона можно взять уже лежащий на сервере
+     файл — он копируется в ссылку.
+     ============================================================ -->
+<template id="tplServer">
+    <div class="sheet sheet--picker" role="dialog" aria-modal="true" aria-labelledby="serverTitle" data-sheet>
+        <div class="sheet__grip"></div>
+        <div class="sheet__head">
+            <div class="grow">
+                <div class="eyebrow" data-i18n="upload_server">Из галереи сервера</div>
+                <h2 class="sheet__title" id="serverTitle" data-i18n="server_title">Файлы на сервере</h2>
+                <div class="sheet__sub" data-i18n="server_hint">Файл будет скопирован в ссылку</div>
+            </div>
+            <button class="icon-btn" type="button" data-close
+                    data-i18n-aria="close" aria-label="Close">
+                <svg data-icon="x"></svg>
+            </button>
+        </div>
+        <div class="sheet__body">
+            <div class="field">
+                <svg class="field__icon" data-icon="search"></svg>
+                <input id="serverFilter" type="search" autocomplete="off" spellcheck="false"
+                       data-i18n-placeholder="server_filter" placeholder="Имя файла"
+                       data-i18n-aria="server_filter" aria-label="File name">
+            </div>
+            <div class="picker" id="serverList"></div>
+            <p class="field-hint is-hidden" id="serverEmpty" data-i18n="nothing_found">Ничего не найдено</p>
+        </div>
+    </div>
+</template>
+
+
+<!-- ============================================================
+     ПОДТВЕРЖДЕНИЕ
+     ============================================================ -->
+<template id="tplConfirm">
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+        <h2 class="dialog__title" id="confirmTitle">Удалить ссылку?</h2>
+        <p class="dialog__text" data-text></p>
+        <div class="dialog__foot">
+            <button class="btn" type="button" data-close data-i18n="cancel">Отмена</button>
+            <button class="btn btn--primary" type="button" data-confirm data-i18n="delete">Удалить</button>
+        </div>
+    </div>
+</template>
+
+
+<script src="/static/js/settings-menu.js" defer></script>
+<script src="/static/js/compressor.js" defer></script>
+<script src="/static/js/app.js" defer></script>
+<script src="/static/js/export-import.js" defer></script>
 </body>
 </html>

@@ -1,2352 +1,2627 @@
-// SPDX-License-Identifier: MIT
-/**
- * Lanpaper Frontend Logic
- * Handles UI interactions, API calls, and state management.
- */
+/* SPDX-License-Identifier: MIT */
+/* ============================================================
+   LANPAPER 2.0 — логика панели.
 
+   Порт макета design/v2/app.js: разметка, классы и состояния те же,
+   источник данных — настоящее API. Ручки, формат ответов и правила
+   проверки здесь ровно те же, что у сервера: панель не должна
+   предлагать имя, которое сервер отвергнет, и не должна показывать
+   состояние, которого нет.
+   ============================================================ */
+(function () {
+    'use strict';
 
-// STATE & CONFIG
-// Declared once in settings-menu.js, which loads first.
-const SUPPORTED_LANGS = new Set(window.LANPAPER_LANGS || ['en']);
-const STATE = {
-    translations: {},
-    lang: localStorage.getItem('lang') || navigator.language.slice(0, 2) || 'en',
-    isDark: false,
-    viewMode: localStorage.getItem('viewMode') || 'list',
-    searchQuery: '',
-    sortBy: 'date_desc',
-    wallpapers: [],
-    filteredWallpapers: [],
-    compressor: null,
-    lazyObserver: null,
-    compressionConfig: null,
-    isDebug: false,
-    createPending: false,
-};
+    /* ========================================================
+       1. МЕЛОЧИ: выборка, создание узлов, формат значений
+       ======================================================== */
+    const $ = (sel, root) => (root || document).querySelector(sel);
+    const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 
-
-// DOM ELEMENTS
-const DOM = {
-    themeBtn: document.getElementById('themeToggle'),
-    viewBtn: document.getElementById('viewToggle'),
-    linksList: document.getElementById('linksList'),
-    emptyState: document.getElementById('emptyState'),
-    toastContainer: document.getElementById('toastContainer'),
-    searchInput: document.getElementById('searchInput'),
-    searchStats: document.getElementById('searchStats'),
-    sortSelect: document.getElementById('sortSelect'),
-    appVersion: document.getElementById('appVersion'),
-
-    modalOverlay: document.getElementById('modalOverlay'),
-    modalTitle: document.getElementById('modalTitle'),
-    modalInput: document.getElementById('modalInput'),
-    modalList: document.getElementById('modalList'),
-    modalCancel: document.getElementById('modalCancelBtn'),
-    modalConfirm: document.getElementById('modalConfirmBtn'),
-
-    confirmOverlay: document.getElementById('confirmOverlay'),
-    confirmTitle: document.getElementById('confirmTitle'),
-    confirmMessage: document.getElementById('confirmMessage'),
-    confirmCancel: document.getElementById('confirmCancelBtn'),
-    confirmDelete: document.getElementById('confirmDeleteBtn'),
-
-    versionsOverlay: document.getElementById('versionsOverlay'),
-    versionsLinkName: document.getElementById('versionsLinkName'),
-    versionsHint: document.getElementById('versionsHint'),
-    versionsList: document.getElementById('versionsList'),
-    playlistList: document.getElementById('playlistList'),
-    rotateEnabled: document.getElementById('rotateEnabled'),
-    rotateInterval: document.getElementById('rotateInterval'),
-    rotateOrder: document.getElementById('rotateOrder'),
-    rotateSave: document.getElementById('rotateSaveBtn'),
-    statsSection: document.getElementById('statsSection'),
-    statsBody: document.getElementById('statsBody'),
-    versionsClose: document.getElementById('versionsCloseBtn'),
-
-    createInput: document.getElementById('newLinkId'),
-    createForm: document.getElementById('createForm'),
-
-    template: document.getElementById('linkCardTemplate'),
-    dropOverlay: document.getElementById('dropOverlay'),
-};
-
-const log = (...args) => STATE.isDebug && console.log(...args);
-
-// --- Compatibility shims ----------------------------------------------------
-// Small fallbacks for older browsers (Smart-TV WebViews, older Safari) and
-// plain-HTTP LAN deployments. A missing API must never break the whole UI.
-if (typeof window.CSS !== 'object') window.CSS = {};
-if (typeof window.CSS.escape !== 'function') {
-    window.CSS.escape = (s) => String(s).replace(/[^a-zA-Z0-9_-]/g, (c) => '\\' + c);
-}
-
-// navigator.clipboard only exists in secure contexts (HTTPS or localhost).
-// On plain-HTTP LAN deployments (the typical Lanpaper setup) fall back to the
-// legacy execCommand path so "Copy URL" keeps working. The fallback also
-// covers writeText being refused (permission policy, unfocused document).
-function copyToClipboard(text) {
-    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-        return navigator.clipboard.writeText(text).catch(() => legacyCopy(text));
-    }
-    return legacyCopy(text);
-}
-
-function legacyCopy(text) {
-    return new Promise((resolve, reject) => {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.setAttribute('readonly', '');
-        ta.style.position = 'fixed';
-        ta.style.top = '-1000px';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        ta.setSelectionRange(0, ta.value.length);
-        let ok = false;
-        try { ok = document.execCommand('copy'); } catch (_) { ok = false; }
-        ta.remove();
-        ok ? resolve() : reject(new Error('copy failed'));
-    });
-}
-
-function onMediaChange(mql, handler) {
-    if (typeof mql.addEventListener === 'function') mql.addEventListener('change', handler);
-    else if (typeof mql.addListener === 'function') mql.addListener(handler);
-}
-
-window.closeAllDropdowns = function(exceptElement) {
-    const settingsDropdown = document.getElementById('settingsDropdown');
-    const settingsBtn = document.getElementById('settingsBtn');
-    if (settingsDropdown && settingsDropdown !== exceptElement) {
-        settingsDropdown.classList.remove('open');
-        if (settingsBtn) settingsBtn.setAttribute('aria-expanded', 'false');
-    }
-    document.querySelectorAll('.upload-dropdown.open').forEach(dropdown => {
-        if (dropdown !== exceptElement) {
-            dropdown.classList.remove('open');
-            const btn = dropdown.querySelector('.upload-toggle-btn');
-            if (btn) btn.setAttribute('aria-expanded', 'false');
+    function h(tag, props) {
+        const el = document.createElement(tag);
+        const attrs = props || {};
+        for (const key of Object.keys(attrs)) {
+            const val = attrs[key];
+            if (val === null || val === undefined || val === false) continue;
+            if (key === 'class') el.className = val;
+            else if (key === 'text') el.textContent = val;
+            else if (key === 'html') el.innerHTML = val;
+            /* CSSOM, а не атрибут style: панель живёт под CSP без
+               'unsafe-inline', и атрибут браузер бы проигнорировал. */
+            else if (key === 'style') el.style.cssText = val;
+            else if (key.startsWith('on')) el.addEventListener(key.slice(2).toLowerCase(), val);
+            else el.setAttribute(key, val === true ? '' : val);
         }
-    });
-    document.querySelectorAll('.custom-select.open').forEach(select => {
-        if (select !== exceptElement) {
-            select.classList.remove('open');
-            const btn = select.querySelector('.custom-select-btn');
-            if (btn) btn.setAttribute('aria-expanded', 'false');
-        }
-    });
-};
-
-
-// A single delegated listener closes every open dropdown when the user
-// clicks anywhere else. Toggle buttons call stopPropagation(), so opening
-// clicks never reach this; menu item clicks close their own menu.
-function initDropdownCloser() {
-    document.addEventListener('click', (e) => {
-        if (e.target.closest('.upload-dropdown, .custom-select, .settings-dropdown')) return;
-        closeAllDropdowns();
-    });
-}
-
-
-// INITIALIZATION
-// Every step is isolated: one broken API/feature in an exotic browser must
-// never take the rest of the app down with it (in particular the create-link
-// form, which is bound first).
-function safeStep(name, fn) {
-    try {
-        return fn();
-    } catch (e) {
-        console.warn(`[init] ${name} failed:`, e);
-        return undefined;
-    }
-}
-
-async function safeStepAsync(name, fn) {
-    try {
-        return await fn();
-    } catch (e) {
-        console.warn(`[init] ${name} failed:`, e);
-        return undefined;
-    }
-}
-
-function initApp() {
-    // Bind all interactive controls BEFORE anything async so the create form,
-    // modals and dialogs work even if loading data or translations fails.
-    safeStep('listeners', setupGlobalListeners);
-    safeStep('theme', initTheme);
-    safeStep('view', initView);
-    safeStep('search-sort', initSearchSort);
-    safeStep('lazy', initLazyLoading);
-    safeStep('shortcuts', initKeyboardShortcuts);
-    safeStep('dropdown-closer', initDropdownCloser);
-    safeStep('pwa', initPWA);
-    safeStep('drop-zone', setupGlobalDropZone);
-    safeStep('drag-hint', showDragDropHint);
-    safeStep('skeletons', showSkeletons);
-
-    safeStep('launch-action', handleLaunchAction);
-
-    return (async () => {
-        await safeStepAsync('language', initLanguage);
-        await safeStepAsync('compression-config', loadCompressionConfig);
-        safeStep('compression', initCompression);
-        safeStep('app-version', loadAppVersion);
-        await safeStepAsync('links', loadLinks);
-    })();
-}
-
-// PWA shortcut from manifest.json ("Create new link" -> /admin?action=create).
-function handleLaunchAction() {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('action') !== 'create') return;
-    history.replaceState(null, '', window.location.pathname);
-    focusAfterPaint(DOM.createInput);
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    initApp();
-});
-
-
-function initPWA() {
-    if ('serviceWorker' in navigator) {
-        // Keep the root-scoped worker to replace older versions that cached
-        // admin pages and public media. The current worker only caches /static/
-        // assets; admin, API and media requests always go to the network.
-        navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
-        // Remove the legacy worker from versions that registered it under
-        // /static/ where it never actually controlled the app.
-        navigator.serviceWorker.getRegistrations()
-            .then(regs => regs.forEach(r => {
-                if (new URL(r.scope).pathname.replace(/\/+$/, '') === '/static') {
-                    r.unregister();
-                }
-            }))
-            .catch(() => {});
-    }
-
-    // "Install app" entry: shown only while the browser offers installation
-    // (Chrome/Edge desktop & Android). iOS installs via the share sheet.
-    const installBtn = document.getElementById('installBtn');
-    let installEvent = null;
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        installEvent = e;
-        if (installBtn) installBtn.hidden = false;
-    });
-
-    if (installBtn) {
-        installBtn.addEventListener('click', async () => {
-            if (!installEvent) return;
-            installBtn.hidden = true;
-            installEvent.prompt();
-            try {
-                const choice = await installEvent.userChoice;
-                log('[PWA] install outcome:', choice && choice.outcome);
-            } catch (_) {}
-            installEvent = null;
-        });
-    }
-
-    window.addEventListener('appinstalled', () => {
-        if (installBtn) installBtn.hidden = true;
-        installEvent = null;
-        showToast(t('installed', 'App installed'), 'success');
-    });
-}
-
-
-async function loadCompressionConfig() {
-    try {
-        const res = await fetch('/api/compression-config');
-        if (res.ok) STATE.compressionConfig = await res.json();
-    } catch (_) {}
-}
-
-
-// Browser-side JPEG re-encoding only reduces upload size. Dimensions are left
-// to the server, which applies COMPRESSION_SCALE to every upload path (file,
-// URL, server gallery) exactly once. Without the server settings the browser
-// cannot know whether lossless mode is active, so originals are sent as-is.
-function initCompression() {
-    if (typeof ImageCompressor === 'undefined' || !STATE.compressionConfig) return;
-
-    const { quality, scale } = STATE.compressionConfig;
-    if (!Number.isFinite(quality) || !Number.isFinite(scale)) return;
-
-    STATE.compressor = new ImageCompressor({
-        quality: quality / 100,
-        preserveOriginal: quality === 100 && scale === 100
-    });
-    log(`[Compression] ${quality}% quality, ${scale}% scale (applied by the server)`);
-}
-
-
-function initLazyLoading() {
-    if (!('IntersectionObserver' in window)) return;
-
-    STATE.lazyObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const img = entry.target;
-                if (img.dataset.src) {
-                    img.src = img.dataset.src;
-                    img.removeAttribute('data-src');
-                    STATE.lazyObserver.unobserve(img);
-                }
+        for (let i = 2; i < arguments.length; i++) {
+            const kids = [].concat(arguments[i]);
+            for (const kid of kids) {
+                if (kid === null || kid === undefined || kid === false) continue;
+                el.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
             }
-        });
-    // Larger rootMargin for taller mobile cards (160px preview height)
-    }, { rootMargin: '200px 0px', threshold: 0.01 });
-}
-
-
-function initKeyboardShortcuts() {
-    document.addEventListener('keydown', (e) => {
-        // e.target is usually an Element, but can be document in exotic cases
-        // where .matches does not exist.
-        if (e.target && typeof e.target.matches === 'function' && e.target.matches('input, textarea')) return;
-
-        const mod = e.ctrlKey || e.metaKey;
-
-        if (mod && !e.altKey && !e.shiftKey) {
-            switch ((e.key || '').toLowerCase()) {
-                case 'n': e.preventDefault(); DOM.createInput.focus(); return;
-                case 'f':
-                    e.preventDefault();
-                    DOM.searchInput.focus();
-                    DOM.searchInput.select();
-                    return;
-                case 'g': e.preventDefault(); DOM.viewBtn.click(); return;
-            }
-            return;
         }
-
-        if (mod || e.altKey) return;
-
-        if (e.key === 'Escape') {
-            if (!DOM.confirmOverlay.classList.contains('hidden')) {
-                closeConfirm();
-            } else if (!DOM.modalOverlay.classList.contains('hidden')) {
-                closeModal();
-            } else if (DOM.versionsOverlay && !DOM.versionsOverlay.classList.contains('hidden')) {
-                closeVersions();
-            } else if (document.querySelector('.upload-dropdown.open, .custom-select.open, .settings-dropdown.open')) {
-                closeAllDropdowns();
-            } else if (DOM.searchInput.value) {
-                DOM.searchInput.value = '';
-                DOM.searchInput.dispatchEvent(new Event('input'));
-            }
-        } else if (e.key === 't' || e.key === 'T') {
-            DOM.themeBtn.click();
-        }
-    });
-
-    if (!localStorage.getItem('shortcuts-seen')) {
-        setTimeout(() => {
-            showToast(t('shortcuts_hint', 'Shortcuts: Ctrl+N (new), Ctrl+F (search), Ctrl+G (view), T (theme)'), 'info');
-            localStorage.setItem('shortcuts-seen', 'true');
-        }, 2000);
-    }
-}
-
-
-function showDragDropHint() {
-    if (!localStorage.getItem('dragdrop-hint-seen')) {
-        setTimeout(() => {
-            showToast(t('dragdrop_hint', 'Drag & drop files anywhere to upload'), 'info');
-            localStorage.setItem('dragdrop-hint-seen', 'true');
-        }, 4000);
-    }
-}
-
-
-async function loadAppVersion() {
-    try {
-        const res = await fetch('/health');
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.version && DOM.appVersion) DOM.appVersion.textContent = `v${data.version}`;
-    } catch (_) {}
-}
-
-
-// SKELETON LOADING
-function buildSkeletonCard(isGrid) {
-    const card = document.createElement('div');
-    card.className = `skeleton-card ${isGrid ? 'grid-skeleton' : 'list-skeleton'}`;
-    card.setAttribute('aria-hidden', 'true');
-    card.innerHTML = `
-        <div class="skeleton-bone skeleton-preview"></div>
-        <div class="skeleton-info">
-            <div class="skeleton-bone skeleton-title"></div>
-            <div class="skeleton-bone skeleton-meta"></div>
-            <div class="skeleton-bone skeleton-meta-short"></div>
-        </div>
-        <div class="skeleton-actions">
-            <div class="skeleton-bone skeleton-btn"></div>
-            <div class="skeleton-bone skeleton-btn-sq"></div>
-        </div>
-    `;
-    return card;
-}
-
-function showSkeletons(count = 4) {
-    DOM.linksList.innerHTML = '';
-    DOM.emptyState.classList.add('d-none');
-    const isGrid = STATE.viewMode === 'grid';
-    const frag = document.createDocumentFragment();
-    for (let i = 0; i < count; i++) {
-        frag.appendChild(buildSkeletonCard(isGrid));
-    }
-    DOM.linksList.appendChild(frag);
-}
-
-
-// THEME
-function initTheme() {
-    const saved = localStorage.getItem('theme');
-    STATE.isDark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
-    applyTheme();
-
-    onMediaChange(window.matchMedia('(prefers-color-scheme: dark)'), e => {
-        if (!localStorage.getItem('theme')) {
-            STATE.isDark = e.matches;
-            applyTheme();
-        }
-    });
-
-    DOM.themeBtn.addEventListener('click', () => {
-        STATE.isDark = !STATE.isDark;
-        localStorage.setItem('theme', STATE.isDark ? 'dark' : 'light');
-        applyTheme();
-    });
-}
-
-
-function applyTheme() {
-    const isDark = STATE.isDark;
-    document.body.classList.toggle('dark', isDark);
-    // Native form controls and scrollbars follow color-scheme.
-    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
-
-    // One resolved color for the browser UI: media attributes are dropped so
-    // a manual toggle wins over the OS preference from now on.
-    const themeColor = isDark ? '#0b0c10' : '#f3f2f7';
-    document.querySelectorAll('meta[name="theme-color"]').forEach(meta => {
-        meta.removeAttribute('media');
-        meta.content = themeColor;
-    });
-
-    const logo = document.querySelector('.logo');
-    if (logo) logo.src = isDark ? '/static/logo-dark.svg' : '/static/logo.svg';
-
-    // Sun icon shows in light mode, moon in dark mode.
-    DOM.themeBtn.querySelectorAll('.theme-icon').forEach(icon => {
-        icon.classList.toggle('active', (icon.dataset.icon === 'moon') === isDark);
-    });
-
-    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
-}
-
-
-// VIEW
-function initView() {
-    applyViewMode(STATE.viewMode, false);
-    DOM.viewBtn.addEventListener('click', () => {
-        const newMode = STATE.viewMode === 'list' ? 'grid' : 'list';
-        STATE.viewMode = newMode;
-        localStorage.setItem('viewMode', newMode);
-        applyViewMode(newMode, true);
-    });
-}
-
-
-function applyViewMode(mode, animate = false) {
-    updateIconClasses(mode);
-    if (animate) {
-        DOM.linksList.classList.add('switching');
-        setTimeout(() => {
-            updateLayoutClasses(mode);
-            void DOM.linksList.offsetHeight;
-            requestAnimationFrame(() => DOM.linksList.classList.remove('switching'));
-        }, 100);
-    } else {
-        updateLayoutClasses(mode);
-    }
-}
-
-
-function updateIconClasses(mode) {
-    const isGrid = mode === 'grid';
-    DOM.viewBtn.querySelectorAll('.list-icon').forEach(el => el.classList.toggle('active', isGrid));
-    DOM.viewBtn.querySelectorAll('.grid-icon').forEach(el => el.classList.toggle('active', !isGrid));
-}
-
-
-function updateLayoutClasses(mode) {
-    DOM.linksList.classList.toggle('grid-view', mode === 'grid');
-}
-
-
-// LANGUAGE
-async function initLanguage() {
-    await setLanguage(STATE.lang);
-}
-
-window.setLanguage = setLanguage;
-
-async function setLanguage(lang) {
-    // Language can come from localStorage or an imported backup. Never use an
-    // arbitrary value as a same-origin URL path.
-    lang = SUPPORTED_LANGS.has(lang) ? lang : 'en';
-    STATE.lang = lang;
-    localStorage.setItem('lang', lang);
-    document.documentElement.lang = lang;
-
-    try {
-        const res = await fetch(`/static/i18n/${lang}.json`);
-        STATE.translations = res.ok ? await res.json() : {};
-    } catch (_) {
-        STATE.translations = {};
+        return el;
     }
 
-    applyTranslations();
-    syncCustomSelectLabels();
-    updateSearchStats();
-    updateAriaLabels();
-
-    document.querySelectorAll('.lang-option').forEach(opt => {
-        opt.classList.toggle('active', opt.dataset.lang === lang);
-    });
-}
-
-
-function applyTranslations(root = document) {
-    root.querySelectorAll('[data-i18n]').forEach(el => {
-        const key = el.dataset.i18n;
-        if (STATE.translations[key]) el.textContent = STATE.translations[key];
-    });
-    root.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-        const key = el.dataset.i18nPlaceholder;
-        if (STATE.translations[key]) el.placeholder = STATE.translations[key];
-    });
-}
-
-
-function t(key, defaultText) {
-    return STATE.translations[key] || defaultText;
-}
-
-
-function updateAriaLabels() {
-    document.querySelectorAll('[data-i18n-aria]').forEach(el => {
-        const key = el.dataset.i18nAria;
-        if (STATE.translations[key]) el.setAttribute('aria-label', STATE.translations[key]);
-    });
-}
-
-
-// SERVER ERROR TRANSLATION
-function translateServerError(errorText) {
-    // Map known server errors to translation keys
-    const errorMap = {
-        'Link name already taken': 'link_taken',
-        'Link exists': 'link_taken',
-        'Invalid link name': 'invalid_id_chars',
-        'Link not found': 'link_not_found',
-        'Invalid JSON': 'invalid_json',
+    /* Иконки: один спрайт в JS вместо сотни строк разметки */
+    const ICONS = {
+        plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+        search: '<circle cx="11" cy="11" r="7"/><line x1="16.4" y1="16.4" x2="21" y2="21"/>',
+        x: '<line x1="6.5" y1="6.5" x2="17.5" y2="17.5"/><line x1="17.5" y1="6.5" x2="6.5" y2="17.5"/>',
+        check: '<polyline points="20 6.5 9.5 17 4 11.5"/>',
+        grid: '<rect x="3" y="3" width="7.5" height="7.5" rx="1.8"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.8"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.8"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.8"/>',
+        list: '<line x1="8.5" y1="6" x2="21" y2="6"/><line x1="8.5" y1="12" x2="21" y2="12"/><line x1="8.5" y1="18" x2="21" y2="18"/><line x1="3.6" y1="6" x2="3.61" y2="6"/><line x1="3.6" y1="12" x2="3.61" y2="12"/><line x1="3.6" y1="18" x2="3.61" y2="18"/>',
+        sun: '<circle cx="12" cy="12" r="4.2"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.9" y1="4.9" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.1" y2="19.1"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.9" y1="19.1" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.1" y2="4.9"/>',
+        moon: '<path d="M20.5 14.3A8.5 8.5 0 0 1 9.7 3.5a8.6 8.6 0 1 0 10.8 10.8z"/>',
+        gear: '<circle cx="12" cy="12" r="3.1"/><path d="M12 2.6l1 2.3 2.5-.3 1 2.3 2.3 1-.3 2.5 1.6 1.9-1.6 1.9.3 2.5-2.3 1-1 2.3-2.5-.3-1 2.3-1-2.3-2.5.3-1-2.3-2.3-1 .3-2.5L2.6 12l1.6-1.9-.3-2.5 2.3-1 1-2.3 2.5.3z"/>',
+        select: '<path d="M9 4.5H6.5A2 2 0 0 0 4.5 6.5V9"/><path d="M15 4.5h2.5a2 2 0 0 1 2 2V9"/><path d="M9 19.5H6.5a2 2 0 0 1-2-2V15"/><path d="M15 19.5h2.5a2 2 0 0 0 2-2V15"/><polyline points="9 12 11 14 15.5 9.5"/>',
+        more: '<circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/>',
+        copy: '<rect x="9" y="9" width="12" height="12" rx="2.6"/><path d="M15 5.6A2.6 2.6 0 0 0 12.4 3H5.6A2.6 2.6 0 0 0 3 5.6v6.8A2.6 2.6 0 0 0 5.6 15"/>',
+        external: '<path d="M18.5 13.6V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7.5a2 2 0 0 1 2-2h5.4"/><polyline points="14.5 3 21 3 21 9.5"/><line x1="10" y1="14" x2="20.5" y2="3.5"/>',
+        pin: '<path d="M19 21.5l-7-5-7 5V5.5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>',
+        trash: '<polyline points="3.5 6.5 5.5 6.5 20.5 6.5"/><path d="M18.5 6.5l-1 13a2 2 0 0 1-2 1.9H8.5a2 2 0 0 1-2-1.9l-1-13"/><path d="M10 11v6M14 11v6"/><path d="M9 6.5V4.8A1.3 1.3 0 0 1 10.3 3.5h3.4A1.3 1.3 0 0 1 15 4.8v1.7"/>',
+        image: '<rect x="3" y="3" width="18" height="18" rx="3.4"/><circle cx="8.8" cy="9.2" r="1.7"/><path d="M20.5 15.2l-4.3-4.2L6.5 20.8"/>',
+        imageOff: '<rect x="3" y="3" width="18" height="18" rx="3.4"/><line x1="4.5" y1="19.5" x2="19.5" y2="4.5"/>',
+        film: '<rect x="2.5" y="4" width="19" height="16" rx="3"/><line x1="7.5" y1="4" x2="7.5" y2="20"/><line x1="16.5" y1="4" x2="16.5" y2="20"/><line x1="2.5" y1="12" x2="21.5" y2="12"/>',
+        playlist: '<line x1="3.5" y1="7" x2="15" y2="7"/><line x1="3.5" y1="12" x2="15" y2="12"/><line x1="3.5" y1="17" x2="11" y2="17"/><polygon points="17 13.5 22 16.5 17 19.5"/>',
+        folder: '<path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h3.3a2 2 0 0 1 1.6.8l1 1.4h7.1A2.5 2.5 0 0 1 21 9.7V17a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17z"/>',
+        globe: '<circle cx="12" cy="12" r="9"/><path d="M3.2 12h17.6"/><path d="M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/>',
+        lock: '<rect x="4.5" y="10.5" width="15" height="10" rx="2.6"/><path d="M8 10.5V7.6a4 4 0 0 1 8 0v2.9"/>',
+        key: '<circle cx="8" cy="15.5" r="3.6"/><path d="M10.7 12.8L20 3.5"/><path d="M17 4.5l2.5 2.5"/><path d="M14.5 7l2.5 2.5"/>',
+        user: '<circle cx="12" cy="8.2" r="3.9"/><path d="M4.8 20.2a7.4 7.4 0 0 1 14.4 0"/>',
+        refresh: '<polyline points="22 4.5 22 10 16.5 10"/><path d="M20.2 15a8.5 8.5 0 1 1-2-8.8L22 10"/>',
+        rotate: '<polyline points="22 4.5 22 10 16.5 10"/><polyline points="2 19.5 2 14 7.5 14"/><path d="M4.6 9.4a8.5 8.5 0 0 1 14-3.2L22 10"/><path d="M2 14l3.4 3.8A8.5 8.5 0 0 0 19.4 14.6"/>',
+        download: '<path d="M21 15.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3.5"/><polyline points="7.5 10.5 12 15 16.5 10.5"/><line x1="12" y1="15" x2="12" y2="3"/>',
+        upload: '<path d="M21 15.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3.5"/><polyline points="16.5 8 12 3.5 7.5 8"/><line x1="12" y1="3.5" x2="12" y2="15"/>',
+        clock: '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12.3 15.4 14.3"/>',
+        pencil: '<path d="M4 20.2h4.2L19.5 8.8a2.9 2.9 0 0 0-4.1-4.1L4 16z"/><line x1="14.2" y1="6.5" x2="17.6" y2="9.9"/>',
+        sliders: '<line x1="4" y1="8.5" x2="20" y2="8.5"/><line x1="4" y1="15.5" x2="20" y2="15.5"/><circle cx="9" cy="8.5" r="2.3"/><circle cx="15" cy="15.5" r="2.3"/>',
+        info: '<circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16.5"/><line x1="12" y1="7.6" x2="12.01" y2="7.6"/>',
+        alert: '<circle cx="12" cy="12" r="9"/><line x1="12" y1="7.6" x2="12" y2="13.2"/><line x1="12" y1="16.4" x2="12.01" y2="16.4"/>',
+        play: '<path d="M7.5 4.8l11.5 7.2-11.5 7.2z"/>',
+        palette: '<path d="M12 3.2c5 0 8.8 3.4 8.8 7.6 0 2.6-2 3.8-3.6 3.8h-1.6a1.9 1.9 0 0 0-1.4 3.2c.5.6.2 1.6-.7 2a6 6 0 0 1-2.3.4c-4.6 0-8.4-3.8-8.4-8.4S7.4 3.2 12 3.2z"/><circle cx="8.4" cy="10.2" r="1.2"/><circle cx="12" cy="8" r="1.2"/><circle cx="15.6" cy="10.2" r="1.2"/>',
+        github: '<path d="M12 2C6.5 2 2 6.6 2 12.2c0 4.5 2.9 8.3 6.8 9.6.5.1.7-.2.7-.5v-1.9c-2.8.6-3.4-1.2-3.4-1.2-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.9.8.1-.7.4-1.1.6-1.4-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.7 1a9.3 9.3 0 0 1 5 0c1.9-1.3 2.7-1 2.7-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.4 4.7-4.6 5 .4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5A10.2 10.2 0 0 0 22 12.2C22 6.6 17.5 2 12 2z"/>'
     };
-
-    const key = errorMap[errorText];
-    return key ? t(key, errorText) : errorText;
-}
-
-
-// SEARCH & SORT
-function initSearchSort() {
-    if (!DOM.searchInput) return;
-
-    STATE.searchQuery = localStorage.getItem('searchQuery') || '';
-    STATE.sortBy = localStorage.getItem('sortBy') || 'date_desc';
-    DOM.searchInput.value = STATE.searchQuery;
-    if (DOM.sortSelect) DOM.sortSelect.value = STATE.sortBy;
-
-    let timer;
-    DOM.searchInput.addEventListener('input', (e) => {
-        clearTimeout(timer);
-        timer = setTimeout(() => {
-            STATE.searchQuery = e.target.value.toLowerCase().trim();
-            localStorage.setItem('searchQuery', STATE.searchQuery);
-            filterAndSort();
-        }, 250);
-    });
-
-    if (DOM.sortSelect) {
-        DOM.sortSelect.addEventListener('change', (e) => {
-            STATE.sortBy = e.target.value;
-            localStorage.setItem('sortBy', STATE.sortBy);
-            filterAndSort();
-        });
-    }
-
-    // Clickable counter to reset search
-    if (DOM.searchStats) {
-        DOM.searchStats.addEventListener('click', () => {
-            if (STATE.searchQuery) {
-                DOM.searchInput.value = '';
-                STATE.searchQuery = '';
-                localStorage.setItem('searchQuery', '');
-                filterAndSort();
-                showToast(t('search_reset', 'Search cleared'), 'info');
-            }
-        });
-    }
-
-    initCustomSelect();
-}
-
-
-function initCustomSelect() {
-    const customSelect = document.getElementById('customSortSelect');
-    if (!customSelect) return;
-
-    const btn = customSelect.querySelector('.custom-select-btn');
-    const label = document.getElementById('customSortLabel');
-    const options = customSelect.querySelectorAll('.custom-select-option');
-
-    syncCustomSelectLabels();
-
-    btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const isOpen = customSelect.classList.contains('open');
-        if (!isOpen) closeAllDropdowns(customSelect);
-        customSelect.classList.toggle('open', !isOpen);
-        btn.setAttribute('aria-expanded', String(!isOpen));
-    });
-
-    options.forEach(opt => {
-        opt.addEventListener('click', () => {
-            const val = opt.dataset.value;
-            options.forEach(o => o.classList.remove('selected'));
-            opt.classList.add('selected');
-            if (label) label.textContent = opt.textContent;
-            customSelect.classList.remove('open');
-            btn.setAttribute('aria-expanded', 'false');
-            if (DOM.sortSelect) DOM.sortSelect.value = val;
-            STATE.sortBy = val;
-            localStorage.setItem('sortBy', val);
-            filterAndSort();
-        });
-    });
-}
-
-
-function syncCustomSelectLabels() {
-    const customSelect = document.getElementById('customSortSelect');
-    if (!customSelect) return;
-
-    const label = document.getElementById('customSortLabel');
-    const options = customSelect.querySelectorAll('.custom-select-option');
-
-    options.forEach(opt => {
-        const i18nKey = opt.dataset.i18n;
-        if (i18nKey && STATE.translations[i18nKey]) opt.textContent = STATE.translations[i18nKey];
-        const isSelected = opt.dataset.value === STATE.sortBy;
-        opt.classList.toggle('selected', isSelected);
-        if (isSelected && label) label.textContent = opt.textContent;
-    });
-}
-
-
-function filterWallpapers() {
-    if (!STATE.searchQuery) {
-        STATE.filteredWallpapers = [...STATE.wallpapers];
-        return;
-    }
-    const query = STATE.searchQuery;
-    const typeQuery = query.replace(/^\./, '');
-    STATE.filteredWallpapers = STATE.wallpapers.filter(wp => {
-        const name = (wp.linkName || wp.id || '').toLowerCase();
-        // "Search by file": a file type such as "png" or ".mp4" also matches.
-        const type = (wp.mimeType || '').toLowerCase();
-        return name.includes(query) || (type !== '' && type === typeQuery);
-    });
-}
-
-
-function sortWallpapers(list) {
-    const sortFns = {
-        name_asc:  (a, b) => (a.linkName || '').localeCompare(b.linkName || ''),
-        name_desc: (a, b) => (b.linkName || '').localeCompare(a.linkName || ''),
-        date_desc: (a, b) => (b.createdAt || 0) - (a.createdAt || 0),
-        date_asc:  (a, b) => (a.createdAt || 0) - (b.createdAt || 0),
-    };
-    const sortFn = sortFns[STATE.sortBy] || sortFns.date_desc;
-    return [...list].sort((a, b) => {
-        if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
-        return sortFn(a, b);
-    });
-}
-
-
-function filterAndSort() {
-    filterWallpapers();
-    STATE.filteredWallpapers = sortWallpapers(STATE.filteredWallpapers);
-    updateSearchStats();
-    renderLinks(STATE.filteredWallpapers);
-}
-
-
-function updateSearchStats() {
-    if (!DOM.searchStats) return;
-    const total = STATE.wallpapers.length;
-    const shown = STATE.filteredWallpapers.length;
-
-    // Make counter clickable when filtered
-    const isFiltered = STATE.searchQuery !== '';
-    DOM.searchStats.classList.toggle('clickable', isFiltered);
-
-    if (isFiltered) {
-        const tpl = t('search_found', 'Found {{shown}} of {{total}}');
-        DOM.searchStats.textContent = tpl.replace('{{shown}}', shown).replace('{{total}}', total);
-        DOM.searchStats.title = t('click_to_reset', 'Click to reset search');
-    } else {
-        const tpl = t('search_total', 'Total: {{total}}');
-        DOM.searchStats.textContent = tpl.replace('{{total}}', total);
-        DOM.searchStats.title = '';
-    }
-}
-
-
-// ============================================================
-// GLOBAL DRAG & DROP
-// ============================================================
-function sanitizeLinkName(filename) {
-    // Remove extension
-    let name = filename.replace(/\.[^.]+$/, '');
-    // Replace non-alphanumeric with hyphens
-    name = name.replace(/[^a-zA-Z0-9]+/g, '-');
-    // Trim hyphens
-    name = name.replace(/^-+|-+$/g, '');
-    // Lowercase
-    name = name.toLowerCase();
-    // Max length
-    return name.slice(0, 64);
-}
-
-function showDropOverlay() {
-    if (DOM.dropOverlay) DOM.dropOverlay.classList.remove('hidden');
-}
-
-function hideDropOverlay() {
-    if (DOM.dropOverlay) DOM.dropOverlay.classList.add('hidden');
-}
-
-function setupGlobalDropZone() {
-    let dragCounter = 0;
-
-    document.body.addEventListener('dragenter', (e) => {
-        if (e.target.closest('.link-card')) return;
-        dragCounter++;
-        if (dragCounter === 1) showDropOverlay();
-    });
-
-    document.body.addEventListener('dragleave', (e) => {
-        if (e.target.closest('.link-card')) return;
-        dragCounter--;
-        if (dragCounter === 0) hideDropOverlay();
-    });
-
-    document.body.addEventListener('dragover', (e) => {
-        if (e.target.closest('.link-card')) return;
-        e.preventDefault();
-    });
-
-    document.body.addEventListener('drop', async (e) => {
-        if (e.target.closest('.link-card')) return;
-        e.preventDefault();
-        dragCounter = 0;
-        hideDropOverlay();
-
-        const files = Array.from(e.dataTransfer.files);
-        if (!files.length) return;
-
-        for (const file of files) {
-            await createAndUpload(file);
-        }
-    });
-}
-
-async function createAndUpload(file) {
-    const linkName = sanitizeLinkName(file.name);
-    
-    if (!linkName) {
-        showToast(t('invalid_id', 'Invalid filename'), 'error');
-        return;
-    }
-
-    // Check if file is valid image/video
-    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-        showToast(t('invalid_image', 'Invalid file format'), 'error');
-        return;
-    }
-
-    try {
-        // Step 1: Create link
-        await apiCall('/api/link', 'POST', { linkName });
-
-        // Step 2: Upload file
-        const formData = new FormData();
-        formData.append('linkName', linkName);
-
-        // Compress if image
-        let fileToUpload = file;
-        if (STATE.compressor && file.type.startsWith('image/')) {
-            const originalSize = file.size;
-            try {
-                fileToUpload = await STATE.compressor.compress(file);
-                if (fileToUpload.size < originalSize) {
-                    const info = ImageCompressor.getCompressionInfo(originalSize, fileToUpload.size);
-                    const msg = t('compression_saved', 'Compressed: {{percent}}% smaller ({{saved}} saved)')
-                        .replace('{{percent}}', info.percent)
-                        .replace('{{saved}}', formatSize(info.saved));
-                    showToast(msg, 'success');
-                }
-            } catch (_) {
-                fileToUpload = file;
-            }
-        }
-
-        formData.append('file', fileToUpload);
-        await apiCall('/api/upload', 'POST', formData, true);
-
-        const msg = t('link_created_uploaded', 'Created "{{name}}" and uploaded')
-            .replace('{{name}}', linkName);
-        showToast(msg, 'success');
-
-        // Refresh list
-        await loadLinks();
-    } catch (_) {
-        // Error already shown by apiCall
-    }
-}
-
-
-// TOASTS
-const TOAST_ICONS = {
-    success: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
-    error:   `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
-    info:    `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
-};
-
-const MAX_TOASTS = 4;
-
-function showToast(message, type = 'success') {
-    // Keep the stack short: a burst of errors must not flood the screen.
-    while (DOM.toastContainer.children.length >= MAX_TOASTS) {
-        DOM.toastContainer.firstElementChild.remove();
-    }
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    const icon = TOAST_ICONS[type] || TOAST_ICONS.info;
-    // Build DOM nodes instead of innerHTML so server/user text cannot inject HTML.
-    const iconEl = document.createElement('div');
-    iconEl.className = 'toast-icon';
-    iconEl.innerHTML = icon; // icons are static trusted SVG constants only
-    const contentEl = document.createElement('div');
-    contentEl.className = 'toast-content';
-    contentEl.textContent = message;
-    toast.appendChild(iconEl);
-    toast.appendChild(contentEl);
-    DOM.toastContainer.appendChild(toast);
-    setTimeout(() => {
-        toast.classList.add('hiding');
-        setTimeout(() => toast.remove(), 320);
-    }, 3000);
-}
-
-
-// Focus management: keep Tab inside an open dialog and restore focus to
-// the element that opened it when the dialog closes.
-let lastFocused = null;
-
-function trapFocus(overlay, e) {
-    const focusables = overlay.querySelectorAll('button, input, select, a[href], [tabindex]:not([tabindex="-1"])');
-    if (!focusables.length) return;
-    const first = focusables[0];
-    const last = focusables[focusables.length - 1];
-    if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-    }
-}
-
-function openDialog(overlay) {
-    lastFocused = document.activeElement;
-    overlay.classList.remove('hidden');
-    overlay.setAttribute('aria-hidden', 'false');
-}
-
-// Focus on open: do it immediately and again after the first painted frame.
-// Some engines ignore focus() while the unhide transition is starting;
-// others (headless shells) may never run the deferred call. Together the
-// two attempts cover both worlds and are harmless when both run.
-function focusAfterPaint(el) {
-    if (!el) return;
-    const tryFocus = () => { try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); } };
-    tryFocus();
-    requestAnimationFrame(tryFocus);
-}
-
-function closeDialog(overlay) {
-    overlay.classList.add('hidden');
-    overlay.setAttribute('aria-hidden', 'true');
-    if (lastFocused && document.contains(lastFocused)) {
-        try { lastFocused.focus(); } catch (_) {}
-    }
-    lastFocused = null;
-}
-
-
-// CONFIRM MODAL
-let confirmResolve = null;
-
-function showConfirm(message) {
-    return new Promise((resolve) => {
-        confirmResolve = resolve;
-        if (DOM.confirmMessage) DOM.confirmMessage.textContent = message;
-        openDialog(DOM.confirmOverlay);
-        focusAfterPaint(DOM.confirmDelete);
-    });
-}
-
-function closeConfirm(result = false) {
-    closeDialog(DOM.confirmOverlay);
-    if (confirmResolve) confirmResolve(result);
-    confirmResolve = null;
-}
-
-
-// MODAL
-let modalResolve = null;
-
-function showModal(type, titleKey, placeholderKey = '') {
-    return new Promise((resolve) => {
-        modalResolve = resolve;
-        DOM.modalTitle.textContent = t(titleKey, t('modal_default_title', 'Input'));
-        openDialog(DOM.modalOverlay);
-        DOM.modalInput.value = '';
-        DOM.modalInput.classList.add('d-none');
-        DOM.modalList.innerHTML = '';
-        DOM.modalList.classList.add('hidden');
-        DOM.modalConfirm.onclick = null;
-
-        if (type === 'input') {
-            DOM.modalInput.classList.remove('d-none');
-            DOM.modalInput.placeholder = placeholderKey ? t(placeholderKey, 'https://...') : t('url_placeholder', 'https://...');
-            focusAfterPaint(DOM.modalInput);
-            DOM.modalInput.onkeydown = (e) => { if (e.key === 'Enter') confirmModal(); };
-        } else if (type === 'grid') {
-            DOM.modalList.classList.remove('hidden');
-            loadExternalImages();
-        }
-
-        DOM.modalCancel.onclick = closeModal;
-        DOM.modalConfirm.onclick = confirmModal;
-    });
-}
-
-
-function closeModal() {
-    closeDialog(DOM.modalOverlay);
-    if (modalResolve) modalResolve(null);
-    modalResolve = null;
-}
-
-
-function confirmModal() {
-    let result = !DOM.modalInput.classList.contains('d-none')
-        ? DOM.modalInput.value.trim()
-        : DOM.modalList.querySelector('.selected')?.dataset.value;
-
-    if (result) {
-        closeDialog(DOM.modalOverlay);
-        if (modalResolve) modalResolve(result);
-        modalResolve = null;
-    } else {
-        DOM.modalInput.classList.add('shake');
-        setTimeout(() => DOM.modalInput.classList.remove('shake'), 300);
-    }
-}
-
-
-function showModalListMessage(text, variant = '') {
-    const message = document.createElement('div');
-    message.className = `modal-list-msg ${variant}`.trim();
-    message.textContent = text;
-    DOM.modalList.replaceChildren(message);
-}
-
-async function loadExternalImages() {
-    showModalListMessage(t('loading', 'Loading...'));
-    try {
-        const res = await fetch('/api/external-images');
-        if (!res.ok) throw new Error('Failed');
-        const files = await res.json();
-
-        if (!files?.length) {
-            showModalListMessage(t('server_empty', 'No images found'), 'muted');
-            return;
-        }
-
-        DOM.modalList.innerHTML = '';
-        const frag = document.createDocumentFragment();
-        files.forEach(file => {
-            const div = document.createElement('div');
-            div.className = 'image-option';
-            div.dataset.value = file;
-            const previewUrl = `/api/external-image-preview?path=${encodeURIComponent(file)}`;
-            const nameEl = document.createElement('div');
-            nameEl.className = 'image-name';
-            nameEl.textContent = file;
-            const isVid = /\.(mp4|webm)$/i.test(file);
-            let media;
-            if (isVid) {
-                // Metadata only: shows the first frame without downloading the video.
-                media = document.createElement('video');
-                media.muted = true;
-                media.playsInline = true;
-                media.preload = 'metadata';
-                media.setAttribute('aria-label', file);
+    const FILLED = new Set(['play', 'more', 'github', 'pin']);
+
+    function hydrateIcons(root) {
+        $$('svg[data-icon]', root || document).forEach(function (svg) {
+            if (svg.dataset.hydrated) return;
+            const path = ICONS[svg.dataset.icon];
+            if (!path) return;
+            svg.setAttribute('viewBox', '0 0 24 24');
+            if (FILLED.has(svg.dataset.icon)) {
+                svg.setAttribute('fill', 'currentColor');
             } else {
-                media = document.createElement('img');
-                media.alt = file;
+                svg.setAttribute('fill', 'none');
+                svg.setAttribute('stroke', 'currentColor');
+                svg.setAttribute('stroke-width', '1.7');
+                svg.setAttribute('stroke-linecap', 'round');
+                svg.setAttribute('stroke-linejoin', 'round');
             }
-            media.className = 'lazy-image-fade';
-            const format = (file.split('.').pop() || '').toLowerCase();
-            const markLoaded = () => {
-                if (media.dataset.src) return; // lazy placeholder, not the file
-                media.classList.add('loaded');
-                applyPreviewFit(div, media, format, GALLERY_FRAME);
-            };
-            media.addEventListener(isVid ? 'loadeddata' : 'load', markLoaded);
-            if (STATE.lazyObserver) {
-                media.dataset.src = previewUrl;
-                if (!isVid) media.src = LAZY_PLACEHOLDER;
-                STATE.lazyObserver.observe(media);
-            } else {
-                media.src = previewUrl;
-                markLoaded();
-            }
-            div.appendChild(media);
-            div.appendChild(nameEl);
-            div.onclick = () => {
-                DOM.modalList.querySelectorAll('.image-option').forEach(el => el.classList.remove('selected'));
-                div.classList.add('selected');
-            };
-            frag.appendChild(div);
+            svg.setAttribute('aria-hidden', 'true');
+            svg.setAttribute('focusable', 'false');
+            svg.innerHTML = path;
+            svg.dataset.hydrated = '1';
         });
-        DOM.modalList.appendChild(frag);
-    } catch (_) {
-        showModalListMessage(t('server_error', 'Error loading images'), 'error');
     }
-}
-
-
-// API
-async function apiCall(url, method = 'GET', body = null, isFormData = false) {
-    const options = {
-        method,
-        // Explicit credentials: WebKit historically omits HTTP-auth on fetch
-        // without this, which would surface as spurious 401s.
-        credentials: 'same-origin',
-        headers: isFormData ? {} : { 'Content-Type': 'application/json' }
+    const icon = (name, cls) => {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.dataset.icon = name;
+        if (cls) svg.setAttribute('class', cls);
+        return svg;
     };
-    if (body) options.body = isFormData ? body : JSON.stringify(body);
-    try {
-        const res = await fetch(url, options);
+
+    /* Банк значений, которые не переживают перезагрузку: сейчас это
+       компрессор изображений (создаётся один раз, после ответа
+       /api/compression-config). */
+    const STATE = { compressor: null };
+
+    /* Форматирование */
+    const UNIT_KEYS = ['unit_b', 'unit_kb', 'unit_mb', 'unit_gb'];
+    function formatBytes(bytes) {
+        if (!bytes) return '—';
+        let i = 0;
+        let v = bytes;
+        while (v >= 1024 && i < UNIT_KEYS.length - 1) { v /= 1024; i++; }
+        const digits = v < 10 && i > 0 ? 1 : 0;
+        /* Разделитель разрядов — по языку: в русском запятая, в английском
+           точка. Число форматируем Intl, единицу берём из словаря. */
+        const value = i === 0 ? String(Math.round(v)) : fmt(state.lang).num.format(Number(v.toFixed(digits)));
+        return value + ' ' + t(UNIT_KEYS[i]);
+    }
+    function formatDuration(sec) {
+        if (!sec) return '';
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return m + ':' + String(s).padStart(2, '0');
+    }
+    /* Интервал ротации в человеческом виде: секунды — до минуты,
+       минуты — до часа, дальше часы. Сырые 900 с ничего не говорят. */
+    function formatInterval(sec) {
+        const s = Math.max(5, Math.round(sec));
+        if (s < 60) return s + ' ' + t('unit_sec');
+        if (s < 3600) return Math.round(s / 60) + ' ' + t('unit_min');
+        const h = s / 3600;
+        return (h < 10 ? h.toFixed(1).replace('.', ',') : Math.round(h)) + ' ' + t('unit_hour');
+    }
+    /* Форматтеры Intl дорого СОЗДАВАТЬ, а не использовать: на 12 карточках
+       их набиралось 16 штук на каждую перерисовку (замер: 320 созданий на
+       20 перерисовок). Держим по одному на язык — ключ кеша и есть язык,
+       поэтому сбрасывать при смене языка ничего не нужно. */
+    const FMT = {};
+    function fmt(lang) {
+        if (!FMT[lang]) {
+            const ru = lang === 'ru';
+            FMT[lang] = {
+                date: new Intl.DateTimeFormat(ru ? 'ru-RU' : 'en-GB', { day: 'numeric', month: 'short' }),
+                rtf: new Intl.RelativeTimeFormat(ru ? 'ru' : 'en', { numeric: 'auto' }),
+                num: new Intl.NumberFormat(ru ? 'ru-RU' : 'en-US')
+            };
+        }
+        return FMT[lang];
+    }
+    function formatDate(ts) {
+        return fmt(state.lang).date.format(new Date(ts * 1000));
+    }
+    function formatRelative(ts) {
+        const diff = Math.floor(Date.now() / 1000 - ts);
+        const rtf = fmt(state.lang).rtf;
+        if (diff < 90) return rtf.format(-Math.max(1, Math.round(diff / 60)), 'minute');
+        if (diff < 3600 * 22) return rtf.format(-Math.round(diff / 3600), 'hour');
+        if (diff < 86400 * 6) return rtf.format(-Math.round(diff / 86400), 'day');
+        return formatDate(ts);
+    }
+    const num = (n) => fmt(state.lang).num.format(n);
+
+    /* Узкий экран: на телефоне строка списка слишком коротка для отдельного
+       переключателя доступа — там о доступе говорит метка на карточке. */
+    function isPhone() { return window.matchMedia('(max-width: 720px)').matches; }
+
+    function sanitizeId(name) {
+        return name.replace(/\.[a-z0-9]+$/i, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9_-]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 64) || 'link';
+    }
+
+    /* ========================================================
+       2. СОСТОЯНИЕ
+       ======================================================== */
+    const STORE_KEY = 'lp-ui';
+    const LANGS = Array.isArray(window.LANPAPER_LANGS) && window.LANPAPER_LANGS.length
+        ? window.LANPAPER_LANGS.slice()
+        : ['en'];
+    const THEME_MODES = ['light', 'dark', 'auto'];
+    /* Ключи сортировки совпадают с тем, что принимает /api/wallpapers
+       (sort=name|date|size), поэтому смена порции на серверную ничего
+       не сломает. */
+    const SORT_KEYS = ['name_asc', 'name_desc', 'date_desc', 'date_asc', 'size_desc'];
+    /* Имена, которые сервер считает занятыми всегда (см. utils/link.go):
+       панель обязана проверять то же самое, иначе предложит имя, на
+       котором запрос упадёт. */
+    const RESERVED_NAMES = ['api', 'admin', 'static', 'external', 'data', 'health',
+        'sw.js', 'favicon.ico', 'robots.txt', 'sitemap.xml', 'manifest.json',
+        'manifest.webmanifest'];
+    /* Правило сервера: латиница или цифра в начале, дальше цифры, латиница,
+       дефис и подчёркивание; длина 1–64. Составляется из той же строки, что
+       в utils/link.go, чтобы правила не разъехались. */
+    const LINK_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/;
+    function validLinkName(name) {
+        return LINK_NAME_RE.test(name) && RESERVED_NAMES.indexOf(name.toLowerCase()) < 0;
+    }
+    /* Порция рендера: список из сотен ссылок не рисуем целиком — сначала
+       первая порция, остальное по кнопке. Это самая дорогая часть работы
+       (кадр + картинка + слушатели на каждую карточку). */
+    const CHUNK = 12;
+
+    const state = {
+        links: [],
+        dict: {},               /* строки текущего языка из /static/i18n */
+        config: {               /* настройки сервера (лимиты и подсказки) */
+            maxUploadMB: 50, playlistMax: 8, historyLimit: 3,
+            historyBudgetBytes: 0, langs: LANGS
+        },
+        busy: false,            /* защита от второго нажатия, пока идёт запрос */
+        query: '',
+        scope: 'name',          /* name — имя и файл, как в приложении; all — плюс доступ и вес */
+        filter: 'all',
+        access: 'any',
+        sort: 'date_desc',
+        view: 'grid',
+        theme: 'auto',
+        palette: 'indigo',
+        lang: 'ru',
+        selecting: false,
+        selected: new Set(),
+        loading: true,
+        loadError: false,
+        shown: CHUNK,
+        reveal: null,          /* ссылки, которые нужно оставить на виду */
+        scrolledReveal: null,
+        pendingScroll: null,
+        lastDeleted: null,
+        panelTab: 'media'
+    };
+
+    /* Ключи настроек до 2.0 (theme, viewMode, sortBy, lang) читаются один
+       раз как запасной вариант: панель, обновлённая с 0.12.x, не должна
+       потерять выбранный вид, тему и язык. */
+    function loadPrefs() {
+        let saved = {};
+        try { saved = JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); } catch (e) { saved = {}; }
+        let legacy = {};
+        try {
+            legacy = {
+                theme: localStorage.getItem('theme') || '',
+                view: localStorage.getItem('viewMode') || '',
+                sort: localStorage.getItem('sortBy') || ''
+            };
+        } catch (e) { legacy = {}; }
+        const theme = saved.theme || (legacy.theme === 'dark' ? 'dark'
+            : (legacy.theme === 'light' ? 'light' : 'auto'));
+        const sort = saved.sort || (SORT_KEYS.indexOf(legacy.sort) >= 0 ? legacy.sort : 'date_desc');
+        state.theme = THEME_MODES.indexOf(theme) >= 0 ? theme : 'auto';
+        state.palette = PALETTES.indexOf(saved.palette) >= 0 ? saved.palette : 'indigo';
+        state.lang = langFromPrefs();
+        state.view = saved.view === 'list' || legacy.view === 'list' ? 'list' : 'grid';
+        state.sort = sort;
+        state.scope = saved.scope === 'all' ? 'all' : 'name';
+    }
+    function langFromPrefs() {
+        let stored = '';
+        try { stored = localStorage.getItem('lang') || ''; } catch (e) { stored = ''; }
+        const guess = String(stored || (navigator.language || 'en')).slice(0, 2).toLowerCase();
+        return LANGS.indexOf(guess) >= 0 ? guess : 'en';
+    }
+    function savePrefs() {
+        try {
+            localStorage.setItem(STORE_KEY, JSON.stringify({
+                theme: state.theme, palette: state.palette, lang: state.lang,
+                view: state.view, sort: state.sort, scope: state.scope
+            }));
+        } catch (e) { /* приватный режим — настройки просто не запомнятся */ }
+    }
+
+    /* ========================================================
+       3. ПЕРЕВОДЫ
+       ======================================================== */
+    function t(key, vars) {
+        const dict = state.dict || {};
+        /* Английский — запасной словарь: если строки ещё не загрузились
+           (или ключ появился позже), панель покажет английский текст,
+           а не сырое имя ключа. */
+        let str = dict[key] || EN_DICT[key] || key;
+        if (vars) {
+            for (const k of Object.keys(vars)) {
+                /* Замена через функцию: иначе имя ссылки, содержащее $& или
+                   $', подставилось бы по правилам String.replace и текст
+                   поехал бы. Имена приходят из имён файлов. */
+                const value = String(vars[k]);
+                str = str.replace(new RegExp('\\{\\{' + k + '\\}\\}', 'g'), () => value);
+            }
+        }
+        return str;
+    }
+    /* На телефоне полное «Поиск по имени или файлу» не помещается */
+    const narrow = () => window.matchMedia('(max-width: 560px)').matches;
+    function applyTranslations(root) {
+        $$('[data-i18n]', root || document).forEach(function (el) {
+            el.textContent = t(el.dataset.i18n);
+        });
+        $$('[data-i18n-placeholder]', root || document).forEach(function (el) {
+            const key = el.dataset.i18nPlaceholder;
+            el.setAttribute('placeholder', narrow() && t(key + '_short') !== key + '_short' ? t(key + '_short') : t(key));
+        });
+        $$('[data-i18n-aria]', root || document).forEach(function (el) {
+            el.setAttribute('aria-label', t(el.dataset.i18nAria));
+        });
+        $$('[data-tip-key]', root || document).forEach(function (el) {
+            el.dataset.tip = t(el.dataset.tipKey);
+        });
+        /* Образцы акцента собираются в скрипте, поэтому их подписи — и в
+           подсказке, и в aria-label — обновляем здесь же, при смене языка. */
+        $$('#paletteRow .swatch').forEach(function (label) {
+            const name = label.dataset.palette;
+            if (!name) return;
+            const text = t('palette_' + name);
+            label.dataset.tip = text;
+            const input = $('input', label);
+            if (input) input.setAttribute('aria-label', text);
+        });
+    }
+
+    /* ========================================================
+       4. ТЕМА, АКЦЕНТ, ЯЗЫК
+       ======================================================== */
+    const prefersDark = () => matchMedia('(prefers-color-scheme: dark)').matches;
+    function effectiveTheme() {
+        return state.theme === 'auto' ? (prefersDark() ? 'dark' : 'light') : state.theme;
+    }
+    function applyTheme() {
+        const dark = effectiveTheme() === 'dark';
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        document.documentElement.dataset.themeMode = state.theme;
+        const svg = $('#themeBtn svg');
+        if (svg) svg.dataset.icon = dark ? 'sun' : 'moon';
+        hydrateIcons($('#themeBtn'));
+        $$('[data-theme-opt]').forEach(input => { input.checked = input.value === state.theme; });
+        /* Тёмная тема меняет оттенок образцов акцента: цвет ставим заново,
+           иначе на тёмном фоне останутся светлые кружки. */
+        paintSwatches();
+    }
+
+    /* Цвет образца зависит от темы, поэтому живёт в скрипте (CSSOM), а не в
+       атрибуте style="" — тот панель под CSP не применяет. */
+    function paintSwatches(root) {
+        $$('.swatch__dot[data-palette]', root || document).forEach(function (dot) {
+            dot.style.background = swatchColor(dot.dataset.palette);
+        });
+    }
+    function applyPalette() {
+        document.documentElement.dataset.palette = state.palette;
+        $$('#paletteRow .swatch input').forEach(function (input) {
+            input.checked = input.value === state.palette;
+        });
+        const name = $('#paletteName');
+        if (name) name.textContent = t('palette_' + state.palette);
+    }
+    function applyView() {
+        document.documentElement.dataset.view = state.view;
+        const grid = $('#grid');
+        grid.classList.toggle('grid--list', state.view === 'list');
+        $('#viewGridBtn').setAttribute('aria-pressed', String(state.view === 'grid'));
+        $('#viewListBtn').setAttribute('aria-pressed', String(state.view === 'list'));
+    }
+    /* Словари кешируются по языку: смена языка не ходит в сеть дважды, а
+       английский остаётся запасным для ключей, которых нет в переводе. */
+    const DICT_CACHE = {};
+    let EN_DICT = {};
+    async function loadDict() {
+        const load = async function (code) {
+            if (DICT_CACHE[code]) return DICT_CACHE[code];
+            try {
+                const res = await fetch('/static/i18n/' + code + '.json', { credentials: 'same-origin' });
+                DICT_CACHE[code] = res.ok ? await res.json() : {};
+            } catch (e) {
+                DICT_CACHE[code] = {};
+            }
+            return DICT_CACHE[code];
+        };
+        const current = await load(state.lang);
+        EN_DICT = state.lang === 'en' ? current : await load('en');
+        state.dict = current;
+    }
+    async function setLang(lang) {
+        if (LANGS.indexOf(lang) < 0) return;
+        state.lang = lang;
+        try { localStorage.setItem('lang', lang); } catch (e) { /* приватный режим */ }
+        await loadDict();
+        document.documentElement.lang = lang;
+        applyTranslations();
+        applyPalette();
+        renderChips();
+        render();
+        /* Открытое окно — тоже на новом языке: у пульта перерисовываем
+           содержимое, у остальных диалогов достаточно переводов разметки. */
+        if (currentOverlay) {
+            applyTranslations(currentOverlay.node);
+            renderPanel();
+        }
+        const sel = $('#langSelect');
+        if (sel) sel.value = lang;
+        savePrefs();
+    }
+
+    /* ========================================================
+       5. ЗАПРОСЫ К СЕРВЕРУ
+       ======================================================== */
+    /* Один вход для всех ручек: ошибку сервера превращаем в текст на языке
+       панели, 401/403 — в объяснение, а не в «Failed to fetch». */
+    async function apiCall(url, method, body, isForm) {
+        const options = {
+            method: method || 'GET',
+            /* Явные учётные данные: WebKit без этого не отправляет
+               HTTP-авторизацию и отвечает 401 на панель под паролем. */
+            credentials: 'same-origin',
+            headers: isForm ? undefined : { 'Content-Type': 'application/json' }
+        };
+        if (body !== undefined && body !== null) {
+            options.body = isForm ? body : JSON.stringify(body);
+        }
+        let res;
+        try {
+            res = await fetch(url, options);
+        } catch (e) {
+            toast(t('network_error'), { type: 'error' });
+            throw e;
+        }
         if (!res.ok) {
-            // Server errors are plain text with a trailing newline.
-            const text = (await res.text()).trim();
-            const err = new Error(text || `HTTP ${res.status}`);
+            const text = (await res.text().catch(() => '')).trim();
+            const err = new Error(text || ('HTTP ' + res.status));
             err.status = res.status;
+            toast(translateServerError(err), { type: 'error' });
             throw err;
         }
-        const contentType = res.headers.get('content-type');
-        return contentType?.includes('application/json') ? res.json() : null;
-    } catch (e) {
-        // Better network error handling
-        if (e.name === 'TypeError' || e.message === 'Failed to fetch') {
-            showToast(t('network_error', 'Network error - check your connection'), 'error');
-        } else if (e.status === 401) {
-            showToast(t('auth_required', 'Authentication required — sign in again'), 'error');
-        } else if (e.status === 403) {
-            showToast(t('forbidden', 'Access denied'), 'error');
-        } else {
-            const translatedMsg = translateServerError(e.message);
-            showToast(translatedMsg, 'error');
-        }
-        throw e;
+        if (res.status === 204) return null;
+        const type = res.headers.get('content-type') || '';
+        return type.indexOf('application/json') >= 0 ? res.json() : null;
     }
-}
 
+    /* Тексты сервера короткие и английские; показываем понятное на языке
+       панели, а неизвестное отдаём как есть — лучше точная цитата, чем
+       выдуманный перевод. */
+    function translateServerError(err) {
+        const status = err && err.status;
+        if (status === 401) return t('auth_required');
+        if (status === 403) return t('forbidden');
+        if (status === 413) return t('upload_too_big', { mb: state.config.maxUploadMB });
+        const text = String((err && err.message) || '');
+        /* Ручки «дай настройки» у сервера нет, зато предел плейлиста назван
+           прямо в отказе: запоминаем его и в следующий раз показываем лимит
+           до нажатия, а не после. */
+        const full = /playlist is full \(max (\d+)/i.exec(text);
+        if (full) state.config.playlistMax = Number(full[1]);
+        if (/link already exists/i.test(text)) return t('link_taken');
+        if (/link does not exist|link not found/i.test(text)) return t('link_gone');
+        if (/invalid link name|invalid id/i.test(text)) return t('invalid_id');
+        if (/file too large/i.test(text)) return t('upload_too_big', { mb: state.config.maxUploadMB });
+        if (/no file provided|invalid or unsupported media/i.test(text)) return t('invalid_image');
+        if (/playlist is full|playlist full/i.test(text)) return t('playlist_full', { max: state.config.playlistMax });
+        if (/no media to add|has no media/i.test(text)) return t('append_needs_media');
+        if (/url too long/i.test(text)) return t('url_too_long');
+        if (/failed to load media|invalid local media path|download/i.test(text)) return t('url_not_media');
+        if (/method not allowed/i.test(text)) return t('action_failed');
+        return text ? t('action_failed') + ': ' + text : t('action_failed');
+    }
 
-// Toggle the empty-state text between "no links" and a load-error hint.
-function setEmptyStateError(isError) {
-    const el = DOM.emptyState && DOM.emptyState.querySelector('.empty-state-text');
-    if (!el) return;
-    el.classList.toggle('error', !!isError);
-    el.textContent = isError
-        ? t('load_error_hint', 'Failed to load links — check the connection and refresh the page.')
-        : t('no_links', 'No links yet. Create one above!');
-}
+    /* Запись ответа: история и плейлист всегда массивы, номер версии — не
+       меньше первого (записи до версионирования приходят с нулём). */
+    function normalizeLink(raw) {
+        const link = Object.assign({}, raw);
+        link.linkName = link.linkName || link.id || '';
+        link.history = Array.isArray(link.history) ? link.history : [];
+        link.items = Array.isArray(link.items) ? link.items : [];
+        link.currentVersion = Math.max(1, Number(link.currentVersion) || 1);
+        link.pinned = !!link.pinned;
+        link.hasImage = !!link.hasImage;
+        link.accessLevel = link.accessLevel || 'public';
+        link.category = link.category || (link.mimeType && link.mimeType.indexOf('video') === 0 ? 'video' : 'image');
+        return link;
+    }
 
-async function loadLinks() {
-    try {
+    async function fetchLinks() {
         const res = await apiCall('/api/wallpapers');
-        // The endpoint returns a bare array; tolerate a wrapped/paginated
-        // shape defensively so a response change can never blank the list.
-        STATE.wallpapers = Array.isArray(res) ? res : (res && Array.isArray(res.data) ? res.data : []);
-        filterAndSort();
-    } catch (_) {
-        showToast(t('load_error', 'Failed to load links'), 'error');
-        STATE.wallpapers = [];
-        renderLinks([]);
-        setEmptyStateError(true);
+        /* Ручка отдаёт либо массив, либо конверт {data,...}: понимаем оба,
+           чтобы смена формы ответа не оставила панель пустой. */
+        const list = Array.isArray(res) ? res : (res && Array.isArray(res.data) ? res.data : []);
+        state.links = list.map(normalizeLink);
+        return state.links;
     }
-}
 
-
-// ============================================================
-// PIN / UNPIN
-// ============================================================
-async function togglePin(link) {
-    try {
-        const updatedLink = await apiCall(
-            `/api/link/${encodeURIComponent(link.linkName)}/pin`,
-            'POST'
-        );
-        if (!updatedLink) return;
-
-        // Update state; filterAndSort() below re-renders the card.
-        const idx = STATE.wallpapers.findIndex(wp => wp.linkName === link.linkName);
-        if (idx !== -1) {
-            STATE.wallpapers[idx] = updatedLink;
+    /* Обновление одной ссылки по ответу сервера: подменяем запись, а карточку
+       и открытый пульт перерисовываем — данные всегда те, что на диске. */
+    function applyLinkUpdate(updated) {
+        if (!updated || !updated.linkName) return null;
+        const fresh = normalizeLink(updated);
+        const idx = state.links.findIndex(l => l.linkName === fresh.linkName);
+        if (idx >= 0) state.links[idx] = fresh;
+        else state.links.push(fresh);
+        render();
+        if (currentOverlay && currentOverlay.kind === 'panel'
+            && currentOverlay.node.dataset.name === fresh.linkName) {
+            const scroller = $('.sheet__body', currentOverlay.node);
+            const top = scroller ? scroller.scrollTop : 0;
+            renderPanel();
+            const after = $('.sheet__body', currentOverlay.node);
+            if (after) after.scrollTop = top;
         }
-        link.pinned = updatedLink.pinned;
-
-        // Show toast
-        const msgKey = updatedLink.pinned ? 'pinned' : 'unpinned';
-        const msg = t(msgKey, updatedLink.pinned ? 'Pinned to top' : 'Unpinned');
-        showToast(msg, 'success');
-
-        // Re-sort and re-render to move item
-        filterAndSort();
-    } catch (_) {
-        // Error already shown by apiCall
-    }
-}
-
-
-function setupPinButton(card, link) {
-    const pinBtn = card.querySelector('.pin-btn');
-    if (!pinBtn) return;
-
-    // Set initial state
-    pinBtn.classList.toggle('pinned', !!link.pinned);
-    const ariaKey = link.pinned ? 'aria_unpin' : 'aria_pin';
-    const ariaLabel = t(ariaKey, link.pinned ? 'Unpin this link' : 'Pin this link to top');
-    pinBtn.setAttribute('aria-label', ariaLabel);
-    pinBtn.title = ariaLabel;
-
-    pinBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        togglePin(link);
-    });
-}
-
-
-function createLinkCard(link) {
-    const clone = DOM.template.content.cloneNode(true);
-    const card = clone.querySelector('article');
-    card._link = link;
-    updateCard(card, link);
-    setupCardEvents(card, link);
-    setupPinButton(card, link);
-    return card;
-}
-
-function renderLinks(wallpapers) {
-    const links = wallpapers || [];
-    if (!links.length) {
-        DOM.linksList.replaceChildren();
-        previewVideos.sweep();
-        setEmptyStateError(false);
-        DOM.emptyState.classList.remove('d-none');
-        return;
-    }
-    DOM.emptyState.classList.add('d-none');
-
-    // Reconcile by stable link ID. Search and sort only move existing cards;
-    // they do not rebuild previews, copy handlers, or document listeners.
-    // Children without a link ID (skeleton placeholders) are always removed.
-    const existing = new Map();
-    for (const card of Array.from(DOM.linksList.children)) {
-        const name = card.dataset.linkName;
-        if (name && !existing.has(name)) existing.set(name, card);
-    }
-    const wanted = new Set(links.map(link => link.linkName || link.id));
-    for (const card of Array.from(DOM.linksList.children)) {
-        if (!card.dataset.linkName || !wanted.has(card.dataset.linkName)) card.remove();
+        return fresh;
     }
 
-    let cursor = DOM.linksList.firstElementChild;
-    for (const link of links) {
-        const name = link.linkName || link.id;
-        let card = existing.get(name);
-        if (!card || card._link !== link) {
-            if (card) {
-                if (card === cursor) cursor = card.nextElementSibling;
-                card.remove();
-            }
-            card = createLinkCard(link);
+    const findLink = (name) => state.links.find(l => l.linkName === name);
+
+    /* ========================================================
+       6. ВЫБОРКА И СЕТКА
+       ======================================================== */
+    const SORTS = {
+        date_desc: (a, b) => b.modTime - a.modTime,
+        date_asc: (a, b) => a.modTime - b.modTime,
+        name_asc: (a, b) => a.linkName.localeCompare(b.linkName, 'ru'),
+        name_desc: (a, b) => b.linkName.localeCompare(a.linkName, 'ru'),
+        size_desc: (a, b) => (b.sizeBytes + b.items.length * 1e6) - (a.sizeBytes + a.items.length * 1e6)
+    };
+    const FILTERS = {
+        all: () => true,
+        image: (l) => l.hasImage && l.category !== 'video',
+        video: (l) => l.category === 'video',
+        playlist: (l) => l.items.length > 0,
+        pinned: (l) => l.pinned
+    };
+
+    /* Что попадает в поиск. «Имя и файл» — как в приложении 0.12.1:
+       имя ссылки и тип файла. «Везде» добавляет уровень доступа, вес,
+       версию и размеры — так ищут, когда помнят не имя, а примету:
+       «локальная», «2 МБ», «png». */
+    function matchesQuery(link) {
+        const q = state.query.trim().toLowerCase();
+        if (!q) return true;
+        const parts = [link.linkName, link.mimeType, link.category];
+        if (state.scope === 'all') {
+            parts.push(t(accessMeta(link.accessLevel).key), formatBytes(link.sizeBytes),
+                String(link.sizeBytes), 'v' + link.currentVersion, String(link.width || ''),
+                String(link.height || ''), (link.items || []).length ? 'плейлист playlist' : '');
         }
-
-        if (card !== cursor) DOM.linksList.insertBefore(card, cursor);
-        cursor = card.nextElementSibling;
+        return parts.some(part => String(part || '').toLowerCase().includes(q));
+    }
+    function filterCount(key) {
+        return state.links.filter(l => matchesQuery(l)
+            && FILTERS[key](l)
+            && (state.access === 'any' || l.accessLevel === state.access)).length;
+    }
+    /* Смена выборки возвращает список к первой порции: иначе «Показать ещё»
+       относилось бы к прошлой выдаче. */
+    function resetShown() {
+        state.shown = CHUNK;
+        state.reveal = null;
+        state.scrolledReveal = null;
     }
 
-    applyTranslations(DOM.linksList);
-    updateAriaLabels();
-    previewVideos.sweep();
-}
-
-
-function detectCategory(link) {
-    const mime = link.mimeType || '';
-    if (mime === 'mp4' || mime === 'webm') return 'video';
-    return mime || link.hasImage ? 'image' : 'other';
-}
-
-
-const LAZY_PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"%3E%3C/svg%3E';
-
-function createLazyImage(src, alt = 'Image', className = 'preview') {
-    const img = document.createElement('img');
-    if (STATE.lazyObserver) {
-        img.dataset.src = src;
-        img.src = LAZY_PLACEHOLDER;
-        STATE.lazyObserver.observe(img);
-    } else {
-        img.src = src;
+    function visibleLinks() {
+        let list = state.links.filter(matchesQuery).filter(FILTERS[state.filter]);
+        if (state.access !== 'any') list = list.filter(l => l.accessLevel === state.access);
+        list.sort(SORTS[state.sort] || SORTS.date_desc);
+        list.sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned));
+        return list;
     }
-    img.alt = alt;
-    img.className = className;
-    img.loading = 'lazy';
-    return img;
-}
 
-
-// ============================================================
-// PREVIEW FIT & VIDEO PLAYBACK
-// ============================================================
-// Thumbnails keep the source aspect ratio and are never upscaled, so an app
-// icon arrives as a small square. Filling a 16:9 frame with it (cover) would
-// crop and enlarge it. previewFit() picks how CSS presents each image:
-//   'fit-icon'     small, or square with possible transparency: natural size,
-//                  centred on a blurred copy of itself
-//   'fit-contain'  far from the frame's aspect ratio (portrait, panorama):
-//                  the whole image on the same blurred backdrop
-//   ''             photos and wallpapers: fill the frame
-const ICON_MAX_SIDE = 256;
-const ALPHA_FORMATS = new Set(['png', 'webp', 'gif']);
-const CARD_FRAME = { min: 1.3, max: 2.4 };     // 16:9 card previews
-const GALLERY_FRAME = { min: 0.95, max: 1.9 }; // 4:3 gallery tiles
-
-function previewFit(width, height, format, frame) {
-    if (!width || !height) return '';
-    const ratio = width / height;
-    const squarish = ratio >= 0.8 && ratio <= 1.25;
-    if (Math.max(width, height) <= ICON_MAX_SIDE || (squarish && ALPHA_FORMATS.has(format))) {
-        return 'fit-icon';
+    const ratio = (l) => (l.width && l.height ? l.width / l.height : 0);
+    function fitMode(link) {
+        if (!link.hasImage) return 'empty';
+        const r = ratio(link);
+        if (link.category === 'video') return r > 1.4 || !r ? 'cover' : 'contain';
+        if (link.mimeType === 'image/png') return 'contain';   /* иконки и логотипы с альфой */
+        if (!r) return 'cover';
+        if (r < 1.25) return 'contain';                        /* вертикаль и квадрат */
+        return 'cover';
     }
-    return ratio < frame.min || ratio > frame.max ? 'fit-contain' : '';
-}
 
-const cssUrl = url => `url("${url.replace(/["\\\n\r]/g, c => encodeURIComponent(c))}")`;
-
-function applyPreviewFit(container, media, format, frame) {
-    const isImg = media.tagName === 'IMG';
-    let fit = isImg
-        ? previewFit(media.naturalWidth, media.naturalHeight, format, frame)
-        : previewFit(media.videoWidth, media.videoHeight, '', frame);
-    if (!isImg && fit) fit = 'fit-contain'; // videos are letterboxed, never icons
-    container.classList.toggle('fit-icon', fit === 'fit-icon');
-    container.classList.toggle('fit-contain', fit === 'fit-contain');
-    // The backdrop reuses the loaded image from the memory cache (no second
-    // request). CSSOM style changes are permitted by the CSP.
-    if (fit && isImg) container.style.setProperty('--thumb', cssUrl(media.currentSrc || media.src));
-    else container.style.removeProperty('--thumb');
-}
-
-function resetPreviewFit(container) {
-    container.classList.remove('fit-icon', 'fit-contain');
-    container.style.removeProperty('--thumb');
-}
-
-// Card videos play only while at least a quarter of them is on screen and
-// the tab is visible, and never with reduced motion: offscreen previews cost
-// no downloads, decoding or battery.
-const previewVideos = (() => {
-    const reduceMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
-    const observed = new Set();
-    const visible = new Set();
-    const allowed = () => !document.hidden && !(reduceMotion && reduceMotion.matches);
-    const sync = video => {
-        if (visible.has(video) && video.isConnected && allowed()) {
-            const playing = video.play();
-            if (playing) playing.catch(() => {}); // autoplay policy, or removed meanwhile
-        } else if (!video.paused) {
-            video.pause();
-        }
-    };
-    const syncAll = () => visible.forEach(sync);
-    const observer = 'IntersectionObserver' in window
-        ? new IntersectionObserver(entries => {
-            for (const entry of entries) {
-                if (entry.isIntersecting) visible.add(entry.target);
-                else visible.delete(entry.target);
-                sync(entry.target);
-            }
-        }, { threshold: 0.25 })
-        : null;
-    document.addEventListener('visibilitychange', syncAll);
-    if (reduceMotion && reduceMotion.addEventListener) reduceMotion.addEventListener('change', syncAll);
-    return {
-        observe(video) {
-            if (observer) {
-                observed.add(video);
-                observer.observe(video);
-            } else if (allowed()) {
-                video.autoplay = true; // no IntersectionObserver: previous behaviour
-            }
-        },
-        // Stop tracking videos whose cards were removed or rebuilt.
-        sweep() {
-            for (const video of observed) {
-                if (video.isConnected) continue;
-                observer.unobserve(video);
-                observed.delete(video);
-                visible.delete(video);
-            }
-        },
-    };
-})();
-
-
-// ============================================================
-// INLINE RENAME
-// ============================================================
-const VALID_LINK_RE = /^[a-zA-Z0-9][a-zA-Z0-9_\-]{0,63}$/;
-
-function setupInlineRename(card, link) {
-    const linkIdEl = card.querySelector('.link-id');
-    if (!linkIdEl) return;
-
-    // Pencil hint shown on hover via CSS; double-click to activate
-    linkIdEl.title = t('rename_hint', 'Double-click to rename');
-    linkIdEl.setAttribute('role', 'button');
-    linkIdEl.tabIndex = 0;
-
-    const startEdit = () => {
-        if (linkIdEl.querySelector('input')) return; // already editing
-
-        const currentName = link.linkName;
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = currentName;
-        input.className = 'link-id-input';
-        input.maxLength = 64;
-        input.setAttribute('aria-label', t('rename_input_label', 'New link name'));
-        input.setAttribute('pattern', '[a-zA-Z0-9_\\-]+');
-        input.spellcheck = false;
-
-        linkIdEl.textContent = '';
-        linkIdEl.appendChild(input);
-        linkIdEl.classList.add('editing');
-
-        // Select all on focus so user can type immediately
-        input.focus();
-        input.select();
-
-        let committed = false;
-
-        const commit = async () => {
-            if (committed) return;
-            committed = true;
-
-            const newName = input.value.trim();
-
-            // Restore label regardless of outcome first
-            linkIdEl.classList.remove('editing');
-
-            if (!newName || newName === currentName) {
-                linkIdEl.textContent = currentName;
-                return;
-            }
-
-            if (!VALID_LINK_RE.test(newName)) {
-                linkIdEl.textContent = currentName;
-                showToast(t('invalid_id_chars', 'Invalid ID format'), 'error');
-                return;
-            }
-
-            // Optimistic update
-            linkIdEl.textContent = newName;
-            card.dataset.linkName = newName;
-
-            try {
-                const updated = await apiCall(
-                    `/api/link/${encodeURIComponent(currentName)}`,
-                    'PATCH',
-                    { newLinkName: newName }
-                );
-                if (!updated) throw new Error('Empty response');
-
-                // Sync state; filterAndSort() below re-renders the card.
-                const idx = STATE.wallpapers.findIndex(wp => wp.linkName === currentName);
-                if (idx !== -1) STATE.wallpapers[idx] = updated;
-                link.linkName = updated.linkName;
-
-                const msg = t('renamed_success', 'Renamed to "{{name}}"').replace('{{name}}', updated.linkName);
-                showToast(msg, 'success');
-                filterAndSort();
-            } catch (_) {
-                // Roll back on error (apiCall already showed toast)
-                linkIdEl.textContent = currentName;
-                card.dataset.linkName = currentName;
-                link.linkName = currentName;
-            }
-        };
-
-        const cancel = () => {
-            if (committed) return;
-            committed = true;
-            linkIdEl.classList.remove('editing');
-            linkIdEl.textContent = currentName;
-        };
-
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter')  { e.preventDefault(); commit(); }
-            if (e.key === 'Escape') { e.preventDefault(); cancel(); }
-        });
-        input.addEventListener('blur', commit);
-    };
-
-    linkIdEl.addEventListener('dblclick', startEdit);
-    linkIdEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); startEdit(); }
-    });
-}
-
-
-
-const ACCESS_LEVELS = ['public', 'local', 'token', 'auth'];
-
-// Static, trusted SVG icons for the token action buttons.
-const TOKEN_COPY_SVG = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  <rect x="9" y="9" width="13" height="13" rx="2"/>
-  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-</svg>`;
-const TOKEN_ROTATE_SVG = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  <polyline points="1 4 1 10 7 10"/>
-  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-</svg>`;
-
-function accessLabel(level) {
-    const key = 'access_' + level;
-    const defaults = {
-        public: 'Public',
-        local: 'Local network',
-        token: 'Token',
-        auth: 'Admin only',
-    };
-    return t(key, defaults[level] || level);
-}
-
-function publicLinkURL(link) {
-    const name = link.linkName || link.id;
-    let url = `${window.location.origin}/${name}`;
-    if (link.accessLevel === 'token' && link.accessToken) {
-        url += `?token=${encodeURIComponent(link.accessToken)}`;
+    function accessMeta(level) {
+        return {
+            public: { icon: 'globe', key: 'access_public' },
+            local: { icon: 'lock', key: 'access_local' },
+            token: { icon: 'key', key: 'access_token' },
+            auth: { icon: 'user', key: 'access_auth' }
+        }[level] || { icon: 'globe', key: 'access_public' };
     }
-    return url;
-}
 
-function setupAccessControl(card, link) {
-    let row = card.querySelector('.access-row');
-    if (!row) {
-        row = document.createElement('div');
-        row.className = 'access-row';
-        const info = card.querySelector('.link-info');
-        if (info) info.appendChild(row);
-        else return;
+    /* Кадр ссылки берём у /api/preview (он отдаётся и для ссылок под
+       авторизацией), а версию добавляем в адрес: после замены файла браузер
+       не должен показывать прежний кадр из кеша. */
+    function previewSrc(link) {
+        const base = link.preview || '/api/preview/' + encodeURIComponent(link.linkName);
+        const path = base.charAt(0) === '/' ? base : '/' + base;
+        const version = link.currentVersion > 1 ? '?v=' + link.currentVersion : '';
+        return path + version;
     }
-    row.innerHTML = '';
 
-    const label = document.createElement('label');
-    label.className = 'access-label';
-    label.textContent = t('access_label', 'Access');
-    // htmlFor takes a plain id (CSS.escape is only for selectors).
-    label.htmlFor = `access-${link.linkName || link.id}`;
+    function cardFor(link) {
+        const node = $('#tplCard').content.firstElementChild.cloneNode(true);
+        node.dataset.name = link.linkName;
+        node.dataset.mime = link.mimeType;
+        node.classList.toggle('is-pinned', !!link.pinned);
+        node.classList.toggle('is-selecting', state.selecting);
+        node.classList.toggle('is-selected', state.selected.has(link.linkName));
 
-    const select = document.createElement('select');
-    select.className = 'access-select';
-    select.id = `access-${link.linkName || link.id}`;
-    select.setAttribute('aria-label', t('access_label', 'Access'));
-    const current = link.accessLevel || 'public';
-    ACCESS_LEVELS.forEach(level => {
-        const opt = document.createElement('option');
-        opt.value = level;
-        opt.textContent = accessLabel(level);
-        if (level === current) opt.selected = true;
-        select.appendChild(opt);
-    });
+        const frame = $('.card__frame', node);
+        const img = $('.card__media', node);
+        const fit = fitMode(link);
+        /* Размеры кадра сервер не отдаёт, зато их видно у загруженного
+           превью: показываем их, когда картинка дошла, — и не показываем
+           выдуманных чисел, если она не загрузилась. */
+        const dimsSpan = h('span', { class: 'is-hidden' });
+        const dims = link.width && link.height ? link.width + '×' + link.height : null;
 
-    select.addEventListener('change', async () => {
-        const newLevel = select.value;
-        select.disabled = true;
-        try {
-            const updated = await apiCall(
-                `/api/link/${encodeURIComponent(link.linkName)}`,
-                'PATCH',
-                { accessLevel: newLevel }
-            );
-            if (!updated) {
-                select.value = current;
-                return;
+        if (fit === 'empty') {
+            frame.classList.add('card__frame--empty');
+            img.remove();
+            frame.append(icon('imageOff'));
+        } else {
+            img.src = previewSrc(link);
+            img.alt = '';
+            if (fit === 'contain') {
+                img.classList.add('card__media--contain');
+                if (link.mimeType === 'image/png') frame.classList.add('card__frame--checker');
             }
-            Object.assign(link, {
-                accessLevel: updated.accessLevel,
-                accessToken: updated.accessToken || '',
+            /* У загруженного превью видно и пропорции, и настоящий размер
+               файла: вертикальное и квадратное показываем целиком, а не
+               обрезком, а строку метаданных дополняем размерами. */
+            img.addEventListener('load', function () {
+                if (!img.naturalWidth) return;
+                if (!dims && link.category !== 'video') {
+                    dimsSpan.textContent = img.naturalWidth + '×' + img.naturalHeight;
+                    dimsSpan.classList.remove('is-hidden');
+                }
+                if (link.category !== 'video' && img.naturalHeight > img.naturalWidth * 1.25) {
+                    img.classList.add('card__media--contain');
+                    if (link.mimeType === 'image/png') frame.classList.add('card__frame--checker');
+                }
             });
-            const idx = STATE.wallpapers.findIndex(wp => wp.linkName === link.linkName);
-            if (idx !== -1) {
-                STATE.wallpapers[idx].accessLevel = link.accessLevel;
-                STATE.wallpapers[idx].accessToken = link.accessToken;
+            /* Файл не пришёл — показываем тот же знак «нет кадра», что и у
+               ссылки без медиа: пустая рамка честнее битой картинки. */
+            img.addEventListener('error', function () { showEmptyFrame(frame, img); });
+        }
+
+        if (link.category === 'video') {
+            const play = $('.card__play', node);
+            play.hidden = false;
+            if (link.durationSec) {
+                const dur = h('span', { class: 'on-media on-media--bottom' },
+                    formatDuration(link.durationSec));
+                frame.append(dur);
             }
-            // Refresh copy URL + token display
-            setupAccessControl(card, link);
-            updateCopyURL(card, link);
-            showToast(t('access_updated', 'Access level updated'), 'success');
-        } catch (_) {
-            select.value = current;
-        } finally {
-            select.disabled = false;
-        }
-    });
-
-    row.appendChild(label);
-    row.appendChild(select);
-
-    // Token chip with inline copy/rotate actions for token level
-    if ((link.accessLevel || 'public') === 'token') {
-        const tokenBox = document.createElement('div');
-        tokenBox.className = 'access-token-box';
-
-        const tokenEl = document.createElement('code');
-        tokenEl.className = 'access-token-value';
-        tokenEl.textContent = link.accessToken || '—';
-        tokenEl.title = link.accessToken || '';
-        tokenEl.setAttribute('aria-label', t('access_token', 'Access token'));
-
-        const copyTok = document.createElement('button');
-        copyTok.type = 'button';
-        copyTok.className = 'token-icon-btn';
-        copyTok.innerHTML = TOKEN_COPY_SVG; // static trusted markup
-        const copyLabel = t('copy_token', 'Copy token URL');
-        copyTok.setAttribute('aria-label', copyLabel);
-        copyTok.title = copyLabel;
-        copyTok.addEventListener('click', (e) => {
-            e.preventDefault();
-            copyToClipboard(publicLinkURL(link)).then(() => {
-                showToast(t('copied', 'Copied!'), 'success');
-            }).catch(() => showToast(t('copy_error', 'Failed to copy URL'), 'error'));
-        });
-
-        const rotateBtn = document.createElement('button');
-        rotateBtn.type = 'button';
-        rotateBtn.className = 'token-icon-btn';
-        rotateBtn.innerHTML = TOKEN_ROTATE_SVG; // static trusted markup
-        const rotateLabel = t('rotate_token', 'Rotate');
-        rotateBtn.setAttribute('aria-label', rotateLabel);
-        rotateBtn.title = rotateLabel;
-        rotateBtn.addEventListener('click', async (e) => {
-            e.preventDefault();
-            rotateBtn.disabled = true;
-            try {
-                const updated = await apiCall(
-                    `/api/link/${encodeURIComponent(link.linkName)}`,
-                    'PATCH',
-                    { rotateToken: true }
-                );
-                if (!updated) return;
-                link.accessToken = updated.accessToken || '';
-                const idx = STATE.wallpapers.findIndex(wp => wp.linkName === link.linkName);
-                if (idx !== -1) STATE.wallpapers[idx].accessToken = link.accessToken;
-                setupAccessControl(card, link);
-                updateCopyURL(card, link);
-                showToast(t('token_rotated', 'Token rotated'), 'success');
-            } catch (_) {}
-            finally { rotateBtn.disabled = false; }
-        });
-
-        tokenBox.appendChild(tokenEl);
-        tokenBox.appendChild(copyTok);
-        tokenBox.appendChild(rotateBtn);
-        row.appendChild(tokenBox);
-    }
-}
-
-// Keep the "open" link and the Copy URL button in sync with access changes.
-function updateCopyURL(card, link) {
-    const fullUrl = publicLinkURL(link);
-    const previewLink = card.querySelector('.preview-link');
-    if (previewLink) previewLink.href = fullUrl;
-    card.dataset.publicUrl = fullUrl;
-}
-
-
-function updateCard(card, link) {
-    const linkName = link.linkName || link.id;
-    const linkIdEl = card.querySelector('.link-id');
-
-    // Don't overwrite if currently in edit mode
-    if (!linkIdEl.querySelector('input')) {
-        linkIdEl.textContent = linkName;
-    }
-    card.dataset.linkName = linkName;
-
-    const fullUrl = publicLinkURL(link);
-    card.dataset.publicUrl = fullUrl;
-
-    const previewLink = card.querySelector('.preview-link');
-    previewLink.href = fullUrl;
-    previewLink.setAttribute('aria-label', t('aria_open_image', 'Open image'));
-    linkIdEl.setAttribute('aria-label', t('aria_link_id', 'Link ID'));
-
-    const category = link.hasImage ? detectCategory(link) : 'other';
-
-    let fileType;
-    if (link.mimeType) {
-        fileType = link.mimeType.toUpperCase();
-    } else if (link.hasImage) {
-        fileType = 'IMAGE';
-    } else {
-        fileType = t('no_image', 'No image');
-    }
-
-    const dateStr = link.createdAt ? formatDate(link.createdAt) : '—';
-    const sizeStr = link.sizeBytes ? ` · ${formatSize(link.sizeBytes)}` : '';
-
-    const linkMeta = card.querySelector('.link-meta');
-    // Version, playlist, rotation and hit counters are appended only when the
-    // link actually uses them, so untouched cards read exactly as before.
-    const extras = [];
-    if (link.currentVersion > 1) {
-        extras.push(t('meta_version', 'v{{n}}').replace('{{n}}', link.currentVersion));
-    }
-    if (Array.isArray(link.items) && link.items.length) {
-        extras.push(t('meta_items', '{{n}} in playlist').replace('{{n}}', link.items.length));
-    }
-    if (link.rotate && link.rotate.enabled) extras.push(t('meta_rotating', 'rotating'));
-    if (link.stats && link.stats.hits) {
-        extras.push(t('meta_hits', '{{n}} hits').replace('{{n}}', link.stats.hits));
-    }
-    linkMeta.textContent = [`${category} · ${fileType}${sizeStr} · ${dateStr}`, ...extras].join(' · ');
-    linkMeta.setAttribute('aria-label', t('aria_file_info', 'File info'));
-
-    setupAccessControl(card, link);
-
-    const previewWrapper = card.querySelector('.preview-wrapper');
-
-    // Only re-build preview when it has actually changed (avoid video flicker)
-    const prevSrc = previewWrapper.dataset.src || '';
-    const newSrc  = link.hasImage ? (link.preview || link.imageUrl || '') : '';
-    const srcChanged = prevSrc !== newSrc;
-
-    if (srcChanged) {
-        previewWrapper.dataset.src = newSrc;
-        
-        // Save pin button reference before clearing
-        const existingPinBtn = previewWrapper.querySelector('.pin-btn');
-        
-        // Clear content
-        previewWrapper.innerHTML = '';
-        resetPreviewFit(previewWrapper);
-        
-        // Re-add pin button first
-        if (existingPinBtn) {
-            previewWrapper.appendChild(existingPinBtn);
         }
 
-        if (link.hasImage) {
-            const isVid = (category === 'video');
-            // Bust browser/API caches only when the file actually changed.
-            const bust = link.modTime ? `?t=${link.modTime}` : '';
-            if (isVid) {
-                // Admin preview route is auth-protected and works for all access levels.
-                const videoSrc = (link.preview || ('/api/preview/' + encodeURIComponent(linkName))) + bust;
-                const video = document.createElement('video');
-                video.src = videoSrc;
-                video.className = 'preview';
-                video.muted = true;
-                video.loop = true;
-                video.playsInline = true;
-                video.setAttribute('playsinline', '');
-                video.setAttribute('preload', 'metadata');
-                video.addEventListener('loadedmetadata', () =>
-                    applyPreviewFit(previewWrapper, video, category, CARD_FRAME));
-                video.onerror = () => {
-                    // Keep pin button when showing error
-                    const pinBtn = previewWrapper.querySelector('.pin-btn');
-                    previewWrapper.innerHTML = '';
-                    resetPreviewFit(previewWrapper);
-                    if (pinBtn) previewWrapper.appendChild(pinBtn);
-                    previewWrapper.appendChild(buildNoImageSVG());
-                    previewVideos.sweep();
-                };
-                previewWrapper.appendChild(video);
-                previewVideos.observe(video);
-            } else {
-                const resolvedPreview = link.preview || ('/api/preview/' + encodeURIComponent(linkName));
-                const imgSrc = (resolvedPreview.startsWith('/') ? resolvedPreview : '/' + resolvedPreview) + bust;
-                const img = createLazyImage(
-                    imgSrc,
-                    resolvedPreview ? 'Preview' : 'Image',
-                    'preview'
-                );
-                img.classList.add('preview-top-center');
-                img.addEventListener('load', () => {
-                    // Skip the lazy-loading placeholder; classify the real preview.
-                    if (!img.dataset.src) applyPreviewFit(previewWrapper, img, link.mimeType, CARD_FRAME);
-                });
-                img.onerror = () => {
-                    // Keep pin button when showing error
-                    const pinBtn = previewWrapper.querySelector('.pin-btn');
-                    previewWrapper.innerHTML = '';
-                    resetPreviewFit(previewWrapper);
-                    if (pinBtn) previewWrapper.appendChild(pinBtn);
-                    previewWrapper.appendChild(buildNoImageSVG());
-                };
-                previewWrapper.appendChild(img);
+        /* Значки на кадре: только то, что не видно из картинки */
+        const left = $('.card__badges-left', node);
+        if (link.currentVersion > 1) left.append(h('span', { class: 'on-media num', text: 'v' + link.currentVersion }));
+        if (link.items.length) {
+            left.append(h('span', { class: 'on-media' }, icon('playlist'),
+                h('span', { text: t('meta_items', { n: link.items.length }) })));
+        } else if (link.category === 'gif') {
+            left.append(h('span', { class: 'on-media', text: t('animation') }));
+        }
+
+        /* Имя и метаданные */
+        const nameBtn = $('.card__name', node);
+        nameBtn.textContent = link.linkName;
+        nameBtn.setAttribute('aria-label', t('open_panel') + ': ' + link.linkName);
+        const check = $('.card__check', node);
+        check.setAttribute('aria-pressed', String(state.selected.has(link.linkName)));
+        if (state.selecting) {
+            check.hidden = false;
+            check.removeAttribute('tabindex');
+            check.setAttribute('aria-label', t('select_mode') + ': ' + link.linkName);
+        }
+        $('.card__open', node).setAttribute('aria-label', t('open_media'));
+
+        const meta = $('.card__meta', node);
+        const parts = [
+            (link.mimeType.split('/')[1] || '—').toUpperCase(),
+            dims || dimsSpan,
+            link.category === 'video' && link.durationSec ? formatDuration(link.durationSec) : null,
+            link.hasImage ? formatBytes(link.sizeBytes) : t('no_image'),
+            formatRelative(link.modTime)
+        ].filter(Boolean);
+        parts.forEach(function (part, i) {
+            /* Разделители рисует CSS: если часть скрыта на узком экране,
+               точка-разделитель исчезает вместе с ней. */
+            if (typeof part !== 'string') {
+                part.classList.toggle('meta-hide-sm', i === parts.length - 1);
+                meta.append(part);
+                return;
+            }
+            meta.append(h('span', { class: i === parts.length - 1 ? 'meta-hide-sm' : '', text: part }));
+        });
+
+        /* В широкой строке списка уровень доступа показывает переключатель
+           справа — метка в теле была бы вторым ответом на тот же вопрос. */
+        const rowSelect = state.view === 'list' && !isPhone();
+
+        /* Теги: доступ (если не публичный) и ротация */
+        const tags = $('.card__tags', node);
+        if (link.accessLevel !== 'public' && !rowSelect) {
+            const acc = accessMeta(link.accessLevel);
+            tags.append(h('span', { class: 'badge' }, icon(acc.icon), h('span', { text: t(acc.key) })));
+        }
+        if (link.rotate && link.rotate.enabled) {
+            tags.append(h('span', { class: 'badge badge--accent' }, icon('rotate'),
+                h('span', { text: t('meta_rotating') + ' ' + formatInterval(link.rotate.interval) })));
+        }
+        if (!tags.children.length) tags.remove();
+
+        /* В режиме списка строка широкая, и справа остаётся место — там
+           помещается переключатель доступа. В приложении 0.12.1 он был в
+           каждой карточке, из-за чего карточка росла в высоту; здесь он
+           появляется только там, где место действительно есть. */
+        if (rowSelect) {
+            const select = h('select', {
+                class: 'select select--mini card__access', 'aria-label': t('access_label') + ': ' + link.linkName,
+                onchange: function () { setAccessLevel(link, select.value); }
+            });
+            ['public', 'local', 'token', 'auth'].forEach(function (level) {
+                select.append(h('option', {
+                    value: level, text: t(accessMeta(level).key), selected: link.accessLevel === level
+                }));
+            });
+            $('.card__body', node).append(select);
+        }
+
+        return node;
+    }
+
+    /* Кадр, который не загрузился, приводим к виду «нет файла» */
+    function showEmptyFrame(frame, img) {
+        if (img && img.isConnected) img.remove();
+        frame.classList.add('card__frame--empty', 'card__frame--failed');
+        /* Своя проверка на конкретный значок: в кадре уже есть svg кнопок
+           («выбрать», «открыть в новой вкладке», «играть»). */
+        if (!$('svg[data-icon="imageOff"]', frame)) {
+            frame.append(icon('imageOff'));
+            hydrateIcons(frame);
+        }
+    }
+
+    function render() {
+        const grid = $('#grid');
+        const list = visibleLinks();
+        const total = state.links.length;
+        const narrowed = !!state.query.trim() || state.filter !== 'all' || state.access !== 'any';
+
+        applyReveal(list);
+        grid.setAttribute('aria-busy', String(state.loading));
+        grid.innerHTML = '';
+
+        if (state.loading) {
+            for (let i = 0; i < 8; i++) {
+                grid.append(h('div', { class: 'skeleton' },
+                    h('div', { class: 'skeleton__frame' }),
+                    h('div', { class: 'skeleton__line' }),
+                    h('div', { class: 'skeleton__line skeleton__line--short' })));
             }
         } else {
-            previewWrapper.appendChild(buildNoImageSVG());
+            const frag = document.createDocumentFragment();
+            list.slice(0, state.shown).forEach(link => frag.append(cardFor(link)));
+            grid.append(frag);
+        }
+
+        document.body.classList.toggle('is-selecting', state.selecting);
+        $('#noResults').classList.toggle('is-hidden', !(!state.loading && !list.length && total > 0 && narrowed));
+        $('#emptyState').classList.toggle('is-hidden', !(!state.loading && !state.loadError && total === 0));
+        $('#errorState').classList.toggle('is-hidden', !(!state.loading && state.loadError));
+        $('#pageTitle').textContent = t('links');
+        $('#pageCount').textContent = narrowed
+            ? t('found', { shown: list.length, total: total })
+            : String(total);
+        $('#brandCount').textContent = String(total);
+        $('#selectAllBtn').hidden = !state.selecting;
+        renderLoadMore(list);
+        updateBulkbar();
+        hydrateIcons(grid);
+        jumpToRevealed();
+    }
+
+    /* «Показать ещё»: длинная библиотека дорисовывается порциями. Кнопка
+       говорит, сколько именно осталось, вместо безымянного «ещё», а рядом
+       видно, сколько из найденного уже на экране. */
+    function renderLoadMore(list) {
+        const box = $('#loadMore');
+        const left = Math.max(0, list.length - state.shown);
+        box.classList.toggle('is-hidden', state.loading || left === 0);
+        if (!left) return;
+        $('#loadMoreBtn').textContent = t('loading_more', { count: Math.min(CHUNK, left) });
+        box.querySelector('[data-left]').textContent = t('shown_of', { shown: state.shown, total: list.length });
+    }
+
+    /* Только что созданная ссылка должна быть видна: иначе тост сказал
+       «создана», а найти её в длинной библиотеке нельзя. Запоминаем имя и
+       раскрываем порцию ровно на время одного рендера — не раньше, чтобы
+       позиция считалась по актуальному порядку. */
+    function revealLinks(names) {
+        const keep = state.reveal || [];
+        state.reveal = keep.concat(names.filter(n => !keep.includes(n)));
+    }
+    function applyReveal(list) {
+        if (!state.reveal || !state.reveal.length) return;
+        let need = state.shown;
+        let last = null;
+        state.reveal.forEach(function (name) {
+            const idx = list.findIndex(l => l.linkName === name);
+            if (idx < 0) return;
+            last = name;
+            if (idx >= need) need = idx + 1;
+        });
+        if (need > state.shown) state.shown = need;
+        /* Прокручиваем один раз — к последней созданной, а не к каждой. */
+        if (last && last !== state.scrolledReveal) {
+            state.pendingScroll = last;
+            state.scrolledReveal = last;
         }
     }
 
-    // Copy button
-    const copyBtn = card.querySelector('.copy-url-btn');
-    const newCopyBtn = copyBtn.cloneNode(true);
-    copyBtn.parentNode.replaceChild(newCopyBtn, copyBtn);
-
-    const copyText = newCopyBtn.querySelector('.copy-text');
-    if (copyText) copyText.textContent = t('copy_url', 'Copy URL');
-
-    let copyResetTimer = null;
-
-    newCopyBtn.onclick = (e) => {
-        e.preventDefault();
-        // Read the URL at click time: access level changes and token
-        // rotation update it after this handler was bound.
-        copyToClipboard(card.dataset.publicUrl || fullUrl).then(() => {
-            if (copyResetTimer) clearTimeout(copyResetTimer);
-
-            newCopyBtn.classList.add('copied');
-            if (copyText) copyText.textContent = t('copied', 'Copied!');
-            newCopyBtn.setAttribute('aria-label', t('copied', 'Copied!'));
-
-            copyResetTimer = setTimeout(() => {
-                newCopyBtn.classList.add('fading-out');
-                copyResetTimer = setTimeout(() => {
-                    newCopyBtn.classList.remove('copied', 'fading-out');
-                    if (copyText) copyText.textContent = t('copy_url', 'Copy URL');
-                    newCopyBtn.setAttribute('aria-label', t('copy_url', 'Copy URL'));
-                }, 300);
-            }, 1500);
-        }).catch(() => {
-            showToast(t('copy_error', 'Failed to copy URL'), 'error');
-        });
-    };
-}
-
-
-// Build the SVG no-image placeholder programmatically (same shape as in HTML template)
-function buildNoImageSVG() {
-    const wrap = document.createElement('div');
-    wrap.className = 'no-image';
-    wrap.innerHTML = `<svg class="no-image-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path d="M8 48 L24 24 L36 38 L44 28 L56 48 Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
-      <circle cx="46" cy="18" r="5" stroke="currentColor" stroke-width="2" fill="none"/>
-      <rect x="6" y="8" width="52" height="44" rx="4" stroke="currentColor" stroke-width="2" fill="none"/>
-    </svg>`;
-    return wrap;
-}
-
-
-function setupCardEvents(card, link) {
-    const fileInput = card.querySelector('.file-input');
-    const dropdown = card.querySelector('.upload-dropdown');
-    const toggleBtn = card.querySelector('.upload-toggle-btn');
-
-    // Outside clicks are handled by the single delegated dropdown closer.
-
-    // Inline rename
-    setupInlineRename(card, link);
-
-    toggleBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const isOpen = dropdown.classList.contains('open');
-        if (!isOpen) closeAllDropdowns(dropdown);
-        dropdown.classList.toggle('open', !isOpen);
-        toggleBtn.setAttribute('aria-expanded', String(!isOpen));
-    });
-
-    card.querySelector('.upload-file-btn').addEventListener('click', () => {
-        dropdown.classList.remove('open');
-        toggleBtn.setAttribute('aria-expanded', 'false');
-        fileInput.click();
-    });
-
-    fileInput.onchange = async () => {
-        if (!fileInput.files.length) return;
-        await handleUpload(link, fileInput.files[0]);
-        fileInput.value = '';
-    };
-
-    card.querySelector('.paste-url-btn').addEventListener('click', async () => {
-        dropdown.classList.remove('open');
-        toggleBtn.setAttribute('aria-expanded', 'false');
-        const url = await showModal('input', 'enter_image_url_title', 'url_placeholder');
-        if (url) await handleUpload(link, url, true);
-    });
-
-    card.querySelector('.select-server-btn').addEventListener('click', async () => {
-        dropdown.classList.remove('open');
-        toggleBtn.setAttribute('aria-expanded', 'false');
-        const filename = await showModal('grid', 'select_server_title');
-        if (filename) await handleUpload(link, filename, true);
-    });
-
-    // Playlist: a second file behind the same URL. It needs media to add to,
-    // which the server also enforces.
-    const appendBtn = card.querySelector('.append-file-btn');
-    const appendInput = card.querySelector('.append-file-input');
-    if (appendBtn && appendInput) {
-        appendBtn.addEventListener('click', () => {
-            dropdown.classList.remove('open');
-            toggleBtn.setAttribute('aria-expanded', 'false');
-            if (!link.hasImage) {
-                showToast(t('append_needs_media', 'Upload a file first — there is nothing to add to yet.'), 'error');
-                return;
-            }
-            appendInput.click();
-        });
-        appendInput.onchange = async () => {
-            if (!appendInput.files.length) return;
-            await handleUpload(link, appendInput.files[0], false, 'append');
-            appendInput.value = '';
-        };
+    /* Прокрутка к только что созданной ссылке: подсвечиваем и подводим
+       экран — иначе в длинном списке непонятно, где она. */
+    function jumpToRevealed() {
+        if (!state.pendingScroll) return;
+        const name = state.pendingScroll;
+        state.pendingScroll = null;
+        const card = $('#grid .card[data-name="' + name + '"]');
+        if (!card) return;
+        card.classList.add('is-new');
+        card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
 
-    const versionsBtn = card.querySelector('.versions-btn');
-    if (versionsBtn) {
-        versionsBtn.addEventListener('click', () => {
-            dropdown.classList.remove('open');
-            toggleBtn.setAttribute('aria-expanded', 'false');
-            openVersions(link);
+    function showMore() {
+        const list = visibleLinks();
+        const before = state.shown;
+        state.shown = Math.min(list.length, state.shown + CHUNK);
+        const grid = $('#grid');
+        const frag = document.createDocumentFragment();
+        list.slice(before, state.shown).forEach(link => frag.append(cardFor(link)));
+        grid.append(frag);
+        hydrateIcons(grid);
+        renderLoadMore(list);
+    }
+
+    /* ========================================================
+       7. ЧИПЫ ФИЛЬТРОВ И СОРТИРОВКА
+       ======================================================== */
+    function chip(label, count, opts) {
+        const o = opts || {};
+        const b = h('button', {
+            class: 'chip' + (o.ghost ? ' chip--ghost' : ''),
+            type: 'button',
+            'aria-pressed': String(!!o.pressed),
+            onclick: o.onclick
+        }, o.icon ? icon(o.icon) : null, h('span', { text: label }));
+        if (count !== undefined) b.append(h('span', { class: 'chip__count', text: String(count) }));
+        if (o.key) b.dataset.key = o.key;
+        if (o.tip) b.dataset.tip = o.tip;
+        if (o.haspopup) b.setAttribute('aria-haspopup', 'menu');
+        return b;
+    }
+
+    /* Счётчики на чипах зависят от запроса, поэтому обновляются при каждом
+       нажатии. Пересобирать всю строку чипов ради шести чисел незачем —
+       меняем только текст, DOM остаётся на месте. */
+    function updateChipCounts() {
+        $$('#filterRow .chip[data-key]').forEach(function (b) {
+            const count = b.querySelector('.chip__count');
+            if (count) count.textContent = String(filterCount(b.dataset.key));
         });
     }
 
-    card.ondragover = e => { e.preventDefault(); card.classList.add('drag-over'); };
-    card.ondragleave = () => card.classList.remove('drag-over');
-    card.ondrop = async e => {
-        e.preventDefault();
-        card.classList.remove('drag-over');
-        if (e.dataTransfer.files.length) await handleUpload(link, e.dataTransfer.files[0]);
-    };
+    function renderChips() {
+        const row = $('#filterRow');
+        /* Чипы пересобираются целиком, а вместе с ними теряются фокус
+           клавиатуры и прокрутка строки: на телефоне нажатие чипа
+           возвращало список к началу, а с клавиатуры фокус улетал в body.
+           Запоминаем «кто в фокусе» по устойчивой примете и возвращаем. */
+        const focus = document.activeElement;
+        const focusKey = (focus && row.contains(focus))
+            ? (focus.dataset.key || focus.dataset.tip || (focus.getAttribute('aria-haspopup') ? 'popup:' + (focus.textContent || '').trim() : ''))
+            : null;
+        const scrollLeft = row.scrollLeft;
+        row.innerHTML = '';
 
-    card.querySelector('.delete-btn').onclick = async () => {
-        const msg = t('confirm_delete_msg', 'Delete "{{name}}"? This cannot be undone.')
-            .replace('{{name}}', link.linkName);
-        const confirmed = await showConfirm(msg);
-        if (!confirmed) return;
+        /* Где искать. По умолчанию — имя и тип файла, как в приложении;
+           «Везде» добавляет уровень доступа, вес, версию и размеры, чтобы
+           можно было найти ссылку по примете, а не по имени. */
+        row.append(chip(t('search_scope') + ': ' + t(state.scope === 'all' ? 'search_in_all' : 'search_in_name'),
+            undefined, {
+                ghost: true, icon: 'search', haspopup: true, tip: t('search_scope'),
+                pressed: state.scope === 'all',
+                onclick: function (e) { openScopeMenu(e.currentTarget); }
+            }));
+        row.append(h('span', { class: 'chip-row__sep' }));
 
-        // Add delete animation
-        card.classList.add('deleting');
-
-        // Wait for animation before API call
-        await new Promise(resolve => setTimeout(resolve, 350));
-
-        try {
-            await apiCall(`/api/link/${encodeURIComponent(link.linkName)}`, 'DELETE');
-            
-            // Remove from state
-            STATE.wallpapers = STATE.wallpapers.filter(wp => wp.linkName !== link.linkName);
-            STATE.filteredWallpapers = STATE.filteredWallpapers.filter(wp => wp.linkName !== link.linkName);
-            
-            // Update stats without re-rendering
-            updateSearchStats();
-            
-            // Remove card from DOM
-            card.remove();
-            previewVideos.sweep();
-            
-            // Show empty state if needed
-            if (!DOM.linksList.children.length) {
-                DOM.emptyState.classList.remove('d-none');
-            }
-            
-            showToast(t('deleted_success', 'Link deleted'), 'success');
-        } catch (_) {
-            // Remove animation class on error
-            card.classList.remove('deleting');
-        }
-    };
-}
-
-
-async function handleUpload(link, fileOrUrl, isUrl = false, mode = 'replace') {
-    const formData = new FormData();
-    formData.append('linkName', link.linkName);
-    // "append" adds a playlist item behind the same URL and leaves the live
-    // file — and therefore every existing embed — untouched.
-    const isAppend = mode === 'append';
-    if (isAppend) formData.append('mode', 'append');
-
-    if (isUrl) {
-        formData.append('url', fileOrUrl);
-    } else {
-        if (!fileOrUrl.type.startsWith('image/') && !fileOrUrl.type.startsWith('video/')) {
-            showToast(t('invalid_image', 'Invalid file format'), 'error');
-            return;
-        }
-        let fileToUpload = fileOrUrl;
-        if (STATE.compressor && fileOrUrl.type.startsWith('image/')) {
-            const originalSize = fileOrUrl.size;
-            try {
-                fileToUpload = await STATE.compressor.compress(fileOrUrl);
-                if (fileToUpload.size < originalSize) {
-                    const info = ImageCompressor.getCompressionInfo(originalSize, fileToUpload.size);
-                    const msg = t('compression_saved', 'Compressed: {{percent}}% smaller ({{saved}} saved)')
-                        .replace('{{percent}}', info.percent)
-                        .replace('{{saved}}', formatSize(info.saved));
-                    showToast(msg, 'success');
-                }
-            } catch (_) {
-                fileToUpload = fileOrUrl;
-            }
-        }
-        formData.append('file', fileToUpload);
-    }
-
-    try {
-        const updatedLink = await apiCall('/api/upload', 'POST', formData, true);
-        if (!updatedLink) return;
-        if (!updatedLink.createdAt && link.createdAt) updatedLink.createdAt = link.createdAt;
-        const idx = STATE.wallpapers.findIndex(wp => wp.linkName === updatedLink.linkName);
-        if (idx !== -1) STATE.wallpapers[idx] = updatedLink;
-        else STATE.wallpapers.push(updatedLink);
-        // Re-rendering replaces the card with one built from the new data.
-        filterAndSort();
-        showToast(isAppend
-            ? t('append_success', 'Added to playlist')
-            : t('upload_success', 'Uploaded!'), 'success');
-    } catch (_) {}
-}
-
-
-// VERSIONS & PLAYLIST
-// One dialog per link: archived versions (restore/delete), playlist items
-// (open/remove), rotation settings and the in-memory access counters.
-let versionsState = null;
-
-// mediaSelectorURL keeps the token of a protected link and adds ?v= or ?i=.
-function mediaSelectorURL(link, selector) {
-    const base = publicLinkURL(link);
-    if (!selector) return base;
-    return base + (base.includes('?') ? '&' : '?') + selector;
-}
-
-// applyLinkUpdate stores a record returned by the API and refreshes only its
-// card, so an open dialog survives the change.
-function applyLinkUpdate(updated) {
-    if (!updated || !updated.linkName) return null;
-    const idx = STATE.wallpapers.findIndex(wp => wp.linkName === updated.linkName);
-    if (idx !== -1) STATE.wallpapers[idx] = updated;
-    else STATE.wallpapers.push(updated);
-    if (versionsState && versionsState.link.linkName === updated.linkName) {
-        versionsState.link = updated;
-    }
-    const card = DOM.linksList.querySelector(`[data-link-name="${CSS.escape(updated.linkName)}"]`);
-    if (card) updateCard(card, updated);
-    return updated;
-}
-
-function versionsMessage(text, variant = '') {
-    const el = document.createElement('p');
-    el.className = `versions-msg ${variant}`.trim();
-    el.textContent = text;
-    return el;
-}
-
-function versionsRow(kind, title, meta) {
-    const row = document.createElement('div');
-    row.className = `versions-row versions-row--${kind}`;
-
-    const info = document.createElement('div');
-    info.className = 'versions-row-info';
-    const titleEl = document.createElement('span');
-    titleEl.className = 'versions-row-title';
-    titleEl.textContent = title;
-    info.appendChild(titleEl);
-    if (meta) {
-        const metaEl = document.createElement('span');
-        metaEl.className = 'versions-row-meta';
-        metaEl.textContent = meta;
-        info.appendChild(metaEl);
-    }
-    row.appendChild(info);
-
-    const actions = document.createElement('div');
-    actions.className = 'versions-row-actions';
-    row.appendChild(actions);
-    return { row, actions };
-}
-
-function versionsButton(label, variant, onClick) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = `btn btn--small ${variant}`.trim();
-    btn.textContent = label;
-    btn.addEventListener('click', onClick);
-    return btn;
-}
-
-function versionsOpenLink(label, href) {
-    const a = document.createElement('a');
-    a.className = 'btn btn--small';
-    a.href = href;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    a.textContent = label;
-    return a;
-}
-
-function entryMeta(entry) {
-    return [
-        entry.ext ? entry.ext.toUpperCase() : '',
-        entry.sizeBytes ? formatSize(entry.sizeBytes) : '',
-        formatDate(entry.savedAt || entry.modTime || 0),
-    ].filter(Boolean).join(' · ');
-}
-
-async function openVersions(link) {
-    versionsState = { link };
-    DOM.versionsLinkName.textContent = link.linkName;
-    openDialog(DOM.versionsOverlay);
-    applyTranslations(DOM.versionsOverlay);
-    focusAfterPaint(DOM.versionsClose);
-    await refreshVersions();
-}
-
-function closeVersions() {
-    closeDialog(DOM.versionsOverlay);
-    versionsState = null;
-}
-
-async function refreshVersions() {
-    if (!versionsState) return;
-    const link = versionsState.link;
-    const name = encodeURIComponent(link.linkName);
-
-    let data = null;
-    try {
-        data = await apiCall(`/api/link/${name}/history`, 'GET');
-    } catch (_) {
-        DOM.versionsList.replaceChildren(versionsMessage(
-            t('load_error_hint', 'Failed to load — check the connection and try again.'), 'error'));
-        DOM.playlistList.replaceChildren();
-        return;
-    }
-    if (!data) return;
-
-    // --- Version history -------------------------------------------------
-    const rows = [];
-    if (link.hasImage) {
-        const live = data.live || {};
-        const { row, actions } = versionsRow('live',
-            `${t('versions_current', 'Current')} · v${data.currentVersion}`, entryMeta(live));
-        actions.appendChild(versionsOpenLink(t('versions_open', 'Open'), mediaSelectorURL(link, '')));
-        rows.push(row);
-    }
-    const history = Array.isArray(data.history) ? data.history : [];
-    if (!history.length) {
-        rows.push(versionsMessage(data.limit > 0
-            ? t('versions_empty', 'No archived versions yet. Replacing the file keeps the previous one here.')
-            : t('versions_disabled', 'Version history is disabled on this server (HISTORY_LIMIT=0).')));
-    }
-    for (const entry of history) {
-        const { row, actions } = versionsRow('archived', `v${entry.version}`, entryMeta(entry));
-        actions.appendChild(versionsOpenLink(t('versions_open', 'Open'),
-            mediaSelectorURL(link, `v=${entry.version}`)));
-        actions.appendChild(versionsButton(t('versions_restore', 'Restore'), 'btn--primary',
-            () => restoreVersion(link, entry.version)));
-        actions.appendChild(versionsButton(t('delete_btn', 'Delete'), 'btn--danger',
-            () => deleteVersion(link, entry.version)));
-        rows.push(row);
-    }
-    DOM.versionsList.replaceChildren(...rows);
-    DOM.versionsHint.textContent = data.limit > 0
-        ? t('versions_hint', 'Up to {{limit}} archived versions per link · {{size}} used')
-            .replace('{{limit}}', data.limit).replace('{{size}}', formatSize(data.bytes || 0))
-        : '';
-
-    // --- Playlist --------------------------------------------------------
-    const items = Array.isArray(link.items) ? link.items : [];
-    const itemRows = [];
-    if (!items.length) {
-        itemRows.push(versionsMessage(
-            t('playlist_empty', 'No playlist items yet. Use Upload → Add to playlist.')));
-    }
-    for (const item of items) {
-        const { row, actions } = versionsRow('item', `#${item.id}`, entryMeta(item));
-        actions.appendChild(versionsOpenLink(t('versions_open', 'Open'),
-            mediaSelectorURL(link, `i=${item.id}`)));
-        actions.appendChild(versionsButton(t('playlist_remove', 'Remove'), 'btn--danger',
-            () => removePlaylistItem(link, item.id)));
-        itemRows.push(row);
-    }
-    itemRows.push(versionsMessage(
-        t('playlist_count', '{{count}} items · the live file is always position 0')
-            .replace('{{count}}', items.length)));
-    DOM.playlistList.replaceChildren(...itemRows);
-
-    // Rotation needs something to rotate to.
-    const rotate = link.rotate || {};
-    const hasItems = items.length > 0;
-    DOM.rotateEnabled.checked = !!rotate.enabled;
-    DOM.rotateInterval.value = rotate.interval || 60;
-    DOM.rotateOrder.value = rotate.order === 'random' ? 'random' : 'sequential';
-    for (const el of [DOM.rotateEnabled, DOM.rotateInterval, DOM.rotateOrder, DOM.rotateSave]) {
-        if (el) el.disabled = !hasItems;
-    }
-
-    // --- Statistics ------------------------------------------------------
-    const stats = link.stats;
-    DOM.statsBody.textContent = stats && stats.hits
-        ? t('stats_hits', '{{hits}} requests · {{bytes}} transferred · last {{when}}')
-            .replace('{{hits}}', stats.hits)
-            .replace('{{bytes}}', formatSize(stats.bytes || 0))
-            .replace('{{when}}', new Date((stats.lastHit || 0) * 1000).toLocaleString())
-        : t('stats_none', 'Not requested since the server started. Counters are kept in memory and reset on restart.');
-}
-
-async function restoreVersion(link, version) {
-    const msg = t('confirm_restore_msg', 'Restore version {{version}} of "{{name}}"? The file it replaces is archived.')
-        .replace('{{version}}', version).replace('{{name}}', link.linkName);
-    if (!await showConfirm(msg)) return;
-    try {
-        const updated = await apiCall(
-            `/api/link/${encodeURIComponent(link.linkName)}/rollback`, 'POST', { version });
-        applyLinkUpdate(updated);
-        showToast(t('restored_success', 'Version {{version}} restored').replace('{{version}}', version), 'success');
-        await refreshVersions();
-    } catch (_) {}
-}
-
-async function deleteVersion(link, version) {
-    const msg = t('confirm_delete_version_msg', 'Delete archived version {{version}}? This cannot be undone.')
-        .replace('{{version}}', version);
-    if (!await showConfirm(msg)) return;
-    try {
-        const updated = await apiCall(
-            `/api/link/${encodeURIComponent(link.linkName)}/history/${version}`, 'DELETE');
-        applyLinkUpdate(updated);
-        showToast(t('version_deleted', 'Version {{version}} deleted').replace('{{version}}', version), 'success');
-        await refreshVersions();
-    } catch (_) {}
-}
-
-async function removePlaylistItem(link, id) {
-    const msg = t('confirm_remove_item_msg', 'Remove playlist item #{{id}}? This cannot be undone.')
-        .replace('{{id}}', id);
-    if (!await showConfirm(msg)) return;
-    try {
-        const updated = await apiCall(`/api/link/${encodeURIComponent(link.linkName)}`, 'PATCH', { removeItem: id });
-        applyLinkUpdate(updated);
-        showToast(t('item_removed', 'Playlist item removed'), 'success');
-        await refreshVersions();
-    } catch (_) {}
-}
-
-async function saveRotation(link) {
-    const enabled = DOM.rotateEnabled.checked;
-    const raw = parseInt(DOM.rotateInterval.value, 10);
-    // 0 restores the server default; anything else must be inside the bounds.
-    const interval = Number.isFinite(raw) && raw > 0 ? raw : 0;
-    if (enabled && interval !== 0 && (interval < 5 || interval > 86400)) {
-        showToast(t('rotate_interval_invalid', 'The interval must be between 5 and 86400 seconds.'), 'error');
-        return;
-    }
-    try {
-        const updated = await apiCall(`/api/link/${encodeURIComponent(link.linkName)}`, 'PATCH', {
-            rotate: { enabled, interval, order: DOM.rotateOrder.value }
+        [['all', 'filter_all'], ['image', 'filter_photo'], ['video', 'filter_video'],
+         ['playlist', 'filter_playlist'], ['pinned', 'filter_pinned']].forEach(function (pair) {
+            row.append(chip(t(pair[1]), filterCount(pair[0]), {
+                key: pair[0],
+                pressed: state.filter === pair[0],
+                onclick: function () { state.filter = pair[0]; renderChips(); resetShown(); render(); }
+            }));
         });
-        applyLinkUpdate(updated);
-        showToast(t('rotate_saved', 'Rotation updated'), 'success');
-        await refreshVersions();
-    } catch (_) {}
-}
 
-function setupGlobalListeners() {
-    DOM.createForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        if (STATE.createPending) return;
-        const id = DOM.createInput.value.trim();
-        if (!id) { showToast(t('invalid_id', 'ID is required'), 'error'); return; }
-        if (!VALID_LINK_RE.test(id)) {
-            showToast(t('invalid_id_chars', 'Invalid ID format'), 'error');
-            return;
-        }
-        STATE.createPending = true;
-        const btn = DOM.createForm.querySelector('[type="submit"]');
-        if (btn) btn.disabled = true;
-        try {
-            const created = await apiCall('/api/link', 'POST', { linkName: id });
-            DOM.createInput.value = '';
-            // Return focus to input so user can create next link immediately
-            DOM.createInput.focus();
-            STATE.wallpapers.push(created || {
-                linkName: id,
-                hasImage: false,
-                createdAt: Math.floor(Date.now() / 1000),
-                pinned: false,
-                accessLevel: 'public',
+        row.append(h('span', { class: 'chip-row__sep' }));
+
+        const accMeta = state.access === 'any'
+            ? { icon: 'globe', label: t('filter_access') }
+            : { icon: accessMeta(state.access).icon, label: t(accessMeta(state.access).key) };
+        row.append(chip(accMeta.label, undefined, {
+            ghost: true, icon: accMeta.icon, haspopup: true,
+            pressed: state.access !== 'any',
+            onclick: function (e) { openAccessMenu(e.currentTarget); }
+        }));
+
+        row.append(chip(t('sort_by') + ': ' + t(SORT_LABELS[state.sort]), undefined, {
+            ghost: true, icon: 'sliders', haspopup: true,
+            pressed: state.sort !== 'date_desc',
+            onclick: function (e) { openSortMenu(e.currentTarget); }
+        }));
+        hydrateIcons(row);
+
+        row.scrollLeft = scrollLeft;
+        if (focusKey) {
+            const again = $$('.chip', row).find(function (b) {
+                const key = b.dataset.key || b.dataset.tip ||
+                    (b.getAttribute('aria-haspopup') ? 'popup:' + (b.textContent || '').trim() : '');
+                return key === focusKey;
             });
-            filterAndSort();
-            const newCard = DOM.linksList.querySelector(`[data-link-name="${CSS.escape(id)}"]`)
-                ?? DOM.linksList.lastElementChild;
-            if (newCard && typeof newCard.animate === 'function') {
-                newCard.animate([
-                    { opacity: 0, transform: 'translateY(10px)' },
-                    { opacity: 1, transform: 'translateY(0)' }
-                ], { duration: 300 });
+            if (again) again.focus({ preventScroll: true });
+        }
+    }
+
+    /* ========================================================
+       8. МЕНЮ
+       ======================================================== */
+    let openMenuEl = null;
+    function closeMenu() {
+        if (openMenuEl) { openMenuEl.remove(); openMenuEl = null; }
+    }
+    function showMenu(anchor, items, opts) {
+        closeMenu();
+        const menu = h('div', { class: 'menu', role: 'menu' });
+        items.forEach(function (item) {
+            if (item.sep) { menu.append(h('div', { class: 'menu__sep' })); return; }
+            if (item.label) { menu.append(h('div', { class: 'menu__label', text: item.label })); return; }
+            menu.append(h('button', {
+                class: 'menu__item' + (item.danger ? ' menu__item--danger' : ''),
+                type: 'button',
+                role: item.checked === undefined ? 'menuitem' : 'menuitemradio',
+                'aria-checked': item.checked === undefined ? null : String(!!item.checked),
+                onclick: function () {
+                    closeMenu();
+                    if (item.onclick) item.onclick();
+                }
+            }, icon(item.icon), h('span', { class: 'grow', text: item.text }),
+               item.hint ? h('span', { class: 'menu__item__hint', text: item.hint }) : null,
+               item.checked ? icon('check') : null));
+        });
+        document.body.append(menu);
+        openMenuEl = menu;
+
+        const r = anchor.getBoundingClientRect();
+        const mw = menu.offsetWidth;
+        const mh = menu.offsetHeight;
+        const align = (opts && opts.align) || 'start';
+        let left = align === 'end' ? r.right - mw : r.left;
+        left = Math.max(10, Math.min(left, window.innerWidth - mw - 10));
+        let top = r.bottom + 6;
+        if (top + mh > window.innerHeight - 10) top = Math.max(10, r.top - mh - 6);
+        menu.style.left = left + 'px';
+        menu.style.top = top + 'px';
+        hydrateIcons(menu);
+        if (opts && opts.focusFirst !== false) $('.menu__item', menu)?.focus();
+        return menu;
+    }
+
+    /* Ключи состояния и ключи перевода не совпадают по имени — держим
+       соответствие в одном месте, чтобы чип не показывал 'date_desc'. */
+    const SORT_LABELS = {
+        name_asc: 'name_asc', name_desc: 'name_desc',
+        date_desc: 'date_new', date_asc: 'date_old', size_desc: 'size_desc'
+    };
+
+    function openSortMenu(anchor) {
+        showMenu(anchor, [
+            { label: t('sort_by') },
+            { text: t('name_asc'), checked: state.sort === 'name_asc', onclick: () => setSort('name_asc') },
+            { text: t('name_desc'), checked: state.sort === 'name_desc', onclick: () => setSort('name_desc') },
+            { text: t('date_new'), checked: state.sort === 'date_desc', onclick: () => setSort('date_desc') },
+            { text: t('date_old'), checked: state.sort === 'date_asc', onclick: () => setSort('date_asc') },
+            { sep: true },
+            { text: t('size_desc'), checked: state.sort === 'size_desc', onclick: () => setSort('size_desc') }
+        ]);
+    }
+    function setSort(sort) {
+        resetShown();
+        state.sort = sort;
+        savePrefs();
+        renderChips();
+        render();
+    }
+    function openScopeMenu(anchor) {
+        showMenu(anchor, [
+            {
+                icon: 'search', text: t('search_in_name'), checked: state.scope === 'name',
+                onclick: function () { state.scope = 'name'; savePrefs(); renderChips(); resetShown(); render(); }
+            },
+            {
+                icon: 'sliders', text: t('search_in_all'), checked: state.scope === 'all',
+                onclick: function () { state.scope = 'all'; savePrefs(); renderChips(); resetShown(); render(); }
             }
-            showToast(t('created_success', 'Link created'), 'success');
-        } catch (_) {}
-        finally {
-            STATE.createPending = false;
-            if (btn) btn.disabled = false;
-        }
-    });
+        ], { align: 'start' });
+    }
 
-    DOM.modalOverlay.onclick = (e) => {
-        if (e.target === DOM.modalOverlay) closeModal();
-    };
+    function openAccessMenu(anchor) {
+        const items = [{ label: t('access_label') }, { text: t('filter_access_any'), checked: state.access === 'any', onclick: () => setAccess('any') }];
+        ['public', 'local', 'token', 'auth'].forEach(function (level) {
+            items.push({
+                icon: accessMeta(level).icon,
+                text: t(accessMeta(level).key),
+                checked: state.access === level,
+                onclick: () => setAccess(level)
+            });
+        });
+        showMenu(anchor, items);
+    }
+    function setAccess(level) {
+        resetShown();
+        state.access = level;
+        renderChips();
+        render();
+    }
 
-    DOM.modalOverlay.addEventListener('keydown', (e) => {
-        if (e.key === 'Tab' && !DOM.modalOverlay.classList.contains('hidden')) trapFocus(DOM.modalOverlay, e);
-    });
+    /* ========================================================
+       9. ОВЕРЛЕИ: панель, диалоги, фокус
+       ======================================================== */
+    const host = () => $('#overlayHost');
+    let currentOverlay = null;
+    let lastFocused = null;
 
-    DOM.confirmCancel.onclick = () => closeConfirm(false);
-    DOM.confirmDelete.onclick = () => closeConfirm(true);
-    DOM.confirmOverlay.onclick = (e) => {
-        if (e.target === DOM.confirmOverlay) closeConfirm(false);
-    };
-
-    DOM.confirmOverlay.addEventListener('keydown', (e) => {
-        if (DOM.confirmOverlay.classList.contains('hidden')) return;
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            closeConfirm(true); // Confirm deletion on Enter
-        } else if (e.key === 'Tab') {
-            trapFocus(DOM.confirmOverlay, e);
-        }
-    });
-
-    if (DOM.versionsOverlay) {
-        DOM.versionsClose.onclick = closeVersions;
-        DOM.versionsOverlay.onclick = (e) => {
-            if (e.target === DOM.versionsOverlay) closeVersions();
+    function openOverlay(node, opts) {
+        // Запоминаем, откуда пришли: после закрытия фокус вернётся туда же.
+        const origin = document.activeElement;
+        closeOverlay(true);
+        lastFocused = (origin && origin !== document.body) ? origin : lastFocused;
+        const scrim = h('div', { class: 'scrim', onclick: () => { if (!(opts && opts.persistent)) closeOverlay(); } });
+        host().append(scrim, node);
+        /* Тексты шаблонов переводим здесь: <template> лежит вне документа,
+           и переводы, наложенные при запуске, до клона не дотягиваются. */
+        applyTranslations(node);
+        currentOverlay = {
+            node: node, scrim: scrim, kind: (opts && opts.kind) || 'other',
+            /* Кто-то ждёт ответа «закрыли и не подтвердили» — например,
+               импорт списка: отмена должна вернуть управление, а не
+               оставить ожидание навсегда. */
+            onDismiss: (opts && opts.onDismiss) || null
         };
-        DOM.versionsOverlay.addEventListener('keydown', (e) => {
-            if (DOM.versionsOverlay.classList.contains('hidden')) return;
-            // Escape must work while the rotation interval input has focus, which
-            // the document-level shortcut handler ignores on purpose.
-            if (e.key === 'Escape') {
-                e.stopPropagation();
-                closeVersions();
+        document.body.style.overflow = 'hidden';
+        hydrateIcons(node);
+        const target = (opts && opts.focus) || node.querySelector('[autofocus], input, button');
+        setTimeout(() => target && target.focus({ preventScroll: true }), 40);
+        return node;
+    }
+    function closeOverlay(keepFocus) {
+        if (!currentOverlay) return;
+        const dismiss = currentOverlay.onDismiss;
+        currentOverlay.node.remove();
+        currentOverlay.scrim.remove();
+        currentOverlay = null;
+        if (dismiss) dismiss();
+        document.body.style.overflow = '';
+        closeMenu();
+        if (!keepFocus && lastFocused && lastFocused.isConnected) lastFocused.focus({ preventScroll: true });
+        lastFocused = null;
+    }
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            if (openMenuEl) { closeMenu(); return; }
+            if (currentOverlay) { closeOverlay(); }
+        }
+        if (e.key === 'Tab' && currentOverlay) {
+            const focusables = $$('a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])', currentOverlay.node)
+                .filter(el => el.offsetParent !== null);
+            if (!focusables.length) return;
+            const first = focusables[0];
+            const last = focusables[focusables.length - 1];
+            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+    });
+    document.addEventListener('click', function (e) {
+        if (openMenuEl && !openMenuEl.contains(e.target) && !e.target.closest('[aria-haspopup]')) closeMenu();
+    });
+    window.addEventListener('resize', closeMenu);
+    window.addEventListener('scroll', closeMenu, true);
+    /* От ширины зависит состав строки списка: на телефоне нет переключателя
+       доступа, на десктопе есть. Пересекли границу — перерисовываем. */
+    let wasPhone = isPhone();
+    window.addEventListener('resize', function () {
+        const now = isPhone();
+        if (now !== wasPhone) { wasPhone = now; render(); }
+    });
+
+    /* ========================================================
+       10. ТОСТЫ
+       ======================================================== */
+    /* Больше четырёх сообщений на экране не читаются: пятое вытесняет
+       самое старое. */
+    const MAX_TOASTS = 4;
+    function toast(message, opts) {
+        const o = opts || {};
+        const box = h('div', { class: 'toast toast--' + (o.type || 'success'), role: 'status' },
+            h('span', { class: 'toast__icon' }, icon(o.type === 'error' ? 'alert' : (o.type === 'info' ? 'info' : 'check'))),
+            h('span', { class: 'toast__text', text: message }));
+        if (o.action) {
+            box.append(h('button', {
+                class: 'toast__action', type: 'button', text: o.action,
+                onclick: function () { dismiss(); if (o.onAction) o.onAction(); }
+            }));
+        }
+        box.append(h('button', {
+            class: 'toast__close', type: 'button', 'aria-label': t('close'),
+            onclick: () => dismiss()
+        }, icon('x')));
+        const container = $('#toasts');
+        container.append(box);
+        hydrateIcons(box);
+        /* Старшие тосты уходят сразу: таймер снимаем, иначе он ещё четыре
+           секунды держит ссылку на удалённый узел. */
+        while (container.children.length >= MAX_TOASTS) {
+            const oldest = container.firstElementChild;
+            if (oldest.dismissToast) oldest.dismissToast();
+            oldest.remove();
+        }
+        const timer = setTimeout(dismiss, o.duration || 4200);
+        box.dismissToast = dismiss;
+        function dismiss() {
+            clearTimeout(timer);
+            if (!box.isConnected || box.classList.contains('is-out')) return;
+            box.classList.add('is-out');
+            setTimeout(() => box.remove(), 200);
+        }
+    }
+
+    /* ========================================================
+       11. ДЕЙСТВИЯ СО ССЫЛКОЙ
+       ======================================================== */
+    const hostName = () => location.hostname && location.protocol !== 'file:' ? location.hostname : 'lanpaper.local';
+    const linkUrl = (link, extra) => location.origin.replace(/\/$/, '') + '/' + link.linkName + (extra || '');
+
+    function copyText(text) {
+        const done = () => toast(t('copied'), { type: 'success', duration: 2000 });
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(done).catch(() => toast(t('copy_error'), { type: 'error' }));
+            return;
+        }
+        const ta = h('textarea', { class: 'clipboard-proxy' });
+        ta.value = text;
+        document.body.append(ta);
+        ta.select();
+        try { document.execCommand('copy'); done(); } catch (e) { toast(t('copy_error'), { type: 'error' }); }
+        ta.remove();
+    }
+    function copyLink(link) {
+        const extra = link.accessLevel === 'token' && link.accessToken ? '?token=' + link.accessToken : '';
+        copyText(linkUrl(link, extra));
+    }
+    function openMedia(link) {
+        if (!link.hasImage) { toast(t('no_image'), { type: 'info' }); return; }
+        window.open(linkUrl(link), '_blank', 'noopener');
+    }
+    /* Закрепление, уровень доступа и удаление меняют файлы на сервере, а
+       показанное берём из ответа: панель никогда не рисует состояние,
+       которого нет на диске. */
+    async function togglePin(link) {
+        if (state.busy) return;
+        state.busy = true;
+        try {
+            const updated = await apiCall('/api/link/' + encodeURIComponent(link.linkName) + '/pin', 'POST');
+            const fresh = applyLinkUpdate(updated);
+            toast(t((fresh && fresh.pinned ? 'pinned_toast' : 'unpinned_toast')), { type: 'info', duration: 2200 });
+        } catch (_) { /* текст ошибки уже показан */ }
+        finally { state.busy = false; }
+    }
+    async function setAccessLevel(link, level) {
+        if (state.busy) return;
+        if (link.accessLevel === level && !(level === 'token' && !link.accessToken)) return;
+        state.busy = true;
+        try {
+            const updated = await apiCall('/api/link/' + encodeURIComponent(link.linkName),
+                'PATCH', { accessLevel: level });
+            applyLinkUpdate(updated);
+            toast(t('access_updated'));
+            /* Пульт перерисовывает applyLinkUpdate, сохраняя прокрутку:
+               иначе переключение уровня отбрасывает в начало панели. */
+        } catch (_) {
+            render();
+            renderPanel();
+        }
+        finally { state.busy = false; }
+    }
+    function deleteLink(link, skipConfirm) {
+        const remove = async function () {
+            try {
+                await apiCall('/api/link/' + encodeURIComponent(link.linkName), 'DELETE');
+            } catch (_) {
+                return;   /* текст ошибки уже показан */
+            }
+            const index = state.links.indexOf(link);
+            if (index >= 0) state.links.splice(index, 1);
+            state.selected.delete(link.linkName);
+            if (currentOverlay && currentOverlay.kind === 'panel'
+                && currentOverlay.node.dataset.name === link.linkName) closeOverlay();
+            renderChips();
+            render();
+            /* Возврата нет: сервер удаляет файл вместе с версиями и
+               плейлистом, поэтому тост говорит о результате, а не обещает
+               отмену, которой не существует. */
+            toast(t('deleted', { name: link.linkName }), { type: 'info', duration: 4000 });
+        };
+        if (skipConfirm) { remove(); return; }
+        openConfirm({
+            title: t('delete_title'),
+            text: t('delete_msg', { name: link.linkName }),
+            onConfirm: remove
+        });
+    }
+    function renameLink(link) {
+        openCreateDialog({ rename: link });
+    }
+
+    /* Меню «⋯» в карточке */
+    function openCardMenu(link, anchor) {
+        anchor.setAttribute('aria-expanded', 'true');
+        const menu = showMenu(anchor, [
+            { icon: 'sliders', text: t('open_panel'), onclick: () => openPanel(link) },
+            { icon: 'external', text: t('open_media'), onclick: () => openMedia(link) },
+            { icon: 'copy', text: t('copy_url'), onclick: () => copyLink(link) },
+            { sep: true },
+            { icon: 'pencil', text: t('rename'), onclick: () => renameLink(link) },
+            {
+                icon: 'pin',
+                text: t(link.pinned ? 'unpin' : 'pin'),
+                checked: !!link.pinned,
+                onclick: () => togglePin(link)
+            },
+            { icon: 'lock', text: t('access_label'), onclick: () => openPanel(link, 'access') },
+            { sep: true },
+            { icon: 'trash', text: t('delete'), danger: true, onclick: () => deleteLink(link) }
+        ], { align: 'end' });
+        const clear = function () { anchor.setAttribute('aria-expanded', 'false'); };
+        menu.addEventListener('mouseleave', () => {});
+        const observer = new MutationObserver(function () {
+            if (!menu.isConnected) { clear(); observer.disconnect(); }
+        });
+        observer.observe(document.body, { childList: true });
+    }
+
+    /* ========================================================
+       12. РЕЖИМ ВЫБОРА И ПАКЕТНЫЕ ДЕЙСТВИЯ
+       ======================================================== */
+    function setSelecting(on) {
+        state.selecting = on;
+        if (!on) state.selected.clear();
+        $('#selectBtn').setAttribute('aria-pressed', String(on));
+        render();
+    }
+    function toggleSelected(link) {
+        if (state.selected.has(link.linkName)) state.selected.delete(link.linkName);
+        else state.selected.add(link.linkName);
+        render();
+    }
+    function selectedLinks() {
+        return state.links.filter(l => state.selected.has(l.linkName));
+    }
+    function updateBulkbar() {
+        let bar = $('#bulkbar');
+        document.body.classList.toggle('has-bulk', !!(state.selecting && state.selected.size));
+        if (!state.selecting || !state.selected.size) {
+            if (bar) bar.remove();
+            $('#fabBtn').classList.remove('is-hidden');
+            return;
+        }
+        if (!bar) {
+            bar = h('div', { class: 'bulkbar', id: 'bulkbar', role: 'toolbar', 'aria-label': t('select_mode') });
+            document.body.append(bar);
+        }
+        bar.innerHTML = '';
+        bar.append(h('span', { class: 'bulkbar__count', text: t('selected', { count: state.selected.size }) }));
+        bar.append(h('span', { class: 'bulkbar__sep' }));
+        const anyUnpinned = selectedLinks().some(l => !l.pinned);
+        bar.append(h('button', {
+            class: 'btn btn--sm', type: 'button', onclick: async function () {
+                /* Пакетной ручки закрепления нет: это N запросов по одному
+                   намерению. Массовой смены ДОСТУПА здесь намеренно нет —
+                   у ссылок разные уровни, и одним нажатием можно открыть
+                   наружу больше, чем хотелось (см. design/06-redesign-v2.md). */
+                const targets = selectedLinks().filter(l => l.pinned !== !anyUnpinned);
+                for (const link of targets) {
+                    try {
+                        const updated = await apiCall('/api/link/'
+                            + encodeURIComponent(link.linkName) + '/pin', 'POST');
+                        const idx = state.links.findIndex(l => l.linkName === link.linkName);
+                        if (idx >= 0 && updated) state.links[idx] = normalizeLink(updated);
+                    } catch (_) { /* по одной ссылке — уже показано */ }
+                }
+                toast(t('bulk_pinned', { count: targets.length }));
+                render();
+            }
+        }, icon('pin'), h('span', { text: t(anyUnpinned ? 'bulk_pin' : 'bulk_unpin') })));
+        bar.append(h('button', {
+            class: 'btn btn--sm', type: 'button', onclick: function () {
+                copyText(selectedLinks().map(l => linkUrl(l, l.accessLevel === 'token' ? '?token=' + l.accessToken : '')).join('\n'));
+                toast(t('bulk_copied', { count: state.selected.size }));
+            }
+        }, icon('copy'), h('span', { text: t('bulk_copy') })));
+        bar.append(h('button', {
+            class: 'btn btn--sm btn--danger', type: 'button', onclick: function () {
+                const count = state.selected.size;
+                openConfirm({
+                    title: t('bulk_delete_title', { count: count }),
+                    text: t('bulk_delete_msg'),
+                    onConfirm: async function () {
+                        const names = Array.from(state.selected);
+                        let done = 0;
+                        for (const name of names) {
+                            try {
+                                await apiCall('/api/link/' + encodeURIComponent(name), 'DELETE');
+                                done++;
+                            } catch (_) { /* по одной ссылке — уже показано */ }
+                        }
+                        state.links = state.links.filter(l => names.indexOf(l.linkName) < 0);
+                        state.selected.clear();
+                        renderChips();
+                        render();
+                        toast(t('bulk_deleted', { count: done }), { type: 'info' });
+                    }
+                });
+            }
+        }, icon('trash'), h('span', { text: t('bulk_delete') })));
+        bar.append(h('button', {
+            class: 'icon-btn icon-btn--sm', type: 'button', 'aria-label': t('clear_selection'),
+            onclick: function () { state.selected.clear(); render(); }
+        }, icon('x')));
+        hydrateIcons(bar);
+        $('#fabBtn').classList.add('is-hidden');
+    }
+
+    /* ========================================================
+       13. ПАНЕЛЬ ССЫЛКИ («пульт»)
+       ======================================================== */
+    function openPanel(link, tab) {
+        state.panelName = link.linkName;
+        state.panelTab = tab || 'media';
+        const node = $('#tplPanel').content.firstElementChild.cloneNode(true);
+        node.dataset.name = link.linkName;
+
+        $$('[data-tab]', node).forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                state.panelTab = btn.dataset.tab;
+                renderPanel();
+            });
+        });
+        $$('[data-close]', node).forEach(b => b.addEventListener('click', () => closeOverlay()));
+        $('[data-delete]', node).addEventListener('click', function () {
+            deleteLink(link);
+        });
+
+        openOverlay(node, { kind: 'panel', focus: node.querySelector('[data-tab][aria-selected="true"]') });
+        renderPanel();
+    }
+
+    function renderPanel() {
+        /* Только для пульта ссылки: диалог создания и настройки — тоже
+           оверлеи, и перерисовка «панелью» закрывала бы их (так смена языка
+           закрывала настройки). */
+        if (!currentOverlay || currentOverlay.kind !== 'panel') return;
+        const node = currentOverlay.node;
+        const link = findLink(node.dataset.name);
+        if (!link) { closeOverlay(); return; }
+
+        $$('[data-tab]', node).forEach(function (btn) {
+            const on = btn.dataset.tab === state.panelTab;
+            btn.setAttribute('aria-selected', String(on));
+            if (on) $('[data-body]', node).setAttribute('aria-labelledby', btn.id);
+        });
+
+        $('#panelTitle', node).textContent = link.linkName;
+        const sub = $('[data-sub]', node);
+        sub.innerHTML = '';
+        if (link.stats && link.stats.hits) {
+            sub.append(
+                h('span', { text: t('stat_hits') + ': ' + num(link.stats.hits) }),
+                h('span', { class: 'sep', text: '·' }),
+                h('span', { text: formatBytes(link.stats.bytes) }),
+                h('span', { class: 'sep', text: '·' }),
+                h('span', { text: formatRelative(link.stats.lastHit || 0) })
+            );
+        } else {
+            sub.append(h('span', { text: t('stat_none') }));
+        }
+
+        const body = $('[data-body]', node);
+        body.innerHTML = '';
+        const builders = { media: panelMedia, versions: panelVersions, playlist: panelPlaylist, access: panelAccess };
+        body.append((builders[state.panelTab] || panelMedia)(link));
+        hydrateIcons(body);
+    }
+
+    function panelMedia(link) {
+        const wrap = h('div', { class: 'stack' });
+
+        /* URL — главная ценность ссылки, поэтому она наверху */
+        wrap.append(h('div', { class: 'url-line' },
+            h('span', { class: 'url-line__host', text: hostName() + '/' }),
+            h('span', { class: 'url-line__id grow', text: link.linkName }),
+            h('button', {
+                class: 'icon-btn icon-btn--sm', type: 'button', 'aria-label': t('copy_url'), 'data-tip': t('copy_url'),
+                onclick: () => copyLink(link)
+            }, icon('copy'))));
+
+        /* Превью текущего файла */
+        const fit = fitMode(link);
+        const frame = h('div', { class: 'card__frame panel-preview' });
+        if (fit === 'empty') {
+            frame.classList.add('card__frame--empty');
+            frame.append(icon('imageOff'));
+        } else {
+            const img = h('img', {
+                class: 'card__media' + (fit === 'contain' ? ' card__media--contain' : ''),
+                src: previewSrc(link), alt: ''
+            });
+            if (fit === 'contain' && link.mimeType === 'image/png') frame.classList.add('card__frame--checker');
+            img.addEventListener('error', function () { showEmptyFrame(frame, img); });
+            frame.append(img);
+        }
+        wrap.append(frame);
+
+        /* Сведения о файле */
+        const info = h('div', { class: 'card-block card-block--soft stack stack--tight' });
+        const rows = [
+            [t('file_type'), (link.mimeType || '—') + (link.width ? ' · ' + link.width + '×' + link.height : '')],
+            [t('file_size'), link.hasImage ? formatBytes(link.sizeBytes) : t('no_image')],
+            [t('file_changed'), formatRelative(link.modTime)],
+            [t('file_version'), 'v' + link.currentVersion + (link.history.length
+                ? ' · ' + t('in_archive', { count: link.history.length }) : '')]
+        ];
+        rows.forEach(function (row) {
+            info.append(h('div', { class: 'split' },
+                h('span', { class: 'label', text: row[0] }),
+                h('span', { class: 'num num--sm', text: row[1] })));
+        });
+        wrap.append(h('section', { class: 'section' },
+            h('div', { class: 'section__head' }, h('span', { class: 'section__title', text: t('change_media') })),
+            info));
+
+        /* Способы заменить медиа */
+        wrap.append(h('div', { class: 'stack stack--tight' },
+            h('button', { class: 'row', type: 'button', onclick: () => pickFileFor(link) },
+                h('span', { class: 'row__thumb row__thumb--icon' }, icon('upload')),
+                h('span', { class: 'row__body' },
+                    h('span', { class: 'row__title', text: t('upload_file') }),
+                    h('span', { class: 'row__sub', text: t('dropzone_hint') })),
+                h('span', { class: 'row__aside' }, icon('external'))),
+            h('button', { class: 'row', type: 'button', onclick: () => openUrlDialog(link) },
+                h('span', { class: 'row__thumb row__thumb--icon' }, icon('globe')),
+                h('span', { class: 'row__body' },
+                    h('span', { class: 'row__title', text: t('upload_url') }),
+                    h('span', { class: 'row__sub', text: t('url_hint') })),
+                h('span', { class: 'row__aside' }, icon('external'))),
+            h('button', { class: 'row', type: 'button', onclick: () => openServerPicker(link) },
+                h('span', { class: 'row__thumb row__thumb--icon' }, icon('folder')),
+                h('span', { class: 'row__body' },
+                    h('span', { class: 'row__title', text: t('upload_server') }),
+                    h('span', { class: 'row__sub', text: t('server_hint') })),
+                h('span', { class: 'row__aside' }, icon('external'))),
+            (function () {
+                /* Лимит сервера (PLAYLIST_MAX) виден заранее: в приложении
+                   панель узнаёт о нём только из отказа. */
+                const max = state.config.playlistMax;
+                const full = link.items.length >= max;
+                const btn = h('button', {
+                    class: 'row', type: 'button',
+                    onclick: () => pickFileFor(link, 'append')
+                },
+                    h('span', { class: 'row__thumb row__thumb--icon' }, icon('playlist')),
+                    h('span', { class: 'row__body' },
+                        h('span', { class: 'row__title', text: t('upload_append') }),
+                        h('span', { class: 'row__sub', text: full
+                            ? t('playlist_full', { max: max })
+                            : (link.items.length ? t('playlist_count', { count: link.items.length }) : t('playlist_empty')) })),
+                    h('span', { class: 'row__aside' }, icon(full ? 'x' : 'external')));
+                if (full) btn.disabled = true;
+                return btn;
+            })()));
+
+        /* Статистика: раздел на месте всегда. Пустой блок честнее
+           исчезающего — видно, что счётчики есть, но обращений не было. */
+        const hits = link.stats && link.stats.hits ? link.stats.hits : 0;
+        const held = link.stats && link.stats.bytes ? link.stats.bytes : 0;
+        const last = link.stats && link.stats.lastHit ? formatRelative(link.stats.lastHit) : '';
+        wrap.append(h('section', { class: 'section' },
+            h('div', { class: 'section__head' },
+                h('span', { class: 'section__title', text: t('stats_title') })),
+            h('div', { class: 'card-block card-block--soft stack stack--tight' },
+                h('div', { class: 'split' },
+                    h('span', { class: 'num num--lg', text: num(hits) }),
+                    h('span', { class: 'label', text: formatBytes(held) })),
+                h('span', { class: 'field-hint', text: hits
+                    ? t('stats_last', { when: last })
+                    : t('stats_none_hint') })),
+            h('p', { class: 'field-hint', text: t('stats_reset_hint') })));
+        return wrap;
+    }
+
+    /* Лимит версий и их бюджет знает только сервер: /api/link/{name}/history
+       отдаёт их вместе с архивом, поэтому строка о бюджете появляется после
+       ответа, а не рисуется из выдуманных чисел. */
+    function loadHistoryInfo(link) {
+        return apiCall('/api/link/' + encodeURIComponent(link.linkName) + '/history')
+            .catch(function () { return null; });
+    }
+
+    function panelVersions(link) {
+        const wrap = h('div', { class: 'stack' });
+        const used = (link.history || []).reduce((sum, v) => sum + (v.sizeBytes || 0), 0);
+        const hint = h('p', { class: 'field-hint', text: t('versions_hint_short', { size: formatBytes(used) }) });
+        wrap.append(hint);
+
+        loadHistoryInfo(link).then(function (data) {
+            if (!data) return;
+            /* История может быть выключена ручкой HISTORY_LIMIT=0 — тогда это
+               не «пустой архив», а другое состояние, и говорит оно другое.
+               Общий бюджет версий сервер не публикует, поэтому строка честно
+               говорит про лимит и занятое место этой ссылки. */
+            hint.textContent = data.limit
+                ? t('versions_hint', { limit: data.limit, size: formatBytes(Number(data.bytes || 0)) })
+                : t('versions_disabled');
+        });
+
+        const list = h('div', { class: 'stack stack--tight' });
+        list.append(versionRow(link, { version: link.currentVersion, sizeBytes: link.sizeBytes, mtime: link.modTime, mimeType: link.mimeType }, true));
+        (link.history || []).forEach(function (v) {
+            list.append(versionRow(link, v, false));
+        });
+        if (!link.history.length) {
+            list.append(h('p', { class: 'field-hint', text: t('versions_empty') }));
+        }
+        wrap.append(h('section', { class: 'section' },
+            h('div', { class: 'section__head' }, h('span', { class: 'section__title', text: t('versions_history') })),
+            list));
+        return wrap;
+    }
+
+    function versionRow(link, version, isCurrent) {
+        const row = h('div', { class: 'vrow' + (isCurrent ? ' vrow--current' : '') },
+            h('span', { class: 'vrow__tag', text: 'v' + version.version }),
+            h('span', { class: 'vrow__body' },
+                h('span', { class: 'vrow__title', text: isCurrent ? t('versions_current') : entryTitle(version) }),
+                h('span', { class: 'vrow__sub', text: formatDate(version.modTime || 0) + ' · ' + formatBytes(version.sizeBytes) })),
+            h('span', { class: 'row__aside' },
+                h('button', {
+                    class: 'icon-btn icon-btn--sm', type: 'button', 'aria-label': t('versions_open'), 'data-tip': t('versions_open'),
+                    onclick: () => openMedia(link)
+                }, icon('external')),
+                isCurrent ? null : h('button', {
+                    class: 'icon-btn icon-btn--sm', type: 'button', 'aria-label': t('versions_restore'), 'data-tip': t('versions_restore'),
+                    onclick: function () {
+                        /* Восстановление обратимо: сервер сам архивирует файл,
+                           который был на месте восстанавливаемого. */
+                        apiCall('/api/link/' + encodeURIComponent(link.linkName) + '/rollback',
+                            'POST', { version: version.version })
+                            .then(function (updated) {
+                                applyLinkUpdate(updated);
+                                toast(t('restored', { version: version.version }));
+                            })
+                            .catch(function () {});
+                    }
+                }, icon('rotate')),
+                isCurrent ? null : h('button', {
+                    class: 'icon-btn icon-btn--sm', type: 'button', 'aria-label': t('versions_delete'), 'data-tip': t('versions_delete'),
+                    onclick: function () {
+                        apiCall('/api/link/' + encodeURIComponent(link.linkName) + '/history/' + version.version, 'DELETE')
+                            .then(function (updated) {
+                                applyLinkUpdate(updated);
+                                toast(t('version_deleted', { version: version.version }), { type: 'info' });
+                            })
+                            .catch(function () {});
+                    }
+                }, icon('trash'))));
+        return row;
+    }
+
+    function panelPlaylist(link) {
+        const wrap = h('div', { class: 'stack' });
+
+        /* Поля ротации у сервера называются enabled / interval / order. */
+        const rotate = link.rotate || { enabled: false, interval: 30, order: 'sequential' };
+        const controls = h('div', { class: 'card-block stack' });
+        const switchEl = h('label', { class: 'switch' },
+            h('input', { type: 'checkbox', checked: rotate.enabled, onchange: markDirty }),
+            h('span', { class: 'switch__track' }),
+            h('span', { class: 'switch__text', text: t('rotate_enabled') }));
+        const intervalInput = h('input', {
+            class: 'input input--interval', type: 'number', min: '5', max: '86400', step: '5',
+            id: 'rotateInterval', value: String(rotate.interval || 30), inputmode: 'numeric', oninput: markDirty
+        });
+        const orderSelect = h('select', { class: 'select', id: 'rotateOrder', onchange: markDirty },
+            h('option', { value: 'sequential', text: t('rotate_sequential') }),
+            h('option', { value: 'random', text: t('rotate_random') }));
+        orderSelect.value = rotate.order;
+
+        const saveBtn = h('button', {
+            class: 'btn btn--primary btn--sm', type: 'button', disabled: true, text: t('rotate_save'),
+            onclick: function () {
+                const payload = {
+                    enabled: switchEl.querySelector('input').checked,
+                    interval: Math.min(86400, Math.max(5, Number(intervalInput.value) || 30)),
+                    order: orderSelect.value
+                };
+                saveBtn.disabled = true;
+                apiCall('/api/link/' + encodeURIComponent(link.linkName), 'PATCH', { rotate: payload })
+                    .then(function (updated) {
+                        applyLinkUpdate(updated);
+                        toast(t('rotate_saved'));
+                    })
+                    .catch(function () { saveBtn.disabled = false; });
+            }
+        });
+        function markDirty() {
+            saveBtn.disabled = false;
+            hint.textContent = t('rotate_unsaved');
+        }
+        const hint = h('p', { class: 'field-hint' });
+
+        controls.append(switchEl,
+            h('div', { class: 'inline inline--wrap' },
+                h('label', { class: 'label', for: 'rotateInterval', text: t('rotate_interval') }),
+                intervalInput,
+                h('label', { class: 'label label--inline', for: 'rotateOrder', text: t('rotate_order') }),
+                orderSelect),
+            h('div', { class: 'split' }, hint, saveBtn));
+
+        wrap.append(h('section', { class: 'section' },
+            h('div', { class: 'section__head' },
+                h('span', { class: 'section__title', text: t('rotate_enabled') }),
+                h('span', { class: 'label', text: link.items.length ? t('playlist_count', { count: link.items.length }) : '' })),
+            controls));
+
+        const list = h('div', { class: 'stack stack--tight' });
+        list.append(playlistRow(link, { id: '0', mimeType: link.mimeType, sizeBytes: link.sizeBytes, mtime: link.modTime }, true));
+        link.items.forEach(function (item) {
+            list.append(playlistRow(link, item, false));
+        });
+        if (!link.items.length) list.append(h('p', { class: 'field-hint', text: t('playlist_empty') }));
+        /* Предел сервера (PLAYLIST_MAX) виден до нажатия: в приложении 0.12.1
+           о нём сообщал только отказ на запрос. Когда файлов уже максимум,
+           вместо кнопки стоит объяснение. */
+        const max = state.config.playlistMax;
+        if (max > 0 && link.items.length >= max) {
+            list.append(h('p', { class: 'field-hint', text: t('playlist_full', { max: max }) }));
+        } else {
+            list.append(h('button', { class: 'btn btn--soft btn--block', type: 'button', onclick: () => pickFileFor(link, 'append') },
+                icon('plus'), h('span', { text: t('upload_append') })));
+        }
+        wrap.append(h('section', { class: 'section' },
+            h('div', { class: 'section__head' }, h('span', { class: 'section__title', text: t('panel_playlist') })),
+            list));
+        return wrap;
+    }
+
+    function playlistRow(link, item, isLive) {
+        return h('div', { class: 'vrow' + (isLive ? ' vrow--current' : '') },
+            h('span', { class: 'vrow__tag', text: isLive ? '0' : String(item.id) }),
+            h('span', { class: 'vrow__body' },
+                h('span', { class: 'vrow__title', text: isLive ? t('versions_current') : ('#' + item.id) }),
+                h('span', { class: 'vrow__sub', text: entryMeta(item) + ' · ' + formatDate(item.modTime || item.addedAt || 0) })),
+            h('span', { class: 'row__aside' },
+                isLive ? null : h('button', {
+                    class: 'icon-btn icon-btn--sm', type: 'button', 'aria-label': t('playlist_remove'), 'data-tip': t('playlist_remove'),
+                    onclick: function () {
+                        apiCall('/api/link/' + encodeURIComponent(link.linkName), 'PATCH', { removeItem: item.id })
+                            .then(function (updated) {
+                                applyLinkUpdate(updated);
+                                toast(t('item_removed'), { type: 'info' });
+                            })
+                            .catch(function () {});
+                    }
+                }, icon('trash'))));
+    }
+
+    /* Тип и вес файла для строк версий и плейлиста: сервер отдаёт расширение
+       (ext), размер и время — этого достаточно, размеров кадра у него нет. */
+    function entryMeta(entry) {
+        return [
+            entry.ext ? String(entry.ext).toUpperCase() : '',
+            entry.sizeBytes ? formatBytes(entry.sizeBytes) : ''
+        ].filter(Boolean).join(' · ');
+    }
+    function entryTitle(entry) {
+        return entryMeta(entry) || formatBytes(entry.sizeBytes);
+    }
+
+    function panelAccess(link) {
+        const wrap = h('div', { class: 'stack' });
+        const levels = [
+            ['public', 'globe', 'access_public', 'access_public_hint'],
+            ['local', 'lock', 'access_local', 'access_local_hint'],
+            ['token', 'key', 'access_token', 'access_token_hint'],
+            ['auth', 'user', 'access_auth', 'access_auth_hint']
+        ];
+        const list = h('div', { class: 'stack stack--tight' });
+        levels.forEach(function (level) {
+            const isOn = link.accessLevel === level[0];
+            const input = h('input', {
+                type: 'radio', name: 'access-' + link.linkName, value: level[0],
+                checked: isOn,
+                onchange: () => setAccessLevel(link, level[0])
+            });
+            list.append(h('label', { class: 'choice' + (isOn ? ' is-checked' : '') }, input,
+                h('span', { class: 'choice__mark' }),
+                h('span', { class: 'choice__body' },
+                    h('span', { class: 'choice__title', text: t(level[2]) }),
+                    h('span', { class: 'choice__hint', text: t(level[3]) })),
+                h('span', { class: 'choice__icon' }, icon(level[1]))));
+        });
+        wrap.append(h('section', { class: 'section' },
+            h('div', { class: 'section__head' }, h('span', { class: 'section__title', text: t('access_label') })),
+            list));
+
+        if (link.accessLevel === 'token') {
+            wrap.append(h('div', { class: 'card-block stack' },
+                h('span', { class: 'label', text: t('token_value') }),
+                h('div', { class: 'url-line' },
+                    h('span', { class: 'mono grow truncate', text: link.accessToken || '—' }),
+                    h('button', {
+                        class: 'icon-btn icon-btn--sm', type: 'button', 'aria-label': t('token_rotate'), 'data-tip': t('token_rotate'),
+                        onclick: function () {
+                            apiCall('/api/link/' + encodeURIComponent(link.linkName), 'PATCH', { rotateToken: true })
+                                .then(function (updated) {
+                                    applyLinkUpdate(updated);
+                                    toast(t('token_rotated'));
+                                })
+                                .catch(function () {});
+                        }
+                    }, icon('refresh'))),
+                h('button', { class: 'btn btn--soft', type: 'button', onclick: () => copyLink(link) },
+                    icon('copy'), h('span', { text: t('token_copy') }))));
+        }
+        return wrap;
+    }
+
+    /* ========================================================
+       13. ЗАГРУЗКА МЕДИА
+       Три пути, как у сервера: файл с устройства (с предварительным сжатием
+       в браузере), адрес в сети и файл из галереи сервера. Режим append
+       добавляет файл за тот же адрес, не трогая текущий.
+       ======================================================== */
+    /* Куда положить выбранный файл: null — создать новые ссылки по именам
+       файлов, иначе — заменить медиа конкретной ссылки (или добавить). */
+    let fileTarget = null;
+
+    function pickFileFor(link, mode) {
+        fileTarget = { link: link, mode: mode || 'replace' };
+        $('#filePicker').click();
+    }
+
+    async function compressFor(file) {
+        if (!STATE.compressor || !file.type.startsWith('image/')) return file;
+        try {
+            const smaller = await STATE.compressor.compress(file);
+            if (smaller && smaller.size < file.size) {
+                const info = ImageCompressor.getCompressionInfo(file.size, smaller.size);
+                toast(t('compression_saved', {
+                    percent: info.percent, saved: formatBytes(info.saved)
+                }), { type: 'info', duration: 3000 });
+                return smaller;
+            }
+        } catch (_) { /* сжатие не удалось — отправляем как есть */ }
+        return file;
+    }
+
+    async function uploadFileTo(link, file, mode) {
+        if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+            toast(t('invalid_image'), { type: 'error' });
+            return;
+        }
+        const form = new FormData();
+        form.append('linkName', link.linkName);
+        if (mode === 'append') form.append('mode', 'append');
+        form.append('file', await compressFor(file));
+        toast(t('uploading'), { type: 'info', duration: 1600 });
+        try {
+            const updated = await apiCall('/api/upload', 'POST', form, true);
+            applyLinkUpdate(updated);
+            toast(t(mode === 'append' ? 'append_success' : 'upload_success'));
+            return true;
+        } catch (_) { return false; }   /* текст ошибки уже показан */
+    }
+
+    async function uploadUrlTo(link, url, mode) {
+        const form = new FormData();
+        form.append('linkName', link.linkName);
+        if (mode === 'append') form.append('mode', 'append');
+        form.append('url', url);
+        toast(t('uploading'), { type: 'info', duration: 1600 });
+        try {
+            const updated = await apiCall('/api/upload', 'POST', form, true);
+            applyLinkUpdate(updated);
+            toast(t(mode === 'append' ? 'append_success' : 'upload_success'));
+            return true;
+        } catch (_) { return false; }   /* текст ошибки уже показан */
+    }
+
+    /* Файл из галереи сервера отдаётся ручкой загрузки как относительный
+       путь (url=): сервер сам копирует файл из своей папки. */
+    function uploadServerFileTo(link, path) {
+        return uploadUrlTo(link, path, 'replace');
+    }
+
+    /* Ссылки из перетащенных файлов: имя файла становится адресом, поэтому
+       негодные имена пропускаем, а не создаём ссылку с ошибкой в ответ. */
+    async function createLinksFromFiles(files) {
+        const created = [];
+        const skipped = [];
+        for (const file of files) {
+            const name = sanitizeId(file.name);
+            if (!validLinkName(name) || findLink(name) || created.indexOf(name) >= 0) {
+                skipped.push(file.name);
+                continue;
+            }
+            try {
+                const res = await apiCall('/api/link', 'POST', { linkName: name });
+                const link = normalizeLink(res || { linkName: name });
+                state.links.unshift(link);
+                created.push(name);
+                await uploadFileTo(link, file, 'replace');
+            } catch (_) {
+                skipped.push(file.name);
+            }
+        }
+        if (created.length) {
+            state.query = '';
+            $('#searchInput').value = '';
+            revealLinks(created);
+            renderChips();
+            render();
+            toast(t('link_created', { name: created.join(', ') }), { duration: 5000 });
+        }
+        if (skipped.length) toast(t('files_skipped') + ': ' + skipped.join(', '), { type: 'info', duration: 5000 });
+    }
+
+    /* Расширения, которые сервер принимает как медиа (см. upload.go):
+       по ним диалог адреса подсказывает, годится ли ссылка, ещё до запроса. */
+    const MEDIA_EXT = /\.(jpe?g|png|gif|webp|bmp|tiff?|avif|mp4|webm|m4v|mov)([?#]|$)/i;
+
+    function openUrlDialog(link) {
+        const node = $('#tplUrl').content.firstElementChild.cloneNode(true);
+        const input = $('#urlInput', node);
+        const status = $('#urlStatus', node);
+        const submit = $('[data-submit]', node);
+        $$('[data-close]', node).forEach(b => b.addEventListener('click', () => closeOverlay()));
+        openOverlay(node, { focus: input });
+        applyTranslations(node);
+        /* Подсказку собираем после перевода: в ней подставляется лимит
+           сервера (MAX_UPLOAD_MB), а не только статичный текст. */
+        $('.dialog__text', node).textContent = t('url_hint');
+
+        let timer = 0;
+        /* Проверка до отправки повторяет серверную: адрес, длина, тип файла.
+           Ошибку лучше увидеть здесь, чем после скачивания десятков мегабайт. */
+        function setStatus(text, ok) {
+            status.textContent = text || '';
+            status.classList.toggle('field-hint--error', !!text && !ok);
+            status.classList.toggle('field-hint--ok', !!ok);
+            input.setAttribute('aria-invalid', String(!!text && !ok));
+            submit.disabled = !ok;
+        }
+        function check() {
+            const value = input.value.trim();
+            clearTimeout(timer);
+            if (!value) { setStatus('', false); return; }
+            if (value.length > 2048) { setStatus(t('url_too_long'), false); return; }
+            if (!/^https?:\/\/[^\s]+$/i.test(value)) { setStatus(t('url_invalid'), false); return; }
+            setStatus(t('url_checking'), false);
+            timer = setTimeout(function () {
+                setStatus(MEDIA_EXT.test(value) ? t('url_ready') : t('url_not_media'), MEDIA_EXT.test(value));
+            }, 420);
+        }
+        input.addEventListener('input', check);
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !submit.disabled) { e.preventDefault(); commit(); }
+        });
+        function commit() {
+            if (submit.disabled) return;
+            const value = input.value.trim();
+            /* Сервер скачивает файл сам и отвечает готовой записью ссылки:
+               размеры, вес и превью приходят в ответе. Пустое состояние
+               показываем как «идёт загрузка» — запрос может быть долгим. */
+            setStatus(t('uploading'), true);
+            /* setStatus включает кнопку для «адрес годен» — на время запроса
+               гасим её ещё раз, иначе второй клик отправил бы вторую загрузку. */
+            submit.disabled = true;
+            uploadUrlTo(link, value, 'replace').then(function (ok) {
+                if (ok) { closeOverlay(true); return; }
+                submit.disabled = false;
+                setStatus(t('action_failed'), false);
+            });
+        }
+        submit.addEventListener('click', commit);
+    }
+
+    /* ========================================================
+       13-бис. ГАЛЕРЕЯ ФАЙЛОВ НА СЕРВЕРЕ
+       ======================================================== */
+    function openServerPicker(link) {
+        const node = $('#tplServer').content.firstElementChild.cloneNode(true);
+        const list = $('#serverList', node);
+        const empty = $('#serverEmpty', node);
+        const filter = $('#serverFilter', node);
+        $$('[data-close]', node).forEach(b => b.addEventListener('click', () => closeOverlay()));
+        openOverlay(node);
+        applyTranslations(node);
+
+        let files = [];
+        const VIDEO_EXT = /(mp4|webm|m4v|mov)$/i;
+        function draw() {
+            const q = filter.value.trim().toLowerCase();
+            const found = files.filter(name => name.toLowerCase().indexOf(q) >= 0);
+            list.replaceChildren();
+            empty.classList.toggle('is-hidden', found.length > 0);
+            found.forEach(function (name) {
+                const isVideo = VIDEO_EXT.test(name);
+                /* Превью галереи отдаёт сервер: полный файл в панель не
+                   тянем, а для видео берём только метаданные. */
+                const src = '/api/external-image-preview?path=' + encodeURIComponent(name);
+                const thumb = isVideo
+                    ? h('video', { class: 'picker__thumb', src: src, muted: true, preload: 'metadata', playsinline: true })
+                    : h('img', { class: 'picker__thumb', src: src, alt: '', loading: 'lazy' });
+                list.append(h('button', {
+                    class: 'picker__item', type: 'button',
+                    onclick: function () {
+                        closeOverlay(true);
+                        uploadServerFileTo(link, name);
+                    }
+                }, thumb,
+                    h('span', { class: 'picker__body' },
+                        h('span', { class: 'picker__name truncate', text: name }),
+                        h('span', { class: 'picker__meta label' },
+                            h('span', { text: isVideo ? t('filter_video') : t('filter_photo') }))),
+                    h('span', { class: 'picker__take', text: t('upload_file') })));
+            });
+            hydrateIcons(list);
+        }
+        filter.addEventListener('input', draw);
+        filter.focus();
+        /* Список читаем один раз при открытии: папка может быть большой,
+           а фильтр работает по уже полученному списку. */
+        apiCall('/api/external-images').then(function (res) {
+            files = Array.isArray(res) ? res.map(String) : [];
+            if (!files.length) {
+                empty.textContent = t('server_empty');
+                empty.classList.remove('is-hidden');
                 return;
             }
-            if (e.key === 'Tab') trapFocus(DOM.versionsOverlay, e);
+            draw();
+        }).catch(function () {
+            empty.textContent = t('server_error');
+            empty.classList.remove('is-hidden');
         });
-        DOM.rotateSave.onclick = () => {
-            if (versionsState) saveRotation(versionsState.link);
-        };
     }
 
-    const regenBtn = document.getElementById('regenPreviewsBtn');
-    if (regenBtn) {
-        regenBtn.addEventListener('click', async () => {
-            regenBtn.disabled = true;
-            const spanEl = regenBtn.querySelector('span');
-            const origText = spanEl?.textContent;
-            if (spanEl) spanEl.textContent = t('regen_previews_running', 'Regenerating...');
+    /* ========================================================
+       14. ДИАЛОГИ: создание/переименование и подтверждение
+       ======================================================== */
+    function openCreateDialog(opts) {
+        const o = opts || {};
+        const node = $('#tplCreate').content.firstElementChild.cloneNode(true);
+        const input = $('#createInput', node);
+        $('#createHost', node).textContent = hostName() + '/';
+        const hint = $('#createHint', node);
+        const submit = $('[data-submit]', node);
+
+        if (o.rename) {
+            $('#createTitle', node).textContent = t('rename');
+            $('#createTitle', node).removeAttribute('data-i18n');
+            input.value = o.rename.linkName;
+        } else {
+            hint.textContent = t('create_hint');
+        }
+
+        $$('[data-close]', node).forEach(b => b.addEventListener('click', () => closeOverlay()));
+
+        /* Проверки совпадают с utils/link.go: формат, длина, занятые имена
+           служебных путей. Иначе панель предлагала бы имя, на котором сервер
+           отвечает ошибкой, — а «Создать» выглядело бы рабочим. */
+        function nameError(value) {
+            if (!value) return t('invalid_id');
+            if (!LINK_NAME_RE.test(value)) return t('invalid_id');
+            if (RESERVED_NAMES.indexOf(value.toLowerCase()) >= 0) return t('link_reserved');
+            const taken = state.links.some(l => l.linkName === value
+                && (!o.rename || l.linkName !== o.rename.linkName));
+            if (taken) return t('link_taken');
+            return '';
+        }
+        function validate() {
+            const value = input.value.trim();
+            const err = nameError(value);
+            if (err) { setError(err); return null; }
+            setError('');
+            return value;
+        }
+        function setError(text, ok) {
+            hint.textContent = text || (o.rename ? '' : t('create_hint'));
+            hint.classList.toggle('field-hint--error', !!text && !ok);
+            hint.classList.toggle('field-hint--ok', !!ok);
+            input.setAttribute('aria-invalid', String(!!text && !ok));
+            submit.disabled = !!text && !ok;
+            if (ok) submit.disabled = false;
+        }
+        /* Пока печатают — молчим. Через 250 мс после последней буквы
+           показываем, свободен ли ID: обычно он свободен, и это заметно
+           экономит одно нажатие на создание. */
+        let checkTimer = 0;
+        input.addEventListener('input', function () {
+            clearTimeout(checkTimer);
+            const value = input.value.trim();
+            if (!value) { setError(''); return; }
+            /* Формат проверяется локально и сразу: ждать ответа незачем, а
+               кнопка не должна выглядеть готовой к негодному имени. */
+            if (nameError(value)) { setError(nameError(value)); return; }
+            setError('', false);
+            checkTimer = setTimeout(function () {
+                if (nameError(value)) setError(nameError(value));
+                else if (value !== (o.rename && o.rename.linkName) || !o.rename) setError(t('id_available'), true);
+            }, 250);
+        });
+
+        async function commit() {
+            const name = validate();
+            if (!name || state.busy) return;
+            state.busy = true;
+            submit.disabled = true;
             try {
-                const result = await apiCall('/api/regenerate-previews', 'POST');
-                if (!result) return;
-                showToast(
-                    t('regen_previews_done', 'Done: {{ok}} ok, {{errors}} errors, {{skipped}} skipped')
-                        .replace('{{ok}}', result.ok)
-                        .replace('{{errors}}', result.errors)
-                        .replace('{{skipped}}', result.skipped),
-                    result.errors > 0 ? 'info' : 'success'
-                );
-                await loadLinks();
-            } catch (_) {}
-            finally {
-                regenBtn.disabled = false;
-                if (spanEl && origText) spanEl.textContent = origText;
+                if (o.rename) {
+                    const oldName = o.rename.linkName;
+                    const updated = await apiCall('/api/link/' + encodeURIComponent(oldName),
+                        'PATCH', { newLinkName: name });
+                    /* Переименование меняет и адрес: карточка, пульт и режим
+                       выбора должны переехать на новое имя вместе с ним. */
+                    const idx = state.links.findIndex(l => l.linkName === oldName);
+                    if (idx >= 0) state.links[idx] = normalizeLink(updated || { linkName: name });
+                    if (state.selected.delete(oldName)) state.selected.add(name);
+                    if (currentOverlay && currentOverlay.kind === 'panel'
+                        && currentOverlay.node.dataset.name === oldName) {
+                        currentOverlay.node.dataset.name = name;
+                    }
+                    closeOverlay();
+                    revealLinks([name]);
+                    renderChips();
+                    render();
+                    renderPanel();
+                    toast(t('renamed', { name: name }));
+                    return;
+                }
+                const res = await apiCall('/api/link', 'POST', { linkName: name });
+                const link = normalizeLink(res || { linkName: name, hasImage: false });
+                state.links.unshift(link);
+                closeOverlay();
+                state.query = '';
+                $('#searchInput').value = '';
+                revealLinks([name]);
+                renderChips();
+                render();
+                toast(t('link_created', { name: name }), {
+                    action: t('upload_file'),
+                    duration: 8000,
+                    onAction: () => openPanel(link)
+                });
+            } catch (_) {
+                submit.disabled = false;
+            } finally {
+                state.busy = false;
+                /* Подсветка и прокрутка — в jumpToRevealed(): она нужна и
+                   после загрузки файлов, и после переименования. */
             }
+        }
+
+        submit.addEventListener('click', commit);
+        input.addEventListener('keydown', function (e) { if (e.key === 'Enter') commit(); });
+        openOverlay(node, { focus: input });
+        input.select();
+    }
+
+    /* Диалог подтверждения отвечает «да/нет»: обработчик onConfirm остаётся
+       для существующих вызовов, а промис нужен там, где ответом управляет
+       другой файл (импорт списка). */
+    function openConfirm(opts) {
+        return new Promise(function (resolve) {
+            let answered = false;
+            const node = $('#tplConfirm').content.firstElementChild.cloneNode(true);
+            $('#confirmTitle', node).textContent = opts.title;
+            $('[data-text]', node).textContent = opts.text || '';
+            $$('[data-close]', node).forEach(b => b.addEventListener('click', () => closeOverlay()));
+            $('[data-confirm]', node).addEventListener('click', function () {
+                answered = true;
+                closeOverlay(true);
+                lastFocused = null;
+                if (opts.onConfirm) opts.onConfirm();
+                resolve(true);
+            });
+            /* Закрытие любым другим способом (Esc, затемнение, крестик) —
+               это отказ; ответ приходит ровно один раз. */
+            openOverlay(node, {
+                focus: $('[data-confirm]', node),
+                onDismiss: function () { if (!answered) resolve(false); }
+            });
         });
     }
-}
 
+    /* ========================================================
+       15. НАСТРОЙКИ
+       ======================================================== */
+    const PALETTES = ['indigo', 'sage', 'clay', 'graphite', 'ocean'];
 
-// UTILS
-function formatSize(bytes) {
-    if (!bytes || bytes < 0) return '0 KB';
-    if (bytes < 1024 * 1024) {
-        const kb = bytes / 1024;
-        return `${kb < 10 ? kb.toFixed(1) : Math.round(kb)} KB`;
+    function openSettings() {
+        const node = $('#tplSettings').content.firstElementChild.cloneNode(true);
+        $$('[data-close]', node).forEach(b => b.addEventListener('click', () => closeOverlay()));
+
+        /* Тема */
+        $$('[data-theme-opt]', node).forEach(function (input) {
+            input.checked = input.value === state.theme;
+            input.addEventListener('change', function () {
+                state.theme = input.value;
+                savePrefs();
+                applyTheme();
+            });
+        });
+
+        /* Акцент */
+        const row = $('#paletteRow', node);
+        PALETTES.forEach(function (name) {
+            const label = t('palette_' + name);
+            const swatch = h('label', {
+                class: 'swatch', 'data-tip': label, 'data-palette': name
+            },
+                h('input', {
+                    type: 'radio', name: 'palette', value: name, 'aria-label': label,
+                    checked: name === state.palette,
+                    onchange: function () {
+                        state.palette = name;
+                        savePrefs();
+                        applyPalette();
+                    }
+                }),
+                h('span', { class: 'swatch__dot', 'data-palette': name }));
+            row.append(swatch);
+        });
+        applyPalette();
+        paintSwatches(node);
+
+        /* Язык */
+        const langSelect = $('#langSelect', node);
+        LANGS.forEach(function (code) {
+            const label = { ru: 'Русский', en: 'English', de: 'Deutsch', fr: 'Français', it: 'Italiano', es: 'Español' }[code] || code;
+            langSelect.append(h('option', { value: code, text: label, selected: code === state.lang }));
+        });
+        langSelect.addEventListener('change', function () {
+            setLang(langSelect.value);
+        });
+
+        /* Данные и обслуживание: экспорт, импорт и перегенерация превью —
+           те же операции, что были в панели 0.12.1, просто в новом месте. */
+        const installBtn = $('[data-act="install"]', node);
+        if (installBtn) installBtn.hidden = !canInstall();
+        $$('[data-act]', node).forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const act = btn.dataset.act;
+                if (act === 'export') {
+                    if (window.LanpaperBackup) window.LanpaperBackup.exportData();
+                } else if (act === 'import') {
+                    if (window.LanpaperBackup) window.LanpaperBackup.triggerImport();
+                } else if (act === 'install') {
+                    promptInstall();
+                } else if (act === 'regen') {
+                    regenPreviews(btn, $('span', btn));
+                }
+            });
+        });
+
+        /* Горячие клавиши: и однобуквенные, и старые сочетания с Ctrl/⌘ —
+           панель не отбирает привычку, а добавляет к ней короткие клавиши. */
+        const list = $('#shortcutList', node);
+        [['/', 'sc_search'], ['n', 'sc_new'], ['t', 'sc_theme'], ['g', 'sc_view'],
+         ['s', 'sc_select'], ['Esc', 'sc_close']].forEach(function (pair) {
+            list.append(h('div', { class: 'split' },
+                h('span', { class: 'label', text: t(pair[1]) }),
+                h('span', { class: 'kbd', text: pair[0] })));
+        });
+        list.append(h('p', { class: 'field-hint', text: t('sc_extra') }));
+
+        openOverlay(node);
     }
-    if (bytes < 1024 * 1024 * 1024) {
-        const mb = bytes / (1024 * 1024);
-        return `${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB`;
-    }
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-}
 
-function formatDate(ts) {
-    return ts ? new Date(ts * 1000).toLocaleDateString() : '—';
-}
+    function swatchColor(name) {
+        const map = {
+            indigo: ['#5A66B5', '#9AA4E8'],
+            sage: ['#4F7C68', '#93C7B2'],
+            clay: ['#A25D44', '#E0A489'],
+            graphite: ['#4E5763', '#AAB4C2'],
+            ocean: ['#2F7C88', '#7CC6D2']
+        };
+        const pair = map[name] || map.indigo;
+        return effectiveTheme() === 'dark' ? pair[1] : pair[0];
+    }
+
+    /* ========================================================
+       16. ПЕРЕТАСКИВАНИЕ ФАЙЛОВ
+       ======================================================== */
+    let dragDepth = 0;
+    function initDragDrop() {
+        document.addEventListener('dragenter', function (e) {
+            if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes('Files')) return;
+            dragDepth++;
+            showDropScrim();
+        });
+        document.addEventListener('dragover', function (e) { e.preventDefault(); });
+        document.addEventListener('dragleave', function () {
+            dragDepth = Math.max(0, dragDepth - 1);
+            if (!dragDepth) hideDropScrim();
+        });
+        document.addEventListener('drop', function (e) {
+            e.preventDefault();
+            dragDepth = 0;
+            hideDropScrim();
+            const files = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
+            if (!files.length) return;
+
+            /* Пульт открыт — файл относится к той ссылке, которую правят.
+               Иначе получилась бы новая ссылка, а пользователь этого не просил. */
+            const openLink = currentOverlay && currentOverlay.node.dataset.name
+                ? findLink(currentOverlay.node.dataset.name) : null;
+            if (openLink) {
+                uploadFileTo(openLink, files[0], 'replace');
+                return;
+            }
+            createLinksFromFiles(files);
+        });
+    }
+    /* Имена файлов становятся адресами ссылок. Занятые имена пропускаем,
+       повторы внутри одной пачки — тоже: две ссылки с одним адресом создать
+       нельзя, а молча получить одну из двух — неприятно. */
+    function createLinksFromFiles(files) {
+        const created = [];
+        const skipped = [];
+        files.forEach(function (file, i) {
+            const name = sanitizeId(file.name);
+            if (state.links.some(l => l.linkName === name) || created.includes(name)) { skipped.push(name); return; }
+            created.push(name);
+            state.links.unshift({
+                id: 'u' + Date.now() + i, linkName: name,
+                category: file.type.startsWith('video') ? 'video' : 'image',
+                hasImage: true, imageUrl: '', preview: '', mimeType: file.type || 'image/jpeg',
+                width: 0, height: 0, sizeBytes: file.size,
+                created: Math.floor(Date.now() / 1000), modTime: Math.floor(Date.now() / 1000),
+                pinned: false, accessLevel: 'public', accessToken: '', currentVersion: 1,
+                history: [], items: [], rotate: null, stats: null
+            });
+        });
+        if (!created.length) return;
+        revealLinks(created);
+        render();
+        toast(t('link_created', { name: created.join(', ') }), { duration: 5000 });
+        if (skipped.length) toast(t('link_taken') + ': ' + skipped.join(', '), { type: 'info', duration: 4500 });
+    }
+
+    function showDropScrim() {
+        if ($('#dropScrim')) return;
+        const openLink = currentOverlay && currentOverlay.node.dataset.name
+            ? findLink(currentOverlay.node.dataset.name) : null;
+        const scrim = h('div', { class: 'drop-scrim', id: 'dropScrim' },
+            h('div', { class: 'drop-scrim__inner' },
+                icon('upload'),
+                h('p', { class: 'drop-scrim__title', text: openLink ? t('drop_replace') : t('drop_files') }),
+                h('p', { class: 'drop-scrim__hint', text: openLink ? openLink.linkName : t('drop_hint') })));
+        document.body.append(scrim);
+        hydrateIcons(scrim);
+    }
+    function hideDropScrim() {
+        const scrim = $('#dropScrim');
+        if (scrim) scrim.remove();
+    }
+
+    /* ========================================================
+       17. ГОРЯЧИЕ КЛАВИШИ
+       ======================================================== */
+    function initShortcuts() {
+        document.addEventListener('keydown', function (e) {
+            const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)
+                || document.activeElement.isContentEditable;
+            const mod = e.ctrlKey || e.metaKey;
+            /* Старые сочетания панели работают как раньше: Ctrl/⌘ + N, F, G, T.
+               Однобуквенные добавлены рядом — они быстрее, но не отменяют
+               привычку, и на них не срабатывает ввод в поле. */
+            if (mod && !e.altKey && !e.shiftKey && !typing) {
+                const combo = e.key.toLowerCase();
+                if (combo === 'n') { e.preventDefault(); openCreateDialog({}); return; }
+                if (combo === 'f') { e.preventDefault(); $('#searchInput').focus(); $('#searchInput').select(); return; }
+                if (combo === 'g') { e.preventDefault(); setView(state.view === 'grid' ? 'list' : 'grid'); return; }
+                if (combo === 't') { e.preventDefault(); cycleTheme(); return; }
+            }
+            if (e.key === '/' && !typing) { e.preventDefault(); $('#searchInput').focus(); return; }
+            if (typing || mod || e.altKey) return;
+            const key = e.key.toLowerCase();
+            if (key === 'n') { e.preventDefault(); openCreateDialog({}); }
+            else if (key === 't') { e.preventDefault(); cycleTheme(); }
+            else if (key === 'g') { e.preventDefault(); setView(state.view === 'grid' ? 'list' : 'grid'); }
+            else if (key === 's') { e.preventDefault(); setSelecting(!state.selecting); }
+        });
+    }
+    function cycleTheme() {
+        state.theme = effectiveTheme() === 'dark' ? 'light' : 'dark';
+        savePrefs();
+        applyTheme();
+    }
+    function setView(view) {
+        state.view = view;
+        savePrefs();
+        applyView();
+        /* В режиме списка в строке появляется переключатель доступа, в плитке
+           его нет: это часть карточки, поэтому вид перерисовывает выдачу.
+           Показанную порцию при этом не сбрасываем. */
+        render();
+    }
+
+    /* ========================================================
+       18. СОБЫТИЯ КАРТОЧЕК И ИНИЦИАЛИЗАЦИЯ
+       ======================================================== */
+    function initGridEvents() {
+        const grid = $('#grid');
+        grid.addEventListener('click', function (e) {
+            const card = e.target.closest('.card');
+            if (!card) return;
+            const link = findLink(card.dataset.name);
+            if (!link) return;
+
+            if (e.target.closest('.card__menu-btn')) {
+                openCardMenu(link, e.target.closest('.card__menu-btn'));
+                return;
+            }
+            if (e.target.closest('.card__open')) {
+                openMedia(link);
+                return;
+            }
+            if (state.selecting) {
+                toggleSelected(link);
+                return;
+            }
+            openPanel(link);
+        });
+    }
+
+    /* Служебные данные: версию показываем из /health (как раньше), настройки
+       сжатия — из /api/compression-config. Оба запроса необязательные: если
+       они не ответили, панель работает дальше без них. */
+    async function loadAppVersion() {
+        try {
+            const res = await fetch('/health', { credentials: 'same-origin' });
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.version) $('#appVersion').textContent = 'v' + data.version;
+        } catch (_) { /* версия не критична */ }
+    }
+
+    async function loadCompressionConfig() {
+        try {
+            const res = await fetch('/api/compression-config', { credentials: 'same-origin' });
+            if (!res.ok) return;
+            const cfg = await res.json();
+            if (typeof ImageCompressor === 'undefined' || !cfg) return;
+            if (!Number.isFinite(cfg.quality) || !Number.isFinite(cfg.scale)) return;
+            /* Размеры оставляем серверу: он применяет COMPRESSION_SCALE на
+               каждом пути загрузки, и уменьшать дважды нельзя. */
+            STATE.compressor = new ImageCompressor({
+                quality: cfg.quality / 100,
+                preserveOriginal: cfg.quality === 100 && cfg.scale === 100
+            });
+        } catch (_) { /* без настроек сжатия грузим как есть */ }
+    }
+
+    /* Перегенерация превью: та же ручка, что и раньше, — состояние кнопки
+       показывает, что запрос идёт. */
+    async function regenPreviews(btn, span) {
+        const original = span ? span.textContent : '';
+        btn.disabled = true;
+        if (span) span.textContent = t('regen_running');
+        try {
+            const result = await apiCall('/api/regenerate-previews', 'POST');
+            if (result) {
+                toast(t('regen_done', { ok: result.ok, errors: result.errors }), {
+                    type: result.errors > 0 ? 'info' : 'success'
+                });
+                await reloadLinks();
+            }
+        } catch (_) { /* текст ошибки уже показан */ }
+        finally {
+            btn.disabled = false;
+            if (span && original) span.textContent = original;
+        }
+    }
+
+    /* Установка приложения: браузер сам решает, когда она доступна
+       (Chrome/Edge). Кнопка в настройках появляется только тогда. */
+    let installEvent = null;
+    function canInstall() { return !!installEvent; }
+    function initPWA() {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+            /* Старый воркер, зарегистрированный под /static/, снимаем: он
+               кешировал то, чего кешировать нельзя. */
+            navigator.serviceWorker.getRegistrations().then(function (regs) {
+                regs.forEach(function (r) {
+                    if (new URL(r.scope).pathname.replace(/\/+$/, '') === '/static') r.unregister();
+                });
+            }).catch(() => {});
+        }
+        window.addEventListener('beforeinstallprompt', function (e) {
+            e.preventDefault();
+            installEvent = e;
+            const btn = $('#installBtn');
+            if (btn) btn.hidden = false;
+        });
+        window.addEventListener('appinstalled', function () {
+            installEvent = null;
+            toast(t('installed'));
+            renderPanel();
+        });
+    }
+    async function promptInstall() {
+        if (!installEvent) return;
+        const event = installEvent;
+        installEvent = null;
+        event.prompt();
+        try { await event.userChoice; } catch (_) {}
+        const btn = $('#installBtn');
+        if (btn) btn.hidden = true;
+    }
+
+    /* Перечитать список с сервера, не теряя состояние вида и выбранное. */
+    async function reloadLinks() {
+        try {
+            await fetchLinks();
+            /* Ссылки могли исчезнуть с сервера: выделение по именам, которых
+               больше нет, показывало бы «выбрано 2», не рисуя ни одной. */
+            const names = new Set(state.links.map(l => l.linkName));
+            Array.from(state.selected).forEach(function (name) {
+                if (!names.has(name)) state.selected.delete(name);
+            });
+            state.loading = false;
+            state.loadError = false;
+            renderChips();
+            render();
+            return true;
+        } catch (e) {
+            state.loading = false;
+            state.loadError = true;
+            render();
+            return false;
+        }
+    }
+
+    async function init() {
+        loadPrefs();
+        hydrateIcons(document);
+        await loadDict();
+        applyTranslations();
+        applyTheme();
+        applyPalette();
+        applyView();
+        renderChips();
+        render();
+        initGridEvents();
+        initDragDrop();
+        initShortcuts();
+        initPWA();
+        loadAppVersion();
+        loadCompressionConfig();
+
+        /* Кнопки шапки */
+        $('#themeBtn').addEventListener('click', cycleTheme);
+        $('#settingsBtn').addEventListener('click', openSettings);
+        $('#viewGridBtn').addEventListener('click', () => setView('grid'));
+        $('#viewListBtn').addEventListener('click', () => setView('list'));
+        $('#selectBtn').addEventListener('click', () => setSelecting(!state.selecting));
+        $('#selectAllBtn').addEventListener('click', function () {
+            visibleLinks().forEach(l => state.selected.add(l.linkName));
+            render();
+        });
+        $('#newLinkBtn').addEventListener('click', () => openCreateDialog({}));
+        $('#fabBtn').addEventListener('click', () => openCreateDialog({}));
+        $('#emptyCreateBtn').addEventListener('click', () => openCreateDialog({}));
+        /* Пустое состояние: «перетащить файлы» открывает обычный выбор файлов
+           — на телефоне перетаскивать нечего, а раньше кнопка только
+           показывала подсказку. */
+        $('#emptyDropBtn').addEventListener('click', () => $('#filePicker').click());
+        $('#filePicker').addEventListener('change', function (e) {
+            const files = Array.from(e.target.files || []);
+            e.target.value = '';
+            if (!files.length) return;
+            /* Цель выбирает тот, кто открыл поле: пульт — заменить медиа
+               ссылки, пустое состояние — создать ссылки по именам файлов. */
+            const target = fileTarget;
+            fileTarget = null;
+            if (target && target.link) {
+                uploadFileTo(target.link, files[0], target.mode);
+                return;
+            }
+            createLinksFromFiles(files);
+        });
+        $('#loadMoreBtn').addEventListener('click', showMore);
+        $('#retryBtn').addEventListener('click', function () {
+            state.loading = true;
+            state.loadError = false;
+            render();
+            reloadLinks();
+        });
+        $('#resetFiltersBtn').addEventListener('click', function () {
+            state.query = ''; state.filter = 'all'; state.access = 'any';
+            $('#searchInput').value = '';
+            renderChips();
+            render();
+        });
+
+        /* Поиск */
+        /* Поиск: счётчики и состояние «ничего не найдено» отзываются сразу,
+           а перерисовка сетки откладывается на 80 мс. На длинной библиотеке
+           это экономит три перерисовки из четырёх при обычном наборе и
+           незаметно на глаз. */
+        const search = $('#searchInput');
+        const searchField = search.closest('.field');
+        let searchTimer = 0;
+        search.addEventListener('input', function () {
+            state.query = search.value;
+            searchField.classList.toggle('has-value', !!search.value);
+            resetShown();
+            updateChipCounts();
+            updateSearchStateNow();
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(render, 80);
+        });
+        /* Мгновенная часть: счётчики, пустое состояние и подписи —
+           без перерисовки карточек. */
+        function updateSearchStateNow() {
+            const list = visibleLinks();
+            const total = state.links.length;
+            const narrowed = !!state.query.trim() || state.filter !== 'all' || state.access !== 'any';
+            $('#noResults').classList.toggle('is-hidden', !(!state.loading && !list.length && total > 0 && narrowed));
+            $('#pageCount').textContent = narrowed ? t('found', { shown: list.length, total }) : String(total);
+        }
+        $('#searchClear').addEventListener('click', function () {
+            search.value = '';
+            state.query = '';
+            searchField.classList.remove('has-value');
+            search.focus();
+            resetShown();
+            renderChips();
+            render();
+        });
+
+        matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
+            if (state.theme === 'auto') applyTheme();   /* он же перекрасит образцы */
+        });
+
+        /* Загрузка списка с состоянием-скелетоном. Если ответа нет, панель
+           показывает состояние с кнопкой «Повторить», а не пустую
+           библиотеку: иначе кажется, что всё удалилось. */
+        reloadLinks();
+
+        /* Ярлык приложения из manifest.json ведёт на /admin?action=create:
+           открываем диалог создания и убираем параметр из адреса, иначе он
+           открывался бы снова при каждом обновлении страницы. */
+        const params = new URLSearchParams(location.search);
+        if (params.get('action') === 'create') {
+            history.replaceState(null, '', location.pathname);
+            openCreateDialog({});
+        }
+    }
+
+    /* Маленький публичный интерфейс: его использует export-import.js
+       (отдельный файл, который должен работать, даже если панель не
+       инициализировалась) и проверки стенда. */
+    window.LanpaperApp = {
+        STATE: STATE,
+        state: state,
+        t: t,
+        apiCall: apiCall,
+        toast: toast,
+        openConfirm: openConfirm,
+        openPanel: openPanel,
+        applyLinkUpdate: applyLinkUpdate,
+        normalizeLink: normalizeLink,
+        setLang: setLang,
+        reloadLinks: reloadLinks,
+        applyTheme: applyTheme,
+        applyView: applyView,
+        getVersions: (name) => apiCall('/api/link/' + encodeURIComponent(name) + '/history'),
+        formatBytes: formatBytes,
+        validLinkName: validLinkName,
+        openCreateDialog: openCreateDialog
+    };
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+})();
