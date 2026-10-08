@@ -198,10 +198,13 @@ delete anything. Keys come from the `PUBLISH_KEYS` environment variable only
 SHA-256 digests in memory — they never reach `config.json`. Wrong keys share
 the brute-force budget with admin logins, so guessing is locked out per client.
 
-**Behind a reverse proxy**, set `TRUSTED_PROXY` to *only* the proxy's IP or
-CIDR. Configure the proxy to **overwrite** `X-Real-IP`, `X-Forwarded-For`,
-`X-Forwarded-Proto` and `X-Forwarded-Host`, and to preserve the original
-`Host`. Without this:
+**Behind a reverse proxy**, set `TRUSTED_PROXY` to *only* the address the
+proxy reaches Lanpaper from — one IP or CIDR, or a comma-separated list when
+the proxy arrives through more than one hop (a Docker container, for example,
+sees the bridge gateway and not the proxy's LAN address:
+`TRUSTED_PROXY="192.168.20.1,172.24.0.1"`). Configure the proxy to
+**overwrite** `X-Real-IP`, `X-Forwarded-For`, `X-Forwarded-Proto` and
+`X-Forwarded-Host`, and to preserve the original `Host`. Without this:
 
 - every visitor appears to come from the proxy's (often private) address, so
   `local` links become reachable for everyone;
@@ -241,7 +244,7 @@ which have the highest priority.
 | `PUBLISH_KEYS` | unset | Comma-separated API keys (16+ characters, max 32) that may upload and create links. Environment only — never written to `config.json` |
 | `COMPRESSION_QUALITY` | `85` | JPEG/WebP quality, 1–100 |
 | `COMPRESSION_SCALE` | `100` | Stored image size as a percentage of the original, 1–100 |
-| `TRUSTED_PROXY` | unset | IP or CIDR of the reverse proxy. Forwarded headers are trusted only from it. |
+| `TRUSTED_PROXY` | unset | Address the reverse proxy connects from: an IP or CIDR, or a comma-separated list of them when there is more than one hop. Forwarded headers are trusted only from these. |
 | `TLS_CERT_FILE`, `TLS_KEY_FILE` | unset | Serve HTTPS from the process itself (TLS 1.2+). Both or neither: a half-configured certificate is a startup error, not a silent downgrade to plaintext. |
 | `PROXY_TYPE` | `http` | Outbound proxy type: `http`, `https` or `socks5` |
 | `PROXY_HOST`, `PROXY_PORT` | unset | Optional outbound proxy for URL downloads |
@@ -328,7 +331,8 @@ hardened systemd unit, which log lines deserve an alert, capacity planning,
 backups, and a pre-launch checklist.
 
 The short version: terminate TLS at a reverse proxy and set `TRUSTED_PROXY` to
-its address, keep `data/` on a volume that is actually backed up, use a long
+the address it reaches Lanpaper from (a list, if there is more than one hop),
+keep `data/` on a volume that is actually backed up, use a long
 random `ADMIN_PASS`, set `HISTORY_MAX_MB` to what the volume can spare, and
 read every `Warning:` the process prints at startup.
 

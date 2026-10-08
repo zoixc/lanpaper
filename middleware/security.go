@@ -4,6 +4,7 @@ package middleware
 
 import (
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -199,6 +200,16 @@ func rightmostHeader(value string) string {
 	return strings.TrimSpace(value)
 }
 
+// peerAddress returns the IP part of an address of the form "ip:port",
+// or the input unchanged when it carries no port. Used only in log lines,
+// where the operator needs the exact value for TRUSTED_PROXY.
+func peerAddress(remoteAddr string) string {
+	if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
+		return host
+	}
+	return remoteAddr
+}
+
 func effectivePort(u *url.URL) string {
 	if port := u.Port(); port != "" {
 		return port
@@ -239,9 +250,15 @@ func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 			if !sameOriginRequest(r) {
 				// Log rejections: a sudden wave of CSRF 403s means either an
 				// attack or a misconfigured reverse proxy — both need a trail.
-				log.Printf("Security: rejected cross-origin %s %s (Origin=%q Sec-Fetch-Site=%q Host=%q RemoteAddr=%s) — if this is a reverse proxy, set TRUSTED_PROXY",
+				// Everything the decision used is printed, because the usual
+				// causes are exactly these values: a Host the browser never
+				// asked for, a proxy that is not trusted yet, or a proxy that
+				// terminates TLS without saying so (X-Forwarded-Proto), which
+				// leaves Origin https:// against a scheme of http.
+				log.Printf("Security: rejected cross-origin %s %s (Origin=%q Sec-Fetch-Site=%q Host=%q X-Forwarded-Host=%q X-Forwarded-Proto=%q trustPeer=%v RemoteAddr=%s): if this is a reverse proxy, add %s to TRUSTED_PROXY (a comma-separated list of IPs and CIDRs is allowed) and make it pass the original Host and X-Forwarded-Proto headers",
 					r.Method, r.URL.Path, r.Header.Get("Origin"), r.Header.Get("Sec-Fetch-Site"),
-					r.Host, r.RemoteAddr)
+					r.Host, r.Header.Get("X-Forwarded-Host"), r.Header.Get("X-Forwarded-Proto"),
+					config.IsTrustedProxy(r.RemoteAddr), r.RemoteAddr, peerAddress(r.RemoteAddr))
 				http.Error(w, "Cross-origin request rejected (if you are behind a reverse proxy, configure TRUSTED_PROXY)", http.StatusForbidden)
 				return
 			}
