@@ -53,7 +53,7 @@ RUN for f in \
       static/js/settings-menu.js static/js/export-import.js static/sw.js \
       static/manifest.json static/logo.svg static/favicon.svg \
       static/i18n/en.json static/icons/icon-512.png \
-      static/fonts/manrope-latin.woff2 \
+      static/fonts/golos-text-latin.woff2 static/fonts/golos-text-cyrillic.woff2 \
       LICENSE THIRD-PARTY-NOTICES.md ; \
     do test -f "$f" || { echo "ERROR: $f missing" >&2; exit 1; }; done
 
