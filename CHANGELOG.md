@@ -30,7 +30,7 @@ Notable changes to Lanpaper. Docker images are published as
   dark themes and a touch-sized mobile layout. `design/v2/screens.html` shows the
   same screen in live 1440 / 834 / 390 px frames, and
   `design/06-redesign-v2.md` holds the audit of 0.12.1, the contrast table and
-  the file-by-file migration plan. `design/v2/standalone.html` (799 KB,
+  the file-by-file migration plan. `design/v2/standalone.html` (800 KB,
   `tools/build-standalone.py`) is the same mock-up as one file with the styles,
   scripts, fonts and demo frames inlined, for viewers that show a single file.
   **Nothing in the application changed**: `admin.html`, `static/` and the Go code
@@ -90,6 +90,21 @@ Notable changes to Lanpaper. Docker images are published as
   (`static/js/app.js:2339`) hard-codes `KB/MB/GB` regardless of language, and
   `static/i18n/*.json` has no keys for the panel's Type / Size / Changed /
   Version labels. Details in section 11-тер of `design/06-redesign-v2.md`.
+- **Three bugs the mock-up showed only on screen.** Wrapper elements
+  (`.choice__body`, `.row__body`, `.vrow__body`) were flex children without a
+  `display`, so the `span`s inside stayed inline and the bold title ran straight
+  into its description — "PublicAvailable to anyone with the link" — in the
+  access options, the "Replace media" rows and the version rows. The panel's
+  tabs switch `aria-selected`, but only `aria-pressed` and `aria-checked` were
+  styled, so the active tab was never highlighted. And the tab strip had no
+  surface or edge of its own while the scrollable body started flush against it,
+  so on scroll the content was cut off right under the pill, full-bleed next to
+  it. All three are `ui.css` only: wrappers became columns, the selector gained
+  `aria-selected`, and the strip got its own bottom border, an 8 px gap and the
+  header shadow, with the line under the panel title removed via
+  `.sheet__head:has(+ .sheet__tabs)`. A sweep of every container built in
+  `app.js` (looking for wrappers whose CSS sets no `display`) and of every
+  attribute the script writes found no other case.
 - **The mock-up survives a narrow screen and a wide list view.** On a phone the
   header keeps the application name (it used to vanish, leaving a row of icons
   with no clue what panel this is) and the link counter moves to the page title

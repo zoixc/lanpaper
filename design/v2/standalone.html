@@ -672,7 +672,7 @@ html[data-palette="ocean"][data-theme="dark"] {
 }
 .segment__item svg { width: 14px; height: 14px; }
 .segment__item:hover { color: var(--text); }
-.segment__item[aria-pressed="true"], .segment__item[aria-checked="true"] {
+.segment__item[aria-pressed="true"], .segment__item[aria-checked="true"], .segment__item[aria-selected="true"] {
     background: var(--surface);
     color: var(--text);
     box-shadow: var(--shadow-xs);
@@ -1222,7 +1222,7 @@ html[data-palette="ocean"][data-theme="dark"] {
     overflow: hidden;
     object-fit: cover;
 }
-.row__body { flex: 1; min-width: 0; }
+.row__body { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .row__title { font-size: var(--t-sm); font-weight: var(--fw-semibold); }
 .row__sub { font-size: var(--t-xs); color: var(--text-3); margin-top: 1px; }
 .row__aside { flex: none; display: flex; align-items: center; gap: 4px; }
@@ -1282,7 +1282,18 @@ html[data-palette="ocean"][data-theme="dark"] {
     font-size: var(--t-xs);
     color: var(--text-3);
 }
-.sheet__tabs { flex: none; padding: 10px 16px 0; }
+/* Линия под заголовком не нужна, когда ниже вкладки: границу задаёт сама
+   полоса, а тень показывает, что содержимое уходит под неё. */
+.sheet__head:has(+ .sheet__tabs) { border-bottom: 0; }
+.sheet__tabs {
+    position: relative;
+    z-index: 1;
+    flex: none;
+    padding: 10px 16px 8px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-bar);
+}
 .sheet__body {
     flex: 1;
     overflow-y: auto;
@@ -1429,7 +1440,9 @@ html[data-palette="ocean"][data-theme="dark"] {
     border: 1.5px solid var(--border-strong);
     transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
-.choice__body { flex: 1; min-width: 0; }
+/* __body — колонка: заголовок и подпись идут строками. Без display: flex
+   вложенные span'ы остаются строчными и слипаются в одну строку. */
+.choice__body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .choice__title { font-size: var(--t-sm); font-weight: var(--fw-semibold); }
 .choice__hint { margin-top: 2px; font-size: var(--t-xs); color: var(--text-3); }
 .choice__icon { flex: none; color: var(--text-3); }
@@ -1469,7 +1482,7 @@ html[data-palette="ocean"][data-theme="dark"] {
     font-variant-numeric: tabular-nums;
 }
 .vrow--current .vrow__tag { background: var(--accent); color: var(--text-on-accent); }
-.vrow__body { flex: 1; min-width: 0; }
+.vrow__body { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .vrow__title { font-size: var(--t-sm); font-weight: var(--fw-medium); }
 .vrow__sub { font-size: var(--t-2xs); color: var(--text-3); margin-top: 1px; }
 
