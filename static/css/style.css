@@ -26,6 +26,12 @@ html {
     color-scheme: light;
     scrollbar-color: var(--border-2) transparent;
     scrollbar-width: thin;
+    /* Страница не должна ехать вбок: всё, что выходит за край (подсказка
+       у края экрана, длинная подпись), обрезается по горизонтали. Сам
+       элемент при этом остаётся прокручиваемым, если он так задуман.
+       clip, а не hidden: hidden сделал бы html контейнером прокрутки и
+       сломал липкую шапку. */
+    overflow-x: clip;
 }
 
 body {
@@ -1566,6 +1572,9 @@ html[data-palette="ocean"][data-theme="dark"] {
     justify-items: center;
     gap: var(--s-3);
     padding: var(--s-7) var(--s-8);
+    /* Имя файла или ссылки приходит без пробелов: без ограничения ширины
+       и переноса по буквам рамка шире телефона. */
+    max-width: min(420px, calc(100% - 24px));
     border: 2px dashed var(--accent);
     border-radius: var(--r-xl);
     background: var(--surface);
@@ -1574,7 +1583,7 @@ html[data-palette="ocean"][data-theme="dark"] {
 }
 .drop-scrim svg { width: 30px; height: 30px; color: var(--accent); }
 .drop-scrim__title { font-size: var(--t-lg); font-weight: var(--fw-bold); }
-.drop-scrim__hint { font-size: var(--t-sm); color: var(--text-3); }
+.drop-scrim__hint { font-size: var(--t-sm); color: var(--text-3); overflow-wrap: anywhere; }
 
 /* Панель массовых действий */
 .bulkbar {
@@ -1644,6 +1653,7 @@ html[data-palette="ocean"][data-theme="dark"] {
    цветным кругом, а кольцо не зависит от того, какой цвет выбран. */
 .swatch input {
     position: absolute; inset: 0;
+    width: 100%; height: 100%;
     appearance: none; margin: 0;
     border: 0; border-radius: 50%;
     background: transparent; cursor: pointer;
@@ -2062,9 +2072,39 @@ html[data-palette="ocean"][data-theme="dark"] {
 
 }
 
+/* --- Сегментированные ряды на узком экране ---
+   Четыре вкладки пульта («Медиа», «Версии», «Плейлист», «Доступ») и три
+   варианта темы в строку не влезают: подписи не сжимаются ниже своей
+   ширины, и ряд растягивал бы страницу. Пусть ряд прокручивается сам. */
+@media (max-width: 560px) {
+    .segment--full {
+        width: 100%;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    .segment--full::-webkit-scrollbar { display: none; }
+    .segment--full .segment__item,
+    .segment--full .segment__opt { flex: 0 0 auto; }
+    .segment__item { padding: 0 10px; }
+    /* Пояснение в рамке перетаскивания не должно упираться в края */
+    .drop-scrim__inner { padding: var(--s-5); }
+}
+
+/* --- Шапка на телефоне ---
+   Пять иконочных кнопок по 44 px (--tap) и слово «Lanpaper» в строку не
+   влезают: кнопки ужимаются до 38 px — та же цель, что у группы
+   «плитка/список», — а на самом узком экране имя уступает место значку,
+   иначе строка начинает распирать страницу. */
+@media (max-width: 560px) and (hover: none) {
+    .appbar .icon-btn { min-width: 38px; min-height: 38px; }
+}
+
 /* --- Очень узкий телефон: одна колонка, крупные элементы --- */
 @media (max-width: 340px) {
     .grid { grid-template-columns: minmax(0, 1fr); }
+    .brand__name { display: none; }
 }
 
 /* --- Широкий десктоп: больше воздуха по краям, 5 колонок --- */
