@@ -153,7 +153,9 @@
    колонки `.grid` и, стоя позже в файле, перебивали список — на широком
    десктопе он оставался сеткой, а карточки просто разворачивались в строку. */
 .grid.grid--list { grid-template-columns: minmax(0, 1fr); gap: 10px; }
-.grid--list .card { flex-direction: row; align-items: stretch; }
+/* min-width: 0 обязателен: карточка — элемент сетки, и без него её
+   ширина не может стать меньше содержимого строки. */
+.grid--list .card { flex-direction: row; align-items: stretch; min-width: 0; }
 .grid--list .card__frame {
     flex: none;
     width: 124px;
@@ -174,15 +176,36 @@
     .grid--list .card__body {
         flex-direction: row;
         align-items: center;
+        /* Перенос — страховка от выдавливания: селект доступа уходит на
+           следующую строку, а не за правый край карточки, где его срезает
+           overflow: hidden. Так строка выглядит одинаково в любом браузере,
+           независимо от того, как он ужимает вложенное содержимое. */
+        flex-wrap: wrap;
         gap: var(--s-4);
         padding: 10px 16px;
+        min-width: 0;
     }
+    /* Имя тянется и ужимается: поиск по нему — первое, за что цепляется глаз. */
     .grid--list .card__head { flex: 1 1 auto; min-width: 0; }
-    .grid--list .card__meta { flex: 0 1 auto; min-width: 0; }
-    .grid--list .card__tags { margin-top: 0; flex: none; }
+    /* Метаданные — самая уступчивая часть строки: нулевая базовая ширина
+       выводит их из расчёта переноса (там, где строка помещается без них,
+       перенос не срабатывает), рост делит с именем остаток, а минимум 72 px
+       не даёт превратиться в полоску. Лишнее у них обрезается: overflow:
+       hidden в ui.css, хвост — с многоточием. */
+    .grid--list .card__meta { flex: 1 1 0; min-width: 72px; }
+    .grid--list .card__tags { margin-top: 0; flex: 0 0 auto; }
+    /* Хвост метаданных уступает место целиком и обрывается многоточием,
+       а не посередине слова */
+    .grid--list .card__meta > span:last-child {
+        flex: 0 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
     /* Доступ — компактный переключатель у правого края: он не тянется на всю
-       строку и не дублирует метку (метка в этом виде не рисуется). */
-    .grid--list .card__access { flex: none; width: 176px; }
+       строку и не дублирует метку (метка в этом виде не рисуется).
+       margin-left: auto держит его справа и на своей строке, и на переносе. */
+    .grid--list .card__access { flex: 0 0 auto; width: 176px; margin-left: auto; }
 }
 
 /* ============================================================
