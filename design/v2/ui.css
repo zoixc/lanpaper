@@ -58,9 +58,6 @@
 }
 .btn--soft:hover { background: var(--accent-soft-2); border-color: transparent; }
 
-.btn--ghost { background: transparent; border-color: transparent; color: var(--text-2); }
-.btn--ghost:hover { background: var(--surface-2); border-color: transparent; color: var(--text); }
-
 .btn--danger { color: var(--danger); }
 .btn--danger:hover { background: var(--danger-soft); border-color: var(--danger); }
 
@@ -88,7 +85,7 @@
 .icon-btn svg { width: 17px; height: 17px; }
 .icon-btn:hover { background: var(--surface-2); color: var(--text); }
 .icon-btn:active { transform: scale(0.94); }
-.icon-btn[aria-pressed="true"], .icon-btn.is-active {
+.icon-btn[aria-pressed="true"] {
     background: var(--accent-soft);
     color: var(--accent-text);
 }
@@ -365,11 +362,6 @@
 }
 .badge svg { width: 11px; height: 11px; }
 .badge--accent  { background: var(--accent-soft);  color: var(--accent-text); }
-.badge--success { background: var(--success-soft); color: var(--success); }
-.badge--warning { background: var(--warning-soft); color: var(--warning); }
-.badge--danger  { background: var(--danger-soft);  color: var(--danger); }
-.badge--info    { background: var(--info-soft);    color: var(--info); }
-.badge--outline { background: transparent; border: 1px solid var(--border-2); color: var(--text-2); }
 
 /* Подпись поверх кадра: тёмная «таблетка», читаемая на любом медиа.
    Без размытия подложки: подписей бывает до четырёх на карточку, и
@@ -753,13 +745,16 @@
     font-size: var(--t-xs);
     color: var(--text-3);
 }
-/* Линия под заголовком не нужна, когда ниже вкладки: границу задаёт сама
-   полоса, а тень показывает, что содержимое уходит под неё. */
-.sheet__head:has(+ .sheet__tabs) { border-bottom: 0; }
+/* Полоса вкладок: линия под заголовком ей не нужна, и своей поверхностью она
+   закрывает её сама (margin-top: -1px), а границу задаёт снизу — там, где
+   содержимое уходит под неё. Тень показывает этот уход.
+   Без :has(): в CSS приложения он не используется ни разу, а полоса и без него
+   знает, что лежит под заголовком. */
 .sheet__tabs {
     position: relative;
     z-index: 1;
     flex: none;
+    margin-top: -1px;
     padding: 10px 16px 8px;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
@@ -918,14 +913,23 @@
 .choice__hint { margin-top: 2px; font-size: var(--t-xs); color: var(--text-3); }
 .choice__icon { flex: none; color: var(--text-3); }
 .choice__icon svg { width: 16px; height: 16px; }
-.choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
-.choice:has(input:checked) .choice__mark {
+/* Состояние — в классе is-checked: его ставит скрипт, и он же перерисовывает
+   список после смены уровня, поэтому :has() здесь не нужен (в CSS приложения
+   его нет ни разу, и порт не должен приносить новое требование к браузеру). */
+.choice.is-checked { border-color: var(--accent); background: var(--accent-soft); }
+.choice.is-checked .choice__mark {
     border-color: var(--accent);
     box-shadow: inset 0 0 0 4px var(--accent);
     background: var(--text-on-accent);
 }
-.choice:has(input:checked) .choice__icon { color: var(--accent-text); }
-.choice:has(input:focus-visible) { box-shadow: var(--shadow-focus); }
+.choice.is-checked .choice__icon { color: var(--accent-text); }
+/* Кольцо фокуса — как у остальных нативных полей макета: на видимом кружке,
+   через соседний селектор. У выбранного варианта кружок залит, поэтому тени
+   складываются, иначе заливка пропала бы при фокусе. */
+.choice input:focus-visible + .choice__mark { box-shadow: var(--shadow-focus); }
+.choice.is-checked input:focus-visible + .choice__mark {
+    box-shadow: var(--shadow-focus), inset 0 0 0 4px var(--accent);
+}
 
 /* Строка версии / элемента плейлиста */
 .vrow {
@@ -956,28 +960,6 @@
 .vrow__body { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .vrow__title { font-size: var(--t-sm); font-weight: var(--fw-medium); }
 .vrow__sub { font-size: var(--t-2xs); color: var(--text-3); margin-top: 1px; }
-
-/* Зона загрузки */
-.dropzone {
-    display: grid;
-    place-items: center;
-    gap: 6px;
-    padding: 22px 16px;
-    border: 1.5px dashed var(--border-2);
-    border-radius: var(--r-lg);
-    background: var(--surface-2);
-    color: var(--text-2);
-    text-align: center;
-    transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease), color var(--dur) var(--ease);
-}
-.dropzone:hover, .dropzone.is-over {
-    border-color: var(--accent);
-    background: var(--accent-soft);
-    color: var(--accent-text);
-}
-.dropzone svg { width: 22px; height: 22px; }
-.dropzone__title { font-size: var(--t-sm); font-weight: var(--fw-semibold); }
-.dropzone__hint { font-size: var(--t-xs); color: var(--text-3); }
 
 /* Полоса заполнения (бюджет версий) */
 .meter { height: 5px; border-radius: var(--r-full); background: var(--surface-3); overflow: hidden; }
