@@ -32,6 +32,11 @@ const (
 	authLocked
 )
 
+// AuthRealm is the Basic-auth realm of every password prompt in the app: the
+// admin password also opens auth-level links, and two different realms would
+// make the browser ask for the same credentials twice.
+const AuthRealm = `Basic realm="Admin", charset="UTF-8"`
+
 // checkAdminCredentials is the only place where admin credentials are
 // verified, for both the admin API and admin-protected public links.
 func checkAdminCredentials(r *http.Request) (authResult, time.Duration) {
@@ -79,7 +84,7 @@ func MaybeBasicAuth(next http.HandlerFunc) http.HandlerFunc {
 		case authLocked:
 			writeTooManyRequests(w, retry, "Too many failed login attempts")
 		default:
-			w.Header().Set("WWW-Authenticate", `Basic realm="Admin", charset="UTF-8"`)
+			w.Header().Set("WWW-Authenticate", AuthRealm)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		}
 	}

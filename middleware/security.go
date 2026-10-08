@@ -4,6 +4,7 @@ package middleware
 
 import (
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -163,17 +164,24 @@ func sameOriginRequest(r *http.Request) bool {
 
 	// Trust forwarded headers only from the configured reverse proxy. Always
 	// use the rightmost entry: preceding entries may have been set by clients.
+	trusted := config.IsTrustedProxy(r.RemoteAddr)
 	scheme := "http"
+	schemeKnown := true
 	if r.TLS != nil {
 		scheme = "https"
-	}
-	if config.IsTrustedProxy(r.RemoteAddr) {
-		if p := rightmostHeader(r.Header.Get("X-Forwarded-Proto")); p == "http" || p == "https" {
+	} else if trusted {
+		switch p := rightmostHeader(r.Header.Get("X-Forwarded-Proto")); p {
+		case "http", "https":
 			scheme = p
+		default:
+			// A proxy that terminates TLS without forwarding the original
+			// scheme leaves it unknown: the browser sees https while the
+			// connection to us is plain http.
+			schemeKnown = false
 		}
 	}
 	hosts := []string{r.Host}
-	if config.IsTrustedProxy(r.RemoteAddr) {
+	if trusted {
 		if h := rightmostHeader(r.Header.Get("X-Forwarded-Host")); h != "" {
 			hosts = append(hosts, h)
 		}
@@ -183,9 +191,30 @@ func sameOriginRequest(r *http.Request) bool {
 		if err != nil || expected.Hostname() == "" || expected.User != nil || expected.Path != "" {
 			continue
 		}
-		if strings.EqualFold(u.Scheme, scheme) && strings.EqualFold(u.Hostname(), expected.Hostname()) &&
-			originPort == effectivePort(expected) {
+		if !strings.EqualFold(u.Hostname(), expected.Hostname()) {
+			continue
+		}
+		if strings.EqualFold(u.Scheme, scheme) && originPort == effectivePort(expected) {
 			return true
+		}
+		// Unknown external scheme behind a trusted proxy: the same host may
+		// have been reached over https while the connection to us is plain
+		// http, so the scheme — and with it the default port — is the one the
+		// proxy hides. The browser itself says the request comes from this very
+		// origin, and host and port fit the other scheme, so accept it; without
+		// this, a TLS-terminating proxy that does not send X-Forwarded-Proto
+		// turns every panel POST into a 403. Cross-site and same-site requests
+		// were already refused by the Sec-Fetch-Site switch above, so a browser
+		// cannot reach this line from a page on another origin.
+		if !schemeKnown && r.Header.Get("Sec-Fetch-Site") == "same-origin" {
+			other := "https"
+			if scheme == "https" {
+				other = "http"
+			}
+			if alt, err := url.Parse(other + "://" + host); err == nil &&
+				strings.EqualFold(u.Scheme, other) && originPort == effectivePort(alt) {
+				return true
+			}
 		}
 	}
 	return false
@@ -197,6 +226,16 @@ func rightmostHeader(value string) string {
 		value = value[i+1:]
 	}
 	return strings.TrimSpace(value)
+}
+
+// peerAddress returns the IP part of an address of the form "ip:port",
+// or the input unchanged when it carries no port. Used only in log lines,
+// where the operator needs the exact value for TRUSTED_PROXY.
+func peerAddress(remoteAddr string) string {
+	if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
+		return host
+	}
+	return remoteAddr
 }
 
 func effectivePort(u *url.URL) string {
@@ -239,9 +278,15 @@ func WithSecurity(next http.HandlerFunc) http.HandlerFunc {
 			if !sameOriginRequest(r) {
 				// Log rejections: a sudden wave of CSRF 403s means either an
 				// attack or a misconfigured reverse proxy — both need a trail.
-				log.Printf("Security: rejected cross-origin %s %s (Origin=%q Sec-Fetch-Site=%q Host=%q RemoteAddr=%s) — if this is a reverse proxy, set TRUSTED_PROXY",
+				// Everything the decision used is printed, because the usual
+				// causes are exactly these values: a Host the browser never
+				// asked for, a proxy that is not trusted yet, or a proxy that
+				// terminates TLS without saying so (X-Forwarded-Proto), which
+				// leaves Origin https:// against a scheme of http.
+				log.Printf("Security: rejected cross-origin %s %s (Origin=%q Sec-Fetch-Site=%q Host=%q X-Forwarded-Host=%q X-Forwarded-Proto=%q trustPeer=%v RemoteAddr=%s): if this is a reverse proxy, add %s to TRUSTED_PROXY (a comma-separated list of IPs and CIDRs is allowed) and make it pass the original Host header; a proxy that terminates TLS should also send X-Forwarded-Proto=https, because without it only requests the browser itself marks as same-origin are accepted",
 					r.Method, r.URL.Path, r.Header.Get("Origin"), r.Header.Get("Sec-Fetch-Site"),
-					r.Host, r.RemoteAddr)
+					r.Host, r.Header.Get("X-Forwarded-Host"), r.Header.Get("X-Forwarded-Proto"),
+					config.IsTrustedProxy(r.RemoteAddr), r.RemoteAddr, peerAddress(r.RemoteAddr))
 				http.Error(w, "Cross-origin request rejected (if you are behind a reverse proxy, configure TRUSTED_PROXY)", http.StatusForbidden)
 				return
 			}

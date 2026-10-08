@@ -174,6 +174,12 @@ func TestUploadSemaphoreBoundsConcurrentRemoteDownloads(t *testing.T) {
 		close(finish)
 		t.Fatalf("upload limit ignored: %d %q", w.Code, w.Body.String())
 	}
+	// docs/API.md promises Retry-After on this 429: the slot frees as soon as
+	// one of the running uploads finishes.
+	if retry := w.Header().Get("Retry-After"); retry == "" {
+		close(finish)
+		t.Fatalf("concurrent-upload 429 without Retry-After: %v", w.Header())
+	}
 	close(finish)
 	select {
 	case first := <-result:
@@ -232,6 +238,25 @@ func TestInspectMediaFileAcceptsAllMP4Brands(t *testing.T) {
 	garbage := []byte("<html>definitely not a video file at all, padding padding</html>")
 	if _, err := inspectMediaFile(bytes.NewReader(garbage), "evil.mp4", int64(len(garbage)), 1<<20); err == nil {
 		t.Error("garbage with .mp4 name must be rejected")
+	}
+
+	// HEIF/AVIF photos share the ftyp box with MP4 but are still images and
+	// have no decoder here. Storing one as .mp4 produced a tile that neither
+	// the panel nor the browser could play.
+	for _, tt := range []struct {
+		name  string
+		brand string
+	}{
+		{"AVIF photo", "avif"},
+		{"Apple HEIC photo", "heic"},
+		{"HEIF generic brand", "mif1"},
+		{"HEIF alpha brand", "heix"},
+	} {
+		photo := mp4WithBrand(tt.brand, "mif1", "miaf")
+		ext, err := inspectMediaFile(bytes.NewReader(photo), "photo."+tt.brand, int64(len(photo)), 1<<20)
+		if err == nil {
+			t.Errorf("%s: inspectMediaFile() = (%q, nil), want an error", tt.name, ext)
+		}
 	}
 }
 

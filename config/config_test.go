@@ -311,3 +311,49 @@ func TestExampleConfigCarriesTheNewDefaults(t *testing.T) {
 		t.Fatal("publish keys were parsed without a refresh")
 	}
 }
+
+func TestTrustedProxyList(t *testing.T) {
+	// A container behind a LAN proxy usually sees the Docker bridge gateway,
+	// not the proxy's own address, so both have to be accepted at once.
+	tests := []struct {
+		name       string
+		configured string
+		remote     string
+		want       bool
+	}{
+		{"single address", "192.168.20.1", "192.168.20.1:56428", true},
+		{"single address, other peer", "192.168.20.1", "172.24.0.1:56428", false},
+		{"list, first entry", "192.168.20.1,172.24.0.1", "192.168.20.1:56428", true},
+		{"list, second entry", "192.168.20.1,172.24.0.1", "172.24.0.1:56428", true},
+		{"list with spaces", " 192.168.20.1 , 172.24.0.1 ", "172.24.0.1:56428", true},
+		{"list, stranger", "192.168.20.1,172.24.0.1", "10.0.0.5:56428", false},
+		{"list with a CIDR", "192.168.20.1,10.0.0.0/8", "10.4.4.4:56428", true},
+		{"list with IPv6", "2001:db8::/32,172.24.0.1", "2001:db8::5", true},
+		{"invalid entry dropped, valid kept", "not-an-ip,172.24.0.1", "172.24.0.1:56428", true},
+		{"invalid entry dropped, nothing valid left", "not-an-ip", "172.24.0.1:56428", false},
+		{"empty", "", "172.24.0.1:56428", false},
+		{"address without a port", "172.24.0.1", "172.24.0.1", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			Current = Config{
+				Port:                 "8080",
+				MaxUploadMB:          10,
+				MaxConcurrentUploads: 3,
+				AdminUser:            "admin",
+				AdminPass:            "pass",
+				Rate:                 RateConfig{PublicPerMin: 50, UploadPerMin: 20, Burst: 10},
+				TrustedProxy:         tt.configured,
+			}
+			validate()
+			if got := IsTrustedProxy(tt.remote); got != tt.want {
+				t.Errorf("IsTrustedProxy(%q) with TRUSTED_PROXY=%q = %v, want %v",
+					tt.remote, tt.configured, got, tt.want)
+			}
+			// Invalid entries must not be reported as trusted either.
+			if tt.name == "invalid entry dropped, valid kept" && Current.TrustedProxy != "172.24.0.1" {
+				t.Errorf("TrustedProxy kept %q, want the valid entry only", Current.TrustedProxy)
+			}
+		})
+	}
+}

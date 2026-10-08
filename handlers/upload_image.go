@@ -102,6 +102,18 @@ func canUseLosslessMode() bool {
 	return config.Current.Compression.Quality == 100 && config.Current.Compression.Scale == 100
 }
 
+// isoBMFFImageBrands are the major brands of ISO-BMFF files that are still
+// images, not video: HEIF (heic/heix/hevc…), AVIF (avif/avis) and the generic
+// MIAF brand mif1. They share the ftyp box with MP4 but have no decoder here,
+// so an uploaded one used to be stored as .mp4 and served as video/mp4 — a
+// tile no browser could play, while the previous build rejected the file.
+var isoBMFFImageBrands = map[string]bool{
+	"avif": true, "avis": true,
+	"heic": true, "heix": true, "heim": true, "heis": true,
+	"hevc": true, "hevx": true, "hevm": true, "hevs": true,
+	"mif1": true, "msf1": true, "msix": true, "mshf": true,
+}
+
 // inspectMediaFile validates a bounded file's type using magic bytes, not a
 // user-provided extension or Content-Type. The reader is reset on return.
 func inspectMediaFile(r io.ReadSeeker, name string, size, maxBytes int64) (string, error) {
@@ -126,6 +138,11 @@ func inspectMediaFile(r io.ReadSeeker, name string, size, maxBytes int64) (strin
 	// were rejected — especially URL downloads, which land in a nameless
 	// temp file with no extension to fall back to.
 	if len(head) >= 12 && string(head[4:8]) == "ftyp" {
+		// An image container is not a video that happens to be unplayable:
+		// name it and refuse it, so the file is not stored under a wrong type.
+		if brand := strings.ToLower(string(head[8:12])); isoBMFFImageBrands[brand] {
+			return "", fmt.Errorf("unsupported image container %q", brand)
+		}
 		return "mp4", utils.ValidateFileType(head, "mp4")
 	}
 	ext, ok := mimeToExt[http.DetectContentType(head)]

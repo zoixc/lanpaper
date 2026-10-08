@@ -45,7 +45,7 @@ link, which is handy for digital frames, smart TVs, kiosks and other displays.
   rollback, playlist items with rotation, and access levels with counters.
 - **Light on resources:** about 10 MB of RAM when idle, gzip for text
   responses, media revalidated with `304` instead of downloaded again, and
-  about 50 KB of self-hosted WOFF2 fonts. Archived versions are moved, not
+  about 60 KB of self-hosted WOFF2 fonts. Archived versions are moved, not
   copied, and per-link access counters live in memory only.
 - **Security:** Basic Auth with a brute-force lockout, CSRF protection,
   strict security headers, SSRF-safe downloads and rate limits. Publish keys
@@ -198,14 +198,25 @@ delete anything. Keys come from the `PUBLISH_KEYS` environment variable only
 SHA-256 digests in memory — they never reach `config.json`. Wrong keys share
 the brute-force budget with admin logins, so guessing is locked out per client.
 
-**Behind a reverse proxy**, set `TRUSTED_PROXY` to *only* the proxy's IP or
-CIDR. Configure the proxy to **overwrite** `X-Real-IP`, `X-Forwarded-For`,
-`X-Forwarded-Proto` and `X-Forwarded-Host`, and to preserve the original
-`Host`. Without this:
+**Behind a reverse proxy**, set `TRUSTED_PROXY` to *only* the address the
+proxy reaches Lanpaper from — one IP or CIDR, or a comma-separated list when
+the proxy arrives through more than one hop (a Docker container, for example,
+sees the bridge gateway and not the proxy's LAN address:
+`TRUSTED_PROXY="192.168.20.1,172.24.0.1"`). Configure the proxy to
+**overwrite** `X-Real-IP`, `X-Forwarded-For`, `X-Forwarded-Proto` and
+`X-Forwarded-Host`, and to preserve the original `Host`. Without this:
 
 - every visitor appears to come from the proxy's (often private) address, so
   `local` links become reachable for everyone;
 - every visitor shares one rate-limit and login-lockout bucket.
+
+A proxy that terminates TLS but forwards no `X-Forwarded-Proto` is the one
+exception: the browser's `https` origin then meets a plain-HTTP connection, and
+only a request the browser itself marks as same-origin (`Sec-Fetch-Site:
+same-origin`) whose host and port fit the other scheme is accepted — the
+classic case of a panel behind a small TLS terminator that adds no headers.
+Forwarding the header keeps the scheme check exact for every client, including
+older browsers that send no `Sec-Fetch-Site`.
 
 See the nginx and Caddy examples in [SECURITY.md](SECURITY.md#reverse-proxy-examples).
 
@@ -241,7 +252,7 @@ which have the highest priority.
 | `PUBLISH_KEYS` | unset | Comma-separated API keys (16+ characters, max 32) that may upload and create links. Environment only — never written to `config.json` |
 | `COMPRESSION_QUALITY` | `85` | JPEG/WebP quality, 1–100 |
 | `COMPRESSION_SCALE` | `100` | Stored image size as a percentage of the original, 1–100 |
-| `TRUSTED_PROXY` | unset | IP or CIDR of the reverse proxy. Forwarded headers are trusted only from it. |
+| `TRUSTED_PROXY` | unset | Address the reverse proxy connects from: an IP or CIDR, or a comma-separated list of them when there is more than one hop. Forwarded headers are trusted only from these. |
 | `TLS_CERT_FILE`, `TLS_KEY_FILE` | unset | Serve HTTPS from the process itself (TLS 1.2+). Both or neither: a half-configured certificate is a startup error, not a silent downgrade to plaintext. |
 | `PROXY_TYPE` | `http` | Outbound proxy type: `http`, `https` or `socks5` |
 | `PROXY_HOST`, `PROXY_PORT` | unset | Optional outbound proxy for URL downloads |
@@ -328,7 +339,8 @@ hardened systemd unit, which log lines deserve an alert, capacity planning,
 backups, and a pre-launch checklist.
 
 The short version: terminate TLS at a reverse proxy and set `TRUSTED_PROXY` to
-its address, keep `data/` on a volume that is actually backed up, use a long
+the address it reaches Lanpaper from (a list, if there is more than one hop),
+keep `data/` on a volume that is actually backed up, use a long
 random `ADMIN_PASS`, set `HISTORY_MAX_MB` to what the volume can spare, and
 read every `Warning:` the process prints at startup.
 
@@ -412,7 +424,7 @@ copyright notice and the licence text travel with your copies. It comes without
 warranty, and no trademark rights are granted.
 
 Every dependency is permissive too — BSD-3-Clause, MIT, and SIL OFL 1.1 for the
-two bundled fonts — and nothing copyleft is linked into the binary or served by
+bundled font — and nothing copyleft is linked into the binary or served by
 it, so a commercial offering carries no source-disclosure obligation. The
 component list, with the licence texts a redistribution has to reproduce, is in
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). Every first-party source file

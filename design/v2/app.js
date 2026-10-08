@@ -48,7 +48,7 @@
         check: '<polyline points="20 6.5 9.5 17 4 11.5"/>',
         grid: '<rect x="3" y="3" width="7.5" height="7.5" rx="1.8"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.8"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.8"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.8"/>',
         list: '<line x1="8.5" y1="6" x2="21" y2="6"/><line x1="8.5" y1="12" x2="21" y2="12"/><line x1="8.5" y1="18" x2="21" y2="18"/><line x1="3.6" y1="6" x2="3.61" y2="6"/><line x1="3.6" y1="12" x2="3.61" y2="12"/><line x1="3.6" y1="18" x2="3.61" y2="18"/>',
-        sun: '<circle cx="12" cy="12" r="4.2"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.9" y1="4.9" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.1" y2="19.1"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.9" y1="19.1" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.1" y2="4.9"/>',
+        sun: '<circle cx="12" cy="12" r="4.5"/><line x1="12" y1="1.5" x2="12" y2="3.5"/><line x1="12" y1="20.5" x2="12" y2="22.5"/><line x1="4.6" y1="4.6" x2="6" y2="6"/><line x1="18" y1="18" x2="19.4" y2="19.4"/><line x1="1.5" y1="12" x2="3.5" y2="12"/><line x1="20.5" y1="12" x2="22.5" y2="12"/><line x1="4.6" y1="19.4" x2="6" y2="18"/><line x1="18" y1="6" x2="19.4" y2="4.6"/>',
         moon: '<path d="M20.5 14.3A8.5 8.5 0 0 1 9.7 3.5a8.6 8.6 0 1 0 10.8 10.8z"/>',
         gear: '<circle cx="12" cy="12" r="3.1"/><path d="M12 2.6l1 2.3 2.5-.3 1 2.3 2.3 1-.3 2.5 1.6 1.9-1.6 1.9.3 2.5-2.3 1-1 2.3-2.5-.3-1 2.3-1-2.3-2.5.3-1-2.3-2.3-1 .3-2.5L2.6 12l1.6-1.9-.3-2.5 2.3-1 1-2.3 2.5.3z"/>',
         select: '<path d="M9 4.5H6.5A2 2 0 0 0 4.5 6.5V9"/><path d="M15 4.5h2.5a2 2 0 0 1 2 2V9"/><path d="M9 19.5H6.5a2 2 0 0 1-2-2V15"/><path d="M15 19.5h2.5a2 2 0 0 0 2-2V15"/><polyline points="9 12 11 14 15.5 9.5"/>',
@@ -83,7 +83,8 @@
 
     function hydrateIcons(root) {
         $$('svg[data-icon]', root || document).forEach(function (svg) {
-            if (svg.dataset.hydrated) return;
+            /* Помним, ЧТО нарисовано: кнопка темы меняет data-icon на ходу. */
+            if (svg.dataset.hydrated === svg.dataset.icon) return;
             const path = ICONS[svg.dataset.icon];
             if (!path) return;
             svg.setAttribute('viewBox', '0 0 24 24');
@@ -99,7 +100,7 @@
             svg.setAttribute('aria-hidden', 'true');
             svg.setAttribute('focusable', 'false');
             svg.innerHTML = path;
-            svg.dataset.hydrated = '1';
+            svg.dataset.hydrated = svg.dataset.icon;
         });
     }
     const icon = (name, cls) => {
@@ -254,6 +255,9 @@
     /* На телефоне полное «Поиск по имени или файлу» не помещается */
     const narrow = () => window.matchMedia('(max-width: 560px)').matches;
     function applyTranslations(root) {
+        /* <html lang> — то, чем пользуется экранный диктор и проверка
+           орфографии; держим его в согласии с выбранным языком. */
+        document.documentElement.lang = state.lang;
         $$('[data-i18n]', root || document).forEach(function (el) {
             el.textContent = t(el.dataset.i18n);
         });
@@ -283,6 +287,8 @@
        4. ТЕМА, АКЦЕНТ, ЯЗЫК
        ======================================================== */
     const prefersDark = () => matchMedia('(prefers-color-scheme: dark)').matches;
+    /* Те же цвета, что в <meta name="theme-color"> в index.html. */
+    const THEME_COLOR = { light: '#F5F6F9', dark: '#14161B' };
     function effectiveTheme() {
         return state.theme === 'auto' ? (prefersDark() ? 'dark' : 'light') : state.theme;
     }
@@ -290,10 +296,14 @@
         const dark = effectiveTheme() === 'dark';
         document.documentElement.dataset.theme = dark ? 'dark' : 'light';
         document.documentElement.dataset.themeMode = state.theme;
-        const svg = $('#themeBtn svg');
-        if (svg) svg.dataset.icon = dark ? 'sun' : 'moon';
-        hydrateIcons($('#themeBtn'));
+        /* Знак кнопки темы переключает CSS: оба значка лежат друг на друге,
+           и виден тот, что подходит html[data-theme] (его ставит prepaint). */
         $$('[data-theme-opt]').forEach(input => { input.checked = input.value === state.theme; });
+        /* У <meta name="theme-color"> есть только media-варианты, поэтому
+           ручной выбор темы они не видят: цвет действующей темы ставим обеим
+           меткам, какая бы media ни совпала. */
+        const ring = dark ? THEME_COLOR.dark : THEME_COLOR.light;
+        $$('meta[name="theme-color"]').forEach(function (meta) { meta.setAttribute('content', ring); });
     }
     function applyPalette() {
         document.documentElement.dataset.palette = state.palette;
@@ -845,10 +855,19 @@
         host().append(scrim, node);
         currentOverlay = { node: node, scrim: scrim, kind: (opts && opts.kind) || 'other' };
         document.body.style.overflow = 'hidden';
+        /* Шестерёнка поворачивается, пока открыт пульт настроек (как в 0.12.1). */
+        const settingsOpen = !!$('[data-sheet="settings"]');
+        document.body.classList.toggle('settings-open', settingsOpen);
+        setSettingsExpanded(settingsOpen);
         hydrateIcons(node);
         const target = (opts && opts.focus) || node.querySelector('[autofocus], input, button');
         setTimeout(() => target && target.focus({ preventScroll: true }), 40);
         return node;
+    }
+    /* Шестерёнка сообщает экранному диктору, открыт ли пульт настроек. */
+    function setSettingsExpanded(open) {
+        const gear = $('#settingsBtn');
+        if (gear) gear.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
     function closeOverlay(keepFocus) {
         if (!currentOverlay) return;
@@ -856,6 +875,9 @@
         currentOverlay.scrim.remove();
         currentOverlay = null;
         document.body.style.overflow = '';
+        const settingsOpen = !!$('[data-sheet="settings"]');
+        document.body.classList.toggle('settings-open', settingsOpen);
+        setSettingsExpanded(settingsOpen);
         closeMenu();
         if (!keepFocus && lastFocused && lastFocused.isConnected) lastFocused.focus({ preventScroll: true });
         lastFocused = null;
@@ -1956,6 +1978,11 @@
        ======================================================== */
     function initShortcuts() {
         document.addEventListener('keydown', function (e) {
+            /* Поверх открытого окна сочетания не работают: «n» открыло бы
+               окно создания заново и стёрло введённое имя, «g»/«t» поменяли бы
+               вид и тему за спиной у пользователя. Esc и Tab обрабатывает
+               обработчик оверлея. */
+            if (currentOverlay) return;
             const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)
                 || document.activeElement.isContentEditable;
             const mod = e.ctrlKey || e.metaKey;

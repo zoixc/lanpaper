@@ -11,7 +11,7 @@
 <meta name="theme-color" content="#14161B" media="(prefers-color-scheme: dark)">
 <link rel="icon" type="image/svg+xml" href="../../static/favicon.svg">
 <link rel="apple-touch-icon" href="../../static/icons/apple-touch-icon.png">
-<link rel="preload" href="../../static/fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../../static/fonts/golos-text-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="ui.css">
 <link rel="stylesheet" href="layout.css">
@@ -91,11 +91,13 @@
 
                     <button class="icon-btn" id="themeBtn" type="button" aria-label="Переключить тему"
                             data-tip-key="aria_toggle_theme" data-i18n-aria="aria_toggle_theme">
-                        <svg data-icon="moon"></svg>
+                        <svg class="theme-icon" data-icon="sun"></svg>
+                        <svg class="theme-icon" data-icon="moon"></svg>
                     </button>
 
                     <button class="icon-btn" id="settingsBtn" type="button" aria-label="Настройки"
-                            data-tip-key="aria_settings" data-i18n-aria="aria_settings"><svg data-icon="gear"></svg></button>
+                            data-tip-key="aria_settings" data-i18n-aria="aria_settings"
+                            aria-expanded="false" aria-controls="settingsSheet"><svg data-icon="gear"></svg></button>
 
                     <button class="btn btn--primary" id="newLinkBtn" type="button">
                         <svg data-icon="plus"></svg><span data-i18n="new_link">Новая ссылка</span>
@@ -261,7 +263,7 @@
      доступ и статистика.
      ============================================================ -->
 <template id="tplPanel">
-    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="panelTitle" data-sheet>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="panelTitle" data-sheet="panel">
         <div class="sheet__grip"></div>
         <div class="sheet__head">
             <div class="grow">
@@ -319,7 +321,7 @@
      НАСТРОЙКИ: тема, акцент, язык, данные, обслуживание, клавиши
      ============================================================ -->
 <template id="tplSettings">
-    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" data-sheet>
+    <div class="sheet" id="settingsSheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" data-sheet="settings">
         <div class="sheet__grip"></div>
         <div class="sheet__head">
             <div class="grow">
@@ -423,7 +425,7 @@
      файл — он копируется в ссылку.
      ============================================================ -->
 <template id="tplServer">
-    <div class="sheet sheet--picker" role="dialog" aria-modal="true" aria-labelledby="serverTitle" data-sheet>
+    <div class="sheet sheet--picker" role="dialog" aria-modal="true" aria-labelledby="serverTitle" data-sheet="picker">
         <div class="sheet__grip"></div>
         <div class="sheet__head">
             <div class="grow">

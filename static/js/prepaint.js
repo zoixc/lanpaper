@@ -25,6 +25,13 @@
             var dark = theme === 'dark' || (theme === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
             root.dataset.theme = dark ? 'dark' : 'light';
             root.dataset.themeMode = theme;
+            /* Полоса браузера: у <meta name="theme-color"> только media-варианты,
+               и ручной выбор темы они не видят. Цвет действующей темы ставим
+               обеим меткам — до первой отрисовки, иначе полоса мигнёт системным
+               цветом. */
+            var ring = dark ? '#14161B' : '#F5F6F9';
+            var metas = document.querySelectorAll('meta[name="theme-color"]');
+            for (var i = 0; i < metas.length; i++) metas[i].setAttribute('content', ring);
             root.dataset.palette = saved.palette || 'indigo';
             root.dataset.view = saved.view || legacyView || 'grid';
             if (saved.lang || legacyLang) root.lang = saved.lang || legacyLang;

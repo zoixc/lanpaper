@@ -50,8 +50,12 @@ type Config struct {
 	ProxyPassword        string            `json:"proxyPassword,omitempty"`
 	Rate                 RateConfig        `json:"rate"`
 	Compression          CompressionConfig `json:"compression"`
-	// TrustedProxy is the IP or CIDR of a reverse proxy in front of Lanpaper.
-	// X-Real-IP / X-Forwarded-For are trusted only for requests from this address.
+	// TrustedProxy lists the reverse proxies in front of Lanpaper: one or
+	// more IPs or CIDRs, comma-separated ("192.168.20.1,172.24.0.0/16").
+	// X-Real-IP / X-Forwarded-* are trusted only for requests from these
+	// addresses. A list is needed whenever a proxy reaches the container
+	// through more than one hop or address — for example a proxy on the LAN
+	// plus the Docker bridge gateway the container actually sees.
 	TrustedProxy string `json:"trustedProxy,omitempty"`
 
 	// History bounds the versions kept when a link's media is replaced.
@@ -93,9 +97,10 @@ var Current Config
 
 // cachedProxy caches the parsed TrustedProxy value set during Load/validate.
 // Stored as *parsedProxy via atomic pointer to avoid any lock on the hot path.
+// The lists stay immutable after validate(), so readers need no lock.
 type parsedProxy struct {
-	ip   *net.IP
-	cidr *net.IPNet
+	ips   []*net.IP
+	cidrs []*net.IPNet
 }
 
 var cachedProxyPtr atomic.Pointer[parsedProxy]
@@ -279,10 +284,11 @@ func parseTrustedProxyValue(s string) (*net.IP, *net.IPNet, error) {
 	return nil, cidr, nil
 }
 
-// IsTrustedProxy reports whether remoteAddr matches the configured TrustedProxy.
+// IsTrustedProxy reports whether remoteAddr matches any entry of the
+// configured TrustedProxy list.
 func IsTrustedProxy(remoteAddr string) bool {
 	p := cachedProxyPtr.Load()
-	if p == nil || (p.ip == nil && p.cidr == nil) {
+	if p == nil || (len(p.ips) == 0 && len(p.cidrs) == 0) {
 		return false
 	}
 	host, _, splitErr := net.SplitHostPort(remoteAddr)
@@ -293,16 +299,58 @@ func IsTrustedProxy(remoteAddr string) bool {
 	if remote == nil {
 		return false
 	}
-	if p.ip != nil {
-		return p.ip.Equal(remote)
+	for _, ip := range p.ips {
+		if ip.Equal(remote) {
+			return true
+		}
 	}
-	return p.cidr.Contains(remote)
+	for _, cidr := range p.cidrs {
+		if cidr.Contains(remote) {
+			return true
+		}
+	}
+	return false
 }
 
 // validate clamps out-of-range values to safe defaults. Missing admin
 // credentials are deliberately NOT treated as "auth disabled": the admin
 // endpoints then fail closed (503) while public links and health checks keep
 // working. DISABLE_AUTH=true is the only way to turn authentication off.
+// ApplyTrustedProxy re-reads Current.TrustedProxy and remembers what is
+// actually in effect: invalid entries are dropped with a warning, and the
+// setting is normalised to the entries that were accepted. Load calls it once
+// at startup; tests that change the setting call it again to refresh the cache
+// IsTrustedProxy reads.
+func ApplyTrustedProxy() {
+	var proxies parsedProxy
+	valid := make([]string, 0, 2)
+	for _, entry := range splitList(Current.TrustedProxy) {
+		ip, cidr, err := parseTrustedProxyValue(entry)
+		if err != nil {
+			log.Printf("Warning: invalid TRUSTED_PROXY entry %q — ignoring (must be an IP or CIDR)", entry)
+			continue
+		}
+		if ip != nil {
+			proxies.ips = append(proxies.ips, ip)
+		}
+		if cidr != nil {
+			proxies.cidrs = append(proxies.cidrs, cidr)
+		}
+		valid = append(valid, entry)
+	}
+	if len(proxies.ips) == 0 && len(proxies.cidrs) == 0 {
+		if strings.TrimSpace(Current.TrustedProxy) != "" {
+			log.Printf("Warning: TRUSTED_PROXY %q has no valid entries — ignoring (comma-separated IPs or CIDRs)", Current.TrustedProxy)
+		}
+		Current.TrustedProxy = ""
+	} else {
+		// Keep what is actually in effect: the invalid entries were dropped
+		// above and must not be reported as trusted.
+		Current.TrustedProxy = strings.Join(valid, ",")
+	}
+	cachedProxyPtr.Store(&proxies)
+}
+
 func validate() {
 	portStr := strings.TrimPrefix(Current.Port, ":")
 	if n, err := strconv.Atoi(portStr); err != nil || n < 1 || n > 65535 {
@@ -353,15 +401,7 @@ func validate() {
 		}
 	}
 
-	ip, cidr, err := parseTrustedProxyValue(Current.TrustedProxy)
-	if err != nil {
-		log.Printf("Warning: invalid TRUSTED_PROXY %q — ignoring (must be IP or CIDR)", Current.TrustedProxy)
-		Current.TrustedProxy = ""
-		cachedProxyPtr.Store(&parsedProxy{})
-	} else {
-		cachedProxyPtr.Store(&parsedProxy{ip: ip, cidr: cidr})
-	}
-
+	ApplyTrustedProxy()
 	if Current.History.Limit < 0 || Current.History.Limit > MaxHistoryLimit {
 		log.Printf("Warning: HISTORY_LIMIT %d out of range (0-%d), using %d",
 			Current.History.Limit, MaxHistoryLimit, DefaultHistoryLimit)

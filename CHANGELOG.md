@@ -3,6 +3,246 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
+## [0.14.1] – 2026-10-08
+
+A fix release for the 2.0 panel: the strings it looked up but never had, the
+phone layout, the header, the typography and one reverse-proxy setting — plus a
+pass over the whole application that repaired dragging files onto the panel,
+bulk pinning, the version links, the access counters and the design stand. Two
+query parameters of `GET /api/wallpapers` are validated instead of ignored and
+the manifest is served with its own media type; no data or URL behaviour
+changes, upgrading is a container restart.
+
+### Fixed
+
+- **Twenty-two interface strings no longer show as raw keys.** The 2.0 panel
+  asks for `sc_search`, `sc_new`, `sc_theme`, `sc_view`, `sc_select`,
+  `sc_close` (settings sheet), `access_public_hint`, `access_local_hint`,
+  `access_token_hint`, `access_auth_hint` (access levels), `filter_all`,
+  `filter_playlist`, `filter_pinned` (filter chips), `pin`, `unpin`,
+  `bulk_pin`, `bulk_unpin`, `pinned_toast`, `unpinned_toast`,
+  `upload_success`, `append_success` and `search_placeholder_short`, none of
+  which existed in `static/i18n/*.json`. Without a dictionary entry `t()`
+  falls back to the key itself, so the sheet, the chips, the card menu and the
+  toasts printed identifiers instead of words. All six languages now carry
+  all 219 keys, and the phone-width placeholder is two characters shorter on
+  purpose.
+- **`tests/i18n.test.cjs` finds this class of defect again.** It matched only
+  `t('key')` and `data-i18n` attributes, while the panel builds its labels
+  from arrays, ternaries and lookup tables (`['t', 'sc_theme']`,
+  `t(pinned ? 'unpin' : 'pin')`, `t(SORT_LABELS[…])`, `t('palette_' + name)`).
+  The test now inventories every snake_case literal in `admin.html`,
+  `static/js/*.js` and `static/sw.js`, checks the argument list of every
+  `t(…)` call, walks the domain of keys assembled from a constant
+  (`PALETTES`), and verifies the narrow-screen `*_short` variants. Keys that
+  deliberately are not translations are listed with a reason.
+- **The accent swatch draws its selection ring around the swatch.** The
+  hidden radio was `position: absolute; inset: 0` without explicit sizes; an
+  `input` is a replaced element, so it stayed at its intrinsic ~15 px in the
+  top-left corner and the ring was drawn there instead of around the 34 px
+  circle.
+- **The phone layout no longer scrolls sideways.** Four segment tabs
+  (media/versions/playlist/access) and the three theme options could not
+  shrink below their text width and pushed the page wider than the screen:
+  the rows scroll on their own now (`max-width: 560px`), and `html` clips
+  accidental horizontal overflow (`overflow-x: clip`, which — unlike
+  `hidden` — keeps the sticky header working). The header itself lost the
+  app name and the 44 px tap targets below 400 px, where five icon buttons
+  and the wordmark no longer fit in one line, and the drag-and-drop frame
+  caps its width and breaks long file names.
+- **Header buttons have no tooltips any more.** A `[data-tip]::after` above a
+  sticky header is pushed off the top edge and, at the right edge, widened the
+  document — the source of the sideways scroll on desktop. `aria-label`
+  stays, so the buttons still have accessible names.
+- **The settings and theme icons are the 0.12.1 ones again.** The hand-drawn
+  gear (`ICONS.gear`) was a twelve-pointed star with uneven radii that read as
+  crooked at 17 px; it and the moon (outer and inner arc of different radii,
+  8.5 and 8.6) are the Feather outlines the 0.12.1 panel used.
+
+- **Dragging files onto the panel uploads them again.** `static/js/app.js`
+  declared `createLinksFromFiles` twice: the second, optimistic definition — no
+  request at all, `hasImage: true`, an empty `imageUrl` — won by hoisting, so a
+  dropped file produced a phantom tile named after the first path segment, no
+  `/api/upload` call, and a `404` after the reload. The dead copy is gone; the
+  surviving one is what the drop handler, the empty state and `#filePicker`
+  reach.
+- **Bulk pin and unpin change the links the button names.** The filter was
+  `l.pinned !== !anyUnpinned`, which selected the links that were *already* in
+  the wanted state: «Закрепить» pinned the pinned ones and left the rest
+  untouched, and «Открепить» (a fully pinned selection) did nothing at all.
+  Only the selected links whose `pinned` still differs from the label are
+  toggled now.
+- **The Open button of an archived version opens that version.** Every history
+  row called `openMedia(link)` and therefore served the current file; the row
+  opens `/{name}?v=N` now, while the live row keeps the plain URL.
+- **Access counters survive a rename.** `storage.RenameStats` moves the
+  counters with the link (and merges them when the new name still had counters
+  from a deleted link), so a renamed link no longer reads as «Обращений пока не
+  было» and a new link under the old name cannot inherit another link's
+  traffic. Covered by the new `storage/stats_test.go`.
+- **The counter map's bound works again.** `RecordHit` read `LoadOrStore`'s
+  second result as "created" while it actually reports "already existed", so
+  `trackedLinks` grew only on the race path while `ForgetStats` decremented it
+  on every deletion: the number drifted negative and the 10 000-name cap never
+  triggered.
+- **A link without media no longer shows 1 January 1970.** `modTime` is `0` for
+  those records and `formatRelative(0)` fell through to the date formatter.
+  `formatDate` and `formatRelative` return «—» for a zero stamp — the same
+  marker `formatBytes` uses.
+- **The rotation interval is formatted in the reader's language.**
+  `toFixed(1).replace('.', ',')` put a comma into the English panel («1,5 h»);
+  the value goes through `Intl.NumberFormat` now.
+- **The panel tells image, PNG and video apart by `mimeType`, not by
+  `category`.** `GET /api/wallpapers` reports the stored file extension in
+  `mimeType` (`png`, `mp4`) and the *user* category in `category`
+  (`tech`/`life`/`work`/`other` — and `other` is what the panel's own create
+  dialog stores), but the panel compared `mimeType` with `image/png` and read
+  the media kind out of `category`. A link with a file therefore printed «—»
+  instead of `PNG` or `MP4`, a transparent PNG was cropped (`cover`) and got no
+  checkerboard background, the «Видео» chip and the play badge stayed empty for
+  every video made in the panel, and such a tile pulled the video itself into
+  an `<img>` through `/api/preview/{name}` — the server keeps no poster for a
+  video and answers with the file, which could only fail. The kind, the
+  checkerboard, the chips and the frame now all come from `mimeType`, and a
+  video frame is never requested.
+- **`design/v2` has its fonts back.** The stand still pointed at the deleted
+  `manrope-*`/`unbounded-*` files, rendered in a system font and made
+  `tools/build-standalone.py` exit with `FileNotFoundError`; it uses Golos Text
+  again and `standalone.html` is rebuilt (816 KB, no external requests).
+- **The theme button and the gear move exactly the way 0.12.1 moved them.**
+  The button keeps both glyphs stacked (`svg.theme-icon`, 17 px, absolutely
+  positioned) and the visible one is chosen by CSS from `html[data-theme]`,
+  which `prepaint.js` sets before the first paint; the leaving glyph goes to
+  `scale(0.5) rotate(-90deg)` while the arriving one returns to
+  `scale(1) rotate(0)` (0.2 s opacity, 0.25 s transform). The gear turns 90°
+  while the settings sheet is open, driven by `body.settings-open`, which
+  `openOverlay()`/`closeOverlay()` toggle from the `data-sheet` attribute. An
+  earlier attempt in this series swapped `data-icon` at runtime and pulsed it
+  with an `is-swap` keyframe; both are gone. The sun is still the 0.12.1
+  (Feather) outline — circle r=4.5 and eight rays from r=8.5 to r=10.5 — and
+  the settings sheet labels its three modes with a sun, a moon and a monitor.
+- **The remaining icons answer the pointer.** Every icon button lifts its glyph
+  slightly on hover and presses it down on click; `+` folds over, the refresh
+  arrows half-turn, the trash tips, the copy glyph hops after a successful
+  copy, the selection check grows out of the centre and the video play mark
+  breathes. Every animation is short, sits in the stylesheet (the panel runs
+  under a CSP without inline styles) and is switched off by
+  `prefers-reduced-motion`. The gear, the sun and the moon deliberately keep
+  the 0.12.1 motion instead of a hover gesture.
+- **Browser chrome, document language and shortcuts follow the panel.** Three
+  more defects from a second audit pass. (1) `<meta name="theme-color">` had
+  only `media`-attributed variants, so a manually chosen dark panel kept a
+  light status bar on phones; `applyTheme()` — and `prepaint.js`, before the
+  first paint — now writes the effective colour into both tags. (2) `<html
+  lang>` stayed `en` for a Russian or German UI because only `setLang()` wrote
+  it; `applyTranslations()` owns the attribute now. (3) The keyboard shortcuts
+  fired behind an open dialog: pressing `n` while the create form was open
+  called `openCreateDialog()` again, `openOverlay()` closed the previous
+  dialog, and everything typed into it was lost. The handler returns early
+  while an overlay is up (Esc and Tab belong to the overlay). The service
+  worker precache generation moved to `lanpaper-static-v9` so offline copies of
+  the changed stylesheet and scripts are replaced on the next visit.
+- **The settings gear announces whether its sheet is open.** The button carries
+  `aria-expanded`/`aria-controls`, both kept in step with the sheet, so a
+  screen reader can hear the state it toggles.
+- **A large file is no longer cut off on a slow link.** Every response ran
+  under the server's 120-second write timeout, which is sized for an API call:
+  a 50 MB video at 256 KiB/s needs longer, and the connection was closed
+  mid-file. Media responses — the public file, its `?v=`/`?i=` variants, the
+  panel preview and the gallery file — now extend their own deadline to fit the
+  size they have to send (at 256 KiB/s, capped at 15 minutes), so a client that
+  reads slowly still receives the whole file, while one that stops reading
+  loses the connection exactly as before. Covered by
+  `handlers/public_test.go:TestMediaWriteBudgetFollowsTheFileSize`.
+- **HEIF and AVIF photos are no longer stored as videos.** The `ftyp` shortcut
+  that accepts camera MP4 brands (`isom`, `iso2`, `avc1`, `M4V`…) also accepted
+  the ISO-BMFF image brands: a photo from an iPhone or an image downloaded as
+  `.avif` was stored as `.mp4` and served as `video/mp4` — a tile no browser can
+  play, while the build before that shortcut simply refused it. The image
+  brands (`avif`, `avis`, `heic`, `heix`, `heim`, `heis`, `hevc`, `hevx`,
+  `hevm`, `hevs`, `mif1`, `msf1`, `msix`, `mshf`) are named and rejected again with `400 Invalid
+  or unsupported media file`; MP4 brands are untouched. Covered by
+  `handlers/upload_test.go:TestInspectMediaFileAcceptsAllMP4Brands`.
+- **The panel no longer claims a success it does not have.** `execCommand("copy")`
+  returns a boolean and its result was ignored, so a refused copy still said
+  «Скопировано»; the bulk button called that per link and then toasted a total,
+  printing «Скопировано» twenty-one times for a twenty-link copy. `copyText()`
+  now returns the real result, the bulk copy prints one toast and only when the
+  clipboard agreed. The upload toast lived 1600 ms — shorter than any real
+  upload, which made the panel look idle and invited a second send — and is held
+  until the request finishes. Bulk delete dropped every selected name from the
+  list whatever the server answered; a refused `DELETE` left a link that still
+  exists on disk hidden until a reload. Covered by two contract tests
+  («copying reports the truth…», «a link the server refused to delete stays on
+  screen»).
+
+### Changed
+
+- **The interface is set in Golos Text.** Manrope (latin + cyrillic) and
+  Unbounded (logo only) — 39 KB + 9 KB — are replaced by one variable
+  Golos Text 400–900 in the same two subsets, 60 KB, SIL OFL 1.1, fetched
+  from `@fontsource-variable/golos-text`. The display face is the same family
+  set tighter, so `--font-display` no longer loads a second file; headings and
+  the wordmark carry a little more weight and less tracking instead. The
+  service worker cache generation moved with the assets
+  (`lanpaper-static-v8` here, `lanpaper-static-v9` after the icon and theme
+  work below), and `tests/sw.test.cjs` now derives the fonts it expects from
+  the stylesheet's `@font-face` rules instead of naming them.
+- **A trusted proxy that forwards no `X-Forwarded-Proto` no longer turns the
+  panel into a wall of `403`s.** Such a proxy leaves the external scheme
+  unknown (the browser sees `https://host`, the connection to the server is
+  plain HTTP), and the CSRF check compared the Origin's scheme with `http`.
+  When the proxy is listed in `TRUSTED_PROXY` and the browser itself marks the
+  request as same-origin (`Sec-Fetch-Site: same-origin`), a matching host and a
+  port that fits the other scheme are accepted now; cross-site, same-site,
+  other-host, other-port and header-less requests are rejected exactly as
+  before, and a forwarded `X-Forwarded-Proto` still wins over the guess.
+  `config.ApplyTrustedProxy` is public so a test (or a future settings reload)
+  can refresh the parsed list.
+- **`TRUSTED_PROXY` accepts a comma-separated list of IPs and CIDRs.** One
+  address was not enough as soon as a proxy reached the container through more
+  than one hop: a Docker container sees the bridge gateway, not the proxy's LAN
+  address, so `TRUSTED_PROXY="192.168.20.1,172.24.0.1"` is what makes rate
+  limiting, the login lockout and the `local` access level see the real client
+  IP. Entries that do not parse are dropped with a warning naming the entry,
+  the remaining ones stay in effect, and `IsTrustedProxy` matches against any
+  of them. The CSRF rejection line now prints `X-Forwarded-Host` as well and
+  names the address to add (`set TRUSTED_PROXY=172.24.0.1`), because that
+  `403` is almost always a proxy that rewrites `Host` rather than an attack.
+- **`GET /api/wallpapers` validates its filters.** `has_image=1` used to mean
+  `false` (`want := hasImg == "true"`, and every other value read as false) and
+  an unknown `sort=…` silently sorted by creation date. `has_image` accepts
+  `1/0/true/false` and `sort` accepts `created/updated`; anything else is a
+  `400` (`Invalid has_image`, `Invalid sort`).
+- **The manifest is served as `application/manifest+json`** — the `.json`
+  extension gave it `application/json`, which Chrome warns about — and its
+  `theme_color` and `background_color` are the panel's `#f5f6f9` instead of
+  `#f3f2f7`.
+- **The concurrent-upload `429` carries `Retry-After: 5`**, as `docs/API.md`
+  already promised, and a non-`POST` probe of `/api/upload` or
+  `/api/regenerate-previews` no longer spends the upload rate budget: the
+  method is checked before the limiter.
+- **`POST /api/link/{name}` answers `405` with `Allow: PATCH, DELETE`** instead
+  of `404` — the path is routed, only the method is wrong.
+- **One Basic-auth realm.** The panel asked for `realm="Admin"` and an
+  auth-level link for `realm="Link"`, so a browser could ask twice for the same
+  credentials; both send `realm="Admin"` now.
+- **The import dialog counts what will be created** — the links missing on the
+  server, not every link in the file — says so when nothing is missing, and the
+  success toast reports how many links were created; a partial failure says how
+  many were not.
+- **Selecting several files for one link is no longer silent.** In the playlist
+  (`append`) every selected file becomes an item (one request each, in order);
+  for a plain replace the first file is used and the toast says how many were
+  skipped. The picker keeps `multiple`, because the empty state creates one
+  link per file.
+- **Dead style from the stand no longer ships.** `style.css` carried rules for
+  a history-usage meter, an icon variant of a picker thumbnail and a footer
+  spacer that the panel never renders (the versions tab shows a text hint,
+  because the server does not publish the history budget), plus the
+  `card__frame--failed` hook that no stylesheet ever described. The rules stay
+  in the `design/v2` snapshot, which does use the meter.
+
 ## [0.14.0] – 2026-10-08
 
 The admin panel is rebuilt on the `design/v2` stand: the same capabilities as

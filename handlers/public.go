@@ -101,6 +101,10 @@ func Public(w http.ResponseWriter, r *http.Request) {
 	setMediaValidators(h, fi)
 	h.Set("X-Content-Type-Options", "nosniff")
 
+	// A big file on a slow link must not be cut off by the server-wide write
+	// timeout: the deadline is sized for what this response has to send.
+	extendMediaDeadline(w, fi.Size())
+
 	// The recorder keeps the sendfile fast path (ReadFrom) and the deadline
 	// control (Unwrap) of the writer it wraps.
 	rec := &hitRecorder{ResponseWriter: w}

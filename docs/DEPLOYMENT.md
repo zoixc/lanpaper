@@ -16,7 +16,7 @@ things the application cannot do alone: **TLS in front of it, backups of
 
 | Topology | When to use it | What Lanpaper does |
 | --- | --- | --- |
-| Reverse proxy terminates TLS (**recommended**) | Any internet-facing or multi-tenant deployment | Set `TRUSTED_PROXY` to the proxy's IP/CIDR so forwarded headers are believed; leave `TLS_*` unset |
+| Reverse proxy terminates TLS (**recommended**) | Any internet-facing or multi-tenant deployment | Set `TRUSTED_PROXY` to the address the proxy connects from (IP/CIDR, or a comma-separated list of them) so forwarded headers are believed; leave `TLS_*` unset |
 | Lanpaper terminates TLS | Single host, no proxy available, internal CA | Set `TLS_CERT_FILE` + `TLS_KEY_FILE` (both or neither — a partial configuration refuses to start) |
 | Plain HTTP | LAN only, or a proxy that already enforces auth | Keep the default and never expose the port to the internet |
 
@@ -33,7 +33,7 @@ Minimum for an internet-facing instance:
 ```sh
 ADMIN_USER=ops
 ADMIN_PASS="$(openssl rand -base64 24)"     # a short password only warns; the lockout is the real defence
-TRUSTED_PROXY=10.0.0.1                      # or the proxy's CIDR
+TRUSTED_PROXY=10.0.0.1                      # or the proxy's CIDR; a list is allowed: "10.0.0.1,172.18.0.1"
 MAX_UPLOAD_MB=50                            # what a client may push, 1–512
 HISTORY_LIMIT=3                             # 0 = no archives, i.e. pre-0.12 behaviour
 HISTORY_MAX_MB=512                          # global disk budget for archives
@@ -140,8 +140,10 @@ Point your log collector at the container/journal output. Lines worth an alert:
 
 - `Security: … locked out after N failed login attempts` — brute force, or a
   misconfigured client retrying with a wrong password.
-- `Security: rejected cross-origin …` — CSRF attempt, or a missing
-  `TRUSTED_PROXY` after a proxy change.
+- `Security: rejected cross-origin …` — CSRF attempt, or a proxy that
+  rewrites `Host` / is missing from `TRUSTED_PROXY`. The line prints
+  `RemoteAddr` and both host names, so the value to trust can be copied
+  straight out of it.
 - `Panic serving …` — a bug; the request was answered with 500 and the stack is
   in the same log line. The service keeps running.
 - `Critical: background prune recovered from a panic` — maintenance pass

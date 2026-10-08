@@ -102,7 +102,10 @@ Lanpaper uses the forwarded client IP, host and scheme **only** when
 `TRUSTED_PROXY` matches the immediate peer.
 
 - Set it narrowly: the proxy's IP or a small CIDR, never a client-accessible
-  subnet.
+  subnet. Several proxies — or a proxy plus the Docker bridge gateway the
+  container actually sees — are listed comma-separated:
+  `TRUSTED_PROXY="192.168.20.1,172.24.0.1"`. Only the listed addresses are
+  believed; an entry that does not parse is dropped with a warning.
 - The proxy must **replace** client-supplied `X-Real-IP` / `X-Forwarded-*`
   headers, not pass them through.
 - Without `TRUSTED_PROXY`, a proxy on a private network makes every visitor
@@ -191,10 +194,17 @@ reverse-proxy access logs.
 
 ## Reverse proxy examples
 
-Set `TRUSTED_PROXY` to the proxy address, for example `127.0.0.1` or the
-Docker network gateway. This makes rate limiting, the login lockout and the
-`local` access level see the real client IP. Do **not** set it when Lanpaper
-is exposed directly.
+Set `TRUSTED_PROXY` to the address the proxy connects from, for example
+`127.0.0.1` or the Docker network gateway — several addresses are listed
+comma-separated (`192.168.20.1,172.24.0.1`). This makes rate limiting, the
+login lockout and the `local` access level see the real client IP. Do **not**
+set it when Lanpaper is exposed directly.
+
+If the panel answers `403 Cross-origin request rejected`, the log line names
+the address to trust: it prints `RemoteAddr` and the `Host` /
+`X-Forwarded-Host` the proxy sent. Behind a proxy the `Host` must be the name
+the browser used — a proxy that rewrites `Host` (or sends it with a scheme)
+fails the check even with `TRUSTED_PROXY` set.
 
 ### nginx
 
@@ -210,11 +220,14 @@ server {
 
     location / {
         proxy_pass         http://127.0.0.1:8080;
-        proxy_set_header   Host              $host;
+        # The original Host, scheme included only in $scheme: the CSRF check
+        # compares Origin against this name, so it must be the one the browser
+        # used. $http_host keeps the port and the exact spelling.
+        proxy_set_header   Host              $http_host;
         proxy_set_header   X-Real-IP         $remote_addr;
         proxy_set_header   X-Forwarded-For   $remote_addr;
         proxy_set_header   X-Forwarded-Proto $scheme;
-        proxy_set_header   X-Forwarded-Host  $host;
+        proxy_set_header   X-Forwarded-Host  $http_host;
         proxy_request_buffering off;
         proxy_read_timeout 600s;
     }

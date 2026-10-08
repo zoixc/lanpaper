@@ -50,9 +50,18 @@
         check: '<polyline points="20 6.5 9.5 17 4 11.5"/>',
         grid: '<rect x="3" y="3" width="7.5" height="7.5" rx="1.8"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.8"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.8"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.8"/>',
         list: '<line x1="8.5" y1="6" x2="21" y2="6"/><line x1="8.5" y1="12" x2="21" y2="12"/><line x1="8.5" y1="18" x2="21" y2="18"/><line x1="3.6" y1="6" x2="3.61" y2="6"/><line x1="3.6" y1="12" x2="3.61" y2="12"/><line x1="3.6" y1="18" x2="3.61" y2="18"/>',
-        sun: '<circle cx="12" cy="12" r="4.2"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.9" y1="4.9" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.1" y2="19.1"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.9" y1="19.1" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.1" y2="4.9"/>',
-        moon: '<path d="M20.5 14.3A8.5 8.5 0 0 1 9.7 3.5a8.6 8.6 0 1 0 10.8 10.8z"/>',
-        gear: '<circle cx="12" cy="12" r="3.1"/><path d="M12 2.6l1 2.3 2.5-.3 1 2.3 2.3 1-.3 2.5 1.6 1.9-1.6 1.9.3 2.5-2.3 1-1 2.3-2.5-.3-1 2.3-1-2.3-2.5.3-1-2.3-2.3-1 .3-2.5L2.6 12l1.6-1.9-.3-2.5 2.3-1 1-2.3 2.5.3z"/>',
+        /* Солнце — контур из панели 0.12.1 (Feather): круг r=4.5 и восемь
+           лучей от r=8.5 до r=10.5. Лучи одинаковой длины и начинаются на
+           одном радиусе, поэтому знак не «разъезжается» на 17 px. */
+        sun: '<circle cx="12" cy="12" r="4.5"/><line x1="12" y1="1.5" x2="12" y2="3.5"/><line x1="12" y1="20.5" x2="12" y2="22.5"/><line x1="4.6" y1="4.6" x2="6" y2="6"/><line x1="18" y1="18" x2="19.4" y2="19.4"/><line x1="1.5" y1="12" x2="3.5" y2="12"/><line x1="20.5" y1="12" x2="22.5" y2="12"/><line x1="4.6" y1="19.4" x2="6" y2="18"/><line x1="18" y1="6" x2="19.4" y2="4.6"/>',
+        /* Луна — тоже из набора 0.12.1 (Feather). У прежнего контура
+           внешняя и внутренняя дуги были разного радиуса (8.5 и 8.6),
+           поэтому месяц выходил слегка перекошенным. */
+        moon: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+        /* Шестерёнка — та же, что в панели 0.12.1 (Feather, 24×24): у
+           нарисованной здесь «звезды» лучи разной длины, и на 17 px она
+           выглядела кривой. */
+        gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
         select: '<path d="M9 4.5H6.5A2 2 0 0 0 4.5 6.5V9"/><path d="M15 4.5h2.5a2 2 0 0 1 2 2V9"/><path d="M9 19.5H6.5a2 2 0 0 1-2-2V15"/><path d="M15 19.5h2.5a2 2 0 0 0 2-2V15"/><polyline points="9 12 11 14 15.5 9.5"/>',
         more: '<circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/>',
         copy: '<rect x="9" y="9" width="12" height="12" rx="2.6"/><path d="M15 5.6A2.6 2.6 0 0 0 12.4 3H5.6A2.6 2.6 0 0 0 3 5.6v6.8A2.6 2.6 0 0 0 5.6 15"/>',
@@ -67,6 +76,8 @@
         globe: '<circle cx="12" cy="12" r="9"/><path d="M3.2 12h17.6"/><path d="M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/>',
         lock: '<rect x="4.5" y="10.5" width="15" height="10" rx="2.6"/><path d="M8 10.5V7.6a4 4 0 0 1 8 0v2.9"/>',
         key: '<circle cx="8" cy="15.5" r="3.6"/><path d="M10.7 12.8L20 3.5"/><path d="M17 4.5l2.5 2.5"/><path d="M14.5 7l2.5 2.5"/>',
+        /* «Как в системе» в переключателе тем — монитор (Feather). */
+        monitor: '<rect x="2.5" y="3.5" width="19" height="13" rx="2.4"/><line x1="8" y1="20.5" x2="16" y2="20.5"/><line x1="12" y1="16.5" x2="12" y2="20.5"/>',
         user: '<circle cx="12" cy="8.2" r="3.9"/><path d="M4.8 20.2a7.4 7.4 0 0 1 14.4 0"/>',
         refresh: '<polyline points="22 4.5 22 10 16.5 10"/><path d="M20.2 15a8.5 8.5 0 1 1-2-8.8L22 10"/>',
         rotate: '<polyline points="22 4.5 22 10 16.5 10"/><polyline points="2 19.5 2 14 7.5 14"/><path d="M4.6 9.4a8.5 8.5 0 0 1 14-3.2L22 10"/><path d="M2 14l3.4 3.8A8.5 8.5 0 0 0 19.4 14.6"/>',
@@ -85,11 +96,15 @@
 
     function hydrateIcons(root) {
         $$('svg[data-icon]', root || document).forEach(function (svg) {
-            if (svg.dataset.hydrated) return;
-            const path = ICONS[svg.dataset.icon];
+            const name = svg.dataset.icon;
+            /* Помним, ЧТО нарисовали, а не «нарисовали ли вообще»: панель
+               зовёт hydrateIcons на уже готовых узлах (тосты, шторки), и
+               флаг без имени перерисовывал бы значки заново. */
+            if (svg.dataset.hydrated === name) return;
+            const path = ICONS[name];
             if (!path) return;
             svg.setAttribute('viewBox', '0 0 24 24');
-            if (FILLED.has(svg.dataset.icon)) {
+            if (FILLED.has(name)) {
                 svg.setAttribute('fill', 'currentColor');
             } else {
                 svg.setAttribute('fill', 'none');
@@ -101,7 +116,21 @@
             svg.setAttribute('aria-hidden', 'true');
             svg.setAttribute('focusable', 'false');
             svg.innerHTML = path;
-            svg.dataset.hydrated = '1';
+            svg.dataset.hydrated = name;
+        });
+    }
+
+    /* Короткая анимация значка как ответ на событие (после копирования).
+       Класс снимается сам: жест можно повторять сколько угодно раз. */
+    function pulseIcon(svg, cls) {
+        if (!svg) return;
+        const name = cls || 'is-pulse';
+        svg.classList.remove(name);
+        void svg.getBoundingClientRect();   /* перезапуск анимации */
+        svg.classList.add(name);
+        svg.addEventListener('animationend', function handler() {
+            svg.classList.remove(name);
+            svg.removeEventListener('animationend', handler);
         });
     }
     const icon = (name, cls) => {
@@ -142,7 +171,10 @@
         if (s < 60) return s + ' ' + t('unit_sec');
         if (s < 3600) return Math.round(s / 60) + ' ' + t('unit_min');
         const h = s / 3600;
-        return (h < 10 ? h.toFixed(1).replace('.', ',') : Math.round(h)) + ' ' + t('unit_hour');
+        /* Разделитель дробной части — по языку: с жёсткой запятой в
+           английском интерфейсе выходило «1,5 h». */
+        const hours = h < 10 ? Number(h.toFixed(1)) : Math.round(h);
+        return num(hours) + ' ' + t('unit_hour');
     }
     /* Форматтеры Intl дорого СОЗДАВАТЬ, а не использовать: на 12 карточках
        их набиралось 16 штук на каждую перерисовку (замер: 320 созданий на
@@ -160,10 +192,15 @@
         }
         return FMT[lang];
     }
+    /* Нулевая метка времени — это «времени нет», а не 1 января 1970 года:
+       у ссылки без файла modTime равен нулю, и «1 Jan» в карточке выглядел
+       как чужой файл. Прочерк — тот же знак отсутствия, что и в formatBytes. */
     function formatDate(ts) {
+        if (!ts) return '—';
         return fmt(state.lang).date.format(new Date(ts * 1000));
     }
     function formatRelative(ts) {
+        if (!ts) return '—';
         const diff = Math.floor(Date.now() / 1000 - ts);
         const rtf = fmt(state.lang).rtf;
         if (diff < 90) return rtf.format(-Math.max(1, Math.round(diff / 60)), 'minute');
@@ -193,10 +230,16 @@
         ? window.LANPAPER_LANGS.slice()
         : ['en'];
     const THEME_MODES = ['light', 'dark', 'auto'];
-    /* Ключи сортировки совпадают с тем, что принимает /api/wallpapers
-       (sort=name|date|size), поэтому смена порции на серверную ничего
-       не сломает. */
-    const SORT_KEYS = ['name_asc', 'name_desc', 'date_desc', 'date_asc', 'size_desc'];
+    /* Ключи состояния и ключи перевода не совпадают по имени ('date_desc' —
+       это 'date_new'), поэтому соответствие живёт в одном месте: список
+       ключей выводится из него, а не наоборот. Панель сортирует загруженный
+       список сама: серверная ручка принимает sort=created|updated (см.
+       handlers/admin.go), а панель сортирует по имени, дате и размеру. */
+    const SORT_LABELS = {
+        name_asc: 'name_asc', name_desc: 'name_desc',
+        date_desc: 'date_new', date_asc: 'date_old', size_desc: 'size_desc'
+    };
+    const SORT_KEYS = Object.keys(SORT_LABELS);
     /* Имена, которые сервер считает занятыми всегда (см. utils/link.go):
        панель обязана проверять то же самое, иначе предложит имя, на
        котором запрос упадёт. */
@@ -306,6 +349,13 @@
     /* На телефоне полное «Поиск по имени или файлу» не помещается */
     const narrow = () => window.matchMedia('(max-width: 560px)').matches;
     function applyTranslations(root) {
+        /* <html lang> в разметке — «en», а панель может говорить по-русски,
+           по-немецки и т. д. Без этой строки html остаётся англоязычным:
+           экранный диктор читает русский текст с английской фонетикой,
+           браузер предлагает перевести страницу, а проверка орфографии
+           подчёркивает каждое слово. prepaint.js ставит язык только для
+           сохранённого выбора — здесь он ставится всегда. */
+        document.documentElement.lang = state.lang;
         $$('[data-i18n]', root || document).forEach(function (el) {
             el.textContent = t(el.dataset.i18n);
         });
@@ -335,6 +385,9 @@
        4. ТЕМА, АКЦЕНТ, ЯЗЫК
        ======================================================== */
     const prefersDark = () => matchMedia('(prefers-color-scheme: dark)').matches;
+    /* Цвет полосы браузера; те же значения стоят в <meta name="theme-color">
+       в admin.html. */
+    const THEME_COLOR = { light: '#F5F6F9', dark: '#14161B' };
     function effectiveTheme() {
         return state.theme === 'auto' ? (prefersDark() ? 'dark' : 'light') : state.theme;
     }
@@ -342,10 +395,19 @@
         const dark = effectiveTheme() === 'dark';
         document.documentElement.dataset.theme = dark ? 'dark' : 'light';
         document.documentElement.dataset.themeMode = state.theme;
-        const svg = $('#themeBtn svg');
-        if (svg) svg.dataset.icon = dark ? 'sun' : 'moon';
-        hydrateIcons($('#themeBtn'));
+        /* Знак кнопки темы переключает CSS: оба значка лежат друг на друге,
+           виден тот, что подходит текущей теме (html[data-theme] ставит
+           prepaint.js до первой отрисовки). Явно трогать data-icon здесь
+           больше не нужно — раньше это и не работало: hydrateIcons считал
+           значок уже нарисованным, и солнце не появлялось вовсе. */
         $$('[data-theme-opt]').forEach(input => { input.checked = input.value === state.theme; });
+        /* Полоса браузера (адресная строка, статус-бар на телефоне) должна
+           совпадать с выбранной темой, а не только с системной: у <meta
+           name="theme-color"> есть лишь media-варианты, и ручной выбор темы
+           они не видят — полоса оставалась чужого цвета. Обе метки получают
+           цвет действующей темы, какая бы media ни совпала. */
+        const ring = dark ? THEME_COLOR.dark : THEME_COLOR.light;
+        $$('meta[name="theme-color"]').forEach(function (meta) { meta.setAttribute('content', ring); });
         /* Тёмная тема меняет оттенок образцов акцента: цвет ставим заново,
            иначе на тёмном фоне останутся светлые кружки. */
         paintSwatches();
@@ -486,8 +548,24 @@
         link.pinned = !!link.pinned;
         link.hasImage = !!link.hasImage;
         link.accessLevel = link.accessLevel || 'public';
-        link.category = link.category || (link.mimeType && link.mimeType.indexOf('video') === 0 ? 'video' : 'image');
+        link.category = link.category || 'other';
         return link;
+    }
+
+    /* Вид медиа определяем по расширению файла: в API `mimeType` — это
+       расширение («png», «mp4»), а не строка вида «image/png», а `category` —
+       пользовательская категория (tech/life/work/other), которую ставят
+       ссылке, а не её файлу. Раньше панель искала видео и PNG в этих двух
+       полях: у любой ссылки, созданной вручную, category равно «other»,
+       поэтому видео открывалось как картинка (значка «играть» не было, а в
+       <img> тянулся сам видеофайл), у прозрачных PNG не было шахматного
+       фона, а в подписи вместо «PNG» стоял прочерк. */
+    function mediaExt(link) {
+        return String(link.mimeType || '').toLowerCase();
+    }
+    function isVideoMedia(link) {
+        const ext = mediaExt(link);
+        return ext === 'mp4' || ext === 'webm';
     }
 
     async function fetchLinks() {
@@ -533,8 +611,8 @@
     };
     const FILTERS = {
         all: () => true,
-        image: (l) => l.hasImage && l.category !== 'video',
-        video: (l) => l.category === 'video',
+        image: (l) => l.hasImage && !isVideoMedia(l),
+        video: (l) => isVideoMedia(l),
         playlist: (l) => l.items.length > 0,
         pinned: (l) => l.pinned
     };
@@ -579,8 +657,8 @@
     function fitMode(link) {
         if (!link.hasImage) return 'empty';
         const r = ratio(link);
-        if (link.category === 'video') return r > 1.4 || !r ? 'cover' : 'contain';
-        if (link.mimeType === 'image/png') return 'contain';   /* иконки и логотипы с альфой */
+        if (isVideoMedia(link)) return r > 1.4 || !r ? 'cover' : 'contain';
+        if (mediaExt(link) === 'png') return 'contain';        /* иконки и логотипы с альфой */
         if (!r) return 'cover';
         if (r < 1.25) return 'contain';                        /* вертикаль и квадрат */
         return 'cover';
@@ -604,6 +682,13 @@
         const version = link.currentVersion > 1 ? '?v=' + link.currentVersion : '';
         return path + version;
     }
+    /* Кадр есть только у картинок. Для видео превью сервер не делает, а
+       /api/preview/{имя} отдал бы сам видеофайл: браузер тянул его как
+       картинку, ловил ошибку и всё равно показывал «нет кадра» — то есть
+       трафик впустую. Поэтому у видео кадра нет сразу. */
+    function hasFrame(link) {
+        return !!(link.hasImage && !isVideoMedia(link));
+    }
 
     function cardFor(link) {
         const node = $('#tplCard').content.firstElementChild.cloneNode(true);
@@ -622,7 +707,7 @@
         const dimsSpan = h('span', { class: 'is-hidden' });
         const dims = link.width && link.height ? link.width + '×' + link.height : null;
 
-        if (fit === 'empty') {
+        if (!hasFrame(link)) {
             frame.classList.add('card__frame--empty');
             img.remove();
             frame.append(icon('imageOff'));
@@ -631,20 +716,20 @@
             img.alt = '';
             if (fit === 'contain') {
                 img.classList.add('card__media--contain');
-                if (link.mimeType === 'image/png') frame.classList.add('card__frame--checker');
+                if (mediaExt(link) === 'png') frame.classList.add('card__frame--checker');
             }
             /* У загруженного превью видно и пропорции, и настоящий размер
                файла: вертикальное и квадратное показываем целиком, а не
                обрезком, а строку метаданных дополняем размерами. */
             img.addEventListener('load', function () {
                 if (!img.naturalWidth) return;
-                if (!dims && link.category !== 'video') {
+                if (!dims && !isVideoMedia(link)) {
                     dimsSpan.textContent = img.naturalWidth + '×' + img.naturalHeight;
                     dimsSpan.classList.remove('is-hidden');
                 }
-                if (link.category !== 'video' && img.naturalHeight > img.naturalWidth * 1.25) {
+                if (!isVideoMedia(link) && img.naturalHeight > img.naturalWidth * 1.25) {
                     img.classList.add('card__media--contain');
-                    if (link.mimeType === 'image/png') frame.classList.add('card__frame--checker');
+                    if (mediaExt(link) === 'png') frame.classList.add('card__frame--checker');
                 }
             });
             /* Файл не пришёл — показываем тот же знак «нет кадра», что и у
@@ -652,7 +737,7 @@
             img.addEventListener('error', function () { showEmptyFrame(frame, img); });
         }
 
-        if (link.category === 'video') {
+        if (isVideoMedia(link)) {
             const play = $('.card__play', node);
             play.hidden = false;
             if (link.durationSec) {
@@ -668,7 +753,7 @@
         if (link.items.length) {
             left.append(h('span', { class: 'on-media' }, icon('playlist'),
                 h('span', { text: t('meta_items', { n: link.items.length }) })));
-        } else if (link.category === 'gif') {
+        } else if (mediaExt(link) === 'gif') {
             left.append(h('span', { class: 'on-media', text: t('animation') }));
         }
 
@@ -687,9 +772,9 @@
 
         const meta = $('.card__meta', node);
         const parts = [
-            (link.mimeType.split('/')[1] || '—').toUpperCase(),
+            (mediaExt(link) || '—').toUpperCase(),
             dims || dimsSpan,
-            link.category === 'video' && link.durationSec ? formatDuration(link.durationSec) : null,
+            isVideoMedia(link) && link.durationSec ? formatDuration(link.durationSec) : null,
             link.hasImage ? formatBytes(link.sizeBytes) : t('no_image'),
             formatRelative(link.modTime)
         ].filter(Boolean);
@@ -743,7 +828,7 @@
     /* Кадр, который не загрузился, приводим к виду «нет файла» */
     function showEmptyFrame(frame, img) {
         if (img && img.isConnected) img.remove();
-        frame.classList.add('card__frame--empty', 'card__frame--failed');
+        frame.classList.add('card__frame--empty');
         /* Своя проверка на конкретный значок: в кадре уже есть svg кнопок
            («выбрать», «открыть в новой вкладке», «играть»). */
         if (!$('svg[data-icon="imageOff"]', frame)) {
@@ -961,9 +1046,11 @@
                 type: 'button',
                 role: item.checked === undefined ? 'menuitem' : 'menuitemradio',
                 'aria-checked': item.checked === undefined ? null : String(!!item.checked),
-                onclick: function () {
+                onclick: function (ev) {
                     closeMenu();
-                    if (item.onclick) item.onclick();
+                    /* Событие идёт дальше: действию нужен значок той кнопки,
+                       по которой щёлкнули (короткая анимация ответа). */
+                    if (item.onclick) item.onclick(ev);
                 }
             }, icon(item.icon), h('span', { class: 'grow', text: item.text }),
                item.hint ? h('span', { class: 'menu__item__hint', text: item.hint }) : null,
@@ -988,11 +1075,8 @@
     }
 
     /* Ключи состояния и ключи перевода не совпадают по имени — держим
-       соответствие в одном месте, чтобы чип не показывал 'date_desc'. */
-    const SORT_LABELS = {
-        name_asc: 'name_asc', name_desc: 'name_desc',
-        date_desc: 'date_new', date_asc: 'date_old', size_desc: 'size_desc'
-    };
+       соответствие в одном месте, чтобы чип не показывал 'date_desc'.
+       Таблица описана выше рядом с SORT_KEYS. */
 
     function openSortMenu(anchor) {
         showMenu(anchor, [
@@ -1069,10 +1153,22 @@
             onDismiss: (opts && opts.onDismiss) || null
         };
         document.body.style.overflow = 'hidden';
+        /* Шестерёнка в шапке поворачивается, пока открыт пульт настроек —
+           как в 0.12.1, где это делал класс .open у выпадашки. */
+        const settingsOpen = !!$('[data-sheet="settings"]');
+        document.body.classList.toggle('settings-open', settingsOpen);
+        setSettingsExpanded(settingsOpen);
         hydrateIcons(node);
         const target = (opts && opts.focus) || node.querySelector('[autofocus], input, button');
         setTimeout(() => target && target.focus({ preventScroll: true }), 40);
         return node;
+    }
+    /* Шестерёнка не только поворачивается, но и сообщает экранному диктору,
+       открыт ли пульт настроек: без aria-expanded кнопка «Настройки» звучит
+       одинаково до и после нажатия. */
+    function setSettingsExpanded(open) {
+        const gear = $('#settingsBtn');
+        if (gear) gear.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
     function closeOverlay(keepFocus) {
         if (!currentOverlay) return;
@@ -1082,6 +1178,9 @@
         currentOverlay = null;
         if (dismiss) dismiss();
         document.body.style.overflow = '';
+        const settingsOpen = !!$('[data-sheet="settings"]');
+        document.body.classList.toggle('settings-open', settingsOpen);
+        setSettingsExpanded(settingsOpen);
         closeMenu();
         if (!keepFocus && lastFocused && lastFocused.isConnected) lastFocused.focus({ preventScroll: true });
         lastFocused = null;
@@ -1145,14 +1244,17 @@
             if (oldest.dismissToast) oldest.dismissToast();
             oldest.remove();
         }
-        const timer = setTimeout(dismiss, o.duration || 4200);
+        /* duration: 0 — «висит, пока его не снимут»: так показывается
+           загрузка, которая может идти минутами. */
+        const timer = o.duration === 0 ? null : setTimeout(dismiss, o.duration || 4200);
         box.dismissToast = dismiss;
         function dismiss() {
-            clearTimeout(timer);
+            if (timer) clearTimeout(timer);
             if (!box.isConnected || box.classList.contains('is-out')) return;
             box.classList.add('is-out');
             setTimeout(() => box.remove(), 200);
         }
+        return box;
     }
 
     /* ========================================================
@@ -1161,26 +1263,48 @@
     const hostName = () => location.hostname && location.protocol !== 'file:' ? location.hostname : 'lanpaper.local';
     const linkUrl = (link, extra) => location.origin.replace(/\/$/, '') + '/' + link.linkName + (extra || '');
 
-    function copyText(text) {
-        const done = () => toast(t('copied'), { type: 'success', duration: 2000 });
+    /* Копирование возвращает промис с результатом: массовое копирование
+       показывает один общий тост и должно знать, удалось ли скопировать, а
+       раньше «Скопировано» всплывало отдельно на каждую ссылку. quiet=true
+       глушит этот отдельный тост. */
+    function copyText(text, trigger, opts) {
+        const quiet = !!(opts && opts.quiet);
+        /* Значок кнопки, которая скопировала, отвечает коротким «плюсом»:
+           иначе на быстрый клик виден только тост в углу. */
+        const done = () => {
+            if (!quiet) toast(t('copied'), { type: 'success', duration: 2000 });
+            pulseIcon(trigger && $('svg', trigger));
+        };
         if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(text).then(done).catch(() => toast(t('copy_error'), { type: 'error' }));
-            return;
+            return navigator.clipboard.writeText(text).then(
+                function () { done(); return true; },
+                function () { if (!quiet) toast(t('copy_error'), { type: 'error' }); return false; }
+            );
         }
         const ta = h('textarea', { class: 'clipboard-proxy' });
         ta.value = text;
         document.body.append(ta);
         ta.select();
-        try { document.execCommand('copy'); done(); } catch (e) { toast(t('copy_error'), { type: 'error' }); }
+        let ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
         ta.remove();
+        if (ok) done(); else if (!quiet) toast(t('copy_error'), { type: 'error' });
+        return Promise.resolve(ok);
     }
-    function copyLink(link) {
+    function copyLink(link, trigger) {
         const extra = link.accessLevel === 'token' && link.accessToken ? '?token=' + link.accessToken : '';
-        copyText(linkUrl(link, extra));
+        copyText(linkUrl(link, extra), trigger);
     }
     function openMedia(link) {
         if (!link.hasImage) { toast(t('no_image'), { type: 'info' }); return; }
         window.open(linkUrl(link), '_blank', 'noopener');
+    }
+    /* Открыть конкретную версию из истории: без ?v=N сервер отдаёт
+       текущий файл, и кнопка «открыть» у строки v1 показывала v3. */
+    function openMediaVersion(link, version, isCurrent) {
+        if (!link.hasImage) { toast(t('no_image'), { type: 'info' }); return; }
+        const extra = isCurrent ? '' : '?v=' + encodeURIComponent(version.version);
+        window.open(linkUrl(link, extra), '_blank', 'noopener');
     }
     /* Закрепление, уровень доступа и удаление меняют файлы на сервере, а
        показанное берём из ответа: панель никогда не рисует состояние,
@@ -1248,7 +1372,7 @@
         const menu = showMenu(anchor, [
             { icon: 'sliders', text: t('open_panel'), onclick: () => openPanel(link) },
             { icon: 'external', text: t('open_media'), onclick: () => openMedia(link) },
-            { icon: 'copy', text: t('copy_url'), onclick: () => copyLink(link) },
+            { icon: 'copy', text: t('copy_url'), onclick: (ev) => copyLink(link, ev.currentTarget) },
             { sep: true },
             { icon: 'pencil', text: t('rename'), onclick: () => renameLink(link) },
             {
@@ -1262,7 +1386,6 @@
             { icon: 'trash', text: t('delete'), danger: true, onclick: () => deleteLink(link) }
         ], { align: 'end' });
         const clear = function () { anchor.setAttribute('aria-expanded', 'false'); };
-        menu.addEventListener('mouseleave', () => {});
         const observer = new MutationObserver(function () {
             if (!menu.isConnected) { clear(); observer.disconnect(); }
         });
@@ -1308,7 +1431,12 @@
                    намерению. Массовой смены ДОСТУПА здесь намеренно нет —
                    у ссылок разные уровни, и одним нажатием можно открыть
                    наружу больше, чем хотелось (см. design/06-redesign-v2.md). */
-                const targets = selectedLinks().filter(l => l.pinned !== !anyUnpinned);
+                /* anyUnpinned — это и подпись кнопки, и желаемое состояние:
+                   при «Закрепить» нужны незакреплённые, при «Открепить» —
+                   закреплённые. Лишний «!» в прежнем условии отбирал ровно
+                   наоборот, поэтому закреплялись уже закреплённые, а
+                   остальные не менялись; /pin, к тому же, переключает. */
+                const targets = selectedLinks().filter(l => Boolean(l.pinned) !== anyUnpinned);
                 for (const link of targets) {
                     try {
                         const updated = await apiCall('/api/link/'
@@ -1323,8 +1451,13 @@
         }, icon('pin'), h('span', { text: t(anyUnpinned ? 'bulk_pin' : 'bulk_unpin') })));
         bar.append(h('button', {
             class: 'btn btn--sm', type: 'button', onclick: function () {
-                copyText(selectedLinks().map(l => linkUrl(l, l.accessLevel === 'token' ? '?token=' + l.accessToken : '')).join('\n'));
-                toast(t('bulk_copied', { count: state.selected.size }));
+                const count = state.selected.size;
+                const text = selectedLinks()
+                    .map(l => linkUrl(l, l.accessLevel === 'token' ? '?token=' + l.accessToken : '')).join('\n');
+                copyText(text, null, { quiet: true }).then(function (ok) {
+                    toast(ok ? t('bulk_copied', { count: count }) : t('copy_error'),
+                        { type: ok ? 'success' : 'error' });
+                });
             }
         }, icon('copy'), h('span', { text: t('bulk_copy') })));
         bar.append(h('button', {
@@ -1335,14 +1468,18 @@
                     text: t('bulk_delete_msg'),
                     onConfirm: async function () {
                         const names = Array.from(state.selected);
-                        let done = 0;
+                        /* С экрана уходят только те ссылки, которые сервер
+                           действительно удалил: при частичном сбое остальные
+                           остаются на месте, а не «исчезают до перезагрузки». */
+                        const removed = [];
                         for (const name of names) {
                             try {
                                 await apiCall('/api/link/' + encodeURIComponent(name), 'DELETE');
-                                done++;
+                                removed.push(name);
                             } catch (_) { /* по одной ссылке — уже показано */ }
                         }
-                        state.links = state.links.filter(l => names.indexOf(l.linkName) < 0);
+                        const done = removed.length;
+                        state.links = state.links.filter(l => removed.indexOf(l.linkName) < 0);
                         state.selected.clear();
                         renderChips();
                         render();
@@ -1429,13 +1566,13 @@
             h('span', { class: 'url-line__id grow', text: link.linkName }),
             h('button', {
                 class: 'icon-btn icon-btn--sm', type: 'button', 'aria-label': t('copy_url'), 'data-tip': t('copy_url'),
-                onclick: () => copyLink(link)
+                onclick: (ev) => copyLink(link, ev.currentTarget)
             }, icon('copy'))));
 
         /* Превью текущего файла */
         const fit = fitMode(link);
         const frame = h('div', { class: 'card__frame panel-preview' });
-        if (fit === 'empty') {
+        if (!hasFrame(link)) {
             frame.classList.add('card__frame--empty');
             frame.append(icon('imageOff'));
         } else {
@@ -1443,7 +1580,7 @@
                 class: 'card__media' + (fit === 'contain' ? ' card__media--contain' : ''),
                 src: previewSrc(link), alt: ''
             });
-            if (fit === 'contain' && link.mimeType === 'image/png') frame.classList.add('card__frame--checker');
+            if (fit === 'contain' && mediaExt(link) === 'png') frame.classList.add('card__frame--checker');
             img.addEventListener('error', function () { showEmptyFrame(frame, img); });
             frame.append(img);
         }
@@ -1574,7 +1711,7 @@
             h('span', { class: 'row__aside' },
                 h('button', {
                     class: 'icon-btn icon-btn--sm', type: 'button', 'aria-label': t('versions_open'), 'data-tip': t('versions_open'),
-                    onclick: () => openMedia(link)
+                    onclick: () => openMediaVersion(link, version, isCurrent)
                 }, icon('external')),
                 isCurrent ? null : h('button', {
                     class: 'icon-btn icon-btn--sm', type: 'button', 'aria-label': t('versions_restore'), 'data-tip': t('versions_restore'),
@@ -1757,7 +1894,7 @@
                                 .catch(function () {});
                         }
                     }, icon('refresh'))),
-                h('button', { class: 'btn btn--soft', type: 'button', onclick: () => copyLink(link) },
+                h('button', { class: 'btn btn--soft', type: 'button', onclick: (ev) => copyLink(link, ev.currentTarget) },
                     icon('copy'), h('span', { text: t('token_copy') }))));
         }
         return wrap;
@@ -1793,22 +1930,48 @@
         return file;
     }
 
-    async function uploadFileTo(link, file, mode) {
+    async function uploadFileTo(link, file, mode, opts) {
         if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
             toast(t('invalid_image'), { type: 'error' });
-            return;
+            return false;
         }
+        const quiet = !!(opts && opts.quiet);
         const form = new FormData();
         form.append('linkName', link.linkName);
         if (mode === 'append') form.append('mode', 'append');
         form.append('file', await compressFor(file));
-        toast(t('uploading'), { type: 'info', duration: 1600 });
+        /* Тост висит до конца загрузки: файл в 50 МБ уходит минутами, и
+           сообщение, исчезающее через полторы секунды, выглядело так, будто
+           ничего не происходит (и провоцировало повторную отправку). */
+        const busy = quiet ? null : toast(t('uploading'), { type: 'info', duration: 0 });
         try {
             const updated = await apiCall('/api/upload', 'POST', form, true);
             applyLinkUpdate(updated);
-            toast(t(mode === 'append' ? 'append_success' : 'upload_success'));
+            if (!quiet) toast(t(mode === 'append' ? 'append_success' : 'upload_success'));
             return true;
         } catch (_) { return false; }   /* текст ошибки уже показан */
+        finally { if (busy) busy.dismissToast(); }
+    }
+
+    /* Несколько файлов на одну ссылку. В плейлист (append) идёт каждый файл —
+       ровно этого ждёт тот, кто выбрал пачку. Заменить текущий файл может
+       только один, поэтому в режиме replace берём первый, а о пропущенных
+       говорим: раньше они исчезали молча. Сервер принимает по одному файлу
+       за запрос, а порядок в плейлисте должен совпасть с порядком выбора,
+       поэтому запросы идут по очереди, а тосты — один в конце. */
+    async function uploadFilesTo(link, files, mode) {
+        if (mode !== 'append') {
+            if (files.length > 1) {
+                toast(t('upload_first_only', { count: files.length - 1 }), { type: 'info', duration: 4500 });
+            }
+            return uploadFileTo(link, files[0], mode);
+        }
+        let done = 0;
+        for (const file of files) {
+            if (await uploadFileTo(link, file, 'append', { quiet: true })) done += 1;
+        }
+        if (done) toast(t('append_many', { count: done }));
+        return done > 0;
     }
 
     async function uploadUrlTo(link, url, mode) {
@@ -1816,13 +1979,14 @@
         form.append('linkName', link.linkName);
         if (mode === 'append') form.append('mode', 'append');
         form.append('url', url);
-        toast(t('uploading'), { type: 'info', duration: 1600 });
+        const busy = toast(t('uploading'), { type: 'info', duration: 0 });
         try {
             const updated = await apiCall('/api/upload', 'POST', form, true);
             applyLinkUpdate(updated);
             toast(t(mode === 'append' ? 'append_success' : 'upload_success'));
             return true;
         } catch (_) { return false; }   /* текст ошибки уже показан */
+        finally { busy.dismissToast(); }
     }
 
     /* Файл из галереи сервера отдаётся ручкой загрузки как относительный
@@ -1863,9 +2027,11 @@
         if (skipped.length) toast(t('files_skipped') + ': ' + skipped.join(', '), { type: 'info', duration: 5000 });
     }
 
-    /* Расширения, которые сервер принимает как медиа (см. upload.go):
-       по ним диалог адреса подсказывает, годится ли ссылка, ещё до запроса. */
-    const MEDIA_EXT = /\.(jpe?g|png|gif|webp|bmp|tiff?|avif|mp4|webm|m4v|mov)([?#]|$)/i;
+    /* Расширения, которые сервер принимает как медиа: список один в один
+       с config.AllowedMediaExts (config/constants.go). avif, m4v и mov
+       здесь стояли зря — сервер их не принимает, и подсказка «годится»
+       в диалоге загрузки по адресу обещала то, чего не будет. */
+    const MEDIA_EXT = /\.(jpe?g|png|gif|webp|bmp|tiff?|mp4|webm)([?#]|$)/i;
 
     function openUrlDialog(link) {
         const node = $('#tplUrl').content.firstElementChild.cloneNode(true);
@@ -1936,7 +2102,7 @@
         applyTranslations(node);
 
         let files = [];
-        const VIDEO_EXT = /(mp4|webm|m4v|mov)$/i;
+        const VIDEO_EXT = /(mp4|webm)$/i;
         function draw() {
             const q = filter.value.trim().toLowerCase();
             const found = files.filter(name => name.toLowerCase().indexOf(q) >= 0);
@@ -2254,37 +2420,11 @@
             const openLink = currentOverlay && currentOverlay.node.dataset.name
                 ? findLink(currentOverlay.node.dataset.name) : null;
             if (openLink) {
-                uploadFileTo(openLink, files[0], 'replace');
+                uploadFilesTo(openLink, files, 'replace');
                 return;
             }
             createLinksFromFiles(files);
         });
-    }
-    /* Имена файлов становятся адресами ссылок. Занятые имена пропускаем,
-       повторы внутри одной пачки — тоже: две ссылки с одним адресом создать
-       нельзя, а молча получить одну из двух — неприятно. */
-    function createLinksFromFiles(files) {
-        const created = [];
-        const skipped = [];
-        files.forEach(function (file, i) {
-            const name = sanitizeId(file.name);
-            if (state.links.some(l => l.linkName === name) || created.includes(name)) { skipped.push(name); return; }
-            created.push(name);
-            state.links.unshift({
-                id: 'u' + Date.now() + i, linkName: name,
-                category: file.type.startsWith('video') ? 'video' : 'image',
-                hasImage: true, imageUrl: '', preview: '', mimeType: file.type || 'image/jpeg',
-                width: 0, height: 0, sizeBytes: file.size,
-                created: Math.floor(Date.now() / 1000), modTime: Math.floor(Date.now() / 1000),
-                pinned: false, accessLevel: 'public', accessToken: '', currentVersion: 1,
-                history: [], items: [], rotate: null, stats: null
-            });
-        });
-        if (!created.length) return;
-        revealLinks(created);
-        render();
-        toast(t('link_created', { name: created.join(', ') }), { duration: 5000 });
-        if (skipped.length) toast(t('link_taken') + ': ' + skipped.join(', '), { type: 'info', duration: 4500 });
     }
 
     function showDropScrim() {
@@ -2309,6 +2449,13 @@
        ======================================================== */
     function initShortcuts() {
         document.addEventListener('keydown', function (e) {
+            /* Поверх открытого окна сочетания не работают: «n» открыло бы
+               окно создания заново и стёрло уже введённое имя (openOverlay
+               закрывает предыдущее окно), «g»/«t» поменяли бы вид и тему за
+               спиной у пользователя, а «/» увела бы фокус из диалога. Esc и
+               Tab обрабатывает отдельный обработчик оверлея, ему это не
+               мешает. */
+            if (currentOverlay) return;
             const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)
                 || document.activeElement.isContentEditable;
             const mod = e.ctrlKey || e.metaKey;
@@ -2525,7 +2672,7 @@
             const target = fileTarget;
             fileTarget = null;
             if (target && target.link) {
-                uploadFileTo(target.link, files[0], target.mode);
+                uploadFilesTo(target.link, files, target.mode);
                 return;
             }
             createLinksFromFiles(files);
