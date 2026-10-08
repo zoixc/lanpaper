@@ -195,8 +195,14 @@
     const THEME_MODES = ['light', 'dark', 'auto'];
     /* Ключи сортировки совпадают с тем, что принимает /api/wallpapers
        (sort=name|date|size), поэтому смена порции на серверную ничего
-       не сломает. */
-    const SORT_KEYS = ['name_asc', 'name_desc', 'date_desc', 'date_asc', 'size_desc'];
+       не сломает. Ключи состояния и ключи перевода не совпадают по имени
+       ('date_desc' — это 'date_new'), поэтому соответствие живёт в одном
+       месте: список ключей выводится из него, а не наоборот. */
+    const SORT_LABELS = {
+        name_asc: 'name_asc', name_desc: 'name_desc',
+        date_desc: 'date_new', date_asc: 'date_old', size_desc: 'size_desc'
+    };
+    const SORT_KEYS = Object.keys(SORT_LABELS);
     /* Имена, которые сервер считает занятыми всегда (см. utils/link.go):
        панель обязана проверять то же самое, иначе предложит имя, на
        котором запрос упадёт. */
@@ -988,11 +994,8 @@
     }
 
     /* Ключи состояния и ключи перевода не совпадают по имени — держим
-       соответствие в одном месте, чтобы чип не показывал 'date_desc'. */
-    const SORT_LABELS = {
-        name_asc: 'name_asc', name_desc: 'name_desc',
-        date_desc: 'date_new', date_asc: 'date_old', size_desc: 'size_desc'
-    };
+       соответствие в одном месте, чтобы чип не показывал 'date_desc'.
+       Таблица описана выше рядом с SORT_KEYS. */
 
     function openSortMenu(anchor) {
         showMenu(anchor, [
