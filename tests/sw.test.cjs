@@ -80,7 +80,8 @@ test('old admin/media caches are purged, only public application assets remain c
   assert.ok(cacheName, 'install must create a versioned lanpaper-static cache');
   const assetCache = worker.stores.get(cacheName);
   assert.ok(assetCache.has(worker.origin + '/static/css/style.css'));
-  assert.ok(assetCache.has(worker.origin + '/static/fonts/manrope-latin.woff2'));
+  assert.ok([...assetCache.keys()].some(url => url.includes('/static/fonts/')),
+    'the precache must keep the self-hosted fonts');
   assert.ok(!assetCache.has(worker.origin + '/admin'));
 
   for (const route of ['/admin', '/api/wallpapers', '/api/preview/photo',
@@ -92,6 +93,19 @@ test('old admin/media caches are purged, only public application assets remain c
   worker.setOffline(true);
   assert.equal(await (await worker.intercept('/static/css/style.css')).text(), 'static asset');
   assert.equal(await worker.intercept('/photo?token=secret'), undefined);
+});
+
+test('every font the stylesheet uses is precached', () => {
+  // The stylesheet names the font files; the precache list must cover them,
+  // otherwise the panel loses its typography offline — and a stale entry
+  // (a font that was deleted) is caught by the "exists in static/" test.
+  const css = fs.readFileSync(path.join(__dirname, '../static/css/style.css'), 'utf8');
+  const fonts = [...css.matchAll(/url\(['"]?\.\.\/(fonts\/[a-zA-Z0-9._-]+\.woff2)['"]?\)/g)]
+    .map(match => `/static/${match[1]}`);
+  assert.ok(fonts.length >= 2, `only ${fonts.length} self-hosted fonts found in the stylesheet`);
+  for (const font of fonts) {
+    assert.ok(code.includes(`'${font}'`), `${font} is used by the stylesheet but not precached`);
+  }
 });
 
 test('every precached asset exists in static/', () => {

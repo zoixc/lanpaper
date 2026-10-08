@@ -82,37 +82,30 @@ ul, ol { list-style: none; }
 
 /* ============================================================
    2. ШРИФТЫ (самостоятельный хостинг, SIL OFL 1.1)
-   Manrope — весь интерфейс. Unbounded 500 — только логотип,
-   ID ссылок и крупные числа: он даёт характер, но в тексте
-   непригоден.
+   Golos Text — весь интерфейс, одна вариативная гарнитура
+   (400–900) с полной кириллицей. Крупные надписи — та же
+   гарнитура, но плотнее набранная: отдельный «характерный»
+   логотипный шрифт в интерфейсе читался хуже текстового и
+   добавлял ещё один файл к загрузке.
    ============================================================ */
 @font-face {
-    font-family: Manrope;
+    font-family: 'Golos Text';
     font-style: normal;
-    font-weight: 400 800;
+    font-weight: 400 900;
     font-display: swap;
-    src: url('../fonts/manrope-latin.woff2') format('woff2');
+    src: url('../fonts/golos-text-latin.woff2') format('woff2');
     unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
                    U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191,
                    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @font-face {
-    font-family: Manrope;
+    font-family: 'Golos Text';
     font-style: normal;
-    font-weight: 400 800;
+    font-weight: 400 900;
     font-display: swap;
-    src: url('../fonts/manrope-cyrillic.woff2') format('woff2');
+    src: url('../fonts/golos-text-cyrillic.woff2') format('woff2');
     unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
-}
-
-@font-face {
-    font-family: Unbounded;
-    font-style: normal;
-    font-weight: 500;
-    font-display: swap;
-    src: url('../fonts/unbounded-latin-500.woff2') format('woff2');
-    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2074, U+20AC, U+2122;
 }
 
 
@@ -203,8 +196,10 @@ ul, ol { list-style: none; }
     --tap:  44px;   /* минимальная зона нажатия на тач-экране */
 
     /* Типографика */
-    --font-ui:      'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-    --font-display: 'Unbounded', 'Manrope', system-ui, sans-serif;
+    --font-ui:      'Golos Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    /* Крупные надписи — тот же шрифт: своя гарнитура для логотипа
+       добавляла файл к загрузке, а в остальном интерфейсе не участвовала */
+    --font-display: var(--font-ui);
     --font-mono:    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 
     --t-2xs: 0.6875rem;  /* 11 — бейджи */
@@ -418,8 +413,8 @@ html[data-palette="ocean"][data-theme="dark"] {
 
 .display {
     font-family: var(--font-display);
-    font-weight: 500;
-    letter-spacing: -0.01em;
+    font-weight: 600;
+    letter-spacing: -0.015em;
 }
 
 .num { font-variant-numeric: tabular-nums; }
@@ -1817,8 +1812,8 @@ html[data-palette="ocean"][data-theme="dark"] {
 .brand__name {
     font-family: var(--font-display);
     font-size: 0.9375rem;
-    font-weight: 500;
-    letter-spacing: -0.01em;
+    font-weight: 600;
+    letter-spacing: -0.015em;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;

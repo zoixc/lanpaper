@@ -4,7 +4,7 @@
  * In particular, an image that was public yesterday must not be replayed
  * offline after its link is changed to token-only or admin-only.
  */
-const STATIC_CACHE = 'lanpaper-static-v7';
+const STATIC_CACHE = 'lanpaper-static-v8';
 const STATIC_ASSETS = [
   '/static/css/style.css',
   '/static/js/prepaint.js',
@@ -20,9 +20,8 @@ const STATIC_ASSETS = [
   '/static/icons/icon-192.png',
   '/static/icons/icon-512.png',
   '/static/icons/icon-maskable-512.png',
-  '/static/fonts/manrope-latin.woff2',
-  '/static/fonts/manrope-cyrillic.woff2',
-  '/static/fonts/unbounded-latin-500.woff2',
+  '/static/fonts/golos-text-latin.woff2',
+  '/static/fonts/golos-text-cyrillic.woff2',
   '/static/i18n/en.json',
   '/static/i18n/ru.json',
   '/static/i18n/de.json',

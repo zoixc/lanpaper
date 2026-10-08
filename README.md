@@ -45,7 +45,7 @@ link, which is handy for digital frames, smart TVs, kiosks and other displays.
   rollback, playlist items with rotation, and access levels with counters.
 - **Light on resources:** about 10 MB of RAM when idle, gzip for text
   responses, media revalidated with `304` instead of downloaded again, and
-  about 50 KB of self-hosted WOFF2 fonts. Archived versions are moved, not
+  about 60 KB of self-hosted WOFF2 fonts. Archived versions are moved, not
   copied, and per-link access counters live in memory only.
 - **Security:** Basic Auth with a brute-force lockout, CSRF protection,
   strict security headers, SSRF-safe downloads and rate limits. Publish keys
@@ -412,7 +412,7 @@ copyright notice and the licence text travel with your copies. It comes without
 warranty, and no trademark rights are granted.
 
 Every dependency is permissive too — BSD-3-Clause, MIT, and SIL OFL 1.1 for the
-two bundled fonts — and nothing copyleft is linked into the binary or served by
+bundled font — and nothing copyleft is linked into the binary or served by
 it, so a commercial offering carries no source-disclosure obligation. The
 component list, with the licence texts a redistribution has to reproduce, is in
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). Every first-party source file

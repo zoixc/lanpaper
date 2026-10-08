@@ -18,8 +18,7 @@ BSD-3-Clause, not using a contributor's name to endorse a derived product.
 | [golang.org/x/image](https://github.com/golang/image) | v0.46.0 | BSD-3-Clause | BMP/TIFF decoding, WebP **decoding**, bilinear resizing | linked into the binary |
 | [joho/godotenv](https://github.com/joho/godotenv) | v1.5.1 | MIT | loading an optional `.env` file at startup | linked into the binary |
 | Go standard library | per the build toolchain | BSD-3-Clause | HTTP server, JSON, crypto, image codecs | linked into the binary |
-| [Manrope](https://github.com/sharanda/manrope) | as shipped | SIL OFL 1.1 | UI font (latin + cyrillic subsets) | `static/fonts/manrope-*.woff2` |
-| [Unbounded](https://github.com/googlefonts/unbounded) | as shipped | SIL OFL 1.1 | logo/heading font | `static/fonts/unbounded-latin-500.woff2` |
+| [Golos Text](https://github.com/googlefonts/golos-text) | as shipped (`@fontsource-variable/golos-text` 5.3.0) | SIL OFL 1.1 | the whole interface, one variable font (latin + cyrillic subsets) | `static/fonts/golos-text-*.woff2` |
 
 Build- and CI-time only (not distributed in any artifact): `gofmt`,
 `go vet`, `govulncheck`, the GitHub Actions runners and the pinned actions in
@@ -33,11 +32,10 @@ with an application, and places no restriction on documents or images produced
 with the fonts. The only prohibition is selling the fonts by themselves. The
 full license texts ship next to the font files:
 
-- [static/fonts/OFL-Manrope.txt](static/fonts/OFL-Manrope.txt)
-- [static/fonts/OFL-Unbounded.txt](static/fonts/OFL-Unbounded.txt)
+- [static/fonts/OFL-Golos-Text.txt](static/fonts/OFL-Golos-Text.txt)
 
-Both fonts are also listed in the service worker's precache, so an offline
-admin panel keeps its typography.
+The font is also listed in the service worker's precache, so an offline admin
+panel keeps its typography.
 
 ## Trademarks
 
