@@ -3,6 +3,80 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
+## [0.14.1] – 2026-10-08
+
+A fix release for the 2.0 panel: the strings it looked up but never had, the
+phone layout, the header, the typography and one reverse-proxy setting. No API,
+data or URL behaviour changes; upgrading is a container restart.
+
+### Fixed
+
+- **Twenty-two interface strings no longer show as raw keys.** The 2.0 panel
+  asks for `sc_search`, `sc_new`, `sc_theme`, `sc_view`, `sc_select`,
+  `sc_close` (settings sheet), `access_public_hint`, `access_local_hint`,
+  `access_token_hint`, `access_auth_hint` (access levels), `filter_all`,
+  `filter_playlist`, `filter_pinned` (filter chips), `pin`, `unpin`,
+  `bulk_pin`, `bulk_unpin`, `pinned_toast`, `unpinned_toast`,
+  `upload_success`, `append_success` and `search_placeholder_short`, none of
+  which existed in `static/i18n/*.json`. Without a dictionary entry `t()`
+  falls back to the key itself, so the sheet, the chips, the card menu and the
+  toasts printed identifiers instead of words. All six languages now carry
+  all 219 keys, and the phone-width placeholder is two characters shorter on
+  purpose.
+- **`tests/i18n.test.cjs` finds this class of defect again.** It matched only
+  `t('key')` and `data-i18n` attributes, while the panel builds its labels
+  from arrays, ternaries and lookup tables (`['t', 'sc_theme']`,
+  `t(pinned ? 'unpin' : 'pin')`, `t(SORT_LABELS[…])`, `t('palette_' + name)`).
+  The test now inventories every snake_case literal in `admin.html`,
+  `static/js/*.js` and `static/sw.js`, checks the argument list of every
+  `t(…)` call, walks the domain of keys assembled from a constant
+  (`PALETTES`), and verifies the narrow-screen `*_short` variants. Keys that
+  deliberately are not translations are listed with a reason.
+- **The accent swatch draws its selection ring around the swatch.** The
+  hidden radio was `position: absolute; inset: 0` without explicit sizes; an
+  `input` is a replaced element, so it stayed at its intrinsic ~15 px in the
+  top-left corner and the ring was drawn there instead of around the 34 px
+  circle.
+- **The phone layout no longer scrolls sideways.** Four segment tabs
+  (media/versions/playlist/access) and the three theme options could not
+  shrink below their text width and pushed the page wider than the screen:
+  the rows scroll on their own now (`max-width: 560px`), and `html` clips
+  accidental horizontal overflow (`overflow-x: clip`, which — unlike
+  `hidden` — keeps the sticky header working). The header itself lost the
+  app name and the 44 px tap targets below 400 px, where five icon buttons
+  and the wordmark no longer fit in one line, and the drag-and-drop frame
+  caps its width and breaks long file names.
+- **Header buttons have no tooltips any more.** A `[data-tip]::after` above a
+  sticky header is pushed off the top edge and, at the right edge, widened the
+  document — the source of the sideways scroll on desktop. `aria-label`
+  stays, so the buttons still have accessible names.
+- **The settings and theme icons are the 0.12.1 ones again.** The hand-drawn
+  gear (`ICONS.gear`) was a twelve-pointed star with uneven radii that read as
+  crooked at 17 px; it and the moon (outer and inner arc of different radii,
+  8.5 and 8.6) are the Feather outlines the 0.12.1 panel used.
+
+### Changed
+
+- **The interface is set in Golos Text.** Manrope (latin + cyrillic) and
+  Unbounded (logo only) — 39 KB + 9 KB — are replaced by one variable
+  Golos Text 400–900 in the same two subsets, 60 KB, SIL OFL 1.1, fetched
+  from `@fontsource-variable/golos-text`. The display face is the same family
+  set tighter, so `--font-display` no longer loads a second file; headings and
+  the wordmark carry a little more weight and less tracking instead. The
+  service worker cache generation moved to `lanpaper-static-v8`, and
+  `tests/sw.test.cjs` now derives the fonts it expects from the stylesheet's
+  `@font-face` rules instead of naming them.
+- **`TRUSTED_PROXY` accepts a comma-separated list of IPs and CIDRs.** One
+  address was not enough as soon as a proxy reached the container through more
+  than one hop: a Docker container sees the bridge gateway, not the proxy's LAN
+  address, so `TRUSTED_PROXY="192.168.20.1,172.24.0.1"` is what makes rate
+  limiting, the login lockout and the `local` access level see the real client
+  IP. Entries that do not parse are dropped with a warning naming the entry,
+  the remaining ones stay in effect, and `IsTrustedProxy` matches against any
+  of them. The CSRF rejection line now prints `X-Forwarded-Host` as well and
+  names the address to add (`set TRUSTED_PROXY=172.24.0.1`), because that
+  `403` is almost always a proxy that rewrites `Host` rather than an attack.
+
 ## [0.14.0] – 2026-10-08
 
 The admin panel is rebuilt on the `design/v2` stand: the same capabilities as
