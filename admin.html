@@ -20,7 +20,7 @@
   <meta name="theme-color" content="#F5F6F9" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#14161B" media="(prefers-color-scheme: dark)">
   <link rel="manifest" href="/static/manifest.json">
-  <link rel="preload" href="/static/fonts/manrope-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/golos-text-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/css/style.css">
 
   <!-- Тема, акцент, вид и язык применяются до первой отрисовки: иначе при
@@ -52,29 +52,24 @@
                 <span class="appbar__spacer"></span>
 
                 <div class="appbar__actions">
-                    <button class="icon-btn" id="selectBtn" type="button" aria-pressed="false"
-                            data-tip-key="select_mode" data-i18n-aria="select_mode"
+                    <button class="icon-btn" id="selectBtn" type="button" aria-pressed="false" data-i18n-aria="select_mode"
                             aria-label="Select several">
                         <svg data-icon="select"></svg>
                     </button>
 
                     <div class="btn-group" role="group" aria-label="View">
-                        <button class="icon-btn" id="viewGridBtn" type="button" aria-pressed="true"
-                                data-tip-key="view_grid" data-i18n-aria="view_grid" aria-label="Grid">
+                        <button class="icon-btn" id="viewGridBtn" type="button" aria-pressed="true" data-i18n-aria="view_grid" aria-label="Grid">
                             <svg data-icon="grid"></svg></button>
-                        <button class="icon-btn" id="viewListBtn" type="button" aria-pressed="false"
-                                data-tip-key="view_list" data-i18n-aria="view_list" aria-label="List">
+                        <button class="icon-btn" id="viewListBtn" type="button" aria-pressed="false" data-i18n-aria="view_list" aria-label="List">
                             <svg data-icon="list"></svg></button>
                     </div>
 
-                    <button class="icon-btn" id="themeBtn" type="button"
-                            data-tip-key="aria_toggle_theme" data-i18n-aria="aria_toggle_theme"
+                    <button class="icon-btn" id="themeBtn" type="button" data-i18n-aria="aria_toggle_theme"
                             aria-label="Toggle theme">
                         <svg data-icon="moon"></svg>
                     </button>
 
-                    <button class="icon-btn" id="settingsBtn" type="button"
-                            data-tip-key="aria_settings" data-i18n-aria="aria_settings"
+                    <button class="icon-btn" id="settingsBtn" type="button" data-i18n-aria="aria_settings"
                             aria-label="Settings"><svg data-icon="gear"></svg></button>
 
                     <button class="btn btn--primary" id="newLinkBtn" type="button">
