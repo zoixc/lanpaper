@@ -316,6 +316,41 @@ func IsTrustedProxy(remoteAddr string) bool {
 // credentials are deliberately NOT treated as "auth disabled": the admin
 // endpoints then fail closed (503) while public links and health checks keep
 // working. DISABLE_AUTH=true is the only way to turn authentication off.
+// ApplyTrustedProxy re-reads Current.TrustedProxy and remembers what is
+// actually in effect: invalid entries are dropped with a warning, and the
+// setting is normalised to the entries that were accepted. Load calls it once
+// at startup; tests that change the setting call it again to refresh the cache
+// IsTrustedProxy reads.
+func ApplyTrustedProxy() {
+	var proxies parsedProxy
+	valid := make([]string, 0, 2)
+	for _, entry := range splitList(Current.TrustedProxy) {
+		ip, cidr, err := parseTrustedProxyValue(entry)
+		if err != nil {
+			log.Printf("Warning: invalid TRUSTED_PROXY entry %q — ignoring (must be an IP or CIDR)", entry)
+			continue
+		}
+		if ip != nil {
+			proxies.ips = append(proxies.ips, ip)
+		}
+		if cidr != nil {
+			proxies.cidrs = append(proxies.cidrs, cidr)
+		}
+		valid = append(valid, entry)
+	}
+	if len(proxies.ips) == 0 && len(proxies.cidrs) == 0 {
+		if strings.TrimSpace(Current.TrustedProxy) != "" {
+			log.Printf("Warning: TRUSTED_PROXY %q has no valid entries — ignoring (comma-separated IPs or CIDRs)", Current.TrustedProxy)
+		}
+		Current.TrustedProxy = ""
+	} else {
+		// Keep what is actually in effect: the invalid entries were dropped
+		// above and must not be reported as trusted.
+		Current.TrustedProxy = strings.Join(valid, ",")
+	}
+	cachedProxyPtr.Store(&proxies)
+}
+
 func validate() {
 	portStr := strings.TrimPrefix(Current.Port, ":")
 	if n, err := strconv.Atoi(portStr); err != nil || n < 1 || n > 65535 {
@@ -366,34 +401,7 @@ func validate() {
 		}
 	}
 
-	var proxies parsedProxy
-	valid := make([]string, 0, 2)
-	for _, entry := range splitList(Current.TrustedProxy) {
-		ip, cidr, err := parseTrustedProxyValue(entry)
-		if err != nil {
-			log.Printf("Warning: invalid TRUSTED_PROXY entry %q — ignoring (must be an IP or CIDR)", entry)
-			continue
-		}
-		if ip != nil {
-			proxies.ips = append(proxies.ips, ip)
-		}
-		if cidr != nil {
-			proxies.cidrs = append(proxies.cidrs, cidr)
-		}
-		valid = append(valid, entry)
-	}
-	if len(proxies.ips) == 0 && len(proxies.cidrs) == 0 {
-		if strings.TrimSpace(Current.TrustedProxy) != "" {
-			log.Printf("Warning: TRUSTED_PROXY %q has no valid entries — ignoring (comma-separated IPs or CIDRs)", Current.TrustedProxy)
-		}
-		Current.TrustedProxy = ""
-	} else {
-		// Keep what is actually in effect: the invalid entries were dropped
-		// above and must not be reported as trusted.
-		Current.TrustedProxy = strings.Join(valid, ",")
-	}
-	cachedProxyPtr.Store(&proxies)
-
+	ApplyTrustedProxy()
 	if Current.History.Limit < 0 || Current.History.Limit > MaxHistoryLimit {
 		log.Printf("Warning: HISTORY_LIMIT %d out of range (0-%d), using %d",
 			Current.History.Limit, MaxHistoryLimit, DefaultHistoryLimit)

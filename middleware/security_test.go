@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"lanpaper/config"
 )
 
 func TestSameOriginRequest(t *testing.T) {
@@ -223,5 +225,115 @@ func TestWithSecurityNeverBlocksGet(t *testing.T) {
 	}
 	if w.Code != http.StatusOK {
 		t.Errorf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+}
+
+func TestSameOriginRequestThroughTLSProxyWithoutForwardedProto(t *testing.T) {
+	// A proxy that terminates TLS but does not forward X-Forwarded-Proto: the
+	// browser sees https while the connection to the server is plain http. With
+	// the proxy trusted, the browser's own same-origin claim plus a host:port
+	// match is enough; every other case keeps the strict scheme check, so a
+	// request from another host, another port or without the browser's
+	// statement is still rejected.
+	saved := config.Current.TrustedProxy
+	t.Cleanup(func() {
+		config.Current.TrustedProxy = saved
+		config.ApplyTrustedProxy()
+	})
+	config.Current.TrustedProxy = "10.1.2.3"
+	config.ApplyTrustedProxy()
+
+	tests := []struct {
+		name    string
+		remote  string
+		host    string
+		headers map[string]string
+		want    bool
+	}{
+		{
+			name:   "trusted proxy, same-origin, https origin without X-Forwarded-Proto",
+			remote: "10.1.2.3:40000",
+			host:   "walls.example.com",
+			headers: map[string]string{
+				"Origin":         "https://walls.example.com",
+				"Sec-Fetch-Site": "same-origin",
+			},
+			want: true,
+		},
+		{
+			name:   "untrusted peer keeps the strict scheme check",
+			remote: "10.9.9.9:40000",
+			host:   "walls.example.com",
+			headers: map[string]string{
+				"Origin":         "https://walls.example.com",
+				"Sec-Fetch-Site": "same-origin",
+			},
+			want: false,
+		},
+		{
+			name:   "origin of another host is rejected",
+			remote: "10.1.2.3:40000",
+			host:   "walls.example.com",
+			headers: map[string]string{
+				"Origin":         "https://evil.example.com",
+				"Sec-Fetch-Site": "same-origin",
+			},
+			want: false,
+		},
+		{
+			name:   "origin on another port is rejected",
+			remote: "10.1.2.3:40000",
+			host:   "walls.example.com",
+			headers: map[string]string{
+				"Origin":         "https://walls.example.com:8443",
+				"Sec-Fetch-Site": "same-origin",
+			},
+			want: false,
+		},
+		{
+			name:   "without the same-origin statement the scheme must match",
+			remote: "10.1.2.3:40000",
+			host:   "walls.example.com",
+			headers: map[string]string{
+				"Origin": "https://walls.example.com",
+			},
+			want: false,
+		},
+		{
+			name:   "forwarded https still matches exactly",
+			remote: "10.1.2.3:40000",
+			host:   "walls.example.com",
+			headers: map[string]string{
+				"Origin":            "https://walls.example.com",
+				"Sec-Fetch-Site":    "same-origin",
+				"X-Forwarded-Proto": "https",
+			},
+			want: true,
+		},
+		{
+			name:   "a proxy that declares http wins over the browser's https",
+			remote: "10.1.2.3:40000",
+			host:   "walls.example.com",
+			headers: map[string]string{
+				"Origin":            "https://walls.example.com",
+				"Sec-Fetch-Site":    "same-origin",
+				"X-Forwarded-Proto": "http",
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodPost, "http://"+tt.host+"/api/link", nil)
+			r.Host = tt.host
+			r.RemoteAddr = tt.remote
+			for k, v := range tt.headers {
+				r.Header.Set(k, v)
+			}
+			if got := sameOriginRequest(r); got != tt.want {
+				t.Errorf("sameOriginRequest() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

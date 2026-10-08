@@ -95,6 +95,11 @@ func serveStaticAsset(w http.ResponseWriter, r *http.Request) {
 	h.Set("X-Frame-Options", "DENY")
 	h.Set("Referrer-Policy", "no-referrer")
 	h.Set("Cross-Origin-Resource-Policy", "same-origin")
+	// The manifest has its own media type: Chrome warns about plain
+	// application/json, and ServeContent would pick exactly that from ".json".
+	if name == "manifest.json" {
+		h.Set("Content-Type", "application/manifest+json")
+	}
 	switch path.Ext(name) {
 	case ".svg":
 		h.Set("Content-Security-Policy", "default-src 'none'; sandbox")

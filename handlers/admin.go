@@ -94,7 +94,11 @@ func Wallpapers(w http.ResponseWriter, r *http.Request) {
 		wallpapers = out
 	}
 	if hasImg := q.Get("has_image"); hasImg != "" {
-		want := hasImg == "true"
+		want, ok := queryFlag(hasImg)
+		if !ok {
+			http.Error(w, "Invalid has_image", http.StatusBadRequest)
+			return
+		}
 		out := wallpapers[:0]
 		for _, wp := range wallpapers {
 			if wp.HasImage == want {
@@ -104,7 +108,15 @@ func Wallpapers(w http.ResponseWriter, r *http.Request) {
 		wallpapers = out
 	}
 	if sf := q.Get("sort"); sf != "" {
-		sortWallpapers(wallpapers, sf, q.Get("order") != "asc")
+		// Anything but the two documented values is a client error: silently
+		// falling back to "created" hid typos and sorted by the wrong field.
+		switch strings.ToLower(sf) {
+		case "created", "updated":
+			sortWallpapers(wallpapers, sf, q.Get("order") != "asc")
+		default:
+			http.Error(w, "Invalid sort", http.StatusBadRequest)
+			return
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -131,6 +143,20 @@ func Wallpapers(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(toResponses(wallpapers)); err != nil {
 		log.Printf("Error encoding wallpapers response: %v", err)
 	}
+}
+
+// queryFlag reads a boolean query parameter. Unlike formFlag, where a wrong
+// value must not break an upload, a filter that cannot be parsed is a client
+// error: treating has_image=1 as false returned exactly the links the caller
+// asked to exclude.
+func queryFlag(raw string) (bool, bool) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "yes", "on":
+		return true, true
+	case "0", "false", "no", "off":
+		return false, true
+	}
+	return false, false
 }
 
 func clampPageSize(s string) int {
@@ -253,8 +279,8 @@ func removeFiles(imagePath, previewPath string) {
 	}
 }
 
-// linkNameFromPath extracts and validates the link name from /api/link/{name}
-// or /api/link/{name}/access etc. The suffix (if any) is returned separately.
+// linkNameFromPath extracts and validates the link name from /api/link/{name},
+// the path shared by PATCH, DELETE and the pin/rollback/history sub-routes.
 func linkNameFromPath(path string) (string, bool) {
 	name := strings.TrimPrefix(path, "/api/link/")
 	name = strings.Trim(name, "/")
@@ -310,6 +336,10 @@ func AdminPreview(w http.ResponseWriter, r *http.Request) {
 	h.Set("Content-Disposition", "inline")
 	h.Set("Cache-Control", mediaCacheControl)
 	setMediaValidators(h, fi)
+	/* Видео-ссылка отдаётся здесь целиком, поэтому у большого файла на
+	   медленном канале должно быть столько же времени, сколько у публичной
+	   отдачи: иначе превью обрывалось бы на середине. */
+	extendMediaDeadline(w, fi.Size())
 	http.ServeContent(w, r, filepath.Base(f.Name()), fi.ModTime(), f)
 }
 
@@ -338,6 +368,10 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 	files := make([]string, 0)
 	_ = fs.WalkDir(gallery, ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
+			// A gallery may hold a directory the process cannot read (a mount
+			// with stricter modes, a file that vanished mid-walk). Skipping it
+			// keeps the reachable files listed; returning the error would turn
+			// one unreadable folder into a 500 for the whole picker.
 			return nil
 		}
 		visited++
@@ -396,6 +430,7 @@ func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
 	h.Set("Content-Disposition", "inline")
 	h.Set("Cache-Control", mediaCacheControl)
 	setMediaValidators(h, fi)
+	extendMediaDeadline(w, fi.Size())
 	http.ServeContent(w, r, filepath.Base(name), fi.ModTime(), f)
 }
 

@@ -97,6 +97,26 @@
     .icon-btn--sm { min-width: var(--tap); min-height: var(--tap); }
 }
 
+/* ---- Переключатель темы и шестерёнка: как в 0.12.1 ----
+   Оба значка темы лежат друг на друге; гаснущий уезжает в
+   scale(0.5) rotate(-90deg), проявляющийся возвращается в scale(1) rotate(0). */
+#themeBtn .theme-icon {
+    position: absolute;
+    width: 17px;
+    height: 17px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.25s ease;
+}
+#themeBtn .theme-icon { transform: scale(0.5) rotate(-90deg); }
+html[data-theme="light"] #themeBtn .theme-icon[data-icon="sun"],
+html[data-theme="dark"]  #themeBtn .theme-icon[data-icon="moon"] {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+}
+#settingsBtn svg { transition: transform 0.25s ease; }
+body.settings-open #settingsBtn svg { transform: rotate(90deg); }
+
 /* Группа иконочных кнопок в общей «таблетке» */
 .btn-group {
     display: inline-flex;

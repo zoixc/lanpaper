@@ -85,6 +85,41 @@ func generateAccessToken() string {
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
+// mediaMinBytesPerSec is the slowest client a media response is sized for,
+// and maxMediaWriteBudget caps how long one response may hold the connection.
+const (
+	mediaMinBytesPerSec = 256 << 10 // 256 KiB/s
+	maxMediaWriteBudget = 15 * time.Minute
+)
+
+// mediaWriteBudget returns how long writing size bytes may take at
+// mediaMinBytesPerSec, and whether that is worth extending the deadline for.
+// Kept separate from the deadline call so the arithmetic is testable without
+// a connection.
+func mediaWriteBudget(size int64) (time.Duration, bool) {
+	if size <= 0 {
+		return 0, false
+	}
+	budget := time.Duration(size/mediaMinBytesPerSec+1) * time.Second
+	if budget <= time.Duration(config.HTTPWriteTimeout)*time.Second {
+		return 0, false
+	}
+	return min(budget, maxMediaWriteBudget), true
+}
+
+// extendMediaDeadline lifts the server-wide write timeout for one media
+// response. That timeout exists to cut off a stalled request, but a large file
+// written to a slow client is not stalled: a 50 MB video at 256 KiB/s needs
+// more than the 120 s default and would be truncated mid-file. The deadline is
+// sized for the bytes the response has to send and never exceeds
+// maxMediaWriteBudget, so a client that stops reading still loses the
+// connection.
+func extendMediaDeadline(w http.ResponseWriter, size int64) {
+	if budget, ok := mediaWriteBudget(size); ok {
+		_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(budget))
+	}
+}
+
 // extendDeadline lifts the server-wide read/write timeouts for a long-running
 // admin request. It is only reached after authentication; public requests
 // keep the short server defaults.

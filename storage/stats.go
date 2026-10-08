@@ -49,9 +49,11 @@ func RecordHit(linkName string, sent int64) {
 		if trackedLinks.Load() >= maxTrackedLinks {
 			return
 		}
-		stored, isNew := linkStats.LoadOrStore(linkName, &statCounters{})
+		stored, loaded := linkStats.LoadOrStore(linkName, &statCounters{})
 		value = stored
-		if isNew {
+		// LoadOrStore reports whether the entry already existed, so the
+		// counter grows exactly once per new link name.
+		if !loaded {
 			trackedLinks.Add(1)
 		}
 	}
@@ -94,6 +96,38 @@ func ForgetStats(linkName string) {
 	if _, loaded := linkStats.LoadAndDelete(linkName); loaded {
 		trackedLinks.Add(-1)
 	}
+}
+
+// RenameStats moves the counters of a link to its new name. A renamed link
+// keeps serving the same media under a new address, so its traffic must not
+// look like it started from zero. It is a no-op when the old name has no
+// counters, and counters already stored for the new name are merged instead of
+// dropped.
+func RenameStats(oldName, newName string) {
+	if oldName == "" || newName == "" || oldName == newName {
+		return
+	}
+	value, loaded := linkStats.LoadAndDelete(oldName)
+	if !loaded {
+		return
+	}
+	counters, ok := value.(*statCounters)
+	if !ok {
+		return
+	}
+	previous, loaded := linkStats.LoadOrStore(newName, counters)
+	if !loaded {
+		// Moved: the map still holds exactly one entry for this link.
+		return
+	}
+	if old, ok := previous.(*statCounters); ok {
+		old.hits.Add(counters.hits.Load())
+		old.bytes.Add(counters.bytes.Load())
+		if last := counters.lastHit.Load(); last > old.lastHit.Load() {
+			old.lastHit.Store(last)
+		}
+	}
+	trackedLinks.Add(-1)
 }
 
 // ResetStats clears every counter. Used by tests.

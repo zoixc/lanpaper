@@ -50,6 +50,13 @@ func Link(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
 		if r.URL.Path != "/api/link" && r.URL.Path != "/api/link/" {
+			// A POST to /api/link/{name} is a method mismatch, not a missing
+			// route: that path exists and answers PATCH and DELETE.
+			if _, ok := linkNameFromPath(r.URL.Path); ok {
+				w.Header().Set("Allow", "PATCH, DELETE")
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
 			http.NotFound(w, r)
 			return
 		}
@@ -372,6 +379,10 @@ func renameLink(oldName, newName string) (*storage.Wallpaper, error) {
 		rollback()
 		return nil, err
 	}
+	// Счётчики обращений переезжают вместе с адресом: иначе ссылка после
+	// переименования показывала бы нулевую статистику, а под старым именем
+	// осталась бы «статистика призрака».
+	storage.RenameStats(oldName, newName)
 	log.Printf("Renamed link: %s -> %s", oldName, newName)
 	return renamed, nil
 }

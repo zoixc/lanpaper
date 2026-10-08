@@ -66,11 +66,14 @@
 
                     <button class="icon-btn" id="themeBtn" type="button" data-i18n-aria="aria_toggle_theme"
                             aria-label="Toggle theme">
-                        <svg data-icon="moon"></svg>
+                        <!-- Оба значка лежат друг на друге, как в 0.12.1: виден
+                             активный, второй ждёт своего часа и перетекает. -->
+                        <svg class="theme-icon" data-icon="sun"></svg>
+                        <svg class="theme-icon" data-icon="moon"></svg>
                     </button>
 
                     <button class="icon-btn" id="settingsBtn" type="button" data-i18n-aria="aria_settings"
-                            aria-label="Settings"><svg data-icon="gear"></svg></button>
+                            aria-label="Settings" aria-expanded="false" aria-controls="settingsSheet"><svg data-icon="gear"></svg></button>
 
                     <button class="btn btn--primary" id="newLinkBtn" type="button">
                         <svg data-icon="plus"></svg><span data-i18n="new_link">Новая ссылка</span>
@@ -233,7 +236,7 @@
      доступ и статистика.
      ============================================================ -->
 <template id="tplPanel">
-    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="panelTitle" data-sheet>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="panelTitle" data-sheet="panel">
         <div class="sheet__grip"></div>
         <div class="sheet__head">
             <div class="grow">
@@ -292,7 +295,7 @@
      НАСТРОЙКИ: тема, акцент, язык, данные, обслуживание, клавиши
      ============================================================ -->
 <template id="tplSettings">
-    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" data-sheet>
+    <div class="sheet" id="settingsSheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" data-sheet="settings">
         <div class="sheet__grip"></div>
         <div class="sheet__head">
             <div class="grow">
@@ -309,15 +312,15 @@
                 <div class="segment segment--full" role="radiogroup" aria-label="Theme">
                     <label class="segment__opt">
                         <input type="radio" name="theme" value="light" data-theme-opt="light">
-                        <span class="segment__item" data-i18n="theme_light">Светлая</span>
+                        <span class="segment__item"><svg data-icon="sun"></svg><span data-i18n="theme_light">Светлая</span></span>
                     </label>
                     <label class="segment__opt">
                         <input type="radio" name="theme" value="dark" data-theme-opt="dark">
-                        <span class="segment__item" data-i18n="theme_dark">Тёмная</span>
+                        <span class="segment__item"><svg data-icon="moon"></svg><span data-i18n="theme_dark">Тёмная</span></span>
                     </label>
                     <label class="segment__opt">
                         <input type="radio" name="theme" value="auto" data-theme-opt="auto" checked>
-                        <span class="segment__item" data-i18n="theme_auto">Как в системе</span>
+                        <span class="segment__item"><svg data-icon="monitor"></svg><span data-i18n="theme_auto">Как в системе</span></span>
                     </label>
                 </div>
             </div>

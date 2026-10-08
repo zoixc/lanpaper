@@ -5,6 +5,7 @@ package handlers
 import (
 	"net/url"
 	"testing"
+	"time"
 
 	"lanpaper/config"
 	"lanpaper/storage"
@@ -132,5 +133,33 @@ func TestLiveVersionTreatsLegacyRecordsAsVersionOne(t *testing.T) {
 	}
 	if got := liveVersion(&storage.Wallpaper{CurrentVersion: 7}); got != 7 {
 		t.Fatalf("liveVersion = %d, want 7", got)
+	}
+}
+
+// A media download must be given time for the bytes it has to send. The
+// server-wide write timeout cuts off a stalled request, but a 50 MB video at
+// 256 KiB/s is not stalled — it simply needs longer, and the response used to
+// be truncated mid-file.
+func TestMediaWriteBudgetFollowsTheFileSize(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		size   int64
+		want   bool
+		budget time.Duration
+	}{
+		{"empty", 0, false, 0},
+		{"small image", 1 << 20, false, 0}, // 1 MB: ~5 s, covered by the default
+		{"just above the default", 40 << 20, true, 161 * time.Second},
+		{"50 MB video at 256 KiB/s", 50 << 20, true, 201 * time.Second},
+		{"huge file is capped", 512 << 20, true, maxMediaWriteBudget},
+	} {
+		budget, ok := mediaWriteBudget(tc.size)
+		if ok != tc.want || budget != tc.budget {
+			t.Errorf("%s: mediaWriteBudget(%d) = %v, %v; want %v, %v",
+				tc.name, tc.size, budget, ok, tc.budget, tc.want)
+		}
+		if budget > maxMediaWriteBudget {
+			t.Errorf("%s: budget %v exceeds the cap %v", tc.name, budget, maxMediaWriteBudget)
+		}
 	}
 }

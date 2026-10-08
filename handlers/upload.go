@@ -61,6 +61,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	case uploadSem <- struct{}{}:
 		defer func() { <-uploadSem }()
 	default:
+		// docs/API.md promises Retry-After on this 429: the slot frees up as
+		// soon as one of the running uploads finishes.
+		w.Header().Set("Retry-After", "5")
 		http.Error(w, "Too many concurrent uploads", http.StatusTooManyRequests)
 		return
 	}

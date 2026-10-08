@@ -68,7 +68,7 @@ func AuthorizeLinkAccess(w http.ResponseWriter, r *http.Request, wp *storage.Wal
 			writeTooManyRequests(w, retry, "Too many failed login attempts")
 			return false
 		}
-		w.Header().Set("WWW-Authenticate", `Basic realm="Link", charset="UTF-8"`)
+		w.Header().Set("WWW-Authenticate", AuthRealm)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return false
 	}

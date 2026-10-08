@@ -593,6 +593,136 @@ html[data-palette="ocean"][data-theme="dark"] {
 
 
 /* ============================================================
+   ДВИЖЕНИЕ ЗНАЧКОВ
+   Значок отвечает на кнопку: при наведении он приподнимается, при
+   нажатии слегка садится, а у некоторых значков есть свой жест —
+   шестерёнка проворачивается, «плюс» складывается, луна наклоняется.
+   Всё движение короткое (120–260 мс) и полностью отключается
+   системной настройкой «меньше движения» (см. блок ниже).
+   ============================================================ */
+.icon-btn svg,
+.btn svg,
+.chip svg,
+.menu__item svg,
+.row svg,
+.card__open svg,
+.card__check svg,
+.segment__item svg,
+.field__icon {
+    transform-origin: 50% 50%;
+    transition: transform var(--dur) var(--ease-out), color var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
+    backface-visibility: hidden;
+}
+
+/* ---- Переключатель темы и шестерёнка: как в 0.12.1 ----
+   Тема. Оба значка лежат друг на друге (position: absolute), виден один:
+   гаснущий уезжает в scale(0.5) rotate(-90deg) за 0.25 s, проявляющийся —
+   возвращается в scale(1) rotate(0) за то же время, прозрачность — 0.2 s.
+   Так это выглядело в панели 0.12.1 (.theme-icon / .theme-icon.active);
+   состояние берём из html[data-theme], который prepaint.js ставит до первой
+   отрисовки, поэтому знак не мигает при загрузке. */
+#themeBtn .theme-icon {
+    position: absolute;
+    width: 17px;
+    height: 17px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.25s ease;
+}
+#themeBtn .theme-icon { transform: scale(0.5) rotate(-90deg); }
+html[data-theme="light"] #themeBtn .theme-icon[data-icon="sun"],
+html[data-theme="dark"]  #themeBtn .theme-icon[data-icon="moon"] {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+}
+
+/* Шестерёнка. Пока открыт пульт настроек, она повёрнута на 90° и
+   возвращается назад тем же движением в 0.25 s — как #settingsBtn в
+   0.12.1, где это делал класс .open у меню. */
+#settingsBtn svg { transition: transform 0.25s ease; }
+body.settings-open #settingsBtn svg { transform: rotate(90deg); }
+
+/* Общий отклик: наведение и нажатие */
+.icon-btn:hover svg,
+.btn:hover svg,
+.chip:hover svg,
+.menu__item:hover svg,
+.card__open:hover svg,
+.field__clear:hover svg,
+.segment__opt:hover .segment__item svg {
+    transform: scale(1.09);
+}
+.icon-btn:active svg,
+.btn:active svg,
+.chip:active svg,
+.menu__item:active svg,
+.card__open:active svg,
+.field__clear:active svg {
+    transform: scale(0.92);
+}
+
+/* Наведение на строку пульта: её значок-подсказка оживает */
+.row:hover .row__thumb svg,
+.row:hover .row__aside svg,
+.picker__item:hover .picker__thumb svg {
+    transform: scale(1.12);
+}
+.field:focus-within .field__icon { transform: scale(1.08); color: var(--accent); }
+
+/* У каждого значка — свой жест, чтобы движение читалось как ответ,
+   а не как общая пульсация интерфейса. У шестерёнки и переключателя темы
+   жестов здесь нет: они ведут себя ровно как в 0.12.1 (см. ниже). */
+.icon-btn:hover svg[data-icon="plus"],
+.btn:hover svg[data-icon="plus"]          { transform: rotate(90deg) scale(1.04); }
+.icon-btn:hover svg[data-icon="x"]        { transform: rotate(90deg); }
+.icon-btn:hover svg[data-icon="refresh"],
+.icon-btn:hover svg[data-icon="rotate"]   { transform: rotate(180deg); }
+.icon-btn:hover svg[data-icon="trash"]    { transform: rotate(-9deg) scale(1.04); }
+.icon-btn:hover svg[data-icon="copy"],
+.btn:hover svg[data-icon="copy"]          { transform: translateY(-1.5px); }
+.icon-btn:hover svg[data-icon="external"] { transform: translate(1.5px, -1.5px); }
+.icon-btn:hover svg[data-icon="download"],
+.btn:hover svg[data-icon="download"]      { transform: translateY(1.5px); }
+.icon-btn:hover svg[data-icon="upload"],
+.btn:hover svg[data-icon="upload"]        { transform: translateY(-1.5px); }
+.icon-btn:hover svg[data-icon="search"]   { transform: scale(1.12) rotate(-8deg); }
+.icon-btn:hover svg[data-icon="pin"]      { transform: rotate(-14deg); }
+.icon-btn:hover svg[data-icon="check"]    { transform: scale(1.2); }
+.icon-btn:hover svg[data-icon="select"]   { transform: scale(1.1); }
+.icon-btn:hover svg[data-icon="sliders"]  { transform: translateX(1.5px); }
+.icon-btn:hover svg[data-icon="pencil"]   { transform: rotate(-8deg); }
+
+/* Ответ на действие (копирование): короткий подскок */
+@keyframes icon-pop {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.3); }
+    100% { transform: scale(1); }
+}
+svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
+
+/* Значок «смотреть» на видео дышит: кадр остаётся живым без наведения */
+@keyframes play-breathe {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.08); }
+}
+.card__play svg { animation: play-breathe 2.8s var(--ease) infinite; }
+
+/* Выбор карточки: отметка вырастает из центра */
+@keyframes check-in { from { transform: scale(0.3); opacity: 0; } }
+.card.is-selected .card__check svg { animation: check-in 240ms var(--ease-out); }
+
+/* Значки на кадре отзываются на наведение карточки */
+.card:hover .on-media svg { transform: scale(1.14); }
+.card:hover .card__open svg { transform: scale(1.1) translate(-0.5px, -0.5px); }
+
+/* Значок уведомления влетает вместе с тостом, а значок выбранного уровня
+   доступа — вместе с наведением на строку выбора */
+@keyframes toast-icon-in { from { transform: scale(0.4) rotate(-12deg); opacity: 0; } }
+.toast__icon svg { animation: toast-icon-in var(--dur-slow) var(--ease-out) both; }
+.choice:hover .choice__icon svg { transform: scale(1.12); }
+
+
+/* ============================================================
    СЕГМЕНТИРОВАННЫЙ ПЕРЕКЛЮЧАТЕЛЬ
    «Плитка / список», «Светлая / Тёмная / Системная».
    ============================================================ */
@@ -1441,8 +1571,6 @@ html[data-palette="ocean"][data-theme="dark"] {
 .vrow__sub { font-size: var(--t-2xs); color: var(--text-3); margin-top: 1px; }
 
 /* Полоса заполнения (бюджет версий) */
-.meter { height: 5px; border-radius: var(--r-full); background: var(--surface-3); overflow: hidden; }
-.meter__fill { height: 100%; border-radius: inherit; background: var(--accent); transition: width var(--dur-slow) var(--ease); }
 
 
 /* ============================================================
@@ -1696,8 +1824,6 @@ html[data-palette="ocean"][data-theme="dark"] {
     object-fit: cover;
     overflow: hidden;
 }
-.picker__thumb--icon { display: grid; place-items: center; color: var(--text-3); }
-.picker__thumb--icon svg { width: 16px; height: 16px; }
 .picker__body { flex: 1; min-width: 0; display: grid; gap: 2px; }
 .picker__name { font-size: var(--t-sm); font-weight: var(--fw-semibold); }
 .picker__meta { display: flex; align-items: center; gap: 6px; }
@@ -1961,7 +2087,6 @@ html[data-palette="ocean"][data-theme="dark"] {
 }
 .foot a { color: var(--text-3); display: inline-flex; align-items: center; gap: 6px; }
 .foot a:hover { color: var(--text); text-decoration: none; }
-.foot__spacer { flex: 1; min-width: 0; }
 .foot a svg { width: 14px; height: 14px; }
 
 /* В подвале макета намеренно написано, что это макет */

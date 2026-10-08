@@ -210,6 +210,14 @@ sees the bridge gateway and not the proxy's LAN address:
   `local` links become reachable for everyone;
 - every visitor shares one rate-limit and login-lockout bucket.
 
+A proxy that terminates TLS but forwards no `X-Forwarded-Proto` is the one
+exception: the browser's `https` origin then meets a plain-HTTP connection, and
+only a request the browser itself marks as same-origin (`Sec-Fetch-Site:
+same-origin`) whose host and port fit the other scheme is accepted — the
+classic case of a panel behind a small TLS terminator that adds no headers.
+Forwarding the header keeps the scheme check exact for every client, including
+older browsers that send no `Sec-Fetch-Site`.
+
 See the nginx and Caddy examples in [SECURITY.md](SECURITY.md#reverse-proxy-examples).
 
 ## Configuration

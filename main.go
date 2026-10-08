@@ -180,7 +180,7 @@ func newMux() *http.ServeMux {
 		middleware.WithSecurity(middleware.PublishOrAdmin(middleware.AllowPublishUpload,
 			middleware.RateLimit(func() (int, int) {
 				return config.Current.Rate.UploadPerMin, config.Current.Rate.Burst
-			})(handlers.Upload),
+			})(postOnly(handlers.Upload)),
 		)),
 	)
 	mux.HandleFunc("/api/external-images", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImages)))
@@ -190,7 +190,7 @@ func newMux() *http.ServeMux {
 			middleware.RateLimit(func() (int, int) {
 				// Regen is CPU-heavy — reuse the upload budget.
 				return config.Current.Rate.UploadPerMin, config.Current.Rate.Burst
-			})(handlers.RegeneratePreviews),
+			})(postOnly(handlers.RegeneratePreviews)),
 		)),
 	)
 	mux.HandleFunc("/", middleware.WithPublicSecurity(middleware.PublicRateLimit(handlers.Public)))
@@ -203,6 +203,20 @@ func newMux() *http.ServeMux {
 func redirectToStaticAsset(name string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/static/"+name, http.StatusFound)
+	}
+}
+
+// postOnly rejects every other method before the wrapped handler runs. It sits
+// inside the upload rate limiter so that a probe like GET /api/upload, which
+// only ever gets a 405, does not spend the upload budget of a real uploader.
+func postOnly(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", "POST")
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		next(w, r)
 	}
 }
 

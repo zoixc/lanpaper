@@ -115,18 +115,31 @@
                 names.add(name);
             }
 
+            /* Считаем не то, сколько ссылок в файле, а сколько появится:
+               импорт создаёт только отсутствующие, и обещать «200 ссылок»,
+               когда создастся три, — обман. */
+            const missing = await missingLinks(Array.from(names));
+            if (!missing.length) {
+                a.toast(t('import_nothing'), { type: 'info' });
+                return;
+            }
             const confirmed = await a.openConfirm({
                 title: t('import_confirm_title'),
-                text: t('import_confirm', { count: names.size })
+                text: t('import_confirm', { count: missing.length })
             });
             if (!confirmed) return;
 
             a.toast(t('sync_in_progress'), { type: 'info' });
-            const result = await syncImportedLinksWithServer(Array.from(names));
-            if (result.failed) throw new Error(result.failed + ' links could not be imported');
-
+            const result = await createMissingLinks(missing);
             await a.reloadLinks();
-            a.toast(t('import_success'), { type: 'success' });
+            /* В файле лежат ещё уровни доступа, категории и настройки, но
+               импорт их не применяет (см. README, «Backups and upgrades»),
+               поэтому и тост говорит только о созданных ссылках. */
+            if (result.failed) {
+                a.toast(t('import_partial', { count: result.failed }), { type: 'error' });
+            } else {
+                a.toast(t('import_success', { count: result.success }), { type: 'success' });
+            }
         } catch (error) {
             console.error('[Import] Error:', error);
             say('import_error', 'error');
@@ -134,15 +147,21 @@
     }
 
     /**
-     * Create the links from a backup that the server does not have yet.
+     * Names from the backup that the server does not have yet.
      */
-    async function syncImportedLinksWithServer(importedNames) {
+    async function missingLinks(importedNames) {
         const a = app();
         const response = await a.apiCall('/api/wallpapers');
         const list = Array.isArray(response) ? response : ((response && response.data) || []);
         const present = new Set(list.map((link) => link.linkName || link.id));
+        return importedNames.filter((name) => !present.has(name));
+    }
 
-        const missing = importedNames.filter((name) => !present.has(name));
+    /**
+     * Create the links the server is missing, one request each.
+     */
+    async function createMissingLinks(missing) {
+        const a = app();
         const results = [];
         for (const linkName of missing) {
             try {

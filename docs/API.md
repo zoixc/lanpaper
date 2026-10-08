@@ -112,7 +112,7 @@ The API returns links in this shape:
 | `preview` | Absent for videos and for links without media. |
 | `pinnedAt` | Present only for pinned links. |
 | `accessToken` | Present only when `accessLevel` is `token`. |
-| `category` | One of `tech`, `life`, `work`, `other`; defaults to `other`. |
+| `category` | One of `tech`, `life`, `work`, `other`; defaults to `other` and is never the media kind. The file's own type is in `mimeType`. |
 | `currentVersion` | Version number of the file `/{name}` serves. Absent for a link without media; a record written before versioning existed reads as `1`. |
 | `history` | Archived versions, newest first. Absent when nothing is archived. |
 | `items` | Playlist entries behind the same URL. The live file is not listed; it is position `0`. |
@@ -130,8 +130,8 @@ first), then links with media (newest first), then empty links.
 | Query parameter | Meaning |
 | --- | --- |
 | `category` | Filter by category (case-insensitive). |
-| `has_image` | `true` or `false`. |
-| `sort` | `created` or `updated`. Pinned links stay first. |
+| `has_image` | `true`/`1` or `false`/`0`. Any other value returns `400`. |
+| `sort` | `created` or `updated`; any other value returns `400`. Pinned links stay first. |
 | `order` | `desc` (default) or `asc`. |
 | `page`, `page_size` | Optional pagination. `page_size` defaults to 50, maximum 200. |
 
@@ -303,6 +303,11 @@ Media handling:
 
 - The type is detected from the file content, not from the file name or the
   `Content-Type` header.
+- Accepted containers are the stored extensions above plus the MP4 brands real
+  cameras write (`isom`, `iso2`, `avc1`, `M4V`…). ISO-BMFF *image* containers
+  are not decoded and are refused with `400 Invalid or unsupported media file`:
+  HEIF/AVIF (`avif`, `avis`, `heic`, `heix`, `heim`, `heis`, `hevc`, `hevx`,
+  `hevm`, `hevs`, `mif1`, `msf1`, `msix`, `mshf`).
 - Images are fully decoded before they are stored.
 - With `COMPRESSION_QUALITY=100` and `COMPRESSION_SCALE=100`, the original
   bytes are kept. Otherwise images are scaled and re-encoded.
@@ -320,11 +325,15 @@ Success: `200` with the updated link object.
 | `403` / `404` | Gallery path outside the gallery directory / file not found. |
 | `409` | The playlist already holds `PLAYLIST_MAX` items. |
 | `413` | Larger than `MAX_UPLOAD_MB`. |
-| `429` | Rate limit, concurrent-upload limit, or image memory budget exhausted (`Retry-After: 5`). |
+| `429` | Rate limit, concurrent-upload limit (`MAX_CONCURRENT_UPLOADS`, default 2 — the slots are busy, not the rate: retry when one finishes), or image memory budget exhausted. All of them carry `Retry-After`. |
 | `500` | Storage error. |
 
 Long uploads are allowed: after authentication, the read deadline is at least
-120 s plus the time needed to transfer the maximum size at 256 KiB/s.
+120 s plus the time needed to transfer the maximum size at 256 KiB/s. Media
+downloads extend their write deadline the same way — sized for the bytes the
+response has to send at 256 KiB/s, capped at 15 minutes — so a large file is not
+cut off on a slow connection (`/{name}`, `?v=`, `?i=`, `/api/preview/{name}` and
+the gallery file).
 
 ### `GET /api/preview/{name}`
 
@@ -365,8 +374,10 @@ for browser-side JPEG re-encoding.
 Rebuilds all image thumbnails and removes orphaned ones. The response is
 `{"total": n, "ok": n, "skipped": n, "errors": n, "failed": ["name", ...]}`.
 
-- Only one run at a time; a second request while one is running returns `429`.
-- Counts towards the upload rate limit.
+- Only one run at a time; a second request while one is running returns `429`
+  (no `Retry-After`: the run has no predictable end).
+- Counts towards the upload rate limit. Only `POST` spends it: a probe with
+  another method gets `405` before the limiter sees it.
 
 ## Public endpoints
 
