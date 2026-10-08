@@ -30,7 +30,7 @@ Notable changes to Lanpaper. Docker images are published as
   dark themes and a touch-sized mobile layout. `design/v2/screens.html` shows the
   same screen in live 1440 / 834 / 390 px frames, and
   `design/06-redesign-v2.md` holds the audit of 0.12.1, the contrast table and
-  the file-by-file migration plan. `design/v2/standalone.html` (800 KB,
+  the file-by-file migration plan. `design/v2/standalone.html` (799 KB,
   `tools/build-standalone.py`) is the same mock-up as one file with the styles,
   scripts, fonts and demo frames inlined, for viewers that show a single file.
   **Nothing in the application changed**: `admin.html`, `static/` and the Go code
@@ -105,6 +105,28 @@ Notable changes to Lanpaper. Docker images are published as
   `.sheet__head:has(+ .sheet__tabs)`. A sweep of every container built in
   `app.js` (looking for wrappers whose CSS sets no `display`) and of every
   attribute the script writes found no other case.
+- **The mock-up no longer needs `:has()`, and twelve dead rules are gone.**
+  It turned out the selected access level and its focus ring hung on
+  `:has(input:checked)` — while the application's own stylesheet does not use
+  `:has()` even once. Ported as it was, that would have smuggled a new browser
+  requirement into the panel, silently: an unsupported selector just shows
+  nothing. The state now lives in the `is-checked` class the script was already
+  writing (the list re-renders on every change, so the class tracks the radio),
+  and the focus ring moved to the sibling selector
+  `input:focus-visible + .choice__mark`, the same trick the mock-up's other
+  native fields use. The tab strip's `:has(+ .sheet__tabs)` went the same way —
+  the strip now covers the header's hairline with its own surface
+  (`margin-top: -1px`). A runtime class audit — the sweep opens every state and
+  collects the classes actually present, 192 of them — found twelve rules from
+  earlier iterations with no markup behind them: five `.badge--*` variants
+  (`badge--accent` is the one in use), `.btn--ghost`, the `.dropzone` block with
+  its captions, `.foot__hint`, `.is-active` and `.is-over`; all removed, along
+  with the dead half of `.icon-btn.is-active`. The audit is repeatable: it also
+  catches names built by concatenation, so it cannot mistake a live rule for a
+  dead one. Harness grown to match: layout rules jsdom cannot compute (40),
+  build checks (30), state checks (33), flow checks (25), all run over the page
+  and the single-file build. Measured after the changes: ~8 ms per 12-card
+  redraw, zero `Intl` constructions, no node growth over 30 open/close cycles.
 - **The mock-up survives a narrow screen and a wide list view.** On a phone the
   header keeps the application name (it used to vanish, leaving a row of icons
   with no clue what panel this is) and the link counter moves to the page title
