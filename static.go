@@ -19,6 +19,7 @@ var staticAssets = map[string]bool{
 	"js/app.js":                       true,
 	"js/compressor.js":                true,
 	"js/export-import.js":             true,
+	"js/prepaint.js":                  true,
 	"js/settings-menu.js":             true,
 	"sw.js":                           true,
 	"manifest.json":                   true,
