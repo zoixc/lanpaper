@@ -3,7 +3,15 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
-## [Unreleased]
+## [0.14.0] – 2026-10-08
+
+The admin panel is rebuilt on the `design/v2` stand: the same capabilities as
+0.12.1 in a quieter, denser interface, plus replacing media from a URL or from
+the files already on the server, version rollback without leaving the panel,
+five muted accents and six fully translated languages. The Go side carries the
+two changes that were already waiting in `main`: WebP encoding in pure Go (no
+CGO, no C toolchain in the image) and a rollback for links that `autoCreate`
+made before an upload failed.
 
 ### Changed
 
