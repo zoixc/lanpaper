@@ -10,8 +10,9 @@ Examples use `curl` and assume `ADMIN_PASS` is set in the shell.
   `ADMIN_PASS`; the `/admin` browser page accepts the session cookie only.
   `POST /api/session` takes `{"username":"…","password":"…"}` and returns
   `204` with the cookie. `DELETE /api/session` signs out the current browser;
-  authenticated `DELETE /api/sessions` signs out every browser session.
-  Sessions are kept in `data/sessions.json`, so they survive a restart. Wrong passwords return `401` and share the Basic Auth
+  authenticated `GET /api/sessions` lists non-secret lifecycle metadata and
+  `DELETE /api/sessions` signs out every browser session. Sessions are kept in
+  `data/sessions.json`, so they survive a restart. Wrong passwords return `401` and share the Basic Auth
   lockout (`429`).
   - **Publish keys.** `PUBLISH_KEYS` (environment only, comma-separated, 16+
     characters, at most 32) authorizes *publishing* without the admin login:
@@ -29,7 +30,9 @@ Examples use `curl` and assume `ADMIN_PASS` is set in the shell.
     `429` plus `Retry-After`, and even a correct key is refused until the
     window ends. When no keys are configured, an `X-Api-Key` header is ignored
     completely and cannot lock anybody out.
-  - Missing credentials: `401` with `WWW-Authenticate`.
+  - Missing API credentials: `401` with `WWW-Authenticate`. Public media at
+    `/{name}` never sends a Basic challenge; session cookies and preemptive
+    Basic credentials are accepted for `auth` links.
   - Credentials not configured on the server: `503` (fail closed).
   - Lockout: after 10 wrong username/password pairs from one client within
     15 minutes, requests with credentials get `429` plus `Retry-After` until
@@ -440,7 +443,7 @@ done in the response writer's `ReadFrom` path, so media still uses `sendfile`.
 | `public` | none | — |
 | `local` | Client IP is loopback, RFC 1918, link-local, CGNAT or IPv6 ULA | `403` |
 | `token` | `?token=…` or `X-Access-Token: …`; admin Basic Auth also works | `403` |
-| `auth` | Admin Basic Auth | `401` (`403` with `DISABLE_AUTH=true`) |
+| `auth` | Admin session or preemptive Basic Auth (no browser challenge) | `401` (`403` with `DISABLE_AUTH=true`) |
 
 - A link without media returns `404`.
 - Wrong admin credentials count towards the login lockout.
@@ -477,6 +480,7 @@ path at the reverse proxy.
 | `GET /admin` | Admin panel. Without a session it shows the sign-in form. |
 | `POST /api/session` | Validate credentials and create a browser session. |
 | `DELETE /api/session` | Durably revoke the session in the request cookie; idempotent. |
+| `GET /api/sessions` | List opaque ID, creation, expiry and current marker for active browser sessions; never tokens, digests, IPs or user agents. |
 | `DELETE /api/sessions` | Authenticated operation that durably revokes every browser session. |
 | `/admin.html` | Permanent redirect to `/admin`. |
 | `/` | Redirect to `/admin`. |

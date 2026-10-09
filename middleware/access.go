@@ -17,11 +17,14 @@ import (
 //	public — always allowed
 //	local  — client IP is loopback / RFC1918 / link-local / CGNAT / ULA
 //	token  — ?token= or X-Access-Token matches the stored secret
-//	auth   — requires valid admin Basic Auth
+//	auth   — requires a browser session or preemptive admin Basic Auth
 //
 // Admin credentials go through the same brute-force protection as the admin
-// API. On denial the status is written here and false is returned; the caller
-// must not write further.
+// API. Public media never sends a Basic challenge: browsers cache those
+// credentials for the whole origin and could otherwise keep authorizing API
+// requests after session logout. Script clients may still send Basic
+// credentials explicitly. On denial the status is written here and false is
+// returned; the caller must not write further.
 func AuthorizeLinkAccess(w http.ResponseWriter, r *http.Request, wp *storage.Wallpaper) bool {
 	switch storage.NormalizeAccessLevel(wp.AccessLevel) {
 	case config.AccessPublic:
@@ -68,7 +71,8 @@ func AuthorizeLinkAccess(w http.ResponseWriter, r *http.Request, wp *storage.Wal
 			writeTooManyRequests(w, retry, "Too many failed login attempts")
 			return false
 		}
-		w.Header().Set("WWW-Authenticate", AuthRealm)
+		// Do not challenge: a browser's Basic-auth cache is origin-wide and has
+		// no reliable logout API. Preemptive Authorization remains supported.
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return false
 	}

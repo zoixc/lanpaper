@@ -132,8 +132,8 @@ A new link has no media until the first upload.
 | --- | --- |
 | `public` (default) | Anyone who knows the URL |
 | `local` | Clients on loopback, private/LAN, link-local, CGNAT or IPv6 ULA networks |
-| `token` | Requests with a valid `?token=` or `X-Access-Token` header; admin Basic Auth also works |
-| `auth` | Admin Basic Auth only |
+| `token` | Requests with a valid `?token=` or `X-Access-Token`; an admin session or preemptive Basic Auth also works |
+| `auth` | Admin session or preemptive Basic Auth; the route never opens a browser password prompt |
 
 Tokens:
 

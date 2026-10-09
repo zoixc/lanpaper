@@ -44,13 +44,17 @@ Added authenticated `DELETE /api/sessions`, atomic rollback on persistence
 failure, “Sign out everywhere” UI with confirmation, CSRF-protected routing,
 restart/integration tests and no IP/User-Agent storage.
 
-### PR 3 — Session metadata and lifecycle hygiene
+### PR 3 — Session metadata and lifecycle hygiene **(implemented; full Go CI pending)**
 
-Add opaque session IDs, creation/expiry timestamps, bounded cleanup persistence, current-session indication and optional idle timeout groundwork. Include migration from the existing digest/expiry JSON schema.
+Added opaque session IDs, creation/expiry timestamps, authenticated lifecycle
+listing, current-session indication and automatic migration from the original
+digest/expiry schema without IP or user-agent collection.
 
-### PR 4 — Separate browser sessions from Basic Auth on protected media
+### PR 4 — Separate browser sessions from Basic Auth on protected media **(implemented; full Go CI pending)**
 
-Authorize browser `auth` media with session cookies without issuing a Basic challenge. Retain documented Basic support for machine clients through an explicit policy. Add browser tests proving cached Basic credentials cannot authorize admin API activity after session logout. Mark any compatibility impact prominently.
+Browser sessions now authorize `auth` media without a Basic challenge. Machine
+clients retain preemptive Basic Auth, while missing credentials return 401
+without populating the browser's origin-wide Basic credential cache.
 
 ### PR 5 — Hashed administrator credentials
 

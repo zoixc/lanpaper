@@ -92,8 +92,8 @@ deliberately narrow credential:
 | --- | --- |
 | `public` | Anyone. |
 | `local` | Decided by the client IP. |
-| `token` | A generated 256-bit secret, or admin credentials. |
-| `auth` | Admin Basic Auth. |
+| `token` | A generated 256-bit secret, an admin session, or preemptive Basic Auth. |
+| `auth` | Admin session or preemptive Basic Auth. No Basic challenge is sent on public media routes, so a browser does not cache origin-wide credentials that can defeat session logout. |
 
 Previews of private links are available only through the admin API. With
 built-in auth disabled, `auth`-level public URLs stay unavailable.

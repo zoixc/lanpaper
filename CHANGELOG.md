@@ -21,6 +21,18 @@ Notable changes to Lanpaper. Docker images are published as
 - **Sign out on all devices.** Settings → Account can atomically revoke every
   browser session. If persistence fails, all sessions remain valid and the
   operation can be retried; partial revocation is never reported as success.
+- **Session lifecycle information.** Settings shows the number of active
+  browser sessions and the current session expiry. Persisted sessions now have
+  opaque IDs and creation timestamps; existing files migrate automatically
+  without collecting IP addresses or user agents.
+
+### Changed
+
+- **Protected media no longer triggers a browser Basic-auth prompt.** `auth`
+  links accept the normal admin session cookie or a Basic `Authorization`
+  header sent preemptively by a script, but never issue `WWW-Authenticate`.
+  This prevents origin-wide cached browser credentials from continuing to
+  authorize API calls after session logout.
 
 ## [0.15.1] – 2026-10-09
 
