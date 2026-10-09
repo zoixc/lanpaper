@@ -360,8 +360,9 @@ Two properties worth knowing before sizing a host:
 - **Authentication uses sign-in sessions.** The browser signs in once through
   the form and keeps an HttpOnly cookie for 14 days. Sessions are stored as
   SHA-256 digests in `data/sessions.json` (mode 0600), so they survive a restart.
-  Settings → Account → Sign out ends a session at once. Scripts can still send
-  the admin password as HTTP Basic Auth on each request. Either way, TLS in front
+  Settings → Account → Sign out ends the current session at once; “Sign out on
+  all devices” durably revokes every browser session. Scripts can still send
+  the admin password as HTTP Basic Auth on each API request. Either way, TLS in front
   (or `TLS_CERT_FILE`/`TLS_KEY_FILE`) keeps the password private. Failed logins
   are counted per client and locked out for a while.
 - **Image work is bounded.** One image may hold 36 M pixels and at most 48 M

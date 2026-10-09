@@ -225,5 +225,9 @@
   "view_list": "Elenco",
   "settings_account": "Account",
   "sign_out": "Esci",
-  "sign_out_error": "Impossibile disconnettersi in modo sicuro. Controlla l’archiviazione del server e riprova."
+  "sign_out_error": "Impossibile disconnettersi in modo sicuro. Controlla l’archiviazione del server e riprova.",
+  "sign_out_all": "Esci da tutti i dispositivi",
+  "sign_out_all_confirm_title": "Uscire ovunque?",
+  "sign_out_all_confirm": "Tutte le sessioni del browser termineranno immediatamente. Dovrai accedere di nuovo su ogni dispositivo.",
+  "sign_out_all_error": "Impossibile terminare in modo sicuro tutte le sessioni. Controlla l’archiviazione del server e riprova."
 }

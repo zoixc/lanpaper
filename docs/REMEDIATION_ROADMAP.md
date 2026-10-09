@@ -38,9 +38,11 @@ Acceptance:
 - ordinary and idempotent logout still return 204;
 - desktop and mobile E2E remain green.
 
-### PR 2 — Revoke all sessions
+### PR 2 — Revoke all sessions **(implemented; full Go CI pending)**
 
-Add `DELETE /api/sessions`, generation-safe session-store operation, “Sign out everywhere” UI, CSRF coverage and restart tests. Do not store IP/User-Agent.
+Added authenticated `DELETE /api/sessions`, atomic rollback on persistence
+failure, “Sign out everywhere” UI with confirmation, CSRF-protected routing,
+restart/integration tests and no IP/User-Agent storage.
 
 ### PR 3 — Session metadata and lifecycle hygiene
 

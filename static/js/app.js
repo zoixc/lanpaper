@@ -543,6 +543,20 @@
         window.location.replace('/admin');
     }
 
+    async function signOutAll() {
+        const confirmed = await openConfirm({
+            title: t('sign_out_all_confirm_title'),
+            text: t('sign_out_all_confirm')
+        });
+        if (!confirmed) return;
+        try {
+            await apiCall('/api/sessions', 'DELETE');
+        } catch (_) {
+            return; /* сессии восстановлены сервером; операцию можно повторить */
+        }
+        window.location.replace('/admin');
+    }
+
     /* Тексты сервера короткие и английские; показываем понятное на языке
        панели, а неизвестное отдаём как есть — лучше точная цитата, чем
        выдуманный перевод. */
@@ -557,6 +571,7 @@
            до нажатия, а не после. */
         const full = /playlist is full \(max (\d+)/i.exec(text);
         if (full) state.config.playlistMax = Number(full[1]);
+        if (/could not sign out all sessions/i.test(text)) return t('sign_out_all_error');
         if (/could not sign out/i.test(text)) return t('sign_out_error');
         if (/link already exists/i.test(text)) return t('link_taken');
         if (/link does not exist|link not found/i.test(text)) return t('link_gone');
@@ -2399,6 +2414,8 @@
                     regenPreviews(btn, $('span', btn));
                 } else if (act === 'signout') {
                     signOut();
+                } else if (act === 'signoutall') {
+                    signOutAll();
                 }
             });
         });

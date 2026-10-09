@@ -225,5 +225,9 @@
   "view_list": "Liste",
   "settings_account": "Konto",
   "sign_out": "Abmelden",
-  "sign_out_error": "Die sichere Abmeldung ist fehlgeschlagen. Prüfe den Serverspeicher und versuche es erneut."
+  "sign_out_error": "Die sichere Abmeldung ist fehlgeschlagen. Prüfe den Serverspeicher und versuche es erneut.",
+  "sign_out_all": "Auf allen Geräten abmelden",
+  "sign_out_all_confirm_title": "Überall abmelden?",
+  "sign_out_all_confirm": "Alle Browsersitzungen werden sofort beendet. Auf jedem Gerät ist eine erneute Anmeldung erforderlich.",
+  "sign_out_all_error": "Nicht alle Sitzungen konnten sicher beendet werden. Prüfe den Serverspeicher und versuche es erneut."
 }

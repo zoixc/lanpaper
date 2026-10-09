@@ -174,6 +174,7 @@ func newMux() *http.ServeMux {
 	mux.HandleFunc("/health/ready", readyHandler)
 	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.AdminPage(serveAdminPage, serveLoginPage)))
 	mux.HandleFunc("/api/session", middleware.WithSecurity(middleware.HandleSession))
+	mux.HandleFunc("/api/sessions", middleware.WithSecurity(middleware.MaybeBasicAuth(middleware.HandleSessions)))
 	mux.HandleFunc("/api/wallpapers", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Wallpapers)))
 	mux.HandleFunc("/api/compression-config", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.GetCompressionConfig)))
 	mux.HandleFunc("/api/preview/", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.AdminPreview)))

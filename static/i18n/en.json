@@ -225,5 +225,9 @@
   "view_list": "List",
   "settings_account": "Account",
   "sign_out": "Sign out",
-  "sign_out_error": "Could not securely sign out. Check the server storage and try again."
+  "sign_out_error": "Could not securely sign out. Check the server storage and try again.",
+  "sign_out_all": "Sign out on all devices",
+  "sign_out_all_confirm_title": "Sign out everywhere?",
+  "sign_out_all_confirm": "Every browser session will end immediately. You will need to sign in again on every device.",
+  "sign_out_all_error": "Could not securely sign out all devices. Check the server storage and try again."
 }

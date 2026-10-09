@@ -16,6 +16,12 @@ Notable changes to Lanpaper. Docker images are published as
   user retry. It no longer reports success for a revocation that could be
   undone by a restart.
 
+### Added
+
+- **Sign out on all devices.** Settings → Account can atomically revoke every
+  browser session. If persistence fails, all sessions remain valid and the
+  operation can be retried; partial revocation is never reported as success.
+
 ## [0.15.1] – 2026-10-09
 
 Security hardening from an internal audit. Behaviour changes are listed under

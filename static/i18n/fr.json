@@ -225,5 +225,9 @@
   "view_list": "Liste",
   "settings_account": "Compte",
   "sign_out": "Se déconnecter",
-  "sign_out_error": "Impossible de fermer la session de manière sûre. Vérifiez le stockage du serveur et réessayez."
+  "sign_out_error": "Impossible de fermer la session de manière sûre. Vérifiez le stockage du serveur et réessayez.",
+  "sign_out_all": "Se déconnecter sur tous les appareils",
+  "sign_out_all_confirm_title": "Se déconnecter partout ?",
+  "sign_out_all_confirm": "Toutes les sessions de navigateur seront immédiatement fermées. Vous devrez vous reconnecter sur chaque appareil.",
+  "sign_out_all_error": "Impossible de fermer toutes les sessions de manière sûre. Vérifiez le stockage du serveur et réessayez."
 }

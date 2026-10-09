@@ -58,6 +58,22 @@ test('the session cookie is HttpOnly and SameSite=Lax', async ({ page, context }
   expect(session.path).toBe('/');
 });
 
+test('sign out on all devices asks for confirmation and ends the session', async ({ page, context }) => {
+  await signIn(page);
+  await expect(page.locator('#library')).toBeVisible();
+
+  await page.click('#settingsBtn');
+  await page.click('#signOutAllBtn');
+  await expect(page.locator('#confirmTitle')).toBeVisible();
+  await page.click('[data-confirm]');
+
+  await expect(page.locator('#loginForm')).toBeVisible();
+  const cookies = await context.cookies();
+  expect(cookies.find((c) => c.name === 'lanpaper_session')).toBeUndefined();
+  const res = await page.request.get('/api/wallpapers');
+  expect(res.status()).toBe(401);
+});
+
 test('sign out returns to the form and ends the session', async ({ page, context }) => {
   await signIn(page);
   await expect(page.locator('#library')).toBeVisible();

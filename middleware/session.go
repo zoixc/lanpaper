@@ -214,6 +214,24 @@ func revokeSession(r *http.Request) error {
 	return nil
 }
 
+// revokeAllSessions removes every browser session as one durable operation.
+// On persistence failure the complete previous map is restored, so no caller
+// receives a false success and another device cannot regain access on restart.
+func revokeAllSessions() error {
+	sessionStore.Lock()
+	defer sessionStore.Unlock()
+	if len(sessionStore.expiry) == 0 {
+		return nil
+	}
+	previous := sessionStore.expiry
+	sessionStore.expiry = make(map[[sha256.Size]byte]time.Time)
+	if err := persistSessions(time.Now()); err != nil {
+		sessionStore.expiry = previous
+		return err
+	}
+	return nil
+}
+
 // HasAdminSession reports whether the request is signed in with the login form.
 func HasAdminSession(r *http.Request) bool {
 	return sessionValid(r, time.Now())
@@ -278,6 +296,24 @@ func HandleSession(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// HandleSessions revokes every browser session. Authentication is applied by
+// the route wrapper; keeping this operation separate from DELETE /api/session
+// prevents an unauthenticated request without a cookie from revoking others.
+func HandleSessions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		w.Header().Set("Allow", "DELETE")
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := revokeAllSessions(); err != nil {
+		log.Printf("Session: could not save revoke-all operation: %v", err)
+		http.Error(w, "Could not sign out all sessions; try again", http.StatusInternalServerError)
+		return
+	}
+	http.SetCookie(w, sessionCookie(r, "", -1))
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func handleSessionLogin(w http.ResponseWriter, r *http.Request) {

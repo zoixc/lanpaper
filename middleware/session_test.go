@@ -188,6 +188,53 @@ func TestLogoutReportsPersistenceFailureAndCanBeRetried(t *testing.T) {
 	}
 }
 
+func TestRevokeAllSessionsIsDurable(t *testing.T) {
+	useSessionDir(t)
+	first, err := issueSession(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := issueSession(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := revokeAllSessions(); err != nil {
+		t.Fatal(err)
+	}
+	for _, token := range []string{first, second} {
+		if HasAdminSession(requestWithToken(token)) {
+			t.Fatal("revoke-all left a session active")
+		}
+	}
+	simulateRestart(t)
+	for _, token := range []string{first, second} {
+		if HasAdminSession(requestWithToken(token)) {
+			t.Fatal("revoke-all session returned after restart")
+		}
+	}
+}
+
+func TestRevokeAllSessionsRollsBackOnPersistenceFailure(t *testing.T) {
+	useSessionDir(t)
+	first, err := issueSession(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := issueSession(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	persistSessions = func(time.Time) error { return errors.New("disk unavailable") }
+	if err := revokeAllSessions(); err == nil {
+		t.Fatal("revoke-all succeeded despite persistence failure")
+	}
+	for _, token := range []string{first, second} {
+		if !HasAdminSession(requestWithToken(token)) {
+			t.Fatal("failed revoke-all did not restore every session")
+		}
+	}
+}
+
 func TestExpiredSessionsAreNotRestored(t *testing.T) {
 	useSessionDir(t)
 	stale, err := json.Marshal([]persistedSession{{

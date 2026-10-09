@@ -155,6 +155,66 @@ func TestSessionLoginLogoutFlow(t *testing.T) {
 	}
 }
 
+func TestRevokeAllSessionsFlow(t *testing.T) {
+	a := setupApp(t)
+	origin := map[string]string{"Origin": a.server.URL}
+	first := sessionCookieFrom(t, loginRequest(t, a, "admin", "strong-test-password", origin))
+	second := sessionCookieFrom(t, loginRequest(t, a, "admin", "strong-test-password", origin))
+	if first == nil || second == nil || first.Value == second.Value {
+		t.Fatal("two independent sessions were not issued")
+	}
+
+	// Unlike single-session logout, revoke-all must itself be authenticated.
+	req, _ := http.NewRequest(http.MethodDelete, a.server.URL+"/api/sessions", nil)
+	req.Header.Set("Origin", a.server.URL)
+	unauthorized, err := a.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unauthorized.Body.Close()
+	if unauthorized.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated revoke-all: status %d, want 401", unauthorized.StatusCode)
+	}
+
+	// Cross-site requests are rejected before they can revoke any session.
+	req, _ = http.NewRequest(http.MethodDelete, a.server.URL+"/api/sessions", nil)
+	req.Header.Set("Origin", "https://evil.example")
+	req.Header.Set("Sec-Fetch-Site", "cross-site")
+	req.AddCookie(first)
+	crossSite, err := a.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	crossSite.Body.Close()
+	if crossSite.StatusCode != http.StatusForbidden {
+		t.Fatalf("cross-site revoke-all: status %d, want 403", crossSite.StatusCode)
+	}
+	if status, _, _ := a.get("/api/wallpapers", second); status != http.StatusOK {
+		t.Fatalf("cross-site revoke-all changed sessions: status %d", status)
+	}
+
+	req, _ = http.NewRequest(http.MethodDelete, a.server.URL+"/api/sessions", nil)
+	req.Header.Set("Origin", a.server.URL)
+	req.AddCookie(first)
+	out, err := a.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out.Body.Close()
+	if out.StatusCode != http.StatusNoContent {
+		t.Fatalf("revoke-all: status %d", out.StatusCode)
+	}
+	cleared := sessionCookieFrom(t, out)
+	if cleared == nil || cleared.MaxAge >= 0 {
+		t.Fatal("revoke-all did not clear the current browser cookie")
+	}
+	for _, cookie := range []*http.Cookie{first, second} {
+		if status, _, _ := a.get("/api/wallpapers", cookie); status != http.StatusUnauthorized {
+			t.Fatalf("revoked session still accepted: status %d", status)
+		}
+	}
+}
+
 // A login posted from another site is refused like any other cross-site
 // state change.
 func TestSessionLoginRefusesCrossSite(t *testing.T) {

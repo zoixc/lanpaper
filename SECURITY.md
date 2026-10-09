@@ -28,8 +28,11 @@ cookie (`SameSite=Lax`, 14 days, `Secure` over HTTPS). HTTP Basic Auth protects
 `/api/*`, the private previews and admin-only links, and scripts use it.
 
 - Sessions are stored as SHA-256 digests in `data/sessions.json` (mode 0600)
-  and expire after 14 days. There is no password database: credentials come
-  from the environment (or `config.json`) and must be handled as secrets.
+  and expire after 14 days. The account settings can durably revoke the current
+  session or every browser session. If the updated file cannot be saved, the
+  operation fails without partially revoking sessions and can be retried.
+  There is no password database: credentials come from the environment (or
+  `config.json`) and must be handled as secrets.
 - If either credential is missing, admin routes return **503**. They never
   fall back to anonymous access.
 - `DISABLE_AUTH=true` is an explicit opt-out. Use it only if all three hold:
