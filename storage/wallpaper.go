@@ -17,6 +17,7 @@ import (
 	"sync"
 
 	"lanpaper/config"
+	"lanpaper/internal/atomicfile"
 	"lanpaper/utils"
 )
 
@@ -332,41 +333,7 @@ func atomicWrite(path string, data map[string]*Wallpaper) error {
 	if err != nil {
 		return fmt.Errorf("marshal: %w", err)
 	}
-	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, ".wallpapers-*.json")
-	if err != nil {
-		return fmt.Errorf("create temp: %w", err)
-	}
-	tmpName := tmp.Name()
-	if _, err := tmp.Write(body); err != nil {
-		tmp.Close()
-		os.Remove(tmpName)
-		return fmt.Errorf("write temp: %w", err)
-	}
-	if err := tmp.Sync(); err != nil {
-		tmp.Close()
-		os.Remove(tmpName)
-		return fmt.Errorf("sync temp: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		os.Remove(tmpName)
-		return fmt.Errorf("close temp: %w", err)
-	}
-	if err := os.Rename(tmpName, path); err != nil {
-		os.Remove(tmpName)
-		return fmt.Errorf("rename temp: %w", err)
-	}
-	syncDir(dir)
-	return nil
-}
-
-// syncDir makes a completed rename durable. Some filesystems (network or
-// FUSE mounts) do not support syncing directories, so this is best effort.
-func syncDir(dir string) {
-	if d, err := os.Open(dir); err == nil {
-		_ = d.Sync()
-		d.Close()
-	}
+	return atomicfile.Write(atomicfile.OSFS{}, path, ".wallpapers-*.json", body)
 }
 
 // MediaPath returns the canonical on-disk path for a link's media file.

@@ -75,9 +75,12 @@ compatibility alias, and tested that target opt-out cannot weaken proxy TLS.
 
 ## Phase 1 — recovery, testing and observability
 
-### PR 7 — Persistence fault-injection framework
+### PR 7 — Persistence fault-injection framework **(implemented; full CI pending)**
 
-Introduce test seams for write, sync, close, rename and directory sync. Cover disk-full, read-only, interrupted session writes and metadata commit failures without relying on filesystem permissions.
+Introduced a shared durable atomic-write primitive with deterministic seams for
+create, chmod, write, file sync/close, rename and directory open/sync/close.
+Session and wallpaper metadata persistence use it, with a fault-matrix test that
+does not rely on filesystem permissions.
 
 ### PR 8 — Upload transaction fault matrix
 

@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Durable persistence fault injection.** Session and wallpaper metadata now
+  share a tested atomic-write path covering write, sync, close, rename and
+  directory-sync failures without permission-dependent tests.
 - **Argon2id administrator credentials.** `ADMIN_PASSWORD_HASH` now takes
   precedence over the deprecated plaintext `ADMIN_PASS`/JSON `adminPass`.
   `lanpaper hash-password` reads a password from standard input and emits a PHC

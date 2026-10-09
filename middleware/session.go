@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"lanpaper/config"
+	"lanpaper/internal/atomicfile"
 )
 
 // Admin sessions. A browser that signs in through the login form gets a random
@@ -173,42 +174,15 @@ func persistLocked(now time.Time) error {
 			})
 		}
 	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Digest < entries[j].Digest })
 	body, err := json.Marshal(entries)
 	if err != nil {
 		return err
 	}
-	dir := filepath.Dir(sessionsPath)
-	if err := os.MkdirAll(dir, config.DataDirPerm); err != nil {
+	if err := os.MkdirAll(filepath.Dir(sessionsPath), config.DataDirPerm); err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(dir, ".sessions-*.json")
-	if err != nil {
-		return err
-	}
-	name := tmp.Name()
-	fail := func(err error) error {
-		tmp.Close()
-		os.Remove(name)
-		return err
-	}
-	if err := tmp.Chmod(0o600); err != nil {
-		return fail(err)
-	}
-	if _, err := tmp.Write(body); err != nil {
-		return fail(err)
-	}
-	if err := tmp.Sync(); err != nil {
-		return fail(err)
-	}
-	if err := tmp.Close(); err != nil {
-		os.Remove(name)
-		return err
-	}
-	if err := os.Rename(name, sessionsPath); err != nil {
-		os.Remove(name)
-		return err
-	}
-	return nil
+	return atomicfile.Write(atomicfile.OSFS{}, sessionsPath, ".sessions-*.json", body, 0o600)
 }
 
 // issueSession creates a session, saves it, and returns its token. If the save
