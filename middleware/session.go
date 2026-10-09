@@ -6,10 +6,14 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -19,14 +23,20 @@ import (
 // Admin sessions. A browser that signs in through the login form gets a random
 // token in an HttpOnly cookie instead of a Basic-auth header. Basic auth cannot
 // be used by installed PWAs: their standalone window has no password prompt.
-// Scripts keep using Basic auth. Only SHA-256 digests of the tokens are stored.
-// Sessions live in memory, so a restart signs everyone out.
+// Scripts keep using Basic auth.
+//
+// Only SHA-256 digests of the tokens are stored, in memory and in
+// data/sessions.json. The file holds digests and expiry times, so reading it
+// does not reveal a usable token. Sessions survive a restart.
 const (
 	sessionCookieName = "lanpaper_session"
 	sessionTTL        = 14 * 24 * time.Hour
 	maxSessions       = 1000
 	maxLoginBody      = 4 << 10
 )
+
+// sessionsPath is a variable so tests can point it at a temporary directory.
+var sessionsPath = filepath.Join("data", "sessions.json")
 
 var sessionStore = struct {
 	sync.Mutex
@@ -39,27 +49,119 @@ func tokenDigest(token string) [sha256.Size]byte {
 	return sha256.Sum256([]byte(token))
 }
 
-// issueSession creates a session and returns its token.
+// persistedSession is one entry of data/sessions.json.
+type persistedSession struct {
+	Digest  string `json:"digest"`  // hex SHA-256 of the token
+	Expires int64  `json:"expires"` // Unix seconds
+}
+
+// LoadSessions restores sessions saved by an earlier run. Expired and malformed
+// entries are dropped. A missing file means no sessions yet.
+func LoadSessions() error {
+	data, err := os.ReadFile(sessionsPath)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var entries []persistedSession
+	if err := json.Unmarshal(data, &entries); err != nil {
+		return fmt.Errorf("%s: %w", sessionsPath, err)
+	}
+	now := time.Now()
+	sessionStore.Lock()
+	defer sessionStore.Unlock()
+	for _, e := range entries {
+		raw, err := hex.DecodeString(e.Digest)
+		if err != nil || len(raw) != sha256.Size {
+			continue
+		}
+		exp := time.Unix(e.Expires, 0)
+		if !now.Before(exp) || len(sessionStore.expiry) >= maxSessions {
+			continue
+		}
+		var digest [sha256.Size]byte
+		copy(digest[:], raw)
+		sessionStore.expiry[digest] = exp
+	}
+	return nil
+}
+
+// persistLocked writes the live sessions to disk atomically. The caller holds
+// sessionStore.Lock.
+func persistLocked(now time.Time) error {
+	entries := make([]persistedSession, 0, len(sessionStore.expiry))
+	for digest, exp := range sessionStore.expiry {
+		if now.Before(exp) {
+			entries = append(entries, persistedSession{Digest: hex.EncodeToString(digest[:]), Expires: exp.Unix()})
+		}
+	}
+	body, err := json.Marshal(entries)
+	if err != nil {
+		return err
+	}
+	dir := filepath.Dir(sessionsPath)
+	if err := os.MkdirAll(dir, config.DataDirPerm); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(dir, ".sessions-*.json")
+	if err != nil {
+		return err
+	}
+	name := tmp.Name()
+	fail := func(err error) error {
+		tmp.Close()
+		os.Remove(name)
+		return err
+	}
+	if err := tmp.Chmod(0o600); err != nil {
+		return fail(err)
+	}
+	if _, err := tmp.Write(body); err != nil {
+		return fail(err)
+	}
+	if err := tmp.Sync(); err != nil {
+		return fail(err)
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(name)
+		return err
+	}
+	if err := os.Rename(name, sessionsPath); err != nil {
+		os.Remove(name)
+		return err
+	}
+	return nil
+}
+
+// issueSession creates a session, saves it, and returns its token. If the save
+// fails, the session is not created.
 func issueSession(now time.Time) (string, error) {
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
 		return "", err
 	}
 	token := base64.RawURLEncoding.EncodeToString(raw)
+	digest := tokenDigest(token)
 
 	sessionStore.Lock()
 	defer sessionStore.Unlock()
 	if len(sessionStore.expiry) >= maxSessions {
-		for digest, exp := range sessionStore.expiry {
+		for d, exp := range sessionStore.expiry {
 			if !now.Before(exp) {
-				delete(sessionStore.expiry, digest)
+				delete(sessionStore.expiry, d)
 			}
 		}
 		if len(sessionStore.expiry) >= maxSessions {
 			return "", errTooManySessions
 		}
 	}
-	sessionStore.expiry[tokenDigest(token)] = now.Add(sessionTTL)
+	sessionStore.expiry[digest] = now.Add(sessionTTL)
+	if err := persistLocked(now); err != nil {
+		delete(sessionStore.expiry, digest)
+		return "", err
+	}
 	return token, nil
 }
 
@@ -83,14 +185,20 @@ func sessionValid(r *http.Request, now time.Time) bool {
 	return true
 }
 
+// revokeSession forgets the request's session and saves the change. A failed
+// save is logged: the session is already gone from memory, and it is dropped
+// from the file at the next save or after it expires.
 func revokeSession(r *http.Request) {
 	c, err := r.Cookie(sessionCookieName)
 	if err != nil {
 		return
 	}
 	sessionStore.Lock()
+	defer sessionStore.Unlock()
 	delete(sessionStore.expiry, tokenDigest(c.Value))
-	sessionStore.Unlock()
+	if err := persistLocked(time.Now()); err != nil {
+		log.Printf("Session: could not save sessions after sign-out: %v", err)
+	}
 }
 
 // HasAdminSession reports whether the request is signed in with the login form.

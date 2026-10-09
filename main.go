@@ -65,6 +65,11 @@ func main() {
 	}
 	// Move any leftover files from static/images into data/media.
 	storage.MigrateMediaToDataDir()
+	// Admin sessions survive a restart. A damaged sessions file only costs a
+	// new sign-in, so it is reported rather than stopping the service.
+	if err := middleware.LoadSessions(); err != nil {
+		log.Printf("Warning: admin sessions not restored, everyone must sign in again: %v", err)
+	}
 
 	go middleware.StartCleaner()
 

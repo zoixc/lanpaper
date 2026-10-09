@@ -222,5 +222,7 @@
   "versions_open": "Öffnen",
   "versions_restore": "Wiederherstellen",
   "view_grid": "Kacheln",
-  "view_list": "Liste"
+  "view_list": "Liste",
+  "settings_account": "Konto",
+  "sign_out": "Abmelden"
 }

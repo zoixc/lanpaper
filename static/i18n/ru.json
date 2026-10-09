@@ -222,5 +222,7 @@
   "versions_open": "Открыть",
   "versions_restore": "Восстановить",
   "view_grid": "Плитка",
-  "view_list": "Список"
+  "view_list": "Список",
+  "settings_account": "Аккаунт",
+  "sign_out": "Выйти"
 }

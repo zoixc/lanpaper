@@ -3,12 +3,43 @@
 package middleware
 
 import (
+	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
 )
+
+// useSessionDir runs the test in a fresh directory with an empty session store,
+// so sessions written by one test are never seen by another.
+func useSessionDir(t *testing.T) {
+	t.Helper()
+	t.Chdir(t.TempDir())
+	if err := os.MkdirAll("data", 0o700); err != nil {
+		t.Fatal(err)
+	}
+	resetSessionStore()
+	t.Cleanup(resetSessionStore)
+}
+
+func resetSessionStore() {
+	sessionStore.Lock()
+	sessionStore.expiry = make(map[[32]byte]time.Time)
+	sessionStore.Unlock()
+}
+
+// simulateRestart forgets the in-memory sessions and loads them from disk, as a
+// new process would.
+func simulateRestart(t *testing.T) {
+	t.Helper()
+	resetSessionStore()
+	if err := LoadSessions(); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func loginAttempt(password, remote string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/api/session",
@@ -20,11 +51,18 @@ func loginAttempt(password, remote string) *httptest.ResponseRecorder {
 	return rec
 }
 
+func requestWithToken(token string) *http.Request {
+	req := httptest.NewRequest(http.MethodGet, "/api/wallpapers", nil)
+	req.AddCookie(sessionCookie(req, token, 0))
+	return req
+}
+
 // The login form shares the Basic-auth lockout: wrong passwords from one client
 // lock that client out, and then even the correct password is refused.
 func TestLoginFormSharesLockout(t *testing.T) {
 	resetLimiter(t)
 	withAdminCredentials(t)
+	useSessionDir(t)
 	const remote = "198.51.100.23:4000"
 	for i := 0; i < authMaxFailures; i++ {
 		if rec := loginAttempt("wrong", remote); rec.Code != http.StatusUnauthorized {
@@ -42,14 +80,13 @@ func TestLoginFormSharesLockout(t *testing.T) {
 
 // An expired session is refused even though its cookie is still sent.
 func TestExpiredSessionIsRefused(t *testing.T) {
-	withAdminCredentials(t)
+	useSessionDir(t)
 	now := time.Now()
 	token, err := issueSession(now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	req := httptest.NewRequest(http.MethodGet, "/api/wallpapers", nil)
-	req.AddCookie(sessionCookie(req, token, 0))
+	req := requestWithToken(token)
 	if !sessionValid(req, now) {
 		t.Fatal("fresh session refused")
 	}
@@ -58,15 +95,99 @@ func TestExpiredSessionIsRefused(t *testing.T) {
 	}
 }
 
-// Session tokens are stored only as digests.
-func TestSessionStoresDigestsOnly(t *testing.T) {
+// The file and the store hold digests, never the token itself.
+func TestSessionFileHoldsDigestsOnly(t *testing.T) {
+	useSessionDir(t)
 	token, err := issueSession(time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
-	sessionStore.Lock()
-	defer sessionStore.Unlock()
-	if _, ok := sessionStore.expiry[tokenDigest(token)]; !ok {
-		t.Fatal("session not stored under its digest")
+	body, err := os.ReadFile(sessionsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), token) {
+		t.Fatal("raw token written to sessions.json")
+	}
+	want := hex.EncodeToString(func() []byte { d := tokenDigest(token); return d[:] }())
+	if !strings.Contains(string(body), want) {
+		t.Fatal("digest missing from sessions.json")
+	}
+	info, err := os.Stat(sessionsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("sessions.json mode %v, want 0600", info.Mode().Perm())
+	}
+}
+
+func TestSessionsSurviveRestart(t *testing.T) {
+	useSessionDir(t)
+	token, err := issueSession(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	simulateRestart(t)
+	if !HasAdminSession(requestWithToken(token)) {
+		t.Fatal("session lost across a restart")
+	}
+}
+
+func TestRevokedSessionStaysRevokedAfterRestart(t *testing.T) {
+	useSessionDir(t)
+	token, err := issueSession(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := requestWithToken(token)
+	revokeSession(req)
+	simulateRestart(t)
+	if HasAdminSession(req) {
+		t.Fatal("signed-out session came back after a restart")
+	}
+}
+
+func TestExpiredSessionsAreNotRestored(t *testing.T) {
+	useSessionDir(t)
+	stale, err := json.Marshal([]persistedSession{{
+		Digest:  hex.EncodeToString(func() []byte { d := tokenDigest("old"); return d[:] }()),
+		Expires: time.Now().Add(-time.Hour).Unix(),
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(sessionsPath, stale, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	simulateRestart(t)
+	if n := len(sessionStore.expiry); n != 0 {
+		t.Fatalf("%d expired session(s) restored", n)
+	}
+}
+
+func TestMalformedSessionsFileIsReported(t *testing.T) {
+	useSessionDir(t)
+	if err := os.WriteFile(sessionsPath, []byte("{not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := LoadSessions(); err == nil {
+		t.Fatal("damaged sessions file was accepted silently")
+	}
+}
+
+// A session that cannot be saved is not issued, so the user never gets a
+// cookie that would disappear on the next restart.
+func TestLoginFailsWhenSessionCannotBeSaved(t *testing.T) {
+	useSessionDir(t)
+	if err := os.Chmod("data", 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod("data", 0o700) })
+	if _, err := issueSession(time.Now()); err == nil {
+		t.Fatal("session issued although it could not be saved")
+	}
+	if n := len(sessionStore.expiry); n != 0 {
+		t.Fatalf("%d unsaved session(s) kept in memory", n)
 	}
 }

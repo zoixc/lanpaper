@@ -222,5 +222,7 @@
   "versions_open": "Open",
   "versions_restore": "Restore",
   "view_grid": "Grid",
-  "view_list": "List"
+  "view_list": "List",
+  "settings_account": "Account",
+  "sign_out": "Sign out"
 }

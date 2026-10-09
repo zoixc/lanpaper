@@ -74,6 +74,7 @@
         playlist: '<line x1="3.5" y1="7" x2="15" y2="7"/><line x1="3.5" y1="12" x2="15" y2="12"/><line x1="3.5" y1="17" x2="11" y2="17"/><polygon points="17 13.5 22 16.5 17 19.5"/>',
         folder: '<path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h3.3a2 2 0 0 1 1.6.8l1 1.4h7.1A2.5 2.5 0 0 1 21 9.7V17a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17z"/>',
         globe: '<circle cx="12" cy="12" r="9"/><path d="M3.2 12h17.6"/><path d="M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/>',
+        logout: '<path d="M15 4.5h2.5a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H15"/><polyline points="10 8 6 12 10 16"/><line x1="6" y1="12" x2="15" y2="12"/>',
         lock: '<rect x="4.5" y="10.5" width="15" height="10" rx="2.6"/><path d="M8 10.5V7.6a4 4 0 0 1 8 0v2.9"/>',
         key: '<circle cx="8" cy="15.5" r="3.6"/><path d="M10.7 12.8L20 3.5"/><path d="M17 4.5l2.5 2.5"/><path d="M14.5 7l2.5 2.5"/>',
         /* «Как в системе» в переключателе тем — монитор (Feather). */
@@ -528,6 +529,16 @@
         if (res.status === 204) return null;
         const type = res.headers.get('content-type') || '';
         return type.indexOf('application/json') >= 0 ? res.json() : null;
+    }
+
+    /* Выход: сервер отзывает сессию и снимает cookie. Дальше /admin показывает
+       форму входа. Если запрос не прошёл, всё равно уходим: cookie при этом
+       может остаться, но сессия истечёт сама. */
+    async function signOut() {
+        try {
+            await apiCall('/api/session', 'DELETE');
+        } catch (_) { /* ошибка уже показана */ }
+        window.location.replace('/admin');
     }
 
     /* Тексты сервера короткие и английские; показываем понятное на языке
@@ -2383,6 +2394,8 @@
                     promptInstall();
                 } else if (act === 'regen') {
                     regenPreviews(btn, $('span', btn));
+                } else if (act === 'signout') {
+                    signOut();
                 }
             });
         });
