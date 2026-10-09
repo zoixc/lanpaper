@@ -90,6 +90,10 @@ cover first/second publish failure, metadata-commit failure, reverse-order
 rollback, successful finalization and rejected out-of-order transitions; staged
 request files remain cleanup-owned until publication.
 
+**Retrospective 5–8 completed:** [`RETROSPECTIVE_PR5_PR8.md`](RETROSPECTIVE_PR5_PR8.md).
+It found and corrected post-rename durability errors that could otherwise leave
+memory behind the already-renamed on-disk state.
+
 ### PR 9 — Read-only storage audit command
 
 Add `lanpaper audit` reporting missing files, orphan files, stale temporary files, invalid types/permissions, history drift and playlist drift. Produce human-readable and JSON output; never mutate.

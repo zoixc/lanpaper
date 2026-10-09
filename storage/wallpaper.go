@@ -333,7 +333,12 @@ func atomicWrite(path string, data map[string]*Wallpaper) error {
 	if err != nil {
 		return fmt.Errorf("marshal: %w", err)
 	}
-	return atomicfile.Write(atomicfile.OSFS{}, path, ".wallpapers-*.json", body)
+	err = atomicfile.Write(atomicfile.OSFS{}, path, ".wallpapers-*.json", body)
+	if atomicfile.IsCommitted(err) {
+		log.Printf("Warning: wallpaper metadata was renamed but directory durability could not be confirmed: %v", err)
+		return nil
+	}
+	return err
 }
 
 // MediaPath returns the canonical on-disk path for a link's media file.

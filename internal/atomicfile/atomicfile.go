@@ -5,6 +5,7 @@
 package atomicfile
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -29,6 +30,20 @@ type FS interface {
 	Rename(oldPath, newPath string) error
 	Remove(path string) error
 	OpenDir(path string) (Dir, error)
+}
+
+// CommittedError means rename succeeded, so callers must publish matching
+// in-memory state even though the final durability confirmation failed.
+type CommittedError struct{ Err error }
+
+func (e *CommittedError) Error() string {
+	return "state renamed but durability confirmation failed: " + e.Err.Error()
+}
+func (e *CommittedError) Unwrap() error { return e.Err }
+
+func IsCommitted(err error) bool {
+	var committed *CommittedError
+	return errors.As(err, &committed)
 }
 
 type OSFS struct{}
@@ -71,14 +86,14 @@ func Write(fs FS, path, pattern string, body []byte, mode ...fs.FileMode) error 
 	}
 	d, err := fs.OpenDir(dir)
 	if err != nil {
-		return fmt.Errorf("open directory after rename: %w", err)
+		return &CommittedError{Err: fmt.Errorf("open directory after rename: %w", err)}
 	}
 	if err := d.Sync(); err != nil {
 		_ = d.Close()
-		return fmt.Errorf("sync directory after rename: %w", err)
+		return &CommittedError{Err: fmt.Errorf("sync directory after rename: %w", err)}
 	}
 	if err := d.Close(); err != nil {
-		return fmt.Errorf("close directory after rename: %w", err)
+		return &CommittedError{Err: fmt.Errorf("close directory after rename: %w", err)}
 	}
 	return nil
 }

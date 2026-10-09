@@ -66,6 +66,10 @@ func TestWriteFaultMatrix(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), at) {
 				t.Fatalf("error=%v, want injected %s", err, at)
 			}
+			postCommit := at == "open-dir" || at == "sync-dir" || at == "close-dir"
+			if IsCommitted(err) != postCommit {
+				t.Fatalf("IsCommitted(%v)=%v, want %v", err, IsCommitted(err), postCommit)
+			}
 			if (at == "create" || at == "chmod" || at == "write" || at == "sync" || at == "close" || at == "rename") && fake.renamed {
 				t.Fatal("published after pre-rename failure")
 			}

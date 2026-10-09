@@ -182,7 +182,12 @@ func persistLocked(now time.Time) error {
 	if err := os.MkdirAll(filepath.Dir(sessionsPath), config.DataDirPerm); err != nil {
 		return err
 	}
-	return atomicfile.Write(atomicfile.OSFS{}, sessionsPath, ".sessions-*.json", body, 0o600)
+	err = atomicfile.Write(atomicfile.OSFS{}, sessionsPath, ".sessions-*.json", body, 0o600)
+	if atomicfile.IsCommitted(err) {
+		log.Printf("Warning: sessions were renamed but directory durability could not be confirmed: %v", err)
+		return nil
+	}
+	return err
 }
 
 // issueSession creates a session, saves it, and returns its token. If the save
