@@ -25,6 +25,15 @@ Security hardening from an internal audit. Behaviour changes are listed under
 - **Runtime image requires zlib 1.3.2-r1** (CVE-2026-85091). The Alpine base
   ships 1.3.2-r0.
 
+### Added
+
+- **Sign-in form for the admin panel.** Installed PWAs have no Basic Auth
+  password prompt, so on iOS they showed "Unauthorized" with no way to sign in,
+  and deletes failed silently. `/admin` now shows a sign-in form that sets an
+  HttpOnly session cookie (`SameSite=Lax`, 14 days). Sessions live in memory, so
+  a restart signs everyone out. Basic Auth keeps working for scripts. An expired
+  session reloads into the sign-in form.
+
 ### Changed
 
 - `GET /health` no longer returns the `version` field.

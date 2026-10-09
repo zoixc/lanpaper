@@ -15,8 +15,11 @@ const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 const exists = (url) => fs.existsSync(path.join(ROOT, url.replace(/^\//, '')));
 
 const adminHtml = read('admin.html');
+// login.js belongs to login.html, not to the admin panel, so the panel-facing
+// checks skip it. It has its own checks below.
+const PANEL_SCRIPTS = (name) => name.endsWith('.js') && name !== 'login.js';
 const scripts = fs.readdirSync(path.join(ROOT, 'static/js'))
-  .filter((name) => name.endsWith('.js'))
+  .filter(PANEL_SCRIPTS)
   .sort()
   .map((name) => read(`static/js/${name}`));
 const scriptSource = scripts.join('\n');
@@ -87,7 +90,7 @@ test('every helper is declared exactly once per script', () => {
   // one into dead code. That is how a createLinksFromFiles() which uploaded
   // nothing took over from the real one: the drop handler and the file picker
   // called it and the panel drew a tile with no file behind it.
-  const files = fs.readdirSync(path.join(ROOT, 'static/js')).filter((name) => name.endsWith('.js'));
+  const files = fs.readdirSync(path.join(ROOT, 'static/js')).filter(PANEL_SCRIPTS);
   const duplicated = [];
   let declarations = 0;
   for (const name of files) {

@@ -22,6 +22,7 @@ import (
 var staticAssets = map[string]bool{
 	"css/style.css":                   true,
 	"js/app.js":                       true,
+	"js/login.js":                     true,
 	"js/compressor.js":                true,
 	"js/export-import.js":             true,
 	"js/prepaint.js":                  true,
@@ -90,11 +91,21 @@ func versionStaticRefs(page []byte) []byte {
 	})
 }
 
-// serveAdminPage serves admin.html with its static references versioned. The
-// page itself is never cached.
+// serveAdminPage serves admin.html for a signed-in user.
 func serveAdminPage(w http.ResponseWriter, r *http.Request) {
+	serveHTMLPage(w, r, "admin.html")
+}
+
+// serveLoginPage serves the sign-in form shown to everyone who is not signed in.
+func serveLoginPage(w http.ResponseWriter, r *http.Request) {
+	serveHTMLPage(w, r, "login.html")
+}
+
+// serveHTMLPage serves one of the application's HTML pages with its static
+// references versioned. The page itself is never cached.
+func serveHTMLPage(w http.ResponseWriter, r *http.Request, file string) {
 	w.Header().Set("Cache-Control", "no-store")
-	f, err := os.Open("admin.html")
+	f, err := os.Open(file)
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -110,7 +121,7 @@ func serveAdminPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Admin page unavailable", http.StatusInternalServerError)
 		return
 	}
-	http.ServeContent(w, r, "admin.html", fi.ModTime(), bytes.NewReader(versionStaticRefs(page)))
+	http.ServeContent(w, r, file, fi.ModTime(), bytes.NewReader(versionStaticRefs(page)))
 }
 
 // openStaticAsset opens a file below static/ through os.Root, so the path

@@ -255,7 +255,7 @@ func effectivePort(u *url.URL) string {
 // served directly or forwarded by the trusted reverse proxy. Plain-HTTP LAN
 // deployments are unaffected.
 func setHSTS(h http.Header, r *http.Request) {
-	if r.TLS != nil || (config.IsTrustedProxy(r.RemoteAddr) && rightmostHeader(r.Header.Get("X-Forwarded-Proto")) == "https") {
+	if IsHTTPS(r) {
 		h.Set("Strict-Transport-Security", "max-age=31536000")
 	}
 }

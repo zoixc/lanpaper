@@ -44,7 +44,7 @@ RUN apk add --no-cache ca-certificates "zlib>=1.3.2-r1" \
 WORKDIR /app
 
 COPY --from=builder /out/lanpaper .
-COPY admin.html .
+COPY admin.html login.html ./
 COPY static ./static
 # The licence and the third-party notices ship inside the image: a redistributor
 # (or an auditor scanning a running container) must be able to read them without

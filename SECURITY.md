@@ -23,7 +23,9 @@ profile.
 
 ### Admin
 
-HTTP Basic Auth protects `/admin`, `/api/*` and the private previews.
+The admin panel is protected by a sign-in form that sets an HttpOnly session
+cookie (`SameSite=Lax`, 14 days, `Secure` over HTTPS). HTTP Basic Auth protects
+`/api/*`, the private previews and admin-only links, and scripts use it.
 
 - There are no sessions and no password database. Credentials come from the
   environment (or `config.json`) and must be handled as secrets.
@@ -155,8 +157,8 @@ reverse-proxy access logs.
 
 ## Operator responsibilities and limits
 
-1. **Serve over HTTPS.** Basic Auth sends the password with every request, so
-   plain HTTP exposes it on the network. Terminate TLS at a reverse proxy
+1. **Serve over HTTPS.** The sign-in form and Basic Auth both send the password,
+   so plain HTTP exposes it on the network. Terminate TLS at a reverse proxy
    (recommended, and the only setup that also gives you an HTTP→HTTPS
    redirect), or set `TLS_CERT_FILE` + `TLS_KEY_FILE` to let Lanpaper serve
    HTTPS itself. Lanpaper never redirects HTTP to HTTPS on its own and provides

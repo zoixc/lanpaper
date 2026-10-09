@@ -5,8 +5,12 @@ Examples use `curl` and assume `ADMIN_PASS` is set in the shell.
 
 ## Conventions
 
-- **Authentication.** Admin endpoints (`/admin`, `/api/*`) use HTTP Basic Auth
-  with `ADMIN_USER` / `ADMIN_PASS`.
+- **Authentication.** Admin endpoints (`/admin`, `/api/*`) accept either the
+  session cookie from `POST /api/session` or HTTP Basic Auth, with
+  `ADMIN_USER` / `ADMIN_PASS`. `POST /api/session` takes
+  `{"username":"…","password":"…"}` and returns `204` with the cookie;
+  `DELETE /api/session` signs out. Wrong passwords return `401` and share the
+  Basic Auth lockout (`429`).
   - **Publish keys.** `PUBLISH_KEYS` (environment only, comma-separated, 16+
     characters, at most 32) authorizes *publishing* without the admin login:
     `POST /api/upload` and `POST /api/link`. Send the key as
@@ -468,7 +472,7 @@ path at the reverse proxy.
 
 | Route | Behaviour |
 | --- | --- |
-| `GET /admin` | Admin panel (Basic Auth). |
+| `GET /admin` | Admin panel. Without a session it shows the sign-in form. |
 | `/admin.html` | Permanent redirect to `/admin`. |
 | `/` | Redirect to `/admin`. |
 | `GET /sw.js` | Service worker (root scope). |

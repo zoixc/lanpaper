@@ -513,6 +513,11 @@
             toast(t('network_error'), { type: 'error' });
             throw e;
         }
+        if (res.status === 401) {
+            /* Session expired or signed out elsewhere: the login form takes over. */
+            window.location.reload();
+            throw new Error('signed out');
+        }
         if (!res.ok) {
             const text = (await res.text().catch(() => '')).trim();
             const err = new Error(text || ('HTTP ' + res.status));

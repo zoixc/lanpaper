@@ -47,7 +47,7 @@ link, which is handy for digital frames, smart TVs, kiosks and other displays.
   responses, media revalidated with `304` instead of downloaded again, and
   about 60 KB of self-hosted WOFF2 fonts. Archived versions are moved, not
   copied, and per-link access counters live in memory only.
-- **Security:** Basic Auth with a brute-force lockout, CSRF protection,
+- **Security:** a sign-in form with an HttpOnly session cookie (Basic Auth for scripts), a brute-force lockout, CSRF protection,
   strict security headers, SSRF-safe downloads and rate limits. Publish keys
   are stored as SHA-256 digests, share the login lockout budget and are never
   written to `config.json`. A panicking handler is answered with a clean `500`
@@ -306,8 +306,8 @@ already set in the environment take precedence over it.
 
 ## API
 
-Admin endpoints use Basic Auth, or a `PUBLISH_KEYS` API key for the two
-publishing routes (`POST /api/upload`, `POST /api/link`). The full reference,
+Admin endpoints accept the sign-in session cookie or HTTP Basic Auth. A
+`PUBLISH_KEYS` API key also works for the two publishing routes (`POST /api/upload`, `POST /api/link`). The full reference,
 with request and response formats, is in [docs/API.md](docs/API.md).
 
 | Method | Path | Purpose |
@@ -355,10 +355,11 @@ read every `Warning:` the process prints at startup.
 
 Two properties worth knowing before sizing a host:
 
-- **Authentication is stateless.** There are no sessions or cookies: the admin
-  password is sent with every request as HTTP Basic Auth, so TLS in front (or
-  `TLS_CERT_FILE`/`TLS_KEY_FILE`) is what keeps it private. Failed logins are
-  counted per client and locked out for a while.
+- **Authentication uses sessions in memory.** The browser signs in once through
+  the form and keeps an HttpOnly cookie for 14 days. Scripts can still send the
+  admin password as HTTP Basic Auth on each request. Either way, TLS in front (or
+  `TLS_CERT_FILE`/`TLS_KEY_FILE`) keeps the password private. Failed logins are
+  counted per client and locked out for a while. A restart signs everyone out.
 - **Image work is bounded.** One image may hold 36 M pixels and at most 48 M
   decoded pixels may be in flight, so a burst of uploads queues instead of
   growing the process without limit. A 36 M pixel upload peaks at about 174 MB
