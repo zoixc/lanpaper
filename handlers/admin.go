@@ -81,7 +81,9 @@ func Wallpapers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wallpapers := storage.Global.GetAll()
+	// Read-only listing: the records are not copied, only the slice of pointers
+	// (filters and sorting below reorder that slice, never the records).
+	wallpapers := storage.Global.Snapshot()
 	q := r.URL.Query()
 
 	if cat := q.Get("category"); cat != "" {
@@ -222,8 +224,11 @@ func inferCategory(wp *storage.Wallpaper) string {
 	return "other"
 }
 
+// toResponse builds the admin view of a record. It only reads wp: records are
+// shared with concurrent readers (see storage.Store.Snapshot), so it must not
+// write to them.
 func toResponse(wp *storage.Wallpaper) WallpaperResponse {
-	wp.AccessLevel = storage.NormalizeAccessLevel(wp.AccessLevel)
+	accessLevel := storage.NormalizeAccessLevel(wp.AccessLevel)
 	resp := WallpaperResponse{
 		ID:          wp.ID,
 		LinkName:    wp.LinkName,
@@ -237,10 +242,10 @@ func toResponse(wp *storage.Wallpaper) WallpaperResponse {
 		CreatedAt:   wp.CreatedAt,
 		Pinned:      wp.IsPinned,
 		PinnedAt:    wp.PinnedAt,
-		AccessLevel: wp.AccessLevel,
+		AccessLevel: accessLevel,
 	}
 	// Only expose the token to the authenticated admin for token-level links.
-	if wp.AccessLevel == config.AccessToken && wp.AccessToken != "" {
+	if accessLevel == config.AccessToken && wp.AccessToken != "" {
 		resp.AccessToken = wp.AccessToken
 	}
 	// Version, playlist and statistics are additive: a link that uses none of

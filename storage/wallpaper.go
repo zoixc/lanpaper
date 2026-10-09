@@ -250,6 +250,34 @@ func (s *Store) GetAll() []*Wallpaper {
 	return cloneSnap(s.sortedSnap)
 }
 
+// Snapshot returns the records in storage order without copying the records.
+// Every write publishes a new copy instead of changing a record in place, so a
+// record a caller holds never changes underneath it. The caller may reorder or
+// filter the returned slice, but must treat the records as read-only.
+func (s *Store) Snapshot() []*Wallpaper {
+	s.RLock()
+	if s.sortedSnap != nil {
+		snap := slices.Clone(s.sortedSnap)
+		s.RUnlock()
+		return snap
+	}
+	s.RUnlock()
+
+	s.Lock()
+	defer s.Unlock()
+	if s.sortedSnap == nil {
+		snap := make([]*Wallpaper, 0, len(s.wallpapers))
+		for _, wp := range s.wallpapers {
+			if wp != nil {
+				snap = append(snap, wp)
+			}
+		}
+		sortSnap(snap)
+		s.sortedSnap = snap
+	}
+	return slices.Clone(s.sortedSnap)
+}
+
 func cloneSnap(original []*Wallpaper) []*Wallpaper {
 	snap := make([]*Wallpaper, len(original))
 	for i, wp := range original {
