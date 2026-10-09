@@ -48,7 +48,22 @@ jobs:
         run: go vet ./...
 
       - name: Test
-        run: go test -race -count=1 ./...
+        shell: bash
+        run: |
+          set +e
+          output="$(go test -race -count=1 ./... 2>&1)"
+          status=$?
+          printf '%s\n' "$output"
+          if [ "$status" -ne 0 ]; then
+            # Keep the failure visible through the Checks API even when a CI
+            # log-storage host is unavailable to the person investigating it.
+            tail="$(printf '%s\n' "$output" | tail -n 80)"
+            tail="${tail//'%'/'%25'}"
+            tail="${tail//$'\r'/'%0D'}"
+            tail="${tail//$'\n'/'%0A'}"
+            echo "::error file=go.mod,line=1,title=Go tests failed::$tail"
+            exit "$status"
+          fi
 
       - name: Build
         run: go build -trimpath -ldflags="-X main.Version=$(cat VERSION)" -o /dev/null .
