@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"lanpaper/internal/atomicfile"
 	"lanpaper/storage"
 )
 
@@ -132,6 +133,10 @@ func ApplyRepair(plan RepairPlan) (err error) {
 		}
 	}
 	if metaChanged {
+		metadataOp := Operation{"commit-metadata", "data/wallpapers.json", "durable atomic replacement"}
+		if err := record(metadataOp, "started", nil); err != nil {
+			return err
+		}
 		metaPath := filepath.Join(dataDir, "wallpapers.json")
 		body, err := json.MarshalIndent(records, "", "  ")
 		if err != nil {
@@ -142,15 +147,16 @@ func ApplyRepair(plan RepairPlan) (err error) {
 			return err
 		}
 		if original, readErr := os.ReadFile(metaPath); readErr == nil {
-			if err := os.WriteFile(backup, original, 0o600); err != nil {
+			if err := atomicfile.Write(atomicfile.OSFS{}, backup, ".metadata-backup-*", original, 0o600); err != nil && !atomicfile.IsCommitted(err) {
+				_ = record(metadataOp, "failed", err)
 				return err
 			}
 		}
-		tmp := metaPath + ".repair.tmp"
-		if err := os.WriteFile(tmp, body, 0o600); err != nil {
+		if err := atomicfile.Write(atomicfile.OSFS{}, metaPath, ".repair-metadata-*", body, 0o600); err != nil && !atomicfile.IsCommitted(err) {
+			_ = record(metadataOp, "failed", err)
 			return err
 		}
-		if err := os.Rename(tmp, metaPath); err != nil {
+		if err := record(metadataOp, "completed", nil); err != nil {
 			return err
 		}
 	}

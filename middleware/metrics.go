@@ -44,6 +44,14 @@ func Metrics(next http.Handler) http.Handler {
 	})
 }
 
+func MetricsEndpoint(w http.ResponseWriter, r *http.Request) {
+	if !config.Current.MetricsEnabled {
+		http.NotFound(w, r)
+		return
+	}
+	MaybeBasicAuth(HandleMetrics)(w, r)
+}
+
 func HandleMetrics(w http.ResponseWriter, r *http.Request) {
 	if !config.Current.MetricsEnabled {
 		http.NotFound(w, r)

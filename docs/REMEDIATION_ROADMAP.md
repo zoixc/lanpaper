@@ -122,6 +122,10 @@ Prometheus status-class and latency-bucket counters, active uploads, bounded
 processing queue, rate-limit rejections, active sessions, persistence failures
 and data-directory usage. No paths, link names, clients or tokens are labels.
 
+**Retrospective 9–12 completed:** [`RETROSPECTIVE_PR9_PR12.md`](RETROSPECTIVE_PR9_PR12.md).
+It corrected ignored audit traversal failures, non-durable repair metadata
+replacement and authentication disclosure on the disabled metrics endpoint.
+
 ### PR 13 — Broader browser E2E
 
 Cover create, upload, rename, access changes, token rotation, history, playlist, import/export and delete on desktop and phone. Add multi-tab session expiration and logout persistence-error scenarios.

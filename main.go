@@ -195,7 +195,7 @@ func newMux() *http.ServeMux {
 	mux.HandleFunc("/manifest.webmanifest", redirectToStaticAsset("manifest.json"))
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/health/ready", readyHandler)
-	mux.HandleFunc("/metrics", middleware.WithSecurity(middleware.MaybeBasicAuth(middleware.HandleMetrics)))
+	mux.HandleFunc("/metrics", middleware.WithSecurity(middleware.MetricsEndpoint))
 	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.AdminPage(serveAdminPage, serveLoginPage)))
 	mux.HandleFunc("/api/session", middleware.WithSecurity(middleware.HandleSession))
 	mux.HandleFunc("/api/sessions", middleware.WithSecurity(middleware.MaybeBasicAuth(middleware.HandleSessions)))

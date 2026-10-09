@@ -108,7 +108,7 @@ func Audit(root string) (Report, error) {
 	}
 	for _, dir := range []string{"media", "previews", "history", "items"} {
 		base := filepath.Join(root, "data", dir)
-		_ = filepath.WalkDir(base, func(path string, d fs.DirEntry, e error) error {
+		walkErr := filepath.WalkDir(base, func(path string, d fs.DirEntry, e error) error {
 			if e != nil {
 				return e
 			}
@@ -127,6 +127,9 @@ func Audit(root string) (Report, error) {
 			}
 			return nil
 		})
+		if walkErr != nil && !os.IsNotExist(walkErr) {
+			return report, fmt.Errorf("walk %s: %w", base, walkErr)
+		}
 	}
 	sort.Slice(report.Issues, func(i, j int) bool {
 		if report.Issues[i].Path == report.Issues[j].Path {
