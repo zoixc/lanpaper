@@ -141,9 +141,13 @@ Added axe serious/critical checks, keyboard-only create-dialog focus checks,
 Safari/WebKit project. CI installs and runs both Chromium and WebKit; focus
 restoration and existing live-region semantics are asserted directly.
 
-### PR 15 — Security fuzzing
+### PR 15 — Security fuzzing **(implemented; full CI pending)**
 
-Add fuzz targets for multipart parsing, URL/Origin/forwarded headers, route selectors, media signatures, metadata/session decoding and CORS normalization. Seed with regression fixtures and enforce bounded allocations.
+Added bounded, regression-seeded Go fuzz targets for multipart fields and file
+bytes, route selectors, Origin/Forwarded/X-Forwarded-For handling and security
+middleware, plus wallpaper/history/playlist metadata decoding and
+normalization. Oversized fuzz inputs are rejected before expensive work; normal
+Go CI executes every seed corpus.
 
 ## Phase 2 — resource governance and backend modularity
 

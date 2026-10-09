@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Security parser fuzzing.** Regression-seeded, size-bounded fuzz targets now
+  cover multipart input, routes, forwarded/origin headers and persisted media
+  metadata normalization.
 - **Accessibility and WebKit CI.** Browser checks now include axe,
   keyboard/focus restoration, narrow 200% zoom, long translations and Desktop
   Safari-compatible WebKit behavior.
