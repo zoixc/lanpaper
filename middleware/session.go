@@ -51,19 +51,21 @@ func tokenDigest(token string) [sha256.Size]byte {
 }
 
 type sessionRecord struct {
-	ID        string
-	CreatedAt time.Time
-	Expires   time.Time
+	ID         string
+	CreatedAt  time.Time
+	Expires    time.Time
+	Credential string
 }
 
 // persistedSession is one entry of data/sessions.json. ID and CreatedAt were
 // added after the original digest/expiry format; zero values are migrated on
 // load without exposing the bearer token or collecting device information.
 type persistedSession struct {
-	ID        string `json:"id,omitempty"`
-	Digest    string `json:"digest"` // hex SHA-256 of the token
-	CreatedAt int64  `json:"createdAt,omitempty"`
-	Expires   int64  `json:"expires"`
+	ID         string `json:"id,omitempty"`
+	Digest     string `json:"digest"` // hex SHA-256 of the token
+	CreatedAt  int64  `json:"createdAt,omitempty"`
+	Expires    int64  `json:"expires"`
+	Credential string `json:"credential,omitempty"`
 }
 
 func randomSessionID() (string, error) {
@@ -97,7 +99,17 @@ func LoadSessions() error {
 	next := make(map[[sha256.Size]byte]sessionRecord)
 	ids := make(map[string]bool)
 	changed := false
+	credential := credentialFingerprint()
 	for _, e := range entries {
+		if e.Credential != "" && e.Credential != credential {
+			changed = true
+			continue
+		}
+		if e.Credential == "" {
+			// One-time migration: pre-fingerprint sessions remain valid until the
+			// first startup on this release, then become rotation-aware.
+			changed = true
+		}
 		raw, err := hex.DecodeString(e.Digest)
 		if err != nil || len(raw) != sha256.Size {
 			changed = true
@@ -128,7 +140,7 @@ func LoadSessions() error {
 			changed = true
 		}
 		ids[id] = true
-		next[digest] = sessionRecord{ID: id, CreatedAt: created, Expires: exp}
+		next[digest] = sessionRecord{ID: id, CreatedAt: created, Expires: exp, Credential: credential}
 	}
 
 	sessionStore.Lock()
@@ -156,7 +168,7 @@ func persistLocked(now time.Time) error {
 	for digest, record := range sessionStore.expiry {
 		if now.Before(record.Expires) {
 			entries = append(entries, persistedSession{
-				ID: record.ID, Digest: hex.EncodeToString(digest[:]),
+				ID: record.ID, Digest: hex.EncodeToString(digest[:]), Credential: record.Credential,
 				CreatedAt: record.CreatedAt.Unix(), Expires: record.Expires.Unix(),
 			})
 		}
@@ -225,7 +237,7 @@ func issueSession(now time.Time) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	sessionStore.expiry[digest] = sessionRecord{ID: id, CreatedAt: now, Expires: now.Add(sessionTTL)}
+	sessionStore.expiry[digest] = sessionRecord{ID: id, CreatedAt: now, Expires: now.Add(sessionTTL), Credential: credentialFingerprint()}
 	if err := persistSessions(now); err != nil {
 		delete(sessionStore.expiry, digest)
 		return "", err
@@ -331,7 +343,7 @@ func AdminPage(admin, login http.HandlerFunc) http.HandlerFunc {
 			admin(w, r)
 			return
 		}
-		if config.Current.AdminUser == "" || config.Current.AdminPass == "" {
+		if config.Current.AdminUser == "" || (config.Current.AdminPasswordHash == "" && config.Current.AdminPass == "") {
 			http.Error(w, "Admin credentials not configured", http.StatusServiceUnavailable)
 			return
 		}
@@ -417,7 +429,7 @@ func HandleSessions(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleSessionLogin(w http.ResponseWriter, r *http.Request) {
-	if config.Current.DisableAuth || config.Current.AdminUser == "" || config.Current.AdminPass == "" {
+	if config.Current.DisableAuth || config.Current.AdminUser == "" || (config.Current.AdminPasswordHash == "" && config.Current.AdminPass == "") {
 		http.Error(w, "Login is not available", http.StatusServiceUnavailable)
 		return
 	}

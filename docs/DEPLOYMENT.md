@@ -198,7 +198,8 @@ once per quarter: an untested backup is a rumour.
 ## 7. Pre-launch checklist
 
 - [ ] TLS terminates somewhere, and `TRUSTED_PROXY` matches that hop
-- [ ] `ADMIN_PASS` is long and random; credentials are in a secret store, not in git
+- [ ] `ADMIN_PASSWORD_HASH` contains a generated Argon2id PHC value; credentials are in a secret store, not in git
+- [ ] Deprecated plaintext `ADMIN_PASS`/`adminPass` has been removed after migration
 - [ ] `data/` is on a volume that survives container replacement, and is backed up
 - [ ] `MAX_UPLOAD_MB`, `MAX_IMAGES`, `HISTORY_MAX_MB`, `PLAYLIST_MAX` reflect the intended use
 - [ ] `DISABLE_AUTH` is `false` unless the proxy authenticates every request

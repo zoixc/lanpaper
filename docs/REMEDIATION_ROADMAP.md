@@ -60,9 +60,12 @@ without populating the browser's origin-wide Basic credential cache.
 It found and corrected legacy-ID normalization, stale startup cleanup and the
 remaining cached-Basic fallback on browser API requests.
 
-### PR 5 — Hashed administrator credentials
+### PR 5 — Hashed administrator credentials **(implemented; full CI pending)**
 
-Add `ADMIN_PASSWORD_HASH` using Argon2id, a hash-generation command, dummy verification, password-rotation session invalidation and deprecation warning for plaintext `adminPass` in JSON. Preserve `ADMIN_PASS` as a documented migration path for one compatibility cycle.
+Added `ADMIN_PASSWORD_HASH` using bounded Argon2id PHC verification, a
+standard-input hash-generation command, password-rotation session invalidation
+and deprecation warnings for plaintext `adminPass`. `ADMIN_PASS` remains a
+documented migration path for one compatibility cycle.
 
 ### PR 6 — Split insecure TLS controls **(implemented; full CI pending)**
 

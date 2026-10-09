@@ -243,7 +243,9 @@ which have the highest priority.
 | Environment variable | Default | Notes |
 | --- | --- | --- |
 | `PORT` | `8080` | Listening port |
-| `ADMIN_USER`, `ADMIN_PASS` | unset | Both required. Missing credentials deny admin access (503). |
+| `ADMIN_USER` | unset | Required unless authentication is explicitly disabled. |
+| `ADMIN_PASSWORD_HASH` | unset | Preferred Argon2id administrator credential. Generate with `printf '%s' 'password' \| ./lanpaper hash-password`. Quote the resulting `$...` value in shells/Compose. |
+| `ADMIN_PASS` | unset | Deprecated plaintext migration fallback. Ignored when `ADMIN_PASSWORD_HASH` is set; planned for removal after one compatibility cycle. |
 | `DISABLE_AUTH` | `false` | Explicit opt-out for an external auth proxy. Dangerous if misused. |
 | `MAX_UPLOAD_MB` | `50` | Per file, 1–512 MiB |
 | `MAX_IMAGES` | `0` | `0` = unlimited. Otherwise the oldest non-pinned media is pruned. |

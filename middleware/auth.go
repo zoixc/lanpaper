@@ -40,7 +40,7 @@ const AuthRealm = `Basic realm="Admin", charset="UTF-8"`
 // checkAdminCredentials is the only place where admin credentials are
 // verified, for both the admin API and admin-protected public links.
 func checkAdminCredentials(r *http.Request) (authResult, time.Duration) {
-	if config.Current.DisableAuth || config.Current.AdminUser == "" || config.Current.AdminPass == "" {
+	if config.Current.DisableAuth || config.Current.AdminUser == "" || (config.Current.AdminPasswordHash == "" && config.Current.AdminPass == "") {
 		return authMissing, 0
 	}
 	if HasAdminSession(r) {
@@ -70,7 +70,7 @@ func verifyAdminPassword(user, pass, key string) (authResult, time.Duration) {
 	// Evaluate both comparisons so the response time does not reveal
 	// whether the username alone was correct.
 	userOK := secureCompare(user, config.Current.AdminUser)
-	passOK := secureCompare(pass, config.Current.AdminPass)
+	passOK := configuredPasswordOK(pass)
 	if userOK && passOK {
 		return authOK, 0
 	}
@@ -90,7 +90,7 @@ func MaybeBasicAuth(next http.HandlerFunc) http.HandlerFunc {
 			next(w, r)
 			return
 		}
-		if config.Current.AdminUser == "" || config.Current.AdminPass == "" {
+		if config.Current.AdminUser == "" || (config.Current.AdminPasswordHash == "" && config.Current.AdminPass == "") {
 			http.Error(w, "Admin credentials not configured", http.StatusServiceUnavailable)
 			return
 		}

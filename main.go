@@ -3,10 +3,12 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -27,13 +29,25 @@ import (
 var Version = "dev"
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "hash-password" {
+		password, err := bufio.NewReader(os.Stdin).ReadString('\n')
+		if err != nil && password == "" {
+			log.Fatalf("Read password from stdin: %v", err)
+		}
+		hash, err := middleware.GeneratePasswordHash(strings.TrimRight(password, "\r\n"))
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(hash)
+		return
+	}
 	_ = godotenv.Load()
 	config.Load()
 
 	if config.Current.DisableAuth {
 		log.Println("Warning: admin authentication explicitly disabled — protect /admin and /api/* at the reverse proxy.")
-	} else if config.Current.AdminUser == "" || config.Current.AdminPass == "" {
-		log.Println("Warning: admin credentials missing; admin endpoints will return 503. Set ADMIN_USER and ADMIN_PASS or explicitly set DISABLE_AUTH=true behind an auth proxy.")
+	} else if config.Current.AdminUser == "" || (config.Current.AdminPasswordHash == "" && config.Current.AdminPass == "") {
+		log.Println("Warning: admin credentials missing; admin endpoints will return 503. Set ADMIN_USER and ADMIN_PASSWORD_HASH (or migration-only ADMIN_PASS) or explicitly set DISABLE_AUTH=true behind an auth proxy.")
 	}
 
 	handlers.InitUploadSemaphore(config.Current.MaxConcurrentUploads)

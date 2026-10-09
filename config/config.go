@@ -41,6 +41,7 @@ type Config struct {
 	ExternalImageDir     string            `json:"externalImageDir"`
 	AdminUser            string            `json:"adminUser"`
 	AdminPass            string            `json:"adminPass"`
+	AdminPasswordHash    string            `json:"adminPasswordHash,omitempty"`
 	DisableAuth          bool              `json:"disableAuth,omitempty"`
 	InsecureSkipVerify   bool              `json:"insecureSkipVerify,omitempty"`
 	RemoteSkipVerify     bool              `json:"remoteInsecureSkipVerify,omitempty"`
@@ -150,6 +151,7 @@ func Load() {
 	envString("EXTERNAL_IMAGE_DIR", &Current.ExternalImageDir)
 	envString("ADMIN_USER", &Current.AdminUser)
 	envString("ADMIN_PASS", &Current.AdminPass)
+	envString("ADMIN_PASSWORD_HASH", &Current.AdminPasswordHash)
 	envBool("DISABLE_AUTH", &Current.DisableAuth)
 	envBool("INSECURE_SKIP_VERIFY", &Current.InsecureSkipVerify)
 	// The legacy switch keeps its old broad behaviour for one compatibility
@@ -219,9 +221,12 @@ func Load() {
 	if Current.ProxySkipVerify {
 		log.Println("Warning: PROXY_INSECURE_SKIP_VERIFY=true — the HTTPS proxy certificate is not validated.")
 	}
-	if Current.AdminPass != "" && len(Current.AdminPass) < MinRecommendedPassLen {
-		log.Printf("Warning: ADMIN_PASS is shorter than %d characters. Any internet-facing deployment needs a long random password.",
-			MinRecommendedPassLen)
+	if Current.AdminPass != "" {
+		log.Println("Warning: plaintext ADMIN_PASS/adminPass is deprecated; migrate to ADMIN_PASSWORD_HASH.")
+		if len(Current.AdminPass) < MinRecommendedPassLen {
+			log.Printf("Warning: ADMIN_PASS is shorter than %d characters. Any internet-facing deployment needs a long random password.",
+				MinRecommendedPassLen)
+		}
 	}
 	if TLSMisconfigured() {
 		log.Println("Warning: TLS_CERT_FILE and TLS_KEY_FILE must be set together; ignoring both.")

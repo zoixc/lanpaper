@@ -8,6 +8,23 @@ HTTPS.
 Deployment, hardening and operations (topology, systemd/Docker, backups,
 capacity, what to alert on) live in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
+## Administrator credential storage
+
+Use `ADMIN_PASSWORD_HASH` for new deployments. Generate an Argon2id PHC value
+without placing the password in argv:
+
+```sh
+printf '%s' 'a long unique password' | ./lanpaper hash-password
+```
+
+Store the output in a secret store and quote it so the shell does not expand
+its `$` characters. `ADMIN_PASS` and JSON `adminPass` remain as deprecated
+migration inputs for one compatibility cycle. A configured hash takes
+precedence over plaintext. Changing either active credential invalidates all
+persisted browser sessions after their credential fingerprint has been
+migrated; pre-fingerprint session files are upgraded once without a forced
+logout.
+
 ## Reporting a vulnerability
 
 If private vulnerability reporting is enabled for this repository, use

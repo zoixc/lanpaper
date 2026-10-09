@@ -28,6 +28,11 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Argon2id administrator credentials.** `ADMIN_PASSWORD_HASH` now takes
+  precedence over the deprecated plaintext `ADMIN_PASS`/JSON `adminPass`.
+  `lanpaper hash-password` reads a password from standard input and emits a PHC
+  value. Credential rotation invalidates fingerprinted browser sessions;
+  legacy session files receive a one-time compatibility migration.
 - **Unsafe outbound TLS opt-outs are separated.** Self-signed remote media can
   be enabled without also disabling HTTPS-proxy certificate verification, and
   vice versa. The broad `INSECURE_SKIP_VERIFY` switch remains as a deprecated
