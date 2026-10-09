@@ -132,8 +132,8 @@ A new link has no media until the first upload.
 | --- | --- |
 | `public` (default) | Anyone who knows the URL |
 | `local` | Clients on loopback, private/LAN, link-local, CGNAT or IPv6 ULA networks |
-| `token` | Requests with a valid `?token=` or `X-Access-Token`; an admin session or preemptive Basic Auth also works |
-| `auth` | Admin session or preemptive Basic Auth; the route never opens a browser password prompt |
+| `token` | Requests with a valid `?token=` or `X-Access-Token`; an admin session or preemptive Basic Auth from non-browser clients also works |
+| `auth` | Admin session or preemptive Basic Auth from non-browser clients; the route never opens a browser password prompt |
 
 Tokens:
 
@@ -306,8 +306,9 @@ already set in the environment take precedence over it.
 
 ## API
 
-Admin API endpoints accept the sign-in session cookie or HTTP Basic Auth. The
-`/admin` browser page accepts only the session cookie so signing out cannot be
+Admin API endpoints accept the sign-in session cookie or HTTP Basic Auth from
+non-browser scripts. Browser requests use sessions only. The `/admin` page
+accepts only the session cookie so signing out cannot be
 undone by credentials retained in the browser's Basic-auth cache. A
 `PUBLISH_KEYS` API key also works for the two publishing routes (`POST /api/upload`, `POST /api/link`). The full reference,
 with request and response formats, is in [docs/API.md](docs/API.md).

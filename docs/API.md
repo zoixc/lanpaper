@@ -5,9 +5,10 @@ Examples use `curl` and assume `ADMIN_PASS` is set in the shell.
 
 ## Conventions
 
-- **Authentication.** Admin API endpoints (`/api/*`) accept either the session
-  cookie from `POST /api/session` or HTTP Basic Auth with `ADMIN_USER` /
-  `ADMIN_PASS`; the `/admin` browser page accepts the session cookie only.
+- **Authentication.** Admin API endpoints (`/api/*`) accept the session cookie
+  from `POST /api/session`; non-browser clients may instead send HTTP Basic
+  Auth with `ADMIN_USER` / `ADMIN_PASS`. Requests with browser Fetch Metadata
+  never fall back to Basic. The `/admin` browser page accepts the cookie only.
   `POST /api/session` takes `{"username":"…","password":"…"}` and returns
   `204` with the cookie. `DELETE /api/session` signs out the current browser;
   authenticated `GET /api/sessions` lists non-secret lifecycle metadata and
@@ -32,7 +33,7 @@ Examples use `curl` and assume `ADMIN_PASS` is set in the shell.
     completely and cannot lock anybody out.
   - Missing API credentials: `401` with `WWW-Authenticate`. Public media at
     `/{name}` never sends a Basic challenge; session cookies and preemptive
-    Basic credentials are accepted for `auth` links.
+    Basic credentials from non-browser clients are accepted for `auth` links.
   - Credentials not configured on the server: `503` (fail closed).
   - Lockout: after 10 wrong username/password pairs from one client within
     15 minutes, requests with credentials get `429` plus `Retry-After` until
@@ -443,7 +444,7 @@ done in the response writer's `ReadFrom` path, so media still uses `sendfile`.
 | `public` | none | — |
 | `local` | Client IP is loopback, RFC 1918, link-local, CGNAT or IPv6 ULA | `403` |
 | `token` | `?token=…` or `X-Access-Token: …`; admin Basic Auth also works | `403` |
-| `auth` | Admin session or preemptive Basic Auth (no browser challenge) | `401` (`403` with `DISABLE_AUTH=true`) |
+| `auth` | Admin session or preemptive Basic Auth from non-browser clients (no browser challenge) | `401` (`403` with `DISABLE_AUTH=true`) |
 
 - A link without media returns `404`.
 - Wrong admin credentials count towards the login lockout.

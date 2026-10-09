@@ -163,9 +163,11 @@ func TestLegacySessionFileIsMigrated(t *testing.T) {
 	useSessionDir(t)
 	token := "legacy-session-token"
 	digest := tokenDigest(token)
-	legacy, err := json.Marshal([]persistedSession{{
-		Digest: hex.EncodeToString(digest[:]), Expires: time.Now().Add(time.Hour).Unix(),
-	}})
+	expiredDigest := tokenDigest("expired-legacy-token")
+	legacy, err := json.Marshal([]persistedSession{
+		{ID: "invalid", Digest: hex.EncodeToString(digest[:]), Expires: time.Now().Add(time.Hour).Unix()},
+		{Digest: hex.EncodeToString(expiredDigest[:]), Expires: time.Now().Add(-time.Hour).Unix()},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,8 +188,8 @@ func TestLegacySessionFileIsMigrated(t *testing.T) {
 	if err := json.Unmarshal(body, &migrated); err != nil || len(migrated) != 1 {
 		t.Fatalf("migrated file: entries=%d err=%v", len(migrated), err)
 	}
-	if migrated[0].ID == "" || migrated[0].CreatedAt <= 0 {
-		t.Fatalf("legacy metadata was not filled: %+v", migrated[0])
+	if !validSessionID(migrated[0].ID) || migrated[0].CreatedAt <= 0 {
+		t.Fatalf("legacy metadata was not normalized: %+v", migrated[0])
 	}
 }
 

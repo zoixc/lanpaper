@@ -74,6 +74,11 @@ func randomSessionID() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(raw), nil
 }
 
+func validSessionID(id string) bool {
+	raw, err := base64.RawURLEncoding.DecodeString(id)
+	return err == nil && len(raw) == 16
+}
+
 // LoadSessions restores sessions saved by an earlier run. Expired and malformed
 // entries are dropped. A missing file means no sessions yet.
 func LoadSessions() error {
@@ -90,31 +95,39 @@ func LoadSessions() error {
 	}
 	now := time.Now()
 	next := make(map[[sha256.Size]byte]sessionRecord)
-	migrated := false
+	ids := make(map[string]bool)
+	changed := false
 	for _, e := range entries {
 		raw, err := hex.DecodeString(e.Digest)
 		if err != nil || len(raw) != sha256.Size {
+			changed = true
 			continue
 		}
 		exp := time.Unix(e.Expires, 0)
 		if !now.Before(exp) || len(next) >= maxSessions {
+			changed = true
+			continue
+		}
+		var digest [sha256.Size]byte
+		copy(digest[:], raw)
+		if _, duplicate := next[digest]; duplicate {
+			changed = true
 			continue
 		}
 		id := e.ID
-		if id == "" {
+		if !validSessionID(id) || ids[id] {
 			id, err = randomSessionID()
 			if err != nil {
 				return err
 			}
-			migrated = true
+			changed = true
 		}
 		created := time.Unix(e.CreatedAt, 0)
 		if e.CreatedAt <= 0 || created.After(exp) {
 			created = exp.Add(-sessionTTL)
-			migrated = true
+			changed = true
 		}
-		var digest [sha256.Size]byte
-		copy(digest[:], raw)
+		ids[id] = true
 		next[digest] = sessionRecord{ID: id, CreatedAt: created, Expires: exp}
 	}
 
@@ -122,10 +135,10 @@ func LoadSessions() error {
 	defer sessionStore.Unlock()
 	previous := sessionStore.expiry
 	sessionStore.expiry = next
-	if migrated {
+	if changed {
 		if err := persistLocked(now); err != nil {
 			sessionStore.expiry = previous
-			return fmt.Errorf("migrate sessions: %w", err)
+			return fmt.Errorf("normalize sessions: %w", err)
 		}
 	}
 	return nil

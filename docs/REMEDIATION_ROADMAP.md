@@ -56,6 +56,10 @@ Browser sessions now authorize `auth` media without a Basic challenge. Machine
 clients retain preemptive Basic Auth, while missing credentials return 401
 without populating the browser's origin-wide Basic credential cache.
 
+**Retrospective 1–4 completed:** [`RETROSPECTIVE_PR1_PR4.md`](RETROSPECTIVE_PR1_PR4.md).
+It found and corrected legacy-ID normalization, stale startup cleanup and the
+remaining cached-Basic fallback on browser API requests.
+
 ### PR 5 — Hashed administrator credentials
 
 Add `ADMIN_PASSWORD_HASH` using Argon2id, a hash-generation command, dummy verification, password-rotation session invalidation and deprecation warning for plaintext `adminPass` in JSON. Preserve `ADMIN_PASS` as a documented migration path for one compatibility cycle.

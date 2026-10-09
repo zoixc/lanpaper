@@ -25,7 +25,9 @@ profile.
 
 The admin panel is protected by a sign-in form that sets an HttpOnly session
 cookie (`SameSite=Lax`, 14 days, `Secure` over HTTPS). HTTP Basic Auth protects
-`/api/*`, the private previews and admin-only links, and scripts use it.
+`/api/*`, the private previews and admin-only links for non-browser scripts.
+Requests carrying browser Fetch Metadata never fall back from an expired or
+revoked session to origin-wide cached Basic credentials.
 
 - Sessions are stored as SHA-256 digests in `data/sessions.json` (mode 0600)
   and expire after 14 days. The account settings can durably revoke the current
@@ -92,8 +94,8 @@ deliberately narrow credential:
 | --- | --- |
 | `public` | Anyone. |
 | `local` | Decided by the client IP. |
-| `token` | A generated 256-bit secret, an admin session, or preemptive Basic Auth. |
-| `auth` | Admin session or preemptive Basic Auth. No Basic challenge is sent on public media routes, so a browser does not cache origin-wide credentials that can defeat session logout. |
+| `token` | A generated 256-bit secret, an admin session, or preemptive Basic Auth from non-browser clients. |
+| `auth` | Admin session or preemptive Basic Auth from non-browser clients. No Basic challenge is sent on public media routes, so a browser does not cache origin-wide credentials that can defeat session logout. |
 
 Previews of private links are available only through the admin API. With
 built-in auth disabled, `auth`-level public URLs stay unavailable.

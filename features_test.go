@@ -502,6 +502,9 @@ func TestAppPublicAliasesCORSEmbedAndStats(t *testing.T) {
 		t.Fatalf("auth media must return 401 without caching browser Basic credentials: status=%d challenge=%q", status, h.Get("WWW-Authenticate"))
 	}
 	a.expect(http.StatusOK, "GET", "/photo.jpg", nil, true, nil) // preemptive Basic for scripts
+	if status, _, _ := a.request("GET", "/photo.jpg", nil, true, map[string]string{"Sec-Fetch-Site": "same-origin"}); status != http.StatusUnauthorized {
+		t.Fatalf("browser-cached Basic reopened auth media after logout: status=%d", status)
+	}
 	a.expect(http.StatusOK, "PATCH", "/api/link/photo", []byte(`{"accessLevel":"public"}`), true, jsonHeaders())
 
 	// OPTIONS stays 405 until CORS is configured.

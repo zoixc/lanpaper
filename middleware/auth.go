@@ -46,6 +46,13 @@ func checkAdminCredentials(r *http.Request) (authResult, time.Duration) {
 	if HasAdminSession(r) {
 		return authOK, 0
 	}
+	// Fetch Metadata identifies browser traffic. Never let an origin-wide
+	// cached Basic credential become a fallback after the browser session was
+	// revoked; non-browser API clients omit this browser-controlled header and
+	// may continue to send Basic credentials preemptively.
+	if r.Header.Get("Sec-Fetch-Site") != "" {
+		return authMissing, 0
+	}
 	user, pass, ok := r.BasicAuth()
 	if !ok {
 		return authMissing, 0
@@ -93,7 +100,12 @@ func MaybeBasicAuth(next http.HandlerFunc) http.HandlerFunc {
 		case authLocked:
 			writeTooManyRequests(w, retry, "Too many failed login attempts")
 		default:
-			w.Header().Set("WWW-Authenticate", AuthRealm)
+			// A browser uses the session flow and must never be prompted into
+			// caching origin-wide Basic credentials. Script clients still receive
+			// the challenge that describes the supported authentication scheme.
+			if r.Header.Get("Sec-Fetch-Site") == "" {
+				w.Header().Set("WWW-Authenticate", AuthRealm)
+			}
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		}
 	}
