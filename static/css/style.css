@@ -1027,6 +1027,11 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
     white-space: nowrap;
 }
 .on-media svg { width: 12px; height: 12px; }
+/* В узком кадре (миниатюра списка на телефоне) текст бейджа обрывается
+   многоточием, а не вылезает за край кадра */
+.on-media { min-width: 0; max-width: 100%; }
+.on-media > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.card__badges-left { min-width: 0; }
 
 .kbd {
     display: inline-flex;
@@ -1292,6 +1297,9 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
 .card__meta > span + span::before { content: '·'; margin-right: 6px; opacity: 0.55; }
 .card__meta .truncate { flex: 0 1 auto; min-width: 0; }
 /* Хвост метаданных в плитке обрывается многоточием, а не режется по букве */
+/* Сжимается только последняя видимая часть строки; остальные не режутся.
+   На телефоне последняя (дата) скрыта, поэтому там сжимается предпоследняя —
+   см. правило для узкого экрана ниже. */
 .card__meta > span:last-child { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .card__tags { display: flex; align-items: center; gap: 5px; margin-top: 3px; flex-wrap: wrap; }
 
@@ -2305,6 +2313,22 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
 @media (min-width: 721px) and (max-width: 1023px) {
     .search { flex: 1 1 200px; max-width: 280px; }
     .tools { flex: 1 1 280px; }
+}
+
+/* Плитка на телефоне: разрешение уходит из строки, остаются формат и размер.
+   Иначе каждая часть обрезалась бы («IMAGE/…», «540×…»). Дата скрыта выше. */
+@media (max-width: 560px) {
+    .grid:not(.grid--list) .card__meta > span:nth-child(2) { display: none; }
+    .card__meta > span:nth-last-child(2) { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+}
+
+/* Телефон: поиск на всю ширину, фильтры — строкой ниже. Раньше поиск был
+   144 px, и плейсхолдер «Search by name or file» обрезался. Фильтры по-прежнему
+   прокручиваются, высота шапки та же: поиск и чипы и так занимали две строки. */
+@media (max-width: 720px) {
+    .appbar__row--tools { flex-wrap: wrap; }
+    .search { flex: 1 1 100%; max-width: none; min-width: 0; }
+    .tools { flex: 1 1 100%; min-width: 0; }
 }
 
 /* Скрытие элементов массовых действий и режима выбора */
