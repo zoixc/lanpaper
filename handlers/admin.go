@@ -3,6 +3,7 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"io/fs"
 	"log"
@@ -13,6 +14,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"lanpaper/config"
 	"lanpaper/storage"
@@ -360,6 +363,22 @@ func AdminPreview(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, filepath.Base(f.Name()), fi.ModTime(), f)
 }
 
+// externalImagesTTL bounds how stale the gallery listing may be. The picker is
+// opened rarely and a walk of a large mount is expensive, so repeated requests
+// within this window reuse one walk. A file added to the gallery shows up in
+// the picker at most this long after it appears on disk.
+const externalImagesTTL = 10 * time.Second
+
+// externalImagesCache holds the last encoded listing. mu is held for the whole
+// walk, so concurrent requests on an expired cache wait for one walk instead of
+// each starting their own.
+var externalImagesCache struct {
+	mu   sync.Mutex
+	key  string
+	at   time.Time
+	body []byte
+}
+
 // ExternalImages enumerates gallery files. The walk runs inside an os.Root,
 // so symlinked files are listed only if they resolve inside the gallery, and
 // symlinked directories are never descended into. Hard caps bound disk walk
@@ -369,10 +388,28 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	root, err := os.OpenRoot(config.Current.ExternalImageDir)
+	dir := config.Current.ExternalImageDir
+	key := dir + "\x00" + strconv.Itoa(config.Current.MaxWalkDepth) + "\x00" + strconv.Itoa(config.Current.MaxUploadMB)
+
+	externalImagesCache.mu.Lock()
+	defer externalImagesCache.mu.Unlock()
+	if externalImagesCache.body == nil || externalImagesCache.key != key || time.Since(externalImagesCache.at) > externalImagesTTL {
+		body, err := listExternalImages(dir)
+		if err != nil {
+			jsonEmpty(w)
+			return
+		}
+		externalImagesCache.key, externalImagesCache.at, externalImagesCache.body = key, time.Now(), body
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(externalImagesCache.body)
+}
+
+// listExternalImages walks the gallery and returns the encoded JSON array.
+func listExternalImages(dir string) ([]byte, error) {
+	root, err := os.OpenRoot(dir)
 	if err != nil {
-		jsonEmpty(w)
-		return
+		return nil, err
 	}
 	defer root.Close()
 	gallery := root.FS()
@@ -412,8 +449,11 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 		files = append(files, p)
 		return nil
 	})
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(files)
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(files); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {
