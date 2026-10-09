@@ -266,7 +266,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v10/,
+  assert.match(code, /lanpaper-static-v11/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 

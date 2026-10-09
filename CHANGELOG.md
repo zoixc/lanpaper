@@ -7,6 +7,8 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **New minimalist logo**: a network mark (one node linked to four) in the
+  favicon, the header, the logo files and the PWA icons.
 - **The panel is monochrome by default.** The accent and the status colours
   are neutral; colour comes only from the Accent palettes in Settings. Mono is
   the default, and Indigo, Sage, Clay, Graphite and Ocean keep their colours.
