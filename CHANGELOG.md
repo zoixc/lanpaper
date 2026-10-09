@@ -3,6 +3,64 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
+## [Unreleased]
+
+## [0.15.1] – 2026-10-09
+
+Security hardening from an internal audit. Behaviour changes are listed under
+**Changed**; upgrading is a container restart.
+
+### Security
+
+- **Client address comes only from the rightmost `X-Forwarded-For` entry.**
+  `X-Real-IP` is no longer read at all. Before, a client could send
+  `X-Real-IP` through a trusted proxy that does not overwrite it and appear as
+  any address, which bypassed the `local` access level and the per-client rate
+  limit and login lockout.
+- **Publish keys cannot replace existing media.** `POST /api/upload` with a
+  publish key and `mode=replace` (the default) on a link that already has media
+  now returns `403`. Keys can still create links, upload a first file and append
+  playlist items. Admin uploads are unchanged.
+- **MP4 detection checks the brand.** A file is stored as MP4 only if its `ftyp`
+  box declares a known video brand as major or compatible brand. Before, any
+  file with `ftyp` at offset 4 was accepted and served as `video/mp4`.
+- **Runtime image requires zlib 1.3.2-r1** (CVE-2026-85091). The Alpine base
+  ships 1.3.2-r0.
+
+### Added
+
+- **Sign-in form for the admin panel.** Installed PWAs have no Basic Auth
+  password prompt, so on iOS they showed "Unauthorized" with no way to sign in,
+  and deletes failed silently. `/admin` now shows a sign-in form that sets an
+  HttpOnly session cookie (`SameSite=Lax`, 14 days). Basic Auth keeps working
+  for scripts. An expired session reloads into the sign-in form.
+- **Sign out** in Settings → Account ends the session on the server as well.
+- **Sessions survive a restart.** Only SHA-256 digests are written, to
+  `data/sessions.json` (mode 0600, written atomically). A session that cannot be
+  saved is not issued, so a sign-in never succeeds without being persisted.
+- **Browser tests for sign-in** (`tests/e2e`, Playwright). CI runs them in the
+  `e2e` job on desktop and phone-sized viewports.
+
+### Changed
+
+- `GET /health` no longer returns the `version` field.
+- Access-token generation fails the request instead of ignoring a failed read
+  from the system random source.
+- Static assets referenced by the admin page carry a content hash (`?v=`) and
+  are cached for a year. Other URLs still revalidate.
+- The external gallery listing is cached for 10 seconds.
+- Preview regeneration runs two previews at a time.
+- Proxy setup: configure `X-Forwarded-For` (append or overwrite) instead of
+  `X-Real-IP`. The nginx example is updated; the Caddy example no longer needs
+  `header_up X-Real-IP`.
+
+### Performance
+
+- `GET /api/wallpapers` no longer copies every record on each request.
+- Metadata writes no longer block readers while the file is written.
+- The rate limiter's counters are split across 64 locks.
+- Upload forms are streamed to disk instead of being parsed into memory first.
+
 ## [0.15.0] – 2026-10-09
 
 A visual release for the 2.0 panel: a monochrome default with the colour kept

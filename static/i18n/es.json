@@ -222,5 +222,7 @@
   "versions_open": "Abrir",
   "versions_restore": "Restaurar",
   "view_grid": "Cuadrícula",
-  "view_list": "Lista"
+  "view_list": "Lista",
+  "settings_account": "Cuenta",
+  "sign_out": "Cerrar sesión"
 }

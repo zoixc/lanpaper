@@ -222,5 +222,7 @@
   "versions_open": "Apri",
   "versions_restore": "Ripristina",
   "view_grid": "Griglia",
-  "view_list": "Elenco"
+  "view_list": "Elenco",
+  "settings_account": "Account",
+  "sign_out": "Esci"
 }

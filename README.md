@@ -47,7 +47,7 @@ link, which is handy for digital frames, smart TVs, kiosks and other displays.
   responses, media revalidated with `304` instead of downloaded again, and
   about 60 KB of self-hosted WOFF2 fonts. Archived versions are moved, not
   copied, and per-link access counters live in memory only.
-- **Security:** Basic Auth with a brute-force lockout, CSRF protection,
+- **Security:** a sign-in form with an HttpOnly session cookie (Basic Auth for scripts), a brute-force lockout, CSRF protection,
   strict security headers, SSRF-safe downloads and rate limits. Publish keys
   are stored as SHA-256 digests, share the login lockout budget and are never
   written to `config.json`. A panicking handler is answered with a clean `500`
@@ -198,13 +198,22 @@ delete anything. Keys come from the `PUBLISH_KEYS` environment variable only
 SHA-256 digests in memory — they never reach `config.json`. Wrong keys share
 the brute-force budget with admin logins, so guessing is locked out per client.
 
+A publish key can **add** media but never **replace** it. `POST /api/upload`
+with a key creates a new link and uploads its first file, or appends a playlist
+item with `mode=append`. A key that asks for the default `mode=replace` on a
+link that already has media gets `403 Publish keys cannot replace existing
+media`. Replacing a live file is an admin action, so a leaked key cannot deface
+links that are already in use.
+
 **Behind a reverse proxy**, set `TRUSTED_PROXY` to *only* the address the
 proxy reaches Lanpaper from — one IP or CIDR, or a comma-separated list when
 the proxy arrives through more than one hop (a Docker container, for example,
 sees the bridge gateway and not the proxy's LAN address:
 `TRUSTED_PROXY="192.168.20.1,172.24.0.1"`). Configure the proxy to
-**overwrite** `X-Real-IP`, `X-Forwarded-For`, `X-Forwarded-Proto` and
-`X-Forwarded-Host`, and to preserve the original `Host`. Without this:
+**append to or overwrite** `X-Forwarded-For`, and **overwrite**
+`X-Forwarded-Proto` and `X-Forwarded-Host`, and to preserve the original `Host`.
+Lanpaper reads only the rightmost `X-Forwarded-For` entry from the trusted
+proxy and never reads `X-Real-IP`. Without this:
 
 - every visitor appears to come from the proxy's (often private) address, so
   `local` links become reachable for everyone;
@@ -249,7 +258,7 @@ which have the highest priority.
 | `RATE_BURST` | `10` | Extra requests allowed per window |
 | `CORS_ORIGINS` | unset | Comma-separated browser origins allowed to read public media; `*` allows any origin |
 | `ALLOW_EMBED` | `false` | Lets other sites frame public media: drops `X-Frame-Options` and the CSP `sandbox` for `/{name}` only |
-| `PUBLISH_KEYS` | unset | Comma-separated API keys (16+ characters, max 32) that may upload and create links. Environment only — never written to `config.json` |
+| `PUBLISH_KEYS` | unset | Comma-separated API keys (16+ characters, max 32) that may create links and add media (`mode=append` or a new link), never replace an existing link's file. Environment only — never written to `config.json` |
 | `COMPRESSION_QUALITY` | `85` | JPEG/WebP quality, 1–100 |
 | `COMPRESSION_SCALE` | `100` | Stored image size as a percentage of the original, 1–100 |
 | `TRUSTED_PROXY` | unset | Address the reverse proxy connects from: an IP or CIDR, or a comma-separated list of them when there is more than one hop. Forwarded headers are trusted only from these. |
@@ -297,8 +306,8 @@ already set in the environment take precedence over it.
 
 ## API
 
-Admin endpoints use Basic Auth, or a `PUBLISH_KEYS` API key for the two
-publishing routes (`POST /api/upload`, `POST /api/link`). The full reference,
+Admin endpoints accept the sign-in session cookie or HTTP Basic Auth. A
+`PUBLISH_KEYS` API key also works for the two publishing routes (`POST /api/upload`, `POST /api/link`). The full reference,
 with request and response formats, is in [docs/API.md](docs/API.md).
 
 | Method | Path | Purpose |
@@ -346,10 +355,13 @@ read every `Warning:` the process prints at startup.
 
 Two properties worth knowing before sizing a host:
 
-- **Authentication is stateless.** There are no sessions or cookies: the admin
-  password is sent with every request as HTTP Basic Auth, so TLS in front (or
-  `TLS_CERT_FILE`/`TLS_KEY_FILE`) is what keeps it private. Failed logins are
-  counted per client and locked out for a while.
+- **Authentication uses sign-in sessions.** The browser signs in once through
+  the form and keeps an HttpOnly cookie for 14 days. Sessions are stored as
+  SHA-256 digests in `data/sessions.json` (mode 0600), so they survive a restart.
+  Settings → Account → Sign out ends a session at once. Scripts can still send
+  the admin password as HTTP Basic Auth on each request. Either way, TLS in front
+  (or `TLS_CERT_FILE`/`TLS_KEY_FILE`) keeps the password private. Failed logins
+  are counted per client and locked out for a while.
 - **Image work is bounded.** One image may hold 36 M pixels and at most 48 M
   decoded pixels may be in flight, so a burst of uploads queues instead of
   growing the process without limit. A 36 M pixel upload peaks at about 174 MB

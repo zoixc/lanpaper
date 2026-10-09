@@ -77,23 +77,26 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	// Large files over slow links need more than the default read timeout.
 	extendDeadline(w, time.Duration(config.UploadBaseTimeout+maxRequest/config.UploadMinBytesPerSec)*time.Second)
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequest)
-	if err := r.ParseMultipartForm(8 << 20); err != nil {
-		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
-			http.Error(w, "File too large", http.StatusRequestEntityTooLarge)
-		} else {
-			http.Error(w, "Invalid multipart form", http.StatusBadRequest)
+	// The body is streamed: the file goes straight to a temporary file, and a
+	// publish key that asks to replace live media is refused before any of its
+	// bytes are written (see readUploadForm).
+	form, err := readUploadForm(r, maxBytes, func(f *uploadForm) error {
+		if publishReplaceDenied(r, f.value("linkName"), f.value("mode")) {
+			return errPublishReplace
 		}
+		return nil
+	})
+	if err != nil {
+		uploadFormError(w, err)
 		return
 	}
-	if r.MultipartForm != nil {
-		defer r.MultipartForm.RemoveAll()
-	}
-	name := r.FormValue("linkName")
+	defer form.close()
+	name := form.value("linkName")
 	if !isValidLinkName(name) {
 		http.Error(w, "Invalid link name", http.StatusBadRequest)
 		return
 	}
-	mode, modeOK := uploadMode(r.FormValue("mode"))
+	mode, modeOK := uploadMode(form.value("mode"))
 	if !modeOK {
 		http.Error(w, "Invalid mode (expected replace or append)", http.StatusBadRequest)
 		return
@@ -102,8 +105,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	// which is what a webhook or a publish key needs. Without the flag an upload
 	// to an unknown name is still rejected, so a typo cannot silently create a
 	// link and an existing client's behaviour does not change.
-	autoCreate := formFlag(r.FormValue("autoCreate"))
-	urlStr := r.FormValue("url")
+	autoCreate := formFlag(form.value("autoCreate"))
+	urlStr := form.value("url")
 	if len(urlStr) > 2048 {
 		http.Error(w, "URL too long", http.StatusBadRequest)
 		return
@@ -111,13 +114,22 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	unlock := storage.LockLinks(name)
 	defer unlock()
 	prev, exists := storage.Global.Get(name)
+	// A publish key may add media — a new link, or a playlist item behind an
+	// existing one — but never replace the live file of a link that already
+	// has media: that would destroy content the URL is serving, and a leaked
+	// key would then be able to deface every link. Admin uploads are unaffected.
+	if exists && prev.HasImage && mode == uploadModeReplace &&
+		middleware.PublisherFingerprint(r) != "" {
+		http.Error(w, "Publish keys cannot replace existing media; use mode=append", http.StatusForbidden)
+		return
+	}
 	createdLink := false
 	if !exists {
 		if !autoCreate {
 			http.Error(w, "Link does not exist", http.StatusBadRequest)
 			return
 		}
-		created, err := createLinkForUpload(name, r)
+		created, err := createLinkForUpload(name, form)
 		if err != nil {
 			if errors.Is(err, errInvalidLinkDefaults) {
 				http.Error(w, "Invalid access level or category", http.StatusBadRequest)
@@ -206,13 +218,16 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			source, sourceSize, sourceName, localPath = f, fi.Size(), urlStr, true
 		}
 	} else {
-		f, header, err := r.FormFile("file")
+		if form.file == nil {
+			http.Error(w, "No file provided", http.StatusBadRequest)
+			return
+		}
+		fi, err := form.file.Stat()
 		if err != nil {
 			http.Error(w, "No file provided", http.StatusBadRequest)
 			return
 		}
-		defer f.Close()
-		source, sourceSize, sourceName = f, header.Size, header.Filename
+		source, sourceSize, sourceName = form.file, fi.Size(), form.fileName
 	}
 
 	ext, err := inspectMediaFile(source, sourceName, sourceSize, maxBytes)
@@ -447,13 +462,13 @@ var errInvalidLinkDefaults = errors.New("invalid access level or category")
 // createLinkForUpload creates the link an upload targets when the client set
 // autoCreate, so a webhook or a publish key can push media in one request
 // instead of create-then-upload. The caller holds the link lock.
-func createLinkForUpload(name string, r *http.Request) (*storage.Wallpaper, error) {
-	rawLevel := strings.TrimSpace(r.FormValue("accessLevel"))
+func createLinkForUpload(name string, form *uploadForm) (*storage.Wallpaper, error) {
+	rawLevel := strings.TrimSpace(form.value("accessLevel"))
 	if rawLevel != "" && !isValidAccessLevel(rawLevel) {
 		return nil, errInvalidLinkDefaults
 	}
 	level := storage.NormalizeAccessLevel(rawLevel)
-	category := strings.TrimSpace(r.FormValue("category"))
+	category := strings.TrimSpace(form.value("category"))
 	if category != "" && !isValidCategory(category) {
 		return nil, errInvalidLinkDefaults
 	}

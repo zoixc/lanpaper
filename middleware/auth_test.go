@@ -15,9 +15,7 @@ import (
 func resetLimiter(t *testing.T) {
 	t.Helper()
 	reset := func() {
-		muCounts.Lock()
-		counts = map[string]*window{}
-		muCounts.Unlock()
+		resetRateCounts()
 	}
 	reset()
 	t.Cleanup(reset)

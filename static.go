@@ -3,10 +3,15 @@
 package main
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"io"
 	"net/http"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -17,6 +22,7 @@ import (
 var staticAssets = map[string]bool{
 	"css/style.css":                   true,
 	"js/app.js":                       true,
+	"js/login.js":                     true,
 	"js/compressor.js":                true,
 	"js/export-import.js":             true,
 	"js/prepaint.js":                  true,
@@ -42,6 +48,81 @@ var staticAssets = map[string]bool{
 }
 
 var errNotRegular = errors.New("not a regular file")
+
+// Asset URLs carry a content hash as ?v=. The hashes are computed once when the
+// process starts, from the allowlisted files; a request with the current hash
+// may be cached forever, because any change to a file changes the URL the page
+// uses. A file that cannot be read gets no hash and is served as before.
+var staticVersions = computeStaticVersions()
+
+func computeStaticVersions() map[string]string {
+	versions := make(map[string]string, len(staticAssets))
+	for asset := range staticAssets {
+		f, _, err := openStaticAsset(asset)
+		if err != nil {
+			continue
+		}
+		h := sha256.New()
+		_, err = io.Copy(h, f)
+		f.Close()
+		if err == nil {
+			versions[asset] = hex.EncodeToString(h.Sum(nil))[:12]
+		}
+	}
+	return versions
+}
+
+func staticVersion(name string) string {
+	return staticVersions[name]
+}
+
+var staticRefPattern = regexp.MustCompile(`"/static/([A-Za-z0-9_./-]+)"`)
+
+// versionStaticRefs adds ?v=<hash> to every double-quoted allowlisted /static/
+// reference in the admin page. Other references are left as they are.
+func versionStaticRefs(page []byte) []byte {
+	return staticRefPattern.ReplaceAllFunc(page, func(m []byte) []byte {
+		name := string(m[len(`"/static/`) : len(m)-1])
+		v := staticVersion(name)
+		if !staticAssets[name] || v == "" {
+			return m
+		}
+		return []byte(`"/static/` + name + `?v=` + v + `"`)
+	})
+}
+
+// serveAdminPage serves admin.html for a signed-in user.
+func serveAdminPage(w http.ResponseWriter, r *http.Request) {
+	serveHTMLPage(w, r, "admin.html")
+}
+
+// serveLoginPage serves the sign-in form shown to everyone who is not signed in.
+func serveLoginPage(w http.ResponseWriter, r *http.Request) {
+	serveHTMLPage(w, r, "login.html")
+}
+
+// serveHTMLPage serves one of the application's HTML pages with its static
+// references versioned. The page itself is never cached.
+func serveHTMLPage(w http.ResponseWriter, r *http.Request, file string) {
+	w.Header().Set("Cache-Control", "no-store")
+	f, err := os.Open(file)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer f.Close()
+	fi, err := f.Stat()
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	page, err := io.ReadAll(f)
+	if err != nil {
+		http.Error(w, "Admin page unavailable", http.StatusInternalServerError)
+		return
+	}
+	http.ServeContent(w, r, file, fi.ModTime(), bytes.NewReader(versionStaticRefs(page)))
+}
 
 // openStaticAsset opens a file below static/ through os.Root, so the path
 // cannot escape the directory. A final symlink is rejected as well: a known
@@ -105,8 +186,13 @@ func serveStaticAsset(w http.ResponseWriter, r *http.Request) {
 		h.Set("Content-Security-Policy", "default-src 'none'; sandbox")
 		h.Set("Cache-Control", "public, max-age=86400")
 	case ".js", ".css", ".json":
-		// Not content-hashed: always revalidate so upgrades take effect.
-		h.Set("Cache-Control", "no-cache")
+		if v := r.URL.Query().Get("v"); v != "" && v == staticVersion(name) {
+			// The URL names this exact content, so the browser never needs to ask again.
+			h.Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			// Unversioned URLs (and any stale hash) always revalidate so upgrades take effect.
+			h.Set("Cache-Control", "no-cache")
+		}
 	case ".woff2":
 		// Not in Go's built-in MIME table; do not depend on /etc/mime.types.
 		h.Set("Content-Type", "font/woff2")

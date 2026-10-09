@@ -65,6 +65,11 @@ func main() {
 	}
 	// Move any leftover files from static/images into data/media.
 	storage.MigrateMediaToDataDir()
+	// Admin sessions survive a restart. A damaged sessions file only costs a
+	// new sign-in, so it is reported rather than stopping the service.
+	if err := middleware.LoadSessions(); err != nil {
+		log.Printf("Warning: admin sessions not restored, everyone must sign in again: %v", err)
+	}
 
 	go middleware.StartCleaner()
 
@@ -167,7 +172,8 @@ func newMux() *http.ServeMux {
 	mux.HandleFunc("/manifest.webmanifest", redirectToStaticAsset("manifest.json"))
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/health/ready", readyHandler)
-	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Admin)))
+	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.AdminPage(serveAdminPage, serveLoginPage)))
+	mux.HandleFunc("/api/session", middleware.WithSecurity(middleware.HandleSession))
 	mux.HandleFunc("/api/wallpapers", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Wallpapers)))
 	mux.HandleFunc("/api/compression-config", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.GetCompressionConfig)))
 	mux.HandleFunc("/api/preview/", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.AdminPreview)))
@@ -249,10 +255,11 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	// The version is deliberately not reported: an unauthenticated probe should
+	// not learn which release to look up for known flaws.
 	_ = json.NewEncoder(w).Encode(map[string]string{
 		"status":  "ok",
 		"service": "lanpaper",
-		"version": Version,
 	})
 }
 

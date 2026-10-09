@@ -23,10 +23,13 @@ profile.
 
 ### Admin
 
-HTTP Basic Auth protects `/admin`, `/api/*` and the private previews.
+The admin panel is protected by a sign-in form that sets an HttpOnly session
+cookie (`SameSite=Lax`, 14 days, `Secure` over HTTPS). HTTP Basic Auth protects
+`/api/*`, the private previews and admin-only links, and scripts use it.
 
-- There are no sessions and no password database. Credentials come from the
-  environment (or `config.json`) and must be handled as secrets.
+- Sessions are stored as SHA-256 digests in `data/sessions.json` (mode 0600)
+  and expire after 14 days. There is no password database: credentials come
+  from the environment (or `config.json`) and must be handled as secrets.
 - If either credential is missing, admin routes return **503**. They never
   fall back to anonymous access.
 - `DISABLE_AUTH=true` is an explicit opt-out. Use it only if all three hold:
@@ -57,7 +60,8 @@ deliberately narrow credential:
 
 | Route | With a valid publish key |
 | --- | --- |
-| `POST /api/upload` (including `mode=append` and `autoCreate=1`) | allowed |
+| `POST /api/upload` with `mode=append`, or with `autoCreate=1` for a link that does not exist yet | allowed |
+| `POST /api/upload` with `mode=replace` (the default) on a link that already has media | `403` — only an admin login may replace a live file |
 | `POST /api/link` | allowed |
 | everything else under `/admin` and `/api/*` | falls back to Basic Auth, so a key alone gets `401` |
 
@@ -106,8 +110,12 @@ Lanpaper uses the forwarded client IP, host and scheme **only** when
   container actually sees — are listed comma-separated:
   `TRUSTED_PROXY="192.168.20.1,172.24.0.1"`. Only the listed addresses are
   believed; an entry that does not parse is dropped with a warning.
-- The proxy must **replace** client-supplied `X-Real-IP` / `X-Forwarded-*`
-  headers, not pass them through.
+- The proxy must **append to or overwrite** `X-Forwarded-For`, and overwrite
+  `X-Forwarded-Proto` and `X-Forwarded-Host`, so that no client-supplied value
+  reaches Lanpaper unchanged. Lanpaper trusts only the rightmost
+  `X-Forwarded-For` entry and never reads `X-Real-IP`: a proxy that does not
+  overwrite a client-supplied `X-Real-IP` would otherwise let a client look like
+  any address, including a private one.
 - Without `TRUSTED_PROXY`, a proxy on a private network makes every visitor
   look `local`.
 
@@ -140,9 +148,9 @@ reverse-proxy access logs.
 | Upload validation | Size limits, then content-based type detection (magic bytes). Images are fully decoded before publication. Limits: 16,384 px per side, 36 M pixels per image, 48 M decoded pixels in flight, and a limited number of parallel uploads. MP4/WebM are checked for container signatures only; they are not transcoded or scanned. |
 | Remote URL fetch | HTTP(S) only. Every DNS answer must be a public unicast address. Private, loopback, link-local, CGNAT, documentation, multicast, NAT64, 6to4 and Teredo ranges are blocked. The vetted IP is pinned for the connection. Every redirect is checked again, including through HTTP, HTTPS and SOCKS5 proxies. Time, size and redirects are bounded. |
 | Timeouts | Header read 10 s, request read 30 s, write 120 s, idle 120 s. Only authenticated uploads and preview regeneration extend their own deadlines. Shutdown waits up to 30 s for in-flight requests. |
-| Filesystem and metadata | Per-link locks serialize conflicting operations. Media and metadata are written to a temporary file, flushed with `fsync`, then atomically renamed. The metadata directory is synced as well. Failed writes roll back. Malformed metadata stops startup instead of being discarded on the next save. |
+| Filesystem and metadata | Per-link locks serialize conflicting operations, and metadata writers are queued. Readers never wait for disk I/O. Media and metadata are written to a temporary file, flushed with `fsync`, then atomically renamed. The metadata directory is synced as well. Failed writes roll back. Malformed metadata stops startup instead of being discarded on the next save. |
 | Container | Non-root user (uid 100, gid 101). Application files are read-only for the service; only `data/` and the gallery directory are writable. The Compose example drops all capabilities and sets `no-new-privileges`. |
-| PWA cache | The service worker caches only public application assets under `/static/` and revalidates them when online. Admin pages, API responses and media links always go to the network. Old `lanpaper-*` caches are purged on activation. |
+| PWA cache | The service worker caches only public application assets under `/static/` and fetches them from the network when online. Asset links from the admin page carry a content hash (`?v=`), so the browser caches those exact files for a year; any other URL revalidates. Admin pages, API responses and media links always go to the network. Old `lanpaper-*` caches are purged on activation. |
 | Fault isolation | A panic in a handler is caught between the gzip layer and the router: it is logged with the method, the path and the stack, and answered with a plain `500` when the response has not started. No panic value, type, path or frame is ever sent to a client, and the query string is never logged because token links carry their secret there. `http.ErrAbortHandler` is re-raised untouched. The background prune worker and the rate-limit cleaner recover too, so neither can take the process down. |
 | TLS (optional) | `TLS_CERT_FILE` + `TLS_KEY_FILE` terminate HTTPS in the process with `MinVersion` TLS 1.2; cipher suites and curves stay at Go's maintained defaults and HTTP/2 is negotiated automatically. Setting only one of the two is a fatal startup error rather than a silent fallback to plaintext. The usual deployment still terminates TLS at a reverse proxy with `TRUSTED_PROXY` set. |
 | Crawler policy | `/robots.txt` disallows everything. Public links are mutable, credential-protected or both; indexing them costs bandwidth and publishes URLs whose access level may later be tightened. |
@@ -150,8 +158,8 @@ reverse-proxy access logs.
 
 ## Operator responsibilities and limits
 
-1. **Serve over HTTPS.** Basic Auth sends the password with every request, so
-   plain HTTP exposes it on the network. Terminate TLS at a reverse proxy
+1. **Serve over HTTPS.** The sign-in form and Basic Auth both send the password,
+   so plain HTTP exposes it on the network. Terminate TLS at a reverse proxy
    (recommended, and the only setup that also gives you an HTTP→HTTPS
    redirect), or set `TLS_CERT_FILE` + `TLS_KEY_FILE` to let Lanpaper serve
    HTTPS itself. Lanpaper never redirects HTTP to HTTPS on its own and provides
@@ -179,9 +187,10 @@ reverse-proxy access logs.
    until they revalidate.
 7. **Publish keys are write credentials.** Give them only to automation that
    needs to push content, keep them out of URLs, logs and version control, and
-   replace them by restarting with a new `PUBLISH_KEYS` when one leaks. A key
-   can overwrite the media of any link, which is the same power an admin upload
-   has.
+   replace them by restarting with a new `PUBLISH_KEYS` when one leaks. A key can
+   add media to any link and create new links, but it cannot replace the live
+   file of a link that already has media: that remains an admin action, so a
+   leaked key cannot deface links that are in use.
 8. **CORS and embedding widen who can read public media.** `CORS_ORIGINS: *`
    lets any website read every `public` link with JavaScript, and
    `ALLOW_EMBED=true` lets any website frame it. List only the origins you
@@ -224,7 +233,6 @@ server {
         # compares Origin against this name, so it must be the one the browser
         # used. $http_host keeps the port and the exact spelling.
         proxy_set_header   Host              $http_host;
-        proxy_set_header   X-Real-IP         $remote_addr;
         proxy_set_header   X-Forwarded-For   $remote_addr;
         proxy_set_header   X-Forwarded-Proto $scheme;
         proxy_set_header   X-Forwarded-Host  $http_host;
@@ -238,18 +246,14 @@ server {
 
 ```caddyfile
 lanpaper.example.com {
-    reverse_proxy 127.0.0.1:8080 {
-        # Caddy passes a client-supplied X-Real-IP through unchanged, and
-        # Lanpaper prefers X-Real-IP over X-Forwarded-For. Always overwrite it.
-        header_up X-Real-IP {remote_host}
-    }
+    reverse_proxy 127.0.0.1:8080
 }
 ```
 
 Caddy sets `X-Forwarded-For`, `X-Forwarded-Proto` and `X-Forwarded-Host`
-itself and preserves `Host`. With any other proxy, make sure that both
-`X-Real-IP` and `X-Forwarded-For` are set by the proxy, never passed through
-from the client.
+itself and preserves `Host`. With any other proxy, make sure that
+`X-Forwarded-For` is appended to or overwritten by the proxy, never passed
+through from the client.
 
 ## Checks for contributors
 

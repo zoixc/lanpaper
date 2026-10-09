@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"runtime/debug"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -22,10 +21,27 @@ type window struct {
 	span  time.Duration
 }
 
-var (
-	muCounts sync.Mutex
-	counts   = map[string]*window{}
-)
+// rateShards splits the counters across independent locks, so requests from
+// different clients rarely contend on the same mutex. A key always maps to the
+// same shard, so one client's counter is still updated under a single lock.
+const rateShards = 64
+
+type rateShard struct {
+	mu     sync.Mutex
+	counts map[string]*window
+}
+
+var rateTable [rateShards]rateShard
+
+// shardFor returns the shard that holds key (FNV-1a, allocation free).
+func shardFor(key string) *rateShard {
+	h := uint32(2166136261)
+	for i := 0; i < len(key); i++ {
+		h ^= uint32(key[i])
+		h *= 16777619
+	}
+	return &rateTable[h%rateShards]
+}
 
 // StartCleaner removes expired counters periodically.
 // Call once from main; runs until the process exits.
@@ -34,6 +50,15 @@ func StartCleaner() {
 	defer ticker.Stop()
 	for range ticker.C {
 		cleanExpiredCounts(time.Now())
+	}
+}
+
+// resetRateCounts forgets every counter. Tests use it to start from a clean state.
+func resetRateCounts() {
+	for i := range rateTable {
+		rateTable[i].mu.Lock()
+		rateTable[i].counts = nil
+		rateTable[i].mu.Unlock()
 	}
 }
 
@@ -46,22 +71,28 @@ func cleanExpiredCounts(now time.Time) {
 			log.Printf("Critical: rate-limit cleaner recovered from a panic: %v\n%s", p, debug.Stack())
 		}
 	}()
-	muCounts.Lock()
-	defer muCounts.Unlock()
-	for key, c := range counts {
-		if now.Sub(c.start) >= c.span {
-			delete(counts, key)
+	for i := range rateTable {
+		sh := &rateTable[i]
+		sh.mu.Lock()
+		for key, c := range sh.counts {
+			if now.Sub(c.start) >= c.span {
+				delete(sh.counts, key)
+			}
 		}
+		sh.mu.Unlock()
 	}
 }
 
-// currentWindow returns the live window for key, starting a new one if the
-// previous window has expired. The caller must hold muCounts.
-func currentWindow(key string, span time.Duration, now time.Time) *window {
-	c, ok := counts[key]
+// currentWindow returns the live window for key in sh, starting a new one if
+// the previous window has expired. The caller must hold sh.mu.
+func currentWindow(sh *rateShard, key string, span time.Duration, now time.Time) *window {
+	c, ok := sh.counts[key]
 	if !ok || now.Sub(c.start) >= span {
+		if sh.counts == nil {
+			sh.counts = make(map[string]*window)
+		}
 		c = &window{start: now, span: span}
-		counts[key] = c
+		sh.counts[key] = c
 	}
 	return c
 }
@@ -75,9 +106,11 @@ func retryAfter(c *window, now time.Time) time.Duration {
 // tells the client when the window resets.
 func allowEvent(ns, key string, limit int, span time.Duration) (bool, time.Duration) {
 	now := time.Now()
-	muCounts.Lock()
-	defer muCounts.Unlock()
-	c := currentWindow(ns+":"+key, span, now)
+	id := ns + ":" + key
+	sh := shardFor(id)
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
+	c := currentWindow(sh, id, span, now)
 	if c.count >= limit {
 		return false, retryAfter(c, now)
 	}
@@ -89,9 +122,11 @@ func allowEvent(ns, key string, limit int, span time.Duration) (bool, time.Durat
 // its budget in the current window.
 func budgetExhausted(ns, key string, limit int, span time.Duration) (bool, time.Duration) {
 	now := time.Now()
-	muCounts.Lock()
-	defer muCounts.Unlock()
-	c, ok := counts[ns+":"+key]
+	id := ns + ":" + key
+	sh := shardFor(id)
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
+	c, ok := sh.counts[id]
 	if !ok || now.Sub(c.start) >= span || c.count < limit {
 		return false, 0
 	}
@@ -101,9 +136,11 @@ func budgetExhausted(ns, key string, limit int, span time.Duration) (bool, time.
 // recordEvent counts one event and returns the new total for the window.
 func recordEvent(ns, key string, span time.Duration) int {
 	now := time.Now()
-	muCounts.Lock()
-	defer muCounts.Unlock()
-	c := currentWindow(ns+":"+key, span, now)
+	id := ns + ":" + key
+	sh := shardFor(id)
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
+	c := currentWindow(sh, id, span, now)
 	c.count++
 	return c.count
 }
@@ -153,21 +190,17 @@ func RateLimit(fn RateLimitFunc) func(http.HandlerFunc) http.HandlerFunc {
 }
 
 // clientIP returns the real client IP.
-// X-Real-IP and X-Forwarded-For are honoured only when the request originates
-// from the configured TrustedProxy, preventing IP spoofing.
-// Both headers are validated as proper IP addresses before use.
+//
+// Only a request from the configured TrustedProxy may supply the client
+// address, and then only through the rightmost X-Forwarded-For entry: the
+// address the trusted proxy itself saw. X-Real-IP is deliberately never read.
+// A proxy that appends to X-Forwarded-For but does not overwrite a client-sent
+// X-Real-IP lets that header through unchanged, so trusting it let a client
+// claim any address, including a private one for the "local" access level,
+// and escape the per-client rate limit and login lockout.
 func clientIP(r *http.Request) string {
 	if config.IsTrustedProxy(r.RemoteAddr) {
-		if xr := r.Header.Get("X-Real-IP"); xr != "" {
-			candidate := strings.TrimSpace(xr)
-			if net.ParseIP(candidate) != nil {
-				return candidate
-			}
-		}
 		if xf := r.Header.Get("X-Forwarded-For"); xf != "" {
-			// XFF is comma-separated. Take the rightmost (last) entry: it is
-			// the address the trusted proxy actually saw, whereas leftmost
-			// entries are client-supplied and trivially spoofed.
 			candidate := rightmostHeader(xf)
 			if net.ParseIP(candidate) != nil {
 				return candidate

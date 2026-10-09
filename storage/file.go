@@ -27,3 +27,11 @@ func OpenMedia(path string) (*os.File, error) {
 	}
 	return f, nil
 }
+
+// IsReadOnlyError reports whether err means the path lives on a read-only
+// filesystem (EROFS), for example a legacy file inside a read_only container
+// whose directory is not mounted writable. Such files cannot be removed or
+// moved by the server, so callers treat that as a notice, not a failure.
+func IsReadOnlyError(err error) bool {
+	return errors.Is(err, syscall.EROFS)
+}

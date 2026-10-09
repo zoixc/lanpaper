@@ -5,14 +5,22 @@ Examples use `curl` and assume `ADMIN_PASS` is set in the shell.
 
 ## Conventions
 
-- **Authentication.** Admin endpoints (`/admin`, `/api/*`) use HTTP Basic Auth
-  with `ADMIN_USER` / `ADMIN_PASS`.
+- **Authentication.** Admin endpoints (`/admin`, `/api/*`) accept either the
+  session cookie from `POST /api/session` or HTTP Basic Auth, with
+  `ADMIN_USER` / `ADMIN_PASS`. `POST /api/session` takes
+  `{"username":"…","password":"…"}` and returns `204` with the cookie;
+  `DELETE /api/session` signs out. Sessions are kept in `data/sessions.json`, so
+  they survive a restart. Wrong passwords return `401` and share the Basic Auth
+  lockout (`429`).
   - **Publish keys.** `PUBLISH_KEYS` (environment only, comma-separated, 16+
     characters, at most 32) authorizes *publishing* without the admin login:
     `POST /api/upload` and `POST /api/link`. Send the key as
     `X-Api-Key: <key>` or `Authorization: Bearer <key>`. Every other admin
     route — rename, access level, pin, history, rollback, delete, listing —
     still requires Basic Auth, so a key is not an admin session.
+  - A key may add media but never replace it: `mode=replace` (the default)
+    on a link that already has media returns `403`. Use `mode=append`, or an
+    admin login, to change a live file.
   - Keys are kept as SHA-256 digests in memory, are never written to
     `config.json`, and appear in logs only as an 8-hex-character fingerprint.
   - A wrong key answers `401` and shares the brute-force budget with admin
@@ -322,7 +330,8 @@ Success: `200` with the updated link object.
 | --- | --- |
 | `400` | Invalid input, unsupported or corrupt media, an unknown `mode`, an `append` to a link without media, invalid `autoCreate` defaults, or a remote URL that is not allowed or failed to download. |
 | `401` | Missing or wrong credentials, or a wrong publish key. |
-| `403` / `404` | Gallery path outside the gallery directory / file not found. |
+| `403` | A publish key tried to replace the media of a link that already has media, a cross-origin request was refused, or a gallery path lies outside the gallery directory. |
+| `404` | File not found. |
 | `409` | The playlist already holds `PLAYLIST_MAX` items. |
 | `413` | Larger than `MAX_UPLOAD_MB`. |
 | `429` | Rate limit, concurrent-upload limit (`MAX_CONCURRENT_UPLOADS`, default 2 — the slots are busy, not the rate: retry when one finishes), or image memory budget exhausted. All of them carry `Retry-After`. |
@@ -353,6 +362,9 @@ slash-separated, for example `["holiday/beach.jpg"]`. The listing:
 - Ignores symlinks that resolve outside the directory.
 - Stops at 5,000 files.
 
+The listing is cached for 10 seconds, so a file added to the gallery can take
+up to 10 seconds to appear.
+
 ### `GET /api/external-image-preview?path=...`
 
 Returns one gallery file after validating its type, with
@@ -376,6 +388,8 @@ Rebuilds all image thumbnails and removes orphaned ones. The response is
 
 - Only one run at a time; a second request while one is running returns `429`
   (no `Retry-After`: the run has no predictable end).
+- Runs two previews at a time. If the shared decode budget is busy, a job waits
+  for it instead of failing.
 - Counts towards the upload rate limit. Only `POST` spends it: a probe with
   another method gets `405` before the limiter sees it.
 
@@ -433,7 +447,8 @@ done in the response writer's `ReadFrom` path, so media still uses `sendfile`.
 ### `GET /health`
 
 Liveness check, always public, no disk I/O. Returns
-`{"service":"lanpaper","status":"ok","version":"0.12.1"}`. Any method other than
+`{"service":"lanpaper","status":"ok"}`. The release version is deliberately not
+reported, so an unauthenticated probe cannot tell which release to attack. Any method other than
 `GET`/`HEAD` is `405`.
 
 ### `GET /health/ready`
@@ -458,7 +473,7 @@ path at the reverse proxy.
 
 | Route | Behaviour |
 | --- | --- |
-| `GET /admin` | Admin panel (Basic Auth). |
+| `GET /admin` | Admin panel. Without a session it shows the sign-in form. |
 | `/admin.html` | Permanent redirect to `/admin`. |
 | `/` | Redirect to `/admin`. |
 | `GET /sw.js` | Service worker (root scope). |

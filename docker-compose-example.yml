@@ -45,10 +45,10 @@ services:
       # ALLOW_EMBED: "true"
       # Set only to the address the proxy connects from: an IP/CIDR, or a
       # comma-separated list when the proxy reaches the container through
-      # more than one hop. Also configure the proxy to overwrite
-      # client-supplied X-Real-IP and X-Forwarded-* headers and to keep the
-      # original Host, otherwise the CSRF check rejects POST requests to
-      # /api/*.
+      # more than one hop. Also configure the proxy to append to or overwrite
+      # X-Forwarded-For, overwrite X-Forwarded-Proto and X-Forwarded-Host, and
+      # keep the original Host, otherwise the CSRF check rejects POST requests
+      # to /api/*. X-Real-IP is never read.
       # TRUSTED_PROXY: "172.18.0.1"
       # TRUSTED_PROXY: "192.168.20.1,172.18.0.1"
       # Terminate TLS in the container instead of at a proxy. Both must be set

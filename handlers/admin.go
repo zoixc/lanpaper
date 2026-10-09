@@ -3,6 +3,7 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"io/fs"
 	"log"
@@ -13,6 +14,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"lanpaper/config"
 	"lanpaper/storage"
@@ -26,12 +29,6 @@ const (
 	// nothing larger than a link name and a category).
 	maxJSONBody = 64 << 10 // 64 KB
 )
-
-func Admin(w http.ResponseWriter, r *http.Request) {
-	// Always revalidate: the panel must not run a stale UI after an upgrade.
-	w.Header().Set("Cache-Control", "no-store")
-	http.ServeFile(w, r, "admin.html")
-}
 
 type WallpaperResponse struct {
 	ID          string `json:"id"`
@@ -81,7 +78,9 @@ func Wallpapers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wallpapers := storage.Global.GetAll()
+	// Read-only listing: the records are not copied, only the slice of pointers
+	// (filters and sorting below reorder that slice, never the records).
+	wallpapers := storage.Global.Snapshot()
 	q := r.URL.Query()
 
 	if cat := q.Get("category"); cat != "" {
@@ -222,8 +221,11 @@ func inferCategory(wp *storage.Wallpaper) string {
 	return "other"
 }
 
+// toResponse builds the admin view of a record. It only reads wp: records are
+// shared with concurrent readers (see storage.Store.Snapshot), so it must not
+// write to them.
 func toResponse(wp *storage.Wallpaper) WallpaperResponse {
-	wp.AccessLevel = storage.NormalizeAccessLevel(wp.AccessLevel)
+	accessLevel := storage.NormalizeAccessLevel(wp.AccessLevel)
 	resp := WallpaperResponse{
 		ID:          wp.ID,
 		LinkName:    wp.LinkName,
@@ -237,10 +239,10 @@ func toResponse(wp *storage.Wallpaper) WallpaperResponse {
 		CreatedAt:   wp.CreatedAt,
 		Pinned:      wp.IsPinned,
 		PinnedAt:    wp.PinnedAt,
-		AccessLevel: wp.AccessLevel,
+		AccessLevel: accessLevel,
 	}
 	// Only expose the token to the authenticated admin for token-level links.
-	if wp.AccessLevel == config.AccessToken && wp.AccessToken != "" {
+	if accessLevel == config.AccessToken && wp.AccessToken != "" {
 		resp.AccessToken = wp.AccessToken
 	}
 	// Version, playlist and statistics are additive: a link that uses none of
@@ -267,16 +269,28 @@ func isValidCategory(cat string) bool { return config.ValidCategories[cat] }
 
 // removeFiles deletes image and optional preview files, ignoring not-found errors.
 func removeFiles(imagePath, previewPath string) {
-	if imagePath != "" {
-		if err := os.Remove(imagePath); err != nil && !os.IsNotExist(err) {
-			log.Printf("Error removing image %s: %v", imagePath, err)
-		}
+	removeFile(imagePath, "image")
+	removeFile(previewPath, "preview")
+}
+
+// removeFile deletes one media file and reports whether it is gone. A file on a
+// read-only filesystem (a legacy static/images copy inside a read_only container)
+// cannot be removed by the server; that is a deployment matter, so it is logged
+// as a note rather than as a failed delete.
+func removeFile(path, kind string) bool {
+	if path == "" {
+		return true
 	}
-	if previewPath != "" {
-		if err := os.Remove(previewPath); err != nil && !os.IsNotExist(err) {
-			log.Printf("Error removing preview %s: %v", previewPath, err)
-		}
+	err := os.Remove(path)
+	switch {
+	case err == nil || os.IsNotExist(err):
+		return true
+	case storage.IsReadOnlyError(err):
+		log.Printf("Note: %s %s is on a read-only filesystem and was left in place", kind, path)
+	default:
+		log.Printf("Error removing %s %s: %v", kind, path, err)
 	}
+	return false
 }
 
 // linkNameFromPath extracts and validates the link name from /api/link/{name},
@@ -343,6 +357,22 @@ func AdminPreview(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, filepath.Base(f.Name()), fi.ModTime(), f)
 }
 
+// externalImagesTTL bounds how stale the gallery listing may be. The picker is
+// opened rarely and a walk of a large mount is expensive, so repeated requests
+// within this window reuse one walk. A file added to the gallery shows up in
+// the picker at most this long after it appears on disk.
+const externalImagesTTL = 10 * time.Second
+
+// externalImagesCache holds the last encoded listing. mu is held for the whole
+// walk, so concurrent requests on an expired cache wait for one walk instead of
+// each starting their own.
+var externalImagesCache struct {
+	mu   sync.Mutex
+	key  string
+	at   time.Time
+	body []byte
+}
+
 // ExternalImages enumerates gallery files. The walk runs inside an os.Root,
 // so symlinked files are listed only if they resolve inside the gallery, and
 // symlinked directories are never descended into. Hard caps bound disk walk
@@ -352,10 +382,28 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	root, err := os.OpenRoot(config.Current.ExternalImageDir)
+	dir := config.Current.ExternalImageDir
+	key := dir + "\x00" + strconv.Itoa(config.Current.MaxWalkDepth) + "\x00" + strconv.Itoa(config.Current.MaxUploadMB)
+
+	externalImagesCache.mu.Lock()
+	defer externalImagesCache.mu.Unlock()
+	if externalImagesCache.body == nil || externalImagesCache.key != key || time.Since(externalImagesCache.at) > externalImagesTTL {
+		body, err := listExternalImages(dir)
+		if err != nil {
+			jsonEmpty(w)
+			return
+		}
+		externalImagesCache.key, externalImagesCache.at, externalImagesCache.body = key, time.Now(), body
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(externalImagesCache.body)
+}
+
+// listExternalImages walks the gallery and returns the encoded JSON array.
+func listExternalImages(dir string) ([]byte, error) {
+	root, err := os.OpenRoot(dir)
 	if err != nil {
-		jsonEmpty(w)
-		return
+		return nil, err
 	}
 	defer root.Close()
 	gallery := root.FS()
@@ -395,8 +443,11 @@ func ExternalImages(w http.ResponseWriter, r *http.Request) {
 		files = append(files, p)
 		return nil
 	})
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(files)
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(files); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func ExternalImagePreview(w http.ResponseWriter, r *http.Request) {

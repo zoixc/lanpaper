@@ -60,12 +60,12 @@ func setupApp(t *testing.T) *testApp {
 	}
 	storage.Global = &storage.Store{}
 	handlers.InitUploadSemaphore(config.Current.MaxConcurrentUploads)
-	for _, dir := range []string{"data/media", "data/previews", "external/images", "static/css", "static/images", "static/i18n"} {
+	for _, dir := range []string{"data/media", "data/previews", "external/images", "static/css", "static/js", "static/images", "static/i18n"} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for _, name := range []string{"admin.html", "static/sw.js", "static/css/style.css", "static/i18n/en.json"} {
+	for _, name := range []string{"admin.html", "login.html", "static/sw.js", "static/css/style.css", "static/i18n/en.json", "static/js/login.js"} {
 		src, err := os.ReadFile(filepath.Join(originalDir, name))
 		if err != nil {
 			t.Fatal(err)
@@ -172,7 +172,7 @@ func (a *testApp) upload(want int, name string, file []byte, url string) []byte 
 
 func TestAppAuthenticationStaticAssetsAndCSRF(t *testing.T) {
 	a := setupApp(t)
-	for _, route := range []string{"/admin", "/api/wallpapers", "/api/preview/x"} {
+	for _, route := range []string{"/api/wallpapers", "/api/preview/x"} {
 		a.expect(http.StatusUnauthorized, "GET", route, nil, false, nil)
 	}
 	a.expect(http.StatusForbidden, "POST", "/api/link", []byte(`{"linkName":"wrong"}`), true,

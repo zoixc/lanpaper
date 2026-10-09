@@ -31,9 +31,8 @@ jobs:
         with:
           go-version: stable
 
-      # Refuse to publish a tag that does not match the version the binary
-      # would report: /health answers with VERSION, so a mismatch is visible
-      # to every operator and every probe.
+      # Refuse to publish a tag that does not match VERSION, which is the version
+      # the image label and the release notes are taken from.
       - name: Check the tag matches VERSION
         run: |
           version="$(cat VERSION)"

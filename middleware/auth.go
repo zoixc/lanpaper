@@ -43,11 +43,20 @@ func checkAdminCredentials(r *http.Request) (authResult, time.Duration) {
 	if config.Current.DisableAuth || config.Current.AdminUser == "" || config.Current.AdminPass == "" {
 		return authMissing, 0
 	}
+	if HasAdminSession(r) {
+		return authOK, 0
+	}
 	user, pass, ok := r.BasicAuth()
 	if !ok {
 		return authMissing, 0
 	}
-	key := rateKey(r)
+	return verifyAdminPassword(user, pass, rateKey(r))
+}
+
+// verifyAdminPassword checks a username and password from client key. It is
+// shared by Basic auth and the login form, so both count failures and enforce
+// the same lockout.
+func verifyAdminPassword(user, pass, key string) (authResult, time.Duration) {
 	if locked, retry := budgetExhausted("authfail", key, authMaxFailures, authFailWindow); locked {
 		return authLocked, retry
 	}
