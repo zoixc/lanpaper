@@ -141,9 +141,17 @@ jobs:
 
           docker run -d --name lp_test -p 8080:8080 lanpaper:test
 
+          # /health deliberately omits the version (it would tell a probe which
+          # release to look up), so the version is checked on the image label.
+          label="$(docker inspect --format '{{index .Config.Labels "org.opencontainers.image.version"}}' lanpaper:test)"
+          if [ "$label" != "${VERSION}" ]; then
+            echo "Image label version '${label}' does not match VERSION '${VERSION}'"
+            exit 1
+          fi
+
           echo "Waiting for container to be ready..."
           for i in $(seq 1 15); do
-            if curl -sf http://localhost:8080/health | grep -q "\"version\":\"${VERSION}\""; then
+            if curl -sf http://localhost:8080/health | grep -q '"status":"ok"'; then
               echo "Container is healthy after $((i * 2))s"
               break
             fi
