@@ -94,9 +94,12 @@ request files remain cleanup-owned until publication.
 It found and corrected post-rename durability errors that could otherwise leave
 memory behind the already-renamed on-disk state.
 
-### PR 9 — Read-only storage audit command
+### PR 9 — Read-only storage audit command **(implemented; full CI pending)**
 
-Add `lanpaper audit` reporting missing files, orphan files, stale temporary files, invalid types/permissions, history drift and playlist drift. Produce human-readable and JSON output; never mutate.
+Added `lanpaper audit [--json] [--root DIR]` reporting missing referenced files,
+orphans, stale temporary files, invalid types/permissions and history/playlist
+size drift. Audits use a read-only filesystem walk and return a nonzero status
+when inconsistencies are found.
 
 ### PR 10 — Explicit repair command
 

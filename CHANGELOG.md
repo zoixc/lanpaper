@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Read-only storage audit.** `lanpaper audit` reports missing, orphaned,
+  temporary, invalid and metadata-drifted media in text or JSON without
+  modifying storage.
 - **Explicit upload transactions.** Upload publication now enforces ordered
   validate, stage, publish, metadata commit and finalize/rollback boundaries,
   with reverse-order rollback under injected failures.

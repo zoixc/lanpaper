@@ -180,6 +180,13 @@ without credentials.
   fine into the tens of thousands of links, but do not script thousands of
   mutations per second against one instance.
 
+## Storage audit
+
+Run `./lanpaper audit` with the application stopped or against a filesystem
+snapshot. Exit status 0 means clean, 1 means issues were found, and 2 means the
+audit could not complete. Use `--json` for automation and `--root DIR` when the
+Lanpaper data directory is mounted elsewhere. The command never mutates files.
+
 ## 6. Back up and restore
 
 ```sh
