@@ -29,6 +29,10 @@ type Report struct {
 
 func (r Report) Healthy() bool { return len(r.Issues) == 0 }
 
+func safeName(name string) bool {
+	return name != "" && name != "." && name != ".." && filepath.Base(name) == name && !strings.ContainsAny(name, `/\\`)
+}
+
 func Audit(root string) (Report, error) {
 	report := Report{Root: root, Issues: []Issue{}}
 	metaPath := filepath.Join(root, "data", "wallpapers.json")
@@ -73,16 +77,32 @@ func Audit(root string) (Report, error) {
 		if name == "" {
 			name = key
 		}
+		if !safeName(name) {
+			report.Issues = append(report.Issues, Issue{"invalid-record", "data/wallpapers.json", name, "unsafe link name", false})
+			continue
+		}
 		if wp.HasImage {
+			if !config.AllowedMediaExts["."+wp.MIMEType] {
+				report.Issues = append(report.Issues, Issue{"invalid-record", "data/wallpapers.json", name, "unsafe or unsupported media extension", false})
+				continue
+			}
 			addMissing(filepath.Join(root, "data", "media", name+"."+wp.MIMEType), "missing-media", name, wp.SizeBytes)
 			if !config.IsVideoExt(wp.MIMEType) {
 				addMissing(filepath.Join(root, "data", "previews", name+".webp"), "missing-preview", name, 0)
 			}
 		}
 		for _, h := range wp.History {
+			if h.Version == 0 || !config.AllowedMediaExts["."+h.Ext] {
+				report.Issues = append(report.Issues, Issue{"invalid-record", "data/wallpapers.json", name, "invalid history reference", false})
+				continue
+			}
 			addMissing(filepath.Join(root, "data", "history", name, fmt.Sprintf("%d.%s", h.Version, h.Ext)), "missing-history", name, h.SizeBytes)
 		}
 		for _, it := range wp.Items {
+			if it.ID <= 0 || !config.AllowedMediaExts["."+it.Ext] {
+				report.Issues = append(report.Issues, Issue{"invalid-record", "data/wallpapers.json", name, "invalid playlist reference", false})
+				continue
+			}
 			addMissing(filepath.Join(root, "data", "items", name, fmt.Sprintf("%d.%s", it.ID, it.Ext)), "missing-item", name, it.SizeBytes)
 		}
 	}

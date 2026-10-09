@@ -187,6 +187,14 @@ snapshot. Exit status 0 means clean, 1 means issues were found, and 2 means the
 audit could not complete. Use `--json` for automation and `--root DIR` when the
 Lanpaper data directory is mounted elsewhere. The command never mutates files.
 
+For recoverable findings, stop Lanpaper and review `./lanpaper repair
+--dry-run`. Apply exactly that plan with `./lanpaper repair --apply`. Files are
+moved to timestamped `data/quarantine/` directories rather than deleted;
+metadata is backed up and every operation is recorded in a fsynced
+`data/repair-*.jsonl` journal. Keep both until a subsequent audit and service
+smoke test pass. Missing live media and structurally invalid records require
+manual restore from backup.
+
 ## 6. Back up and restore
 
 ```sh

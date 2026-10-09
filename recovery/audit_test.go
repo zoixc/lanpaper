@@ -23,7 +23,11 @@ func TestAuditReportsMissingOrphanStaleAndDrift(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "data/wallpapers.json"), body, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "data/media/wall.png"), []byte("too-long"), 0o666); err != nil {
+	media := filepath.Join(root, "data/media/wall.png")
+	if err := os.WriteFile(media, []byte("too-long"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(media, 0o666); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "data/media/orphan.png"), []byte("x"), 0o600); err != nil {

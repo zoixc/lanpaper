@@ -101,9 +101,12 @@ orphans, stale temporary files, invalid types/permissions and history/playlist
 size drift. Audits use a read-only filesystem walk and return a nonzero status
 when inconsistencies are found.
 
-### PR 10 — Explicit repair command
+### PR 10 — Explicit repair command **(implemented; full CI pending)**
 
-Add `lanpaper repair --dry-run` and `--apply`, quarantine rather than immediate deletion, operation journal and recovery tests. Keep repair offline or under an exclusive application lock.
+Added explicit `lanpaper repair --dry-run|--apply`, timestamped quarantine,
+fsynced JSONL operation journal, metadata backup, exclusive repair lock and
+recovery tests. Missing live media and invalid records remain manual rather
+than being guessed or deleted.
 
 ### PR 11 — Structured logging
 

@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Offline storage repair.** `lanpaper repair --dry-run` plans safe changes;
+  `--apply` quarantines unreferenced files, journals operations, backs up
+  metadata and repairs recoverable references under an exclusive lock.
 - **Read-only storage audit.** `lanpaper audit` reports missing, orphaned,
   temporary, invalid and metadata-drifted media in text or JSON without
   modifying storage.
