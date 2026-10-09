@@ -79,7 +79,8 @@ self.addEventListener('fetch', event => {
       }
       return response;
     } catch (_) {
-      return await caches.match(request) || Response.error();
+      // ignoreSearch: a versioned asset (?v=) falls back to the precached copy offline.
+      return await caches.match(request, { ignoreSearch: true }) || Response.error();
     }
   })());
 });

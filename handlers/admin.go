@@ -30,12 +30,6 @@ const (
 	maxJSONBody = 64 << 10 // 64 KB
 )
 
-func Admin(w http.ResponseWriter, r *http.Request) {
-	// Always revalidate: the panel must not run a stale UI after an upgrade.
-	w.Header().Set("Cache-Control", "no-store")
-	http.ServeFile(w, r, "admin.html")
-}
-
 type WallpaperResponse struct {
 	ID          string `json:"id"`
 	LinkName    string `json:"linkName"`
