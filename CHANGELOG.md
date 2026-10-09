@@ -7,9 +7,10 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
-- **The panel is monochrome by default.** The accent, the status colours and
-  the card accents are neutral; colour now comes only from the Accent palettes
-  in Settings (Mono is the default, the previous palettes remain selectable).
+- **The panel is monochrome by default.** The accent and the status colours
+  are neutral; colour comes only from the Accent palettes in Settings. Mono is
+  the default, and Indigo, Sage, Clay, Graphite and Ocean keep their colours.
+  Destructive actions stay red.
 - **Softer shadows** on cards, the header and the buttons.
 - **Header controls share one height**: the grid/list switch, the theme and
   settings buttons and "New link" sit on the same line.

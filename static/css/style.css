@@ -150,8 +150,8 @@ ul, ol { list-style: none; }
     --success-soft:  rgba(27, 28, 30, 0.07);
     --warning:       #3E4147;
     --warning-soft:  rgba(27, 28, 30, 0.07);
-    --danger:        #3E4147;
-    --danger-soft:   rgba(27, 28, 30, 0.07);
+    --danger:        #B04A45;
+    --danger-soft:   rgba(176, 74, 69, 0.10);
     --info:          #3E4147;
     --info-soft:     rgba(27, 28, 30, 0.07);
 
@@ -274,8 +274,8 @@ html[data-theme="dark"] {
     --success-soft:  rgba(233, 234, 236, 0.08);
     --warning:       #B9BCC2;
     --warning-soft:  rgba(233, 234, 236, 0.08);
-    --danger:        #B9BCC2;
-    --danger-soft:   rgba(233, 234, 236, 0.08);
+    --danger:        #E79A96;
+    --danger-soft:   rgba(231, 154, 150, 0.14);
     --info:          #B9BCC2;
     --info-soft:     rgba(233, 234, 236, 0.08);
 
@@ -310,8 +310,20 @@ html[data-theme="dark"] {
    Блока нет: палитра совпадает с базовыми переменными :root. */
 
 /* --- Индиго — спокойный синий --- */
-html[data-palette="indigo"] { --bg: #F5F6F9; --bg-2: #EDEFF4; --surface-2: #F1F3F7; --surface-3: #E7EAF1; --matte: #ECEEF2; }
-html[data-palette="indigo"][data-theme="dark"] { --bg: #14161B; --bg-2: #0F1114; --surface: #1B1E24; --surface-2: #22262E; --surface-3: #2A2F38; --matte: #23262C; }
+html[data-palette="indigo"] {
+    --bg: #F5F6F9; --bg-2: #EDEFF4; --surface-2: #F1F3F7; --surface-3: #E7EAF1; --matte: #ECEEF2;
+    --accent: #5A66B5; --accent-rgb: 90, 102, 181;
+    --accent-hover: #4E5AA9; --accent-active: #46529C;
+    --accent-soft: rgba(90, 102, 181, 0.09); --accent-soft-2: rgba(90, 102, 181, 0.16);
+    --accent-text: #4C57A2;
+}
+html[data-palette="indigo"][data-theme="dark"] {
+    --bg: #14161B; --bg-2: #0F1114; --surface: #1B1E24; --surface-2: #22262E; --surface-3: #2A2F38; --matte: #23262C;
+    --accent: #9AA4E8; --accent-rgb: 154, 164, 232;
+    --accent-hover: #AAB3EE; --accent-active: #8C97E2;
+    --accent-soft: rgba(154, 164, 232, 0.13); --accent-soft-2: rgba(154, 164, 232, 0.22);
+    --accent-text: #AAB3EE;
+}
 
 /* --- Шалфей — приглушённая зелень --- */
 html[data-palette="sage"] {
