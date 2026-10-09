@@ -64,6 +64,11 @@ type Wallpaper struct {
 // sortedSnap caches the sorted slice and is invalidated on any mutation.
 type Store struct {
 	sync.RWMutex
+	// writeMu serializes every change to wallpapers. A writer holds it for the
+	// whole read-modify-write-publish sequence, including the disk write, but
+	// takes the RWMutex only for the in-memory reads and the final swap. Readers
+	// therefore never wait for file I/O or fsync.
+	writeMu    sync.Mutex
 	wallpapers map[string]*Wallpaper
 	sortedSnap []*Wallpaper
 	generation uint64
@@ -94,6 +99,8 @@ func (s *Store) Get(id string) (*Wallpaper, bool) {
 // Set is for the one-time startup media migration. Request handlers must use
 // the persistent Create/Update/Rename/DeleteEntry operations below.
 func (s *Store) Set(id string, wp *Wallpaper) {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
 	s.Lock()
 	defer s.Unlock()
 	clone := *wp
@@ -103,23 +110,32 @@ func (s *Store) Set(id string, wp *Wallpaper) {
 	s.sortedSnap = nil
 }
 
-// commitLocked atomically persists a new map BEFORE publishing it to readers.
-// No handler may report success or change access levels in memory if saving
-// fails. File I/O under the write lock also serializes concurrent writers.
-func (s *Store) commitLocked(next map[string]*Wallpaper) error {
-	if err := atomicWrite(dataFile, next); err != nil {
+// writeFile persists a full wallpaper map. It is a variable so tests can slow
+// it down and check that readers are not blocked by a write in progress.
+var writeFile = atomicWrite
+
+// commit persists next BEFORE publishing it to readers. No handler may report
+// success or change access levels in memory if saving fails. The caller must
+// hold writeMu and must not hold the RWMutex, so readers keep running during
+// the write.
+func (s *Store) commit(next map[string]*Wallpaper) error {
+	if err := writeFile(dataFile, next); err != nil {
 		return err
 	}
+	s.Lock()
 	s.wallpapers = next
 	s.generation++
 	s.sortedSnap = nil
+	s.Unlock()
 	return nil
 }
 
 func (s *Store) Create(wp *Wallpaper) error {
-	s.Lock()
-	defer s.Unlock()
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	s.RLock()
 	if _, ok := s.wallpapers[wp.LinkName]; ok {
+		s.RUnlock()
 		return ErrExists
 	}
 	next := maps.Clone(s.wallpapers)
@@ -128,27 +144,32 @@ func (s *Store) Create(wp *Wallpaper) error {
 	}
 	clone := *wp
 	clone.Version = s.generation + 1
+	s.RUnlock()
 	next[wp.LinkName] = &clone
-	return s.commitLocked(next)
+	return s.commit(next)
 }
 
 // Update applies edit to a copy and publishes it only after successful save.
 // The returned record is also a copy; never mutate a record from the map.
 func (s *Store) Update(id string, edit func(*Wallpaper) error) (*Wallpaper, error) {
-	s.Lock()
-	defer s.Unlock()
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	s.RLock()
 	old, ok := s.wallpapers[id]
 	if !ok || old == nil {
+		s.RUnlock()
 		return nil, ErrNotFound
 	}
 	clone := *old
 	if err := edit(&clone); err != nil {
+		s.RUnlock()
 		return nil, err
 	}
 	clone.Version = s.generation + 1
 	next := maps.Clone(s.wallpapers)
+	s.RUnlock()
 	next[id] = &clone
-	if err := s.commitLocked(next); err != nil {
+	if err := s.commit(next); err != nil {
 		return nil, err
 	}
 	out := clone
@@ -156,13 +177,16 @@ func (s *Store) Update(id string, edit func(*Wallpaper) error) (*Wallpaper, erro
 }
 
 func (s *Store) Rename(oldName, newName string) (*Wallpaper, error) {
-	s.Lock()
-	defer s.Unlock()
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	s.RLock()
 	wp, ok := s.wallpapers[oldName]
 	if !ok || wp == nil {
+		s.RUnlock()
 		return nil, ErrNotFound
 	}
 	if _, exists := s.wallpapers[newName]; exists {
+		s.RUnlock()
 		return nil, ErrExists
 	}
 	clone := *wp
@@ -177,9 +201,10 @@ func (s *Store) Rename(oldName, newName string) (*Wallpaper, error) {
 		}
 	}
 	next := maps.Clone(s.wallpapers)
+	s.RUnlock()
 	delete(next, oldName)
 	next[newName] = &clone
-	if err := s.commitLocked(next); err != nil {
+	if err := s.commit(next); err != nil {
 		return nil, err
 	}
 	out := clone
@@ -187,15 +212,18 @@ func (s *Store) Rename(oldName, newName string) (*Wallpaper, error) {
 }
 
 func (s *Store) DeleteEntry(id string) (*Wallpaper, error) {
-	s.Lock()
-	defer s.Unlock()
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	s.RLock()
 	wp, ok := s.wallpapers[id]
 	if !ok || wp == nil {
+		s.RUnlock()
 		return nil, ErrNotFound
 	}
 	next := maps.Clone(s.wallpapers)
+	s.RUnlock()
 	delete(next, id)
-	if err := s.commitLocked(next); err != nil {
+	if err := s.commit(next); err != nil {
 		return nil, err
 	}
 	clone := *wp
@@ -649,6 +677,8 @@ func (s *Store) Load() error {
 	// The archive budget is checked from a counter, so it has to start from the
 	// value already on disk.
 	historyBytesTotal.Store(archived)
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
 	s.Lock()
 	s.generation++
 	for _, wp := range m {
