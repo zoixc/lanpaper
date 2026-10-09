@@ -5,6 +5,8 @@ Notable changes to Lanpaper. Docker images are published as
 
 ## [Unreleased]
 
+## [0.15.1] – 2026-10-09
+
 Security hardening from an internal audit. Behaviour changes are listed under
 **Changed**; upgrading is a container restart.
 
