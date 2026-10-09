@@ -3,6 +3,42 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
+## [0.15.0] – 2026-10-09
+
+A visual release for the 2.0 panel: a monochrome default with the colour kept
+in the accent palettes, a new minimalist logo, and a tidier header, list and
+card layout. No data or URL behaviour changes; the palette a user has already
+chosen is kept. Users who never picked one see the new Mono default. Upgrading
+is a container restart.
+
+### Changed
+
+- **New minimalist logo**: a network mark (one node linked to four) in the
+  favicon, the header, the logo files and the PWA icons.
+- **The panel is monochrome by default.** The accent and the status colours
+  are neutral; colour comes only from the Accent palettes in Settings. Mono is
+  the default, and Indigo, Sage, Clay, Graphite and Ocean keep their colours.
+  Destructive actions stay red.
+- **Softer shadows** on cards, the header and the buttons.
+- **Header controls share one height**: the grid/list switch, the theme and
+  settings buttons and "New link" sit on the same line.
+- **The list/grid switch animates**: a sliding highlight under the active view
+  and a short fade of the cards.
+- **The card menu (⋯) is always visible** as a bordered button at the end of
+  the card's title row.
+- **List rows are aligned in columns**: metadata, tags, access and the menu sit
+  on the same vertical lines in every row.
+
+### Fixed
+
+- **The search field on phones is full width**, so its placeholder is no longer
+  cut off; filters sit on the line below and still scroll.
+- **The metadata line on phones and in tiles** no longer cuts a value in the
+  middle: the type and size stay whole, the resolution is hidden in the phone
+  tile, and the date is hidden on phones as before.
+- **The "1 in playlist" badge on a thumbnail** shrinks with an ellipsis instead
+  of overflowing the frame.
+
 ## [0.14.1] – 2026-10-08
 
 A fix release for the 2.0 panel: the strings it looked up but never had, the

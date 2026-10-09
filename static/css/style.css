@@ -137,23 +137,23 @@ ul, ol { list-style: none; }
     --border-strong: #BFC4D1;
 
     /* Акцент */
-    --accent:        #5A66B5;
-    --accent-rgb:    90, 102, 181;
-    --accent-hover:  #4E5AA9;
-    --accent-active: #46529C;
-    --accent-soft:   rgba(90, 102, 181, 0.09);
-    --accent-soft-2: rgba(90, 102, 181, 0.16);
-    --accent-text:   #4C57A2;
+    --accent:        #1B1C1E;
+    --accent-rgb:    27, 28, 30;
+    --accent-hover:  #35373B;
+    --accent-active: #000;
+    --accent-soft:   rgba(27, 28, 30, 0.06);
+    --accent-soft-2: rgba(27, 28, 30, 0.12);
+    --accent-text:   #1B1C1E;
 
-    /* Статусы */
-    --success:       #2F7C5F;
-    --success-soft:  rgba(47, 124, 95, 0.11);
-    --warning:       #93661A;
-    --warning-soft:  rgba(147, 102, 26, 0.12);
+    /* Статусы: монохром — различаются значком и текстом, не цветом */
+    --success:       #3E4147;
+    --success-soft:  rgba(27, 28, 30, 0.07);
+    --warning:       #3E4147;
+    --warning-soft:  rgba(27, 28, 30, 0.07);
     --danger:        #B04A45;
     --danger-soft:   rgba(176, 74, 69, 0.10);
-    --info:          #3D6E92;
-    --info-soft:     rgba(61, 110, 146, 0.11);
+    --info:          #3E4147;
+    --info-soft:     rgba(27, 28, 30, 0.07);
 
     /* Матование превью: поля вокруг вписанного кадра */
     --matte:         #ECEEF2;
@@ -165,16 +165,16 @@ ul, ol { list-style: none; }
     /* Тени. У каждой поверхности — своя высота, и это видно без «парения»:
        мягкий разлёт с отрицательным spread держит тень под элементом, а не
        вокруг него. Свечения и цветных градиентов нет ни у одной. */
-    --shadow-xs: 0 1px 2px rgba(20, 22, 32, 0.05);
-    --shadow-sm: 0 1px 2px rgba(20, 22, 32, 0.05), 0 2px 6px -2px rgba(20, 22, 32, 0.07);
-    --shadow-md: 0 2px 6px rgba(20, 22, 32, 0.06), 0 12px 28px -12px rgba(20, 22, 32, 0.18);
-    --shadow-lg: 0 4px 12px rgba(20, 22, 32, 0.08), 0 28px 60px -24px rgba(20, 22, 32, 0.30);
+    --shadow-xs: 0 1px 1px rgba(20, 22, 32, 0.03);
+    --shadow-sm: 0 1px 2px rgba(20, 22, 32, 0.04);
+    --shadow-md: 0 2px 5px rgba(20, 22, 32, 0.04), 0 8px 18px -14px rgba(20, 22, 32, 0.12);
+    --shadow-lg: 0 4px 10px rgba(20, 22, 32, 0.05), 0 18px 36px -26px rgba(20, 22, 32, 0.18);
     /* Плитка. На светлом фоне сама поверхность белее фона, поэтому хватает
        одной мягкой тени по нижнему краю — карточка перестаёт быть наклейкой. */
-    --shadow-card: 0 1px 2px rgba(20, 22, 32, 0.05), 0 6px 16px -10px rgba(20, 22, 32, 0.18);
-    --shadow-card-hover: 0 2px 4px rgba(20, 22, 32, 0.06), 0 14px 28px -12px rgba(20, 22, 32, 0.24);
+    --shadow-card: 0 1px 2px rgba(20, 22, 32, 0.03), 0 4px 10px -8px rgba(20, 22, 32, 0.10);
+    --shadow-card-hover: 0 1px 3px rgba(20, 22, 32, 0.04), 0 8px 18px -12px rgba(20, 22, 32, 0.14);
     /* Липкая шапка: тень уходит вниз, отделяя её от содержимого */
-    --shadow-bar: 0 10px 22px -18px rgba(20, 22, 32, 0.42);
+    --shadow-bar: 0 6px 14px -14px rgba(20, 22, 32, 0.20);
     --shadow-focus: 0 0 0 3px rgba(var(--accent-rgb), 0.22);
 
     /* Радиусы */
@@ -262,22 +262,22 @@ html[data-theme="dark"] {
     --border-2:      #3A404A;
     --border-strong: #4A5260;
 
-    --accent:        #9AA4E8;
-    --accent-rgb:    154, 164, 232;
-    --accent-hover:  #AAB3EE;
-    --accent-active: #8C97E2;
-    --accent-soft:   rgba(154, 164, 232, 0.13);
-    --accent-soft-2: rgba(154, 164, 232, 0.22);
-    --accent-text:   #AAB3EE;
+    --accent:        #E9EAEC;
+    --accent-rgb:    233, 234, 236;
+    --accent-hover:  #FFF;
+    --accent-active: #D4D6DA;
+    --accent-soft:   rgba(233, 234, 236, 0.08);
+    --accent-soft-2: rgba(233, 234, 236, 0.14);
+    --accent-text:   #F2F3F4;
 
-    --success:       #7FCBB0;
-    --success-soft:  rgba(127, 203, 176, 0.14);
-    --warning:       #E0BC7E;
-    --warning-soft:  rgba(224, 188, 126, 0.14);
+    --success:       #B9BCC2;
+    --success-soft:  rgba(233, 234, 236, 0.08);
+    --warning:       #B9BCC2;
+    --warning-soft:  rgba(233, 234, 236, 0.08);
     --danger:        #E79A96;
     --danger-soft:   rgba(231, 154, 150, 0.14);
-    --info:          #8CC0DC;
-    --info-soft:     rgba(140, 192, 220, 0.14);
+    --info:          #B9BCC2;
+    --info-soft:     rgba(233, 234, 236, 0.08);
 
     --matte:         #23262C;
     --matte-line:    rgba(255, 255, 255, 0.05);
@@ -285,16 +285,16 @@ html[data-theme="dark"] {
     --checker-b:     #2A2F38;
     --shade:         rgba(8, 9, 11, 0.66);
 
-    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 6px -2px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.45), 0 14px 30px -14px rgba(0, 0, 0, 0.6);
-    --shadow-lg: 0 6px 16px rgba(0, 0, 0, 0.5), 0 32px 64px -28px rgba(0, 0, 0, 0.75);
+    --shadow-xs: 0 1px 1px rgba(0, 0, 0, 0.25);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28);
+    --shadow-md: 0 2px 5px rgba(0, 0, 0, 0.28), 0 8px 18px -14px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 4px 10px rgba(0, 0, 0, 0.32), 0 18px 36px -26px rgba(0, 0, 0, 0.55);
     /* В темноте тень почти не читается, поэтому высоту показывает светлая
        кромка сверху: одна прозрачная линия в 1 px — и поверхность отделяется
        от фона, не превращаясь в «свечение». */
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.45), 0 8px 20px -12px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.5), 0 16px 30px -14px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    --shadow-bar: 0 10px 24px -18px rgba(0, 0, 0, 0.8);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.28), 0 4px 10px -8px rgba(0, 0, 0, 0.40);
+    --shadow-card-hover: 0 1px 3px rgba(0, 0, 0, 0.30), 0 8px 18px -12px rgba(0, 0, 0, 0.45);
+    --shadow-bar: 0 6px 14px -14px rgba(0, 0, 0, 0.55);
 }
 
 
@@ -306,9 +306,24 @@ html[data-theme="dark"] {
    Переключатель: <html data-palette="sage">.
    ============================================================ */
 
-/* --- Индиго (значения по умолчанию, см. :root) — спокойный синий --- */
-html[data-palette="indigo"] { --bg: #F5F6F9; --bg-2: #EDEFF4; --surface-2: #F1F3F7; --surface-3: #E7EAF1; --matte: #ECEEF2; }
-html[data-palette="indigo"][data-theme="dark"] { --bg: #14161B; --bg-2: #0F1114; --surface: #1B1E24; --surface-2: #22262E; --surface-3: #2A2F38; --matte: #23262C; }
+/* --- Монохром (по умолчанию, значения в :root) — акцент = текст: без цвета ---
+   Блока нет: палитра совпадает с базовыми переменными :root. */
+
+/* --- Индиго — спокойный синий --- */
+html[data-palette="indigo"] {
+    --bg: #F5F6F9; --bg-2: #EDEFF4; --surface-2: #F1F3F7; --surface-3: #E7EAF1; --matte: #ECEEF2;
+    --accent: #5A66B5; --accent-rgb: 90, 102, 181;
+    --accent-hover: #4E5AA9; --accent-active: #46529C;
+    --accent-soft: rgba(90, 102, 181, 0.09); --accent-soft-2: rgba(90, 102, 181, 0.16);
+    --accent-text: #4C57A2;
+}
+html[data-palette="indigo"][data-theme="dark"] {
+    --bg: #14161B; --bg-2: #0F1114; --surface: #1B1E24; --surface-2: #22262E; --surface-3: #2A2F38; --matte: #23262C;
+    --accent: #9AA4E8; --accent-rgb: 154, 164, 232;
+    --accent-hover: #AAB3EE; --accent-active: #8C97E2;
+    --accent-soft: rgba(154, 164, 232, 0.13); --accent-soft-2: rgba(154, 164, 232, 0.22);
+    --accent-text: #AAB3EE;
+}
 
 /* --- Шалфей — приглушённая зелень --- */
 html[data-palette="sage"] {
@@ -525,7 +540,7 @@ html[data-palette="ocean"][data-theme="dark"] {
     color: var(--text-on-accent);
     /* Тот же приём, что у плавающей кнопки, но слабее: акцентная кнопка
        отбрасывает тень своего цвета — она читается нажимаемой. */
-    box-shadow: 0 1px 2px rgba(var(--accent-rgb), 0.28), 0 8px 18px -10px rgba(var(--accent-rgb), 0.5);
+    box-shadow: 0 1px 2px rgba(var(--accent-rgb), 0.18);
 }
 .btn--primary:hover { background: var(--accent-hover); border-color: transparent; }
 .btn--primary:active { background: var(--accent-active); }
@@ -581,13 +596,34 @@ html[data-palette="ocean"][data-theme="dark"] {
     display: inline-flex;
     align-items: center;
     gap: 2px;
-    padding: 3px;
+    padding: 2px;
     border: 1px solid var(--border);
     border-radius: var(--r-full);
     background: var(--surface);
 }
 .btn-group .icon-btn { width: 30px; height: 30px; }
 .btn-group .icon-btn svg { width: 16px; height: 16px; }
+
+/* Переключатель «плитка/список»: под активной кнопкой едет одна подложка.
+   Она лежит первым ребёнком (::before), значки выше неё — поэтому видны. */
+.btn-group--view { position: relative; --seg: 30px; }
+@media (hover: none) { .btn-group--view { --seg: 34px; } }
+.btn-group--view::before {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: var(--seg); height: var(--seg);
+    border-radius: 50%;
+    background: var(--accent-soft-2);
+    transition: transform 260ms var(--ease-out);
+    pointer-events: none;
+}
+.btn-group--view[data-view="list"]::before { transform: translateX(calc(var(--seg) + 2px)); }
+.btn-group--view .icon-btn[aria-pressed="true"],
+.btn-group--view .icon-btn[aria-pressed="true"]:hover {
+    background: transparent;
+    color: var(--text);
+}
 
 @media (hover: none) { .btn-group .icon-btn { min-width: 38px; min-height: 38px; } }
 
@@ -991,6 +1027,11 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
     white-space: nowrap;
 }
 .on-media svg { width: 12px; height: 12px; }
+/* В узком кадре (миниатюра списка на телефоне) текст бейджа обрывается
+   многоточием, а не вылезает за край кадра */
+.on-media { min-width: 0; max-width: 100%; }
+.on-media > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.card__badges-left { min-width: 0; }
 
 .kbd {
     display: inline-flex;
@@ -1221,22 +1262,26 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
     cursor: pointer;
 }
 .card.is-selected .card__name { color: var(--accent-text); }
+/* «⋯» видна всегда: раньше она появлялась только при наведении, и её
+   было не найти. Теперь это явная кнопка с рамкой в правом краю строки. */
 .card__menu-btn {
     flex: none;
-    width: 26px; height: 26px;
-    margin: -4px -6px -4px 0;
+    width: 30px; height: 30px;
+    margin: -2px -4px -2px 0;
+    border: 1px solid var(--border);
     border-radius: var(--r-full);
-    color: var(--text-3);
+    background: var(--surface);
+    color: var(--text-2);
     display: inline-flex; align-items: center; justify-content: center;
-    opacity: 0;
-    transition: opacity var(--dur) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+    box-shadow: var(--shadow-xs);
+    transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
 .card__menu-btn svg { width: 16px; height: 16px; }
-.card:hover .card__menu-btn, .card:focus-within .card__menu-btn, .card__menu-btn[aria-expanded="true"] { opacity: 1; }
-.card__menu-btn:hover { background: var(--surface-2); color: var(--text); }
+.card__menu-btn:hover,
+.card__menu-btn[aria-expanded="true"] { background: var(--surface-2); border-color: var(--border-2); color: var(--text); }
 
 @media (hover: none) {
-    .card__menu-btn { opacity: 1; width: 34px; height: 34px; margin: -6px -8px -6px 0; }
+    .card__menu-btn { width: 36px; height: 36px; margin: -4px -6px -4px 0; }
 }
 
 .card__meta {
@@ -1251,6 +1296,11 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
 .card__meta > * { flex: none; }
 .card__meta > span + span::before { content: '·'; margin-right: 6px; opacity: 0.55; }
 .card__meta .truncate { flex: 0 1 auto; min-width: 0; }
+/* Хвост метаданных в плитке обрывается многоточием, а не режется по букве */
+/* Сжимается только последняя видимая часть строки; остальные не режутся.
+   На телефоне последняя (дата) скрыта, поэтому там сжимается предпоследняя —
+   см. правило для узкого экрана ниже. */
+.card__meta > span:last-child { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .card__tags { display: flex; align-items: center; gap: 5px; margin-top: 3px; flex-wrap: wrap; }
 
 @media (max-width: 560px) { .card__meta .meta-hide-sm { display: none; } }
@@ -2029,44 +2079,61 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
 .grid--list .card__open { opacity: 1; transform: none; }
 .grid--list .card:hover { transform: none; }
 
-/* Широкая строка: имя, мета, метки и доступ — в одну линию, как в списке
-   файлов. Только там, где для этого есть место; на телефоне строка узкая,
-   и тело остаётся колонкой. */
+/* Широкая строка списка: колонки фиксированы, а не растут от содержимого.
+   Поэтому у всех строк «метаданные», «метки», «доступ» и «⋯» стоят на одной
+   вертикали, даже если у одной ссылки есть ротация, а у другой нет.
+   Каждый элемент ставится на свою линию сетки явно: отсутствующая метка
+   не сдвигает соседей. Имя тянется и ужимается многоточием. */
 @media (min-width: 721px) {
     .grid--list .card__body {
-        flex-direction: row;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 300px 150px 176px 30px;
+        column-gap: var(--s-4);
+        row-gap: 4px;
         align-items: center;
-        /* Перенос — страховка от выдавливания: селект доступа уходит на
-           следующую строку, а не за правый край карточки, где его срезает
-           overflow: hidden. Так строка выглядит одинаково в любом браузере,
-           независимо от того, как он ужимает вложенное содержимое. */
-        flex-wrap: wrap;
-        gap: var(--s-4);
-        padding: 10px 16px;
+        padding: 10px 14px 10px 16px;
         min-width: 0;
     }
-    /* Имя тянется и ужимается: поиск по нему — первое, за что цепляется глаз. */
-    .grid--list .card__head { flex: 1 1 auto; min-width: 0; }
-    /* Метаданные — самая уступчивая часть строки: нулевая базовая ширина
-       выводит их из расчёта переноса (там, где строка помещается без них,
-       перенос не срабатывает), рост делит с именем остаток, а минимум 72 px
-       не даёт превратиться в полоску. Лишнее у них обрезается: overflow:
-       hidden в ui.css, хвост — с многоточием. */
-    .grid--list .card__meta { flex: 1 1 0; min-width: 72px; }
-    .grid--list .card__tags { margin-top: 0; flex: 0 0 auto; }
-    /* Хвост метаданных уступает место целиком и обрывается многоточием,
-       а не посередине слова */
+    /* Заголовок растворяется в сетке строки: его имя и «⋯» — колонки строки */
+    .grid--list .card__head { display: contents; }
+    .grid--list .card__name     { grid-column: 1; grid-row: 1; min-width: 0; }
+    .grid--list .card__meta     { grid-column: 2; grid-row: 1; min-width: 0; }
+    .grid--list .card__tags     { grid-column: 3; grid-row: 1; min-width: 0; margin-top: 0; }
+    .grid--list .card__access   { grid-column: 4; grid-row: 1; width: 176px; }
+    .grid--list .card__menu-btn { grid-column: 5; grid-row: 1; margin: 0; justify-self: end; }
+    /* Хвост метаданных обрывается многоточием, а не посередине слова */
     .grid--list .card__meta > span:last-child {
         flex: 0 1 auto;
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    /* Доступ — компактный переключатель у правого края: он не тянется на всю
-       строку и не дублирует метку (метка в этом виде не рисуется).
-       margin-left: auto держит его справа и на своей строке, и на переносе. */
-    .grid--list .card__access { flex: 0 0 auto; width: 176px; margin-left: auto; }
 }
+
+/* Планшет и узкое окно: строка в две линии. Сверху — имя, доступ и «⋯»,
+   ниже — метаданные и метки. Так три колонки справа не выдавливают имя. */
+@media (min-width: 721px) and (max-width: 1080px) {
+    .grid--list .card__body {
+        grid-template-columns: minmax(0, 1fr) 176px 30px;
+        row-gap: 6px;
+    }
+    .grid--list .card__name     { grid-column: 1; grid-row: 1; }
+    .grid--list .card__access   { grid-column: 2; grid-row: 1; width: 176px; }
+    .grid--list .card__menu-btn { grid-column: 3; grid-row: 1; margin: 0; justify-self: end; }
+    .grid--list .card__meta     { grid-column: 1 / span 3; grid-row: 2; }
+    .grid--list .card__tags     { grid-column: 1 / span 3; grid-row: 3; }
+}
+
+/* Переключение вида: карточки проявляются из лёгкого сдвига, первые
+   несколько — с задержкой друг за другом. backwards: анимация действует
+   только до своего конца, поэтому не перебивает подъём при наведении. */
+@keyframes view-in { from { opacity: 0; transform: translateY(6px); } }
+.grid.is-switching > * { animation: view-in 260ms var(--ease-out) backwards; }
+.grid.is-switching > :nth-child(2) { animation-delay: 25ms; }
+.grid.is-switching > :nth-child(3) { animation-delay: 50ms; }
+.grid.is-switching > :nth-child(4) { animation-delay: 75ms; }
+.grid.is-switching > :nth-child(5) { animation-delay: 100ms; }
+.grid.is-switching > :nth-child(n+6) { animation-delay: 125ms; }
 
 /* ============================================================
    ПОДВАЛ
@@ -2112,7 +2179,7 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
     color: var(--text-on-accent);
     font-size: var(--t-sm);
     font-weight: var(--fw-semibold);
-    box-shadow: 0 6px 20px -6px rgba(var(--accent-rgb), 0.65), 0 2px 6px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 4px 12px -6px rgba(var(--accent-rgb), 0.45), 0 1px 3px rgba(0, 0, 0, 0.10);
     transition: transform var(--dur) var(--ease-out), background var(--dur-fast) var(--ease), opacity var(--dur) var(--ease);
 }
 .fab svg { width: 18px; height: 18px; }
@@ -2212,13 +2279,22 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
     .drop-scrim__inner { padding: var(--s-5); }
 }
 
-/* --- Шапка на телефоне ---
-   Пять иконочных кнопок по 44 px (--tap) и слово «Lanpaper» в строку не
-   влезают: кнопки ужимаются до 38 px — та же цель, что у группы
-   «плитка/список», — а на самом узком экране имя уступает место значку,
-   иначе строка начинает распирать страницу. */
-@media (max-width: 560px) and (hover: none) {
-    .appbar .icon-btn { min-width: 38px; min-height: 38px; }
+/* --- Ряд действий в шапке: все контролы одной высоты ---
+   Иконки, группа «плитка/список» и «Новая ссылка» стоят на одной оси.
+   Размер задан явно через --ctl, а не разными min-height: раньше группа
+   вида была выше соседних кнопок и «сидела» на них не по центру.
+   На тач-экране всё растёт вместе, чтобы сохранить зону нажатия. */
+.appbar__actions { --ctl: 36px; --ctl-inner: 30px; }
+.appbar__actions .icon-btn,
+.appbar__actions .btn { width: auto; height: var(--ctl); min-width: var(--ctl); min-height: var(--ctl); }
+.appbar__actions .icon-btn { width: var(--ctl); }
+.appbar__actions .btn-group { height: var(--ctl); }
+.appbar__actions .btn-group .icon-btn {
+    width: var(--ctl-inner); height: var(--ctl-inner);
+    min-width: 0; min-height: 0;
+}
+@media (hover: none) {
+    .appbar__actions { --ctl: 40px; --ctl-inner: 34px; }
 }
 
 /* --- Очень узкий телефон: одна колонка, крупные элементы --- */
@@ -2237,6 +2313,22 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
 @media (min-width: 721px) and (max-width: 1023px) {
     .search { flex: 1 1 200px; max-width: 280px; }
     .tools { flex: 1 1 280px; }
+}
+
+/* Плитка на телефоне: разрешение уходит из строки, остаются формат и размер.
+   Иначе каждая часть обрезалась бы («IMAGE/…», «540×…»). Дата скрыта выше. */
+@media (max-width: 560px) {
+    .grid:not(.grid--list) .card__meta > span:nth-child(2) { display: none; }
+    .card__meta > span:nth-last-child(2) { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+}
+
+/* Телефон: поиск на всю ширину, фильтры — строкой ниже. Раньше поиск был
+   144 px, и плейсхолдер «Search by name or file» обрезался. Фильтры по-прежнему
+   прокручиваются, высота шапки та же: поиск и чипы и так занимали две строки. */
+@media (max-width: 720px) {
+    .appbar__row--tools { flex-wrap: wrap; }
+    .search { flex: 1 1 100%; max-width: none; min-width: 0; }
+    .tools { flex: 1 1 100%; min-width: 0; }
 }
 
 /* Скрытие элементов массовых действий и режима выбора */

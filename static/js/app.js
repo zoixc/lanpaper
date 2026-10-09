@@ -273,7 +273,7 @@
         sort: 'date_desc',
         view: 'grid',
         theme: 'auto',
-        palette: 'indigo',
+        palette: 'mono',
         lang: 'ru',
         selecting: false,
         selected: new Set(),
@@ -305,7 +305,7 @@
             : (legacy.theme === 'light' ? 'light' : 'auto'));
         const sort = saved.sort || (SORT_KEYS.indexOf(legacy.sort) >= 0 ? legacy.sort : 'date_desc');
         state.theme = THEME_MODES.indexOf(theme) >= 0 ? theme : 'auto';
-        state.palette = PALETTES.indexOf(saved.palette) >= 0 ? saved.palette : 'indigo';
+        state.palette = PALETTES.indexOf(saved.palette) >= 0 ? saved.palette : 'mono';
         state.lang = langFromPrefs();
         state.view = saved.view === 'list' || legacy.view === 'list' ? 'list' : 'grid';
         state.sort = sort;
@@ -432,8 +432,23 @@
         document.documentElement.dataset.view = state.view;
         const grid = $('#grid');
         grid.classList.toggle('grid--list', state.view === 'list');
+        /* Подложка переключателя едет к активной кнопке (см. style.css) */
+        $('#viewGridBtn').parentElement.dataset.view = state.view;
         $('#viewGridBtn').setAttribute('aria-pressed', String(state.view === 'grid'));
         $('#viewListBtn').setAttribute('aria-pressed', String(state.view === 'list'));
+    }
+    /* Короткое проявление карточек после смены вида. Класс ставится уже на
+       свежие карточки (render перерисовал выдачу), поэтому анимация идёт
+       у них, а не у ушедших из DOM. Снимаем класс, чтобы он не мешал
+       подъёму карточки при наведении. */
+    let viewSwitchTimer = null;
+    function playViewSwitch() {
+        const grid = $('#grid');
+        grid.classList.remove('is-switching');
+        void grid.offsetWidth;
+        grid.classList.add('is-switching');
+        clearTimeout(viewSwitchTimer);
+        viewSwitchTimer = setTimeout(function () { grid.classList.remove('is-switching'); }, 700);
     }
     /* Словари кешируются по языку: смена языка не ходит в сеть дважды, а
        английский остаётся запасным для ключей, которых нет в переводе. */
@@ -2300,7 +2315,7 @@
     /* ========================================================
        15. НАСТРОЙКИ
        ======================================================== */
-    const PALETTES = ['indigo', 'sage', 'clay', 'graphite', 'ocean'];
+    const PALETTES = ['mono', 'indigo', 'sage', 'clay', 'graphite', 'ocean'];
 
     function openSettings() {
         const node = $('#tplSettings').content.firstElementChild.cloneNode(true);
@@ -2383,13 +2398,14 @@
 
     function swatchColor(name) {
         const map = {
+            mono: ['#1B1C1E', '#E9EAEC'],
             indigo: ['#5A66B5', '#9AA4E8'],
             sage: ['#4F7C68', '#93C7B2'],
             clay: ['#A25D44', '#E0A489'],
             graphite: ['#4E5763', '#AAB4C2'],
             ocean: ['#2F7C88', '#7CC6D2']
         };
-        const pair = map[name] || map.indigo;
+        const pair = map[name] || map.mono;
         return effectiveTheme() === 'dark' ? pair[1] : pair[0];
     }
 
@@ -2491,6 +2507,7 @@
            его нет: это часть карточки, поэтому вид перерисовывает выдачу.
            Показанную порцию при этом не сбрасываем. */
         render();
+        playViewSwitch();
     }
 
     /* ========================================================

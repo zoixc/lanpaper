@@ -3,7 +3,7 @@
 <!-- Разметка панели — порт макета design/v2 (см. design/06-redesign-v2.md).
      Классы, состояния и шаблоны совпадают с макетом; отличия только в
      источниках данных и путях: /static/... вместо относительных. -->
-<html lang="en" data-theme="light" data-palette="indigo" data-view="grid">
+<html lang="en" data-theme="light" data-palette="mono" data-view="grid">
 <head>
   <meta charset="utf-8">
   <title>Lanpaper</title>
@@ -57,7 +57,7 @@
                         <svg data-icon="select"></svg>
                     </button>
 
-                    <div class="btn-group" role="group" aria-label="View">
+                    <div class="btn-group btn-group--view" role="group" aria-label="View" data-view="grid">
                         <button class="icon-btn" id="viewGridBtn" type="button" aria-pressed="true" data-i18n-aria="view_grid" aria-label="Grid">
                             <svg data-icon="grid"></svg></button>
                         <button class="icon-btn" id="viewListBtn" type="button" aria-pressed="false" data-i18n-aria="view_list" aria-label="List">
