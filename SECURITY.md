@@ -63,7 +63,8 @@ deliberately narrow credential:
 | `POST /api/upload` with `mode=append`, or with `autoCreate=1` for a link that does not exist yet | allowed |
 | `POST /api/upload` with `mode=replace` (the default) on a link that already has media | `403` — only an admin login may replace a live file |
 | `POST /api/link` | allowed |
-| everything else under `/admin` and `/api/*` | falls back to Basic Auth, so a key alone gets `401` |
+| everything else under `/api/*` | falls back to Basic Auth, so a key alone gets `401` |
+| `/admin` browser page | requires a sign-in session; Basic Auth is intentionally ignored so browser-cached credentials cannot defeat sign-out |
 
 - **Environment only.** Keys are read from `PUBLISH_KEYS`, never from
   `config.json`, and the field is not serializable, so an exported or backed-up

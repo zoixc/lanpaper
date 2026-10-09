@@ -5,6 +5,17 @@ Notable changes to Lanpaper. Docker images are published as
 
 ## [Unreleased]
 
+### Fixed
+
+- **Signing out cannot be undone by the browser's Basic-auth cache.** The
+  `/admin` page now accepts only sign-in sessions; HTTP Basic Auth remains
+  available to API scripts. Previously, a desktop browser that had cached
+  Basic credentials could reopen the panel immediately after session logout.
+- **Logout is now durable or explicitly fails.** If `sessions.json` cannot be
+  updated, the server keeps the current session, returns an error and lets the
+  user retry. It no longer reports success for a revocation that could be
+  undone by a restart.
+
 ## [0.15.1] – 2026-10-09
 
 Security hardening from an internal audit. Behaviour changes are listed under

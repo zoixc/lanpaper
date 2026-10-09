@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -81,8 +82,26 @@ func TestAdminShowsLoginFormWithoutSession(t *testing.T) {
 	if h.Get("Cache-Control") != "no-store" {
 		t.Fatalf("login page cache header = %q", h.Get("Cache-Control"))
 	}
-	// APIs still answer 401 for anyone without credentials.
+
+	// A browser may retain Basic credentials from an older Lanpaper release.
+	// They must not reopen the UI after Sign out: browsers do not expose a
+	// reliable API for clearing their Basic-auth cache. Basic remains valid for
+	// API clients below.
+	req, _ := http.NewRequest(http.MethodGet, a.server.URL+"/admin", nil)
+	req.SetBasicAuth("admin", "strong-test-password")
+	resp, err := a.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(raw), `id="loginForm"`) {
+		t.Fatalf("Basic-auth admin request reopened panel: status %d", resp.StatusCode)
+	}
+
+	// APIs still answer 401 without credentials and accept Basic for scripts.
 	a.expect(http.StatusUnauthorized, "GET", "/api/wallpapers", nil, false, nil)
+	a.expect(http.StatusOK, "GET", "/api/wallpapers", nil, true, nil)
 }
 
 func TestSessionLoginLogoutFlow(t *testing.T) {

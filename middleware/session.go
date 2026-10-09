@@ -88,6 +88,11 @@ func LoadSessions() error {
 	return nil
 }
 
+// persistSessions is replaceable in tests so disk failures can be injected
+// deterministically. Production always points it at persistLocked. The caller
+// holds sessionStore.Lock.
+var persistSessions = persistLocked
+
 // persistLocked writes the live sessions to disk atomically. The caller holds
 // sessionStore.Lock.
 func persistLocked(now time.Time) error {
@@ -158,7 +163,7 @@ func issueSession(now time.Time) (string, error) {
 		}
 	}
 	sessionStore.expiry[digest] = now.Add(sessionTTL)
-	if err := persistLocked(now); err != nil {
+	if err := persistSessions(now); err != nil {
 		delete(sessionStore.expiry, digest)
 		return "", err
 	}
@@ -185,20 +190,28 @@ func sessionValid(r *http.Request, now time.Time) bool {
 	return true
 }
 
-// revokeSession forgets the request's session and saves the change. A failed
-// save is logged: the session is already gone from memory, and it is dropped
-// from the file at the next save or after it expires.
-func revokeSession(r *http.Request) {
+// revokeSession forgets the request's session only after the updated store is
+// durably saved. If persistence fails, the in-memory entry is restored: the
+// caller can report failure and the user can retry instead of receiving a
+// false-success response whose revoked session returns after a restart.
+func revokeSession(r *http.Request) error {
 	c, err := r.Cookie(sessionCookieName)
 	if err != nil {
-		return
+		return nil // signing out without a session is idempotent
 	}
+	digest := tokenDigest(c.Value)
 	sessionStore.Lock()
 	defer sessionStore.Unlock()
-	delete(sessionStore.expiry, tokenDigest(c.Value))
-	if err := persistLocked(time.Now()); err != nil {
-		log.Printf("Session: could not save sessions after sign-out: %v", err)
+	exp, exists := sessionStore.expiry[digest]
+	if !exists {
+		return nil
 	}
+	delete(sessionStore.expiry, digest)
+	if err := persistSessions(time.Now()); err != nil {
+		sessionStore.expiry[digest] = exp
+		return err
+	}
+	return nil
 }
 
 // HasAdminSession reports whether the request is signed in with the login form.
@@ -227,17 +240,25 @@ func sessionCookie(r *http.Request, value string, maxAge int) *http.Cookie {
 }
 
 // AdminPage serves the admin page to signed-in users and the login page to
-// everyone else. Requests that carry Basic credentials go through
-// MaybeBasicAuth, so a wrong password still gets 401 and lockout still applies.
+// everyone else. The browser UI deliberately accepts sessions only, not Basic
+// auth: browsers cache Basic credentials and provide no dependable way for a
+// web page to forget them, which used to make the Sign out button immediately
+// sign the user back in. Basic auth remains available on /api/* for scripts.
 func AdminPage(admin, login http.HandlerFunc) http.HandlerFunc {
-	guarded := MaybeBasicAuth(admin)
 	return func(w http.ResponseWriter, r *http.Request) {
-		required := !config.Current.DisableAuth && config.Current.AdminUser != "" && config.Current.AdminPass != ""
-		if required && !HasAdminSession(r) && r.Header.Get("Authorization") == "" {
+		if config.Current.DisableAuth {
+			admin(w, r)
+			return
+		}
+		if config.Current.AdminUser == "" || config.Current.AdminPass == "" {
+			http.Error(w, "Admin credentials not configured", http.StatusServiceUnavailable)
+			return
+		}
+		if !HasAdminSession(r) {
 			login(w, r)
 			return
 		}
-		guarded(w, r)
+		admin(w, r)
 	}
 }
 
@@ -247,7 +268,11 @@ func HandleSession(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		handleSessionLogin(w, r)
 	case http.MethodDelete:
-		revokeSession(r)
+		if err := revokeSession(r); err != nil {
+			log.Printf("Session: could not save sessions after sign-out: %v", err)
+			http.Error(w, "Could not sign out; try again", http.StatusInternalServerError)
+			return
+		}
 		http.SetCookie(w, sessionCookie(r, "", -1))
 		w.WriteHeader(http.StatusNoContent)
 	default:

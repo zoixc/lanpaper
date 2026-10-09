@@ -224,5 +224,6 @@
   "view_grid": "Cuadrícula",
   "view_list": "Lista",
   "settings_account": "Cuenta",
-  "sign_out": "Cerrar sesión"
+  "sign_out": "Cerrar sesión",
+  "sign_out_error": "No se pudo cerrar la sesión de forma segura. Comprueba el almacenamiento del servidor e inténtalo de nuevo."
 }

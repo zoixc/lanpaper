@@ -224,5 +224,6 @@
   "view_grid": "Griglia",
   "view_list": "Elenco",
   "settings_account": "Account",
-  "sign_out": "Esci"
+  "sign_out": "Esci",
+  "sign_out_error": "Impossibile disconnettersi in modo sicuro. Controlla l’archiviazione del server e riprova."
 }

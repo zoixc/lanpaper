@@ -531,13 +531,15 @@
         return type.indexOf('application/json') >= 0 ? res.json() : null;
     }
 
-    /* Выход: сервер отзывает сессию и снимает cookie. Дальше /admin показывает
-       форму входа. Если запрос не прошёл, всё равно уходим: cookie при этом
-       может остаться, но сессия истечёт сама. */
+    /* Выход считается завершённым только после того, как сервер надёжно
+       сохранил отзыв сессии. При ошибке остаёмся в панели: cookie и сессия ещё
+       действуют, поэтому пользователь может исправить storage и повторить. */
     async function signOut() {
         try {
             await apiCall('/api/session', 'DELETE');
-        } catch (_) { /* ошибка уже показана */ }
+        } catch (_) {
+            return; /* apiCall уже показал локализованную ошибку */
+        }
         window.location.replace('/admin');
     }
 
@@ -555,6 +557,7 @@
            до нажатия, а не после. */
         const full = /playlist is full \(max (\d+)/i.exec(text);
         if (full) state.config.playlistMax = Number(full[1]);
+        if (/could not sign out/i.test(text)) return t('sign_out_error');
         if (/link already exists/i.test(text)) return t('link_taken');
         if (/link does not exist|link not found/i.test(text)) return t('link_gone');
         if (/invalid link name|invalid id/i.test(text)) return t('invalid_id');

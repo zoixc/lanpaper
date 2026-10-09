@@ -306,7 +306,9 @@ already set in the environment take precedence over it.
 
 ## API
 
-Admin endpoints accept the sign-in session cookie or HTTP Basic Auth. A
+Admin API endpoints accept the sign-in session cookie or HTTP Basic Auth. The
+`/admin` browser page accepts only the session cookie so signing out cannot be
+undone by credentials retained in the browser's Basic-auth cache. A
 `PUBLISH_KEYS` API key also works for the two publishing routes (`POST /api/upload`, `POST /api/link`). The full reference,
 with request and response formats, is in [docs/API.md](docs/API.md).
 

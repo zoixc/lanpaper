@@ -56,6 +56,12 @@ test('every element id the scripts use exists in the panel', () => {
   assert.ok(used.size > 20, `only ${used.size} ids found; the selector patterns probably stopped matching`);
 });
 
+test('sign out redirects only after durable server success', () => {
+  assert.match(scriptSource,
+    /async function signOut\(\)[\s\S]*?catch \(_\) \{[\s\S]*?return;[\s\S]*?window\.location\.replace\('\/admin'\)/,
+    'a failed session revocation must remain retryable instead of redirecting');
+});
+
 test('every API path the scripts call is routed in main.go', () => {
   // The catch-all "/" matches every path by prefix, so it is not evidence that
   // a specific API path is routed.

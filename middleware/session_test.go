@@ -5,6 +5,7 @@ package middleware
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -29,6 +30,7 @@ func resetSessionStore() {
 	sessionStore.Lock()
 	sessionStore.expiry = make(map[[32]byte]time.Time)
 	sessionStore.Unlock()
+	persistSessions = persistLocked
 }
 
 // simulateRestart forgets the in-memory sessions and loads them from disk, as a
@@ -141,10 +143,48 @@ func TestRevokedSessionStaysRevokedAfterRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	req := requestWithToken(token)
-	revokeSession(req)
+	if err := revokeSession(req); err != nil {
+		t.Fatal(err)
+	}
 	simulateRestart(t)
 	if HasAdminSession(req) {
 		t.Fatal("signed-out session came back after a restart")
+	}
+}
+
+func TestLogoutReportsPersistenceFailureAndCanBeRetried(t *testing.T) {
+	useSessionDir(t)
+	token, err := issueSession(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := requestWithToken(token)
+	req.Method = http.MethodDelete
+
+	persistSessions = func(time.Time) error { return errors.New("disk unavailable") }
+	rec := httptest.NewRecorder()
+	HandleSession(rec, req)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("failed durable logout: status %d, want 500", rec.Code)
+	}
+	if !HasAdminSession(requestWithToken(token)) {
+		t.Fatal("failed durable logout removed the in-memory session")
+	}
+	for _, cookie := range rec.Result().Cookies() {
+		if cookie.Name == sessionCookieName && cookie.MaxAge < 0 {
+			t.Fatal("failed durable logout cleared the cookie, preventing a retry")
+		}
+	}
+
+	persistSessions = persistLocked
+	retry := httptest.NewRecorder()
+	HandleSession(retry, req)
+	if retry.Code != http.StatusNoContent {
+		t.Fatalf("retried logout: status %d, want 204", retry.Code)
+	}
+	simulateRestart(t)
+	if HasAdminSession(requestWithToken(token)) {
+		t.Fatal("retried logout was not durable across restart")
 	}
 }
 

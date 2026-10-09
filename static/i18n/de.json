@@ -224,5 +224,6 @@
   "view_grid": "Kacheln",
   "view_list": "Liste",
   "settings_account": "Konto",
-  "sign_out": "Abmelden"
+  "sign_out": "Abmelden",
+  "sign_out_error": "Die sichere Abmeldung ist fehlgeschlagen. Prüfe den Serverspeicher und versuche es erneut."
 }

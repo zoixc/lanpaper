@@ -224,5 +224,6 @@
   "view_grid": "Grid",
   "view_list": "List",
   "settings_account": "Account",
-  "sign_out": "Sign out"
+  "sign_out": "Sign out",
+  "sign_out_error": "Could not securely sign out. Check the server storage and try again."
 }

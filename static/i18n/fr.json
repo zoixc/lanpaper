@@ -224,5 +224,6 @@
   "view_grid": "Grille",
   "view_list": "Liste",
   "settings_account": "Compte",
-  "sign_out": "Se déconnecter"
+  "sign_out": "Se déconnecter",
+  "sign_out_error": "Impossible de fermer la session de manière sûre. Vérifiez le stockage du serveur et réessayez."
 }
