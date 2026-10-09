@@ -267,16 +267,28 @@ func isValidCategory(cat string) bool { return config.ValidCategories[cat] }
 
 // removeFiles deletes image and optional preview files, ignoring not-found errors.
 func removeFiles(imagePath, previewPath string) {
-	if imagePath != "" {
-		if err := os.Remove(imagePath); err != nil && !os.IsNotExist(err) {
-			log.Printf("Error removing image %s: %v", imagePath, err)
-		}
+	removeFile(imagePath, "image")
+	removeFile(previewPath, "preview")
+}
+
+// removeFile deletes one media file and reports whether it is gone. A file on a
+// read-only filesystem (a legacy static/images copy inside a read_only container)
+// cannot be removed by the server; that is a deployment matter, so it is logged
+// as a note rather than as a failed delete.
+func removeFile(path, kind string) bool {
+	if path == "" {
+		return true
 	}
-	if previewPath != "" {
-		if err := os.Remove(previewPath); err != nil && !os.IsNotExist(err) {
-			log.Printf("Error removing preview %s: %v", previewPath, err)
-		}
+	err := os.Remove(path)
+	switch {
+	case err == nil || os.IsNotExist(err):
+		return true
+	case storage.IsReadOnlyError(err):
+		log.Printf("Note: %s %s is on a read-only filesystem and was left in place", kind, path)
+	default:
+		log.Printf("Error removing %s %s: %v", kind, path, err)
 	}
+	return false
 }
 
 // linkNameFromPath extracts and validates the link name from /api/link/{name},

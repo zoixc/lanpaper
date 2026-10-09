@@ -439,6 +439,29 @@ func MigrateMediaToDataDir() {
 		// Paths are runtime-only (json:"-"); no metadata save is needed.
 		log.Printf("Migrated %d media file(s) from static/images to data/media", moved)
 	}
+	if left := countLegacyLeftovers(); left > 0 {
+		log.Printf("Warning: %d file(s) remain in %s after migration (read-only mount or a failed move). "+
+			"Mount that directory writable to finish the move, or delete the files once their links have data/ copies.",
+			left, config.LegacyMedia)
+	}
+}
+
+// countLegacyLeftovers counts regular files still in the legacy static/images
+// tree (top level and previews/). Symlinks and directories are not counted.
+func countLegacyLeftovers() int {
+	count := 0
+	for _, dir := range []string{config.LegacyMedia, filepath.Join(config.LegacyMedia, "previews")} {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if e.Type().IsRegular() {
+				count++
+			}
+		}
+	}
+	return count
 }
 
 func moveIfNeeded(src, dst string) bool {

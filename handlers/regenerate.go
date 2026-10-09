@@ -155,12 +155,22 @@ func cleanStalePreviewFiles() {
 				continue
 			}
 			unlock := storage.LockLinks(name)
+			readOnly := false
 			if _, exists := storage.Global.Get(name); !exists {
 				if err := os.Remove(filepath.Join(dir, entry.Name())); err != nil && !os.IsNotExist(err) {
-					log.Printf("Could not remove orphan preview %s: %v", entry.Name(), err)
+					if storage.IsReadOnlyError(err) {
+						readOnly = true
+					} else {
+						log.Printf("Could not remove orphan preview %s: %v", entry.Name(), err)
+					}
 				}
 			}
 			unlock()
+			if readOnly {
+				// Nothing in a read-only directory can be removed; say so once.
+				log.Printf("Note: %s is read-only; orphan previews there are kept", dir)
+				break
+			}
 		}
 	}
 }
