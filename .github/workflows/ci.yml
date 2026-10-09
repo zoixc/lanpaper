@@ -74,8 +74,38 @@ jobs:
       - name: Unit tests
         run: node --test tests/*.test.cjs
 
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: lts/*
+
+      - name: Build the server
+        run: go build -o "$RUNNER_TEMP/lanpaper" .
+
+      - name: Install browser tests
+        working-directory: tests/e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Sign-in browser tests
+        working-directory: tests/e2e
+        env:
+          LANPAPER_BIN: ${{ runner.temp }}/lanpaper
+        run: npm test
+
   docker:
-    needs: [ test, frontend ]
+    needs: [ test, frontend, e2e ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
