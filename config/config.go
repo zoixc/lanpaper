@@ -43,6 +43,7 @@ type Config struct {
 	AdminPass            string            `json:"adminPass"`
 	AdminPasswordHash    string            `json:"adminPasswordHash,omitempty"`
 	DisableAuth          bool              `json:"disableAuth,omitempty"`
+	MetricsEnabled       bool              `json:"metricsEnabled,omitempty"`
 	InsecureSkipVerify   bool              `json:"insecureSkipVerify,omitempty"`
 	RemoteSkipVerify     bool              `json:"remoteInsecureSkipVerify,omitempty"`
 	ProxySkipVerify      bool              `json:"proxyInsecureSkipVerify,omitempty"`
@@ -153,6 +154,7 @@ func Load() {
 	envString("ADMIN_PASS", &Current.AdminPass)
 	envString("ADMIN_PASSWORD_HASH", &Current.AdminPasswordHash)
 	envBool("DISABLE_AUTH", &Current.DisableAuth)
+	envBool("METRICS_ENABLED", &Current.MetricsEnabled)
 	envBool("INSECURE_SKIP_VERIFY", &Current.InsecureSkipVerify)
 	// The legacy switch keeps its old broad behaviour for one compatibility
 	// cycle; either specific environment variable can then override its side.

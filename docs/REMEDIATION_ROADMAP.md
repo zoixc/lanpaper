@@ -115,9 +115,12 @@ for legacy call sites, named authentication events and centralized redaction of
 password, token, cookie, authorization, proxy-secret, URL and query attributes.
 Redaction and compatibility output are covered by tests.
 
-### PR 12 — Operational metrics
+### PR 12 — Operational metrics **(implemented; full CI pending)**
 
-Add an optional authenticated metrics endpoint for request latency/status, active uploads, processing queue, rate-limit rejection, session count, persistence failures and disk usage. Document privacy properties and cardinality bounds.
+Added the opt-in, administrator-authenticated `/metrics` endpoint with bounded
+Prometheus status-class and latency-bucket counters, active uploads, bounded
+processing queue, rate-limit rejections, active sessions, persistence failures
+and data-directory usage. No paths, link names, clients or tokens are labels.
 
 ### PR 13 — Broader browser E2E
 

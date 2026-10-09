@@ -268,6 +268,7 @@ which have the highest priority.
 | `PROXY_TYPE` | `http` | Outbound proxy type: `http`, `https` or `socks5` |
 | `PROXY_HOST`, `PROXY_PORT` | unset | Optional outbound proxy for URL downloads |
 | `PROXY_USERNAME`, `PROXY_PASSWORD` | unset | Proxy credentials (aliases: `PROXY_USER`, `PROXY_PASS`) |
+| `METRICS_ENABLED` | `false` | Enables the authenticated `/metrics` Prometheus endpoint. |
 | `REMOTE_INSECURE_SKIP_VERIFY` | `false` | Skips downloaded-media TLS verification. Development only. |
 | `PROXY_INSECURE_SKIP_VERIFY` | `false` | Skips HTTPS-proxy TLS verification. Development only. |
 | `INSECURE_SKIP_VERIFY` | `false` | Deprecated alias that enables both unsafe settings. |

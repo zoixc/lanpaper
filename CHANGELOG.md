@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Optional operational metrics.** `METRICS_ENABLED=true` exposes an
+  administrator-authenticated `/metrics` endpoint with bounded-cardinality
+  request, upload, session, persistence, rate-limit and disk signals.
 - **Structured redacted logging.** Runtime logs now use console-readable
   `log/slog` records with stable event names and centralized secret-attribute
   redaction; legacy messages are bridged during migration.

@@ -8,6 +8,13 @@ HTTPS.
 Deployment, hardening and operations (topology, systemd/Docker, backups,
 capacity, what to alert on) live in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
+## Operational metrics
+
+`/metrics` is disabled unless `METRICS_ENABLED=true` and uses the same
+administrator authentication policy as other machine endpoints. Metrics use
+only fixed status classes and latency buckets: URLs, link names, client
+addresses, tokens, cookies and credentials are never labels.
+
 ## Administrator credential storage
 
 Use `ADMIN_PASSWORD_HASH` for new deployments. Generate an Argon2id PHC value

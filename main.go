@@ -169,7 +169,7 @@ func main() {
 // real compression, authentication, CSRF, panic-recovery and routing stack,
 // not just bare handlers.
 func newHandler() http.Handler {
-	return middleware.Gzip(middleware.Recover(newMux()))
+	return middleware.Metrics(middleware.Gzip(middleware.Recover(newMux())))
 }
 
 func newMux() *http.ServeMux {
@@ -195,6 +195,7 @@ func newMux() *http.ServeMux {
 	mux.HandleFunc("/manifest.webmanifest", redirectToStaticAsset("manifest.json"))
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/health/ready", readyHandler)
+	mux.HandleFunc("/metrics", middleware.WithSecurity(middleware.MaybeBasicAuth(middleware.HandleMetrics)))
 	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.AdminPage(serveAdminPage, serveLoginPage)))
 	mux.HandleFunc("/api/session", middleware.WithSecurity(middleware.HandleSession))
 	mux.HandleFunc("/api/sessions", middleware.WithSecurity(middleware.MaybeBasicAuth(middleware.HandleSessions)))

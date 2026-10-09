@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"lanpaper/config"
+	appmetrics "lanpaper/internal/metrics"
 	"lanpaper/middleware"
 	"lanpaper/storage"
 	"lanpaper/utils"
@@ -53,6 +54,8 @@ func formFlag(raw string) bool {
 }
 
 func Upload(w http.ResponseWriter, r *http.Request) {
+	finishMetric := appmetrics.BeginUpload()
+	defer finishMetric()
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return

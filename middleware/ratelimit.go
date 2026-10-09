@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"lanpaper/config"
+	appmetrics "lanpaper/internal/metrics"
 )
 
 // window is a fixed-window event counter for one client in one namespace.
@@ -146,6 +147,7 @@ func recordEvent(ns, key string, span time.Duration) int {
 }
 
 func writeTooManyRequests(w http.ResponseWriter, retry time.Duration, msg string) {
+	appmetrics.RateRejected()
 	secs := int((retry + time.Second - 1) / time.Second)
 	w.Header().Set("Retry-After", strconv.Itoa(max(secs, 1)))
 	http.Error(w, msg, http.StatusTooManyRequests)

@@ -18,6 +18,7 @@ import (
 
 	"lanpaper/config"
 	"lanpaper/internal/atomicfile"
+	appmetrics "lanpaper/internal/metrics"
 	"lanpaper/utils"
 )
 
@@ -335,8 +336,12 @@ func atomicWrite(path string, data map[string]*Wallpaper) error {
 	}
 	err = atomicfile.Write(atomicfile.OSFS{}, path, ".wallpapers-*.json", body)
 	if atomicfile.IsCommitted(err) {
+		appmetrics.PersistenceFailure()
 		log.Printf("Warning: wallpaper metadata was renamed but directory durability could not be confirmed: %v", err)
 		return nil
+	}
+	if err != nil {
+		appmetrics.PersistenceFailure()
 	}
 	return err
 }

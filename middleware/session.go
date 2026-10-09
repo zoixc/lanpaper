@@ -20,6 +20,7 @@ import (
 
 	"lanpaper/config"
 	"lanpaper/internal/atomicfile"
+	appmetrics "lanpaper/internal/metrics"
 )
 
 // Admin sessions. A browser that signs in through the login form gets a random
@@ -184,8 +185,12 @@ func persistLocked(now time.Time) error {
 	}
 	err = atomicfile.Write(atomicfile.OSFS{}, sessionsPath, ".sessions-*.json", body, 0o600)
 	if atomicfile.IsCommitted(err) {
+		appmetrics.PersistenceFailure()
 		log.Printf("Warning: sessions were renamed but directory durability could not be confirmed: %v", err)
 		return nil
+	}
+	if err != nil {
+		appmetrics.PersistenceFailure()
 	}
 	return err
 }
