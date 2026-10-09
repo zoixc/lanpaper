@@ -3,7 +3,13 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
-## [Unreleased]
+## [0.15.0] – 2026-10-09
+
+A visual release for the 2.0 panel: a monochrome default with the colour kept
+in the accent palettes, a new minimalist logo, and a tidier header, list and
+card layout. No data or URL behaviour changes; the palette a user has already
+chosen is kept. Users who never picked one see the new Mono default. Upgrading
+is a container restart.
 
 ### Changed
 
@@ -22,6 +28,16 @@ Notable changes to Lanpaper. Docker images are published as
   the card's title row.
 - **List rows are aligned in columns**: metadata, tags, access and the menu sit
   on the same vertical lines in every row.
+
+### Fixed
+
+- **The search field on phones is full width**, so its placeholder is no longer
+  cut off; filters sit on the line below and still scroll.
+- **The metadata line on phones and in tiles** no longer cuts a value in the
+  middle: the type and size stay whole, the resolution is hidden in the phone
+  tile, and the date is hidden on phones as before.
+- **The "1 in playlist" badge on a thumbnail** shrinks with an ellipsis instead
+  of overflowing the frame.
 
 ## [0.14.1] – 2026-10-08
 
