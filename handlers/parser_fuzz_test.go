@@ -5,9 +5,22 @@ package handlers
 import (
 	"bytes"
 	"mime/multipart"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 )
+
+func FuzzMediaSignatures(f *testing.F) {
+	f.Add([]byte("GIF89a"))
+	f.Add([]byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'})
+	f.Fuzz(func(t *testing.T, data []byte) {
+		if len(data) > 1024 {
+			t.Skip()
+		}
+		contentType := http.DetectContentType(data)
+		_, _ = mimeToExt[contentType]
+	})
+}
 
 func FuzzRouteSelectors(f *testing.F) {
 	for _, seed := range []string{"/api/link/wall/history/1", "/api/link/%2e%2e/history/0", "/rollback", "//history/999999999999999999999"} {

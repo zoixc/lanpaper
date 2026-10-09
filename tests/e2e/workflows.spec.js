@@ -71,24 +71,43 @@ test('create, upload, rename, access, history, playlist, export/import and delet
   });
   expect(result.status).toBe(200);
   expect(result.body.accessToken).not.toBe(firstToken);
+  const currentToken = result.body.accessToken;
 
   result = await api(page, `/api/link/${renamed}/history`);
   expect(result.status).toBe(200);
   expect(result.body.history.length).toBeGreaterThan(0);
 
-  // Link-list export/import contract: export excludes bearer access tokens;
-  // importing recreates the configuration after deletion.
-  result = await api(page, '/api/wallpapers');
-  const exported = result.body.find((item) => item.linkName === renamed);
-  expect(exported).toBeTruthy();
-  expect(JSON.stringify(exported)).not.toContain(firstToken);
+  // Refresh the panel's client-side state after the direct browser fetches,
+  // then exercise the real settings export. Bearer tokens must never enter
+  // the downloaded link-list file.
+  await page.reload();
+  await expect(page.locator('#library')).toBeVisible();
+  await page.click('#settingsBtn');
+  const downloadPromise = page.waitForEvent('download');
+  await page.click('#exportBtn');
+  const download = await downloadPromise;
+  const stream = await download.createReadStream();
+  let exportedText = '';
+  for await (const chunk of stream) exportedText += chunk.toString();
+  const exported = JSON.parse(exportedText);
+  expect(exported.wallpapers.some((item) => item.linkName === renamed)).toBe(true);
+  expect(exportedText).not.toContain(firstToken);
+  expect(exportedText).not.toContain(currentToken);
 
+  // Delete and import through the real browser module. Import deliberately
+  // recreates link names only and asks for interactive confirmation.
   expect((await api(page, `/api/link/${renamed}`, { method: 'DELETE' })).status).toBe(204);
-  result = await api(page, '/api/link', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ linkName: renamed, category: exported.category, accessLevel: 'public' }),
-  });
-  expect(result.status).toBe(201);
+  await page.evaluate((text) => {
+    const file = new File([text], 'links.json', { type: 'application/json' });
+    window.LanpaperBackup.importData(file);
+  }, exportedText);
+  await expect(page.locator('#confirmTitle')).toBeVisible();
+  await page.click('[data-confirm]');
+  await expect.poll(async () => {
+    const listed = await api(page, '/api/wallpapers');
+    const links = Array.isArray(listed.body) ? listed.body : listed.body.data;
+    return links.some((item) => item.linkName === renamed);
+  }).toBe(true);
   expect((await api(page, `/api/link/${renamed}`, { method: 'DELETE' })).status).toBe(204);
 });
 

@@ -160,6 +160,11 @@ remain independent; the existing global upload/decode ceilings bound heavy
 work. Startup now warns when public or upload limits are disabled. State remains
 explicitly single-instance and in-memory.
 
+**Retrospective 13–16 completed:** [`RETROSPECTIVE_PR13_PR16.md`](RETROSPECTIVE_PR13_PR16.md).
+It corrected non-representative export/import coverage, a fuzz compilation
+error and accessibility/viewport assumptions, and added missing session/media
+fuzz coverage.
+
 ### PR 17 — Application composition root
 
 Introduce an `App` struct holding immutable config, stores, sessions, limiters, logger and services. Build routes through `App.Handler()`. Migrate globals incrementally with compatibility adapters.
