@@ -157,6 +157,9 @@ func TestSessionLoginLogoutFlow(t *testing.T) {
 
 func TestRevokeAllSessionsFlow(t *testing.T) {
 	a := setupApp(t)
+	// The session store is process-global today; isolate this integration test
+	// from sessions created by earlier main-package tests.
+	a.expect(http.StatusNoContent, http.MethodDelete, "/api/sessions", nil, true, nil)
 	origin := map[string]string{"Origin": a.server.URL}
 	first := sessionCookieFrom(t, loginRequest(t, a, "admin", "strong-test-password", origin))
 	second := sessionCookieFrom(t, loginRequest(t, a, "admin", "strong-test-password", origin))
