@@ -22,15 +22,28 @@ Security hardening from an internal audit. Behaviour changes are listed under
 - **MP4 detection checks the brand.** A file is stored as MP4 only if its `ftyp`
   box declares a known video brand as major or compatible brand. Before, any
   file with `ftyp` at offset 4 was accepted and served as `video/mp4`.
+- **Runtime image requires zlib 1.3.2-r1** (CVE-2026-85091). The Alpine base
+  ships 1.3.2-r0.
 
 ### Changed
 
 - `GET /health` no longer returns the `version` field.
 - Access-token generation fails the request instead of ignoring a failed read
   from the system random source.
+- Static assets referenced by the admin page carry a content hash (`?v=`) and
+  are cached for a year. Other URLs still revalidate.
+- The external gallery listing is cached for 10 seconds.
+- Preview regeneration runs two previews at a time.
 - Proxy setup: configure `X-Forwarded-For` (append or overwrite) instead of
   `X-Real-IP`. The nginx example is updated; the Caddy example no longer needs
   `header_up X-Real-IP`.
+
+### Performance
+
+- `GET /api/wallpapers` no longer copies every record on each request.
+- Metadata writes no longer block readers while the file is written.
+- The rate limiter's counters are split across 64 locks.
+- Upload forms are streamed to disk instead of being parsed into memory first.
 
 ## [0.15.0] – 2026-10-09
 

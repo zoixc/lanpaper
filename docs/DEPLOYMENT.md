@@ -16,7 +16,7 @@ things the application cannot do alone: **TLS in front of it, backups of
 
 | Topology | When to use it | What Lanpaper does |
 | --- | --- | --- |
-| Reverse proxy terminates TLS (**recommended**) | Any internet-facing or multi-tenant deployment | Set `TRUSTED_PROXY` to the address the proxy connects from (IP/CIDR, or a comma-separated list of them) so forwarded headers are believed; leave `TLS_*` unset |
+| Reverse proxy terminates TLS (**recommended**) | Any internet-facing or multi-tenant deployment | Set `TRUSTED_PROXY` to the address the proxy connects from (IP/CIDR, or a comma-separated list). The proxy must set `X-Forwarded-For` (see [SECURITY.md](../SECURITY.md#reverse-proxy)); Lanpaper reads only its rightmost entry and ignores `X-Real-IP`. Leave `TLS_*` unset |
 | Lanpaper terminates TLS | Single host, no proxy available, internal CA | Set `TLS_CERT_FILE` + `TLS_KEY_FILE` (both or neither — a partial configuration refuses to start) |
 | Plain HTTP | LAN only, or a proxy that already enforces auth | Keep the default and never expose the port to the internet |
 
@@ -122,9 +122,10 @@ future dependency needs it, drop that one line rather than the rest.
 `SIGTERM`/`SIGINT` stops the listener and waits up to 30 s for in-flight
 uploads and metadata writes, so a rolling upgrade does not truncate a file.
 Upgrade = stop, replace the binary or image, start; `data/` is forward
-compatible (see *Backups and upgrades* in the [README](../README.md)). Keep one
-copy of the previous image tag around: downgrading is safe as long as you did
-not start using history or playlists, and those directories are simply ignored
+compatible (see *Backups and upgrades* in the [README](../README.md)). Rebuild
+the image from the current base regularly so Alpine security fixes reach it.
+Keep one copy of the previous image tag around: downgrading is safe as long as
+you did not start using history or playlists, and those directories are simply ignored
 by older versions.
 
 ## 4. Observe it
@@ -169,10 +170,12 @@ without credentials.
   while the budget is busy gets `429` with `Retry-After: 5`. Metadata is one
   small struct per link.
 - **CPU** spikes on upload (decode + scale + encode + thumbnail) and on
-  `POST /api/regenerate-previews` (whole library, rate limited like uploads).
+  `POST /api/regenerate-previews` (whole library, two previews at a time,
+  rate limited like uploads).
   Serving media is `sendfile`: cheap, and range requests cost one syscall path.
 - **Writes**: every metadata mutation rewrites `data/wallpapers.json`
-  atomically (temp file → `fsync` → `rename` → directory `fsync`). That is
+  atomically (temp file → `fsync` → `rename` → directory `fsync`). Writers are
+  queued, but readers keep serving while the file is written. That is
   O(links) per mutation and the reason the file stays human-readable; it is
   fine into the tens of thousands of links, but do not script thousands of
   mutations per second against one instance.
@@ -201,9 +204,8 @@ once per quarter: an untested backup is a rumour.
 - [ ] `DISABLE_AUTH` is `false` unless the proxy authenticates every request
 - [ ] `INSECURE_SKIP_VERIFY` is `false`
 - [ ] `CORS_ORIGINS`/`ALLOW_EMBED` are set only if a real consumer needs them
-- [ ] Publish keys are long, random, and rotatable (add the new key, migrate
-      clients, remove the old one — keys are compared by digest, so rotating
-      needs no restart order)
+- [ ] Publish keys are long and random. Rotating one means restarting with a
+      new `PUBLISH_KEYS`; per-key revocation is on the [roadmap](../ROADMAP.md)
 - [ ] `/health` and `/health/ready` are wired into the orchestrator
 - [ ] The startup log has been read once: every `Warning:` is understood
 - [ ] Log output is collected, and the alerts in §4 exist

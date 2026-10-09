@@ -357,6 +357,9 @@ slash-separated, for example `["holiday/beach.jpg"]`. The listing:
 - Ignores symlinks that resolve outside the directory.
 - Stops at 5,000 files.
 
+The listing is cached for 10 seconds, so a file added to the gallery can take
+up to 10 seconds to appear.
+
 ### `GET /api/external-image-preview?path=...`
 
 Returns one gallery file after validating its type, with
@@ -380,6 +383,8 @@ Rebuilds all image thumbnails and removes orphaned ones. The response is
 
 - Only one run at a time; a second request while one is running returns `429`
   (no `Retry-After`: the run has no predictable end).
+- Runs two previews at a time. If the shared decode budget is busy, a job waits
+  for it instead of failing.
 - Counts towards the upload rate limit. Only `POST` spends it: a probe with
   another method gets `405` before the limiter sees it.
 
