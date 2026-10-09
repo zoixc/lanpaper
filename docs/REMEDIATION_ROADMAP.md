@@ -134,9 +134,12 @@ export/import semantics and delete. Multi-tab tests verify that logout expires
 other tabs without a cached Basic-auth fallback; persistence rollback remains
 covered by deterministic integration tests.
 
-### PR 14 — Accessibility and cross-browser CI
+### PR 14 — Accessibility and cross-browser CI **(implemented; full CI pending)**
 
-Add axe checks, keyboard-only flows, zoom/narrow viewport cases, long translations and WebKit. Fix focus restoration, live regions or contrast defects found by those tests in narrowly scoped follow-ups.
+Added axe serious/critical checks, keyboard-only create-dialog focus checks,
+200% zoom at a 320 px viewport, long German settings labels and a Desktop
+Safari/WebKit project. CI installs and runs both Chromium and WebKit; focus
+restoration and existing live-region semantics are asserted directly.
 
 ### PR 15 — Security fuzzing
 

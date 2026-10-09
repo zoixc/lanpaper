@@ -119,13 +119,22 @@ jobs:
         working-directory: tests/e2e
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium webkit
 
       - name: Sign-in browser tests
         working-directory: tests/e2e
         env:
           LANPAPER_BIN: ${{ runner.temp }}/lanpaper
-        run: npm test
+        run: |
+          set +e
+          set -o pipefail
+          npm test 2>&1 | tee "$RUNNER_TEMP/playwright.log"
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            detail="$(tail -120 "$RUNNER_TEMP/playwright.log" | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')"
+            echo "::error file=tests/e2e::${detail}"
+          fi
+          exit "$status"
 
   docker:
     needs: [ test, frontend, e2e ]

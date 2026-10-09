@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Accessibility and WebKit CI.** Browser checks now include axe,
+  keyboard/focus restoration, narrow 200% zoom, long translations and Desktop
+  Safari-compatible WebKit behavior.
 - **Broader browser workflows.** Desktop and phone E2E now exercise the media
   lifecycle, access/token changes, history, playlists, link-list migration,
   deletion and multi-tab session expiration.
