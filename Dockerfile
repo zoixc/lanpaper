@@ -34,7 +34,11 @@ LABEL org.opencontainers.image.title="Lanpaper" \
 # ca-certificates for outbound HTTPS downloads. wget (used by HEALTHCHECK)
 # is part of busybox in the base image. The fixed IDs (uid 100, gid 101) match
 # earlier images; bind-mounted data directories must be writable by them.
-RUN apk add --no-cache ca-certificates \
+# zlib is pinned to a minimum version because alpine:3.24 ships 1.3.2-r0,
+# which is affected by CVE-2026-85091; 1.3.2-r1 is the fixed build. A minimum
+# (not an exact version) keeps later fixed revisions installable, and the build
+# fails rather than ship the old library if the fix is not available.
+RUN apk add --no-cache ca-certificates "zlib>=1.3.2-r1" \
     && addgroup -S -g 101 lanpaper && adduser -S -u 100 -G lanpaper lanpaper
 
 WORKDIR /app
