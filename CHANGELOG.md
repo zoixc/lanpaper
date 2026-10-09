@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Broader browser workflows.** Desktop and phone E2E now exercise the media
+  lifecycle, access/token changes, history, playlists, link-list migration,
+  deletion and multi-tab session expiration.
 - **Optional operational metrics.** `METRICS_ENABLED=true` exposes an
   administrator-authenticated `/metrics` endpoint with bounded-cardinality
   request, upload, session, persistence, rate-limit and disk signals.

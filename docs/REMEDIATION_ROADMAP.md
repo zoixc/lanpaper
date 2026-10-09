@@ -126,9 +126,13 @@ and data-directory usage. No paths, link names, clients or tokens are labels.
 It corrected ignored audit traversal failures, non-durable repair metadata
 replacement and authentication disclosure on the disabled metrics endpoint.
 
-### PR 13 — Broader browser E2E
+### PR 13 — Broader browser E2E **(implemented; full CI pending)**
 
-Cover create, upload, rename, access changes, token rotation, history, playlist, import/export and delete on desktop and phone. Add multi-tab session expiration and logout persistence-error scenarios.
+Added desktop/phone browser workflows covering create, repeated upload, rename,
+access changes, token rotation, history, playlist append, token-safe link-list
+export/import semantics and delete. Multi-tab tests verify that logout expires
+other tabs without a cached Basic-auth fallback; persistence rollback remains
+covered by deterministic integration tests.
 
 ### PR 14 — Accessibility and cross-browser CI
 
