@@ -28,6 +28,10 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Unsafe outbound TLS opt-outs are separated.** Self-signed remote media can
+  be enabled without also disabling HTTPS-proxy certificate verification, and
+  vice versa. The broad `INSECURE_SKIP_VERIFY` switch remains as a deprecated
+  compatibility alias for one release.
 - **Protected media no longer triggers a browser Basic-auth prompt.** `auth`
   links accept the normal admin session cookie or a Basic `Authorization`
   header sent preemptively by a script, but never issue `WWW-Authenticate`.

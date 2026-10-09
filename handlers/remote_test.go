@@ -274,7 +274,11 @@ func TestHTTPSProxyVerifiesItsOwnCertificate(t *testing.T) {
 	if _, err := readDownload(t, "http://public.test/image.png", 1024); err == nil {
 		t.Fatal("accepted untrusted HTTPS proxy certificate")
 	}
-	config.Current.InsecureSkipVerify = true // explicit opt-in test only
+	config.Current.RemoteSkipVerify = true
+	if _, err := readDownload(t, "http://public.test/image.png", 1024); err == nil {
+		t.Fatal("remote TLS opt-out also disabled HTTPS proxy verification")
+	}
+	config.Current.ProxySkipVerify = true // explicit proxy-only opt-in
 	body, err := readDownload(t, "http://public.test/image.png", 1024)
 	if err != nil || string(body) != "through HTTPS proxy" {
 		t.Fatalf("HTTPS proxy handshake did not work: %v %q", err, body)
@@ -318,7 +322,7 @@ func TestHTTPProxyConnectPinsHTTPSAndKeepsSNI(t *testing.T) {
 	}))
 	defer proxy.Close()
 	configureProxy(t, proxy)
-	config.Current.InsecureSkipVerify = true // httptest uses a self-signed cert
+	config.Current.RemoteSkipVerify = true // httptest origin uses a self-signed cert
 	body, err := readDownload(t, "https://public.test/photo.png", 1024)
 	if err != nil || string(body) != "TLS origin" {
 		t.Fatalf("HTTPS origin via proxy failed: %v %q", err, body)

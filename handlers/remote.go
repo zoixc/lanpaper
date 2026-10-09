@@ -43,11 +43,11 @@ func (safeRemoteTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	pinned.URL = &urlCopy
 	pinned.Host = req.URL.Host // virtual hosting, even through an HTTP proxy
 
-	insecure := config.Current.InsecureSkipVerify // explicitly configured opt-in
+	targetInsecure := config.Current.RemoteSkipVerify // explicit opt-in
 	dialer := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}
 	tr := &http.Transport{
 		DialContext:            dialer.DialContext,
-		TLSClientConfig:        &tls.Config{ServerName: req.URL.Hostname(), InsecureSkipVerify: insecure},
+		TLSClientConfig:        &tls.Config{ServerName: req.URL.Hostname(), InsecureSkipVerify: targetInsecure},
 		TLSHandshakeTimeout:    10 * time.Second,
 		ResponseHeaderTimeout:  30 * time.Second,
 		MaxResponseHeaderBytes: 1 << 20,
@@ -84,7 +84,7 @@ func (safeRemoteTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 				if err != nil {
 					return nil, err
 				}
-				c := tls.Client(conn, &tls.Config{ServerName: host, InsecureSkipVerify: insecure})
+				c := tls.Client(conn, &tls.Config{ServerName: host, InsecureSkipVerify: config.Current.ProxySkipVerify})
 				if err := c.HandshakeContext(ctx); err != nil {
 					conn.Close()
 					return nil, err

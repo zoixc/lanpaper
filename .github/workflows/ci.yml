@@ -41,7 +41,12 @@ jobs:
         run: |
           unformatted="$(gofmt -l .)"
           if [ -n "$unformatted" ]; then
-            echo "Run gofmt -w on:"; echo "$unformatted"; exit 1
+            echo "Run gofmt -w on:"
+            echo "$unformatted"
+            while IFS= read -r file; do
+              echo "::error file=${file}::File is not formatted; run gofmt -w ${file}"
+            done <<< "$unformatted"
+            exit 1
           fi
 
       - name: Vet

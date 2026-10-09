@@ -43,6 +43,8 @@ type Config struct {
 	AdminPass            string            `json:"adminPass"`
 	DisableAuth          bool              `json:"disableAuth,omitempty"`
 	InsecureSkipVerify   bool              `json:"insecureSkipVerify,omitempty"`
+	RemoteSkipVerify     bool              `json:"remoteInsecureSkipVerify,omitempty"`
+	ProxySkipVerify      bool              `json:"proxyInsecureSkipVerify,omitempty"`
 	ProxyHost            string            `json:"proxyHost,omitempty"`
 	ProxyPort            string            `json:"proxyPort,omitempty"`
 	ProxyType            string            `json:"proxyType,omitempty"`
@@ -150,6 +152,14 @@ func Load() {
 	envString("ADMIN_PASS", &Current.AdminPass)
 	envBool("DISABLE_AUTH", &Current.DisableAuth)
 	envBool("INSECURE_SKIP_VERIFY", &Current.InsecureSkipVerify)
+	// The legacy switch keeps its old broad behaviour for one compatibility
+	// cycle; either specific environment variable can then override its side.
+	if Current.InsecureSkipVerify {
+		Current.RemoteSkipVerify = true
+		Current.ProxySkipVerify = true
+	}
+	envBool("REMOTE_INSECURE_SKIP_VERIFY", &Current.RemoteSkipVerify)
+	envBool("PROXY_INSECURE_SKIP_VERIFY", &Current.ProxySkipVerify)
 	envString("PROXY_HOST", &Current.ProxyHost)
 	envString("PROXY_PORT", &Current.ProxyPort)
 	envString("PROXY_TYPE", &Current.ProxyType)
@@ -201,7 +211,13 @@ func Load() {
 		}
 	}
 	if Current.InsecureSkipVerify {
-		log.Println("Warning: INSECURE_SKIP_VERIFY=true — certificates of downloaded media are not validated. Use it only for a trusted internal source with a self-signed certificate.")
+		log.Println("Warning: INSECURE_SKIP_VERIFY is deprecated and disables certificate validation for both remote media and the HTTPS proxy. Use the two specific settings instead.")
+	}
+	if Current.RemoteSkipVerify {
+		log.Println("Warning: REMOTE_INSECURE_SKIP_VERIFY=true — certificates of downloaded media are not validated.")
+	}
+	if Current.ProxySkipVerify {
+		log.Println("Warning: PROXY_INSECURE_SKIP_VERIFY=true — the HTTPS proxy certificate is not validated.")
 	}
 	if Current.AdminPass != "" && len(Current.AdminPass) < MinRecommendedPassLen {
 		log.Printf("Warning: ADMIN_PASS is shorter than %d characters. Any internet-facing deployment needs a long random password.",

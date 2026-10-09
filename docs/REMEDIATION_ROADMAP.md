@@ -64,9 +64,11 @@ remaining cached-Basic fallback on browser API requests.
 
 Add `ADMIN_PASSWORD_HASH` using Argon2id, a hash-generation command, dummy verification, password-rotation session invalidation and deprecation warning for plaintext `adminPass` in JSON. Preserve `ADMIN_PASS` as a documented migration path for one compatibility cycle.
 
-### PR 6 — Split insecure TLS controls
+### PR 6 — Split insecure TLS controls **(implemented; full CI pending)**
 
-Replace the broad switch with `REMOTE_INSECURE_SKIP_VERIFY` and `PROXY_INSECURE_SKIP_VERIFY`; keep a temporary deprecated alias. Test target TLS and HTTPS-proxy TLS independently.
+Added independent `REMOTE_INSECURE_SKIP_VERIFY` and
+`PROXY_INSECURE_SKIP_VERIFY` controls, retained the broad switch as a deprecated
+compatibility alias, and tested that target opt-out cannot weaken proxy TLS.
 
 ## Phase 1 — recovery, testing and observability
 

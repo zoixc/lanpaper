@@ -53,7 +53,7 @@ Notes that matter in production:
 - `DISABLE_AUTH=true` only makes sense behind a proxy that authenticates every
   request. With it enabled, `auth`-level links are refused (403) rather than
   served, because Lanpaper can no longer tell who is asking.
-- `INSECURE_SKIP_VERIFY=true` disables certificate validation for URL
+- `REMOTE_INSECURE_SKIP_VERIFY=true` disables certificate validation for URL
   downloads. It is logged loudly at startup and should not survive a review.
 - Every out-of-range value is clamped and logged, so a typo degrades one
   setting instead of the service.
@@ -202,7 +202,7 @@ once per quarter: an untested backup is a rumour.
 - [ ] `data/` is on a volume that survives container replacement, and is backed up
 - [ ] `MAX_UPLOAD_MB`, `MAX_IMAGES`, `HISTORY_MAX_MB`, `PLAYLIST_MAX` reflect the intended use
 - [ ] `DISABLE_AUTH` is `false` unless the proxy authenticates every request
-- [ ] `INSECURE_SKIP_VERIFY` is `false`
+- [ ] `REMOTE_INSECURE_SKIP_VERIFY` and `PROXY_INSECURE_SKIP_VERIFY` are `false`
 - [ ] `CORS_ORIGINS`/`ALLOW_EMBED` are set only if a real consumer needs them
 - [ ] Publish keys are long and random. Rotating one means restarting with a
       new `PUBLISH_KEYS`; per-key revocation is on the [roadmap](../ROADMAP.md)

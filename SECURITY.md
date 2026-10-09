@@ -174,7 +174,7 @@ reverse-proxy access logs.
 2. **Trust your outbound proxy.** For plain-HTTP targets, Lanpaper sends an
    absolute request URI with the vetted IP, plus the original `Host` header.
    A proxy that routes by `Host` instead can defeat DNS pinning.
-   `INSECURE_SKIP_VERIFY=true` disables outbound TLS verification; do not
+   `REMOTE_INSECURE_SKIP_VERIFY=true` or `PROXY_INSECURE_SKIP_VERIFY=true` disables the corresponding outbound TLS verification; do not
    enable it in production.
 3. **Treat uploaded media as untrusted.** Decoders and media players can have
    bugs. Keep Lanpaper, the base image and browsers updated. Add scanning or
