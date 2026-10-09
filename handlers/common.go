@@ -81,7 +81,11 @@ func mediaContentType(ext string) string {
 // entropy. crypto/rand.Read never fails (Go 1.24+).
 func generateAccessToken() string {
 	b := make([]byte, 32)
-	_, _ = rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		// Without secure randomness no token may be issued. The recover
+		// middleware turns this into a 500 for the one request.
+		panic("access token: no secure randomness: " + err.Error())
+	}
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 

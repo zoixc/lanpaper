@@ -249,10 +249,11 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	// The version is deliberately not reported: an unauthenticated probe should
+	// not learn which release to look up for known flaws.
 	_ = json.NewEncoder(w).Encode(map[string]string{
 		"status":  "ok",
 		"service": "lanpaper",
-		"version": Version,
 	})
 }
 

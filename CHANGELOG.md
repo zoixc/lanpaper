@@ -3,6 +3,35 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
+## [Unreleased]
+
+Security hardening from an internal audit. Behaviour changes are listed under
+**Changed**; upgrading is a container restart.
+
+### Security
+
+- **Client address comes only from the rightmost `X-Forwarded-For` entry.**
+  `X-Real-IP` is no longer read at all. Before, a client could send
+  `X-Real-IP` through a trusted proxy that does not overwrite it and appear as
+  any address, which bypassed the `local` access level and the per-client rate
+  limit and login lockout.
+- **Publish keys cannot replace existing media.** `POST /api/upload` with a
+  publish key and `mode=replace` (the default) on a link that already has media
+  now returns `403`. Keys can still create links, upload a first file and append
+  playlist items. Admin uploads are unchanged.
+- **MP4 detection checks the brand.** A file is stored as MP4 only if its `ftyp`
+  box declares a known video brand as major or compatible brand. Before, any
+  file with `ftyp` at offset 4 was accepted and served as `video/mp4`.
+
+### Changed
+
+- `GET /health` no longer returns the `version` field.
+- Access-token generation fails the request instead of ignoring a failed read
+  from the system random source.
+- Proxy setup: configure `X-Forwarded-For` (append or overwrite) instead of
+  `X-Real-IP`. The nginx example is updated; the Caddy example no longer needs
+  `header_up X-Real-IP`.
+
 ## [0.15.0] – 2026-10-09
 
 A visual release for the 2.0 panel: a monochrome default with the colour kept

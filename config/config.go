@@ -52,8 +52,9 @@ type Config struct {
 	Compression          CompressionConfig `json:"compression"`
 	// TrustedProxy lists the reverse proxies in front of Lanpaper: one or
 	// more IPs or CIDRs, comma-separated ("192.168.20.1,172.24.0.0/16").
-	// X-Real-IP / X-Forwarded-* are trusted only for requests from these
-	// addresses. A list is needed whenever a proxy reaches the container
+	// The rightmost X-Forwarded-For entry and X-Forwarded-Proto/-Host are
+	// trusted only for requests from these addresses. X-Real-IP is never read.
+	// A list is needed whenever a proxy reaches the container
 	// through more than one hop or address — for example a proxy on the LAN
 	// plus the Docker bridge gateway the container actually sees.
 	TrustedProxy string `json:"trustedProxy,omitempty"`

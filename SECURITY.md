@@ -57,7 +57,8 @@ deliberately narrow credential:
 
 | Route | With a valid publish key |
 | --- | --- |
-| `POST /api/upload` (including `mode=append` and `autoCreate=1`) | allowed |
+| `POST /api/upload` with `mode=append`, or with `autoCreate=1` for a link that does not exist yet | allowed |
+| `POST /api/upload` with `mode=replace` (the default) on a link that already has media | `403` — only an admin login may replace a live file |
 | `POST /api/link` | allowed |
 | everything else under `/admin` and `/api/*` | falls back to Basic Auth, so a key alone gets `401` |
 
@@ -106,8 +107,12 @@ Lanpaper uses the forwarded client IP, host and scheme **only** when
   container actually sees — are listed comma-separated:
   `TRUSTED_PROXY="192.168.20.1,172.24.0.1"`. Only the listed addresses are
   believed; an entry that does not parse is dropped with a warning.
-- The proxy must **replace** client-supplied `X-Real-IP` / `X-Forwarded-*`
-  headers, not pass them through.
+- The proxy must **append to or overwrite** `X-Forwarded-For`, and overwrite
+  `X-Forwarded-Proto` and `X-Forwarded-Host`, so that no client-supplied value
+  reaches Lanpaper unchanged. Lanpaper trusts only the rightmost
+  `X-Forwarded-For` entry and never reads `X-Real-IP`: a proxy that does not
+  overwrite a client-supplied `X-Real-IP` would otherwise let a client look like
+  any address, including a private one.
 - Without `TRUSTED_PROXY`, a proxy on a private network makes every visitor
   look `local`.
 
@@ -179,9 +184,10 @@ reverse-proxy access logs.
    until they revalidate.
 7. **Publish keys are write credentials.** Give them only to automation that
    needs to push content, keep them out of URLs, logs and version control, and
-   replace them by restarting with a new `PUBLISH_KEYS` when one leaks. A key
-   can overwrite the media of any link, which is the same power an admin upload
-   has.
+   replace them by restarting with a new `PUBLISH_KEYS` when one leaks. A key can
+   add media to any link and create new links, but it cannot replace the live
+   file of a link that already has media: that remains an admin action, so a
+   leaked key cannot deface links that are in use.
 8. **CORS and embedding widen who can read public media.** `CORS_ORIGINS: *`
    lets any website read every `public` link with JavaScript, and
    `ALLOW_EMBED=true` lets any website frame it. List only the origins you
@@ -224,7 +230,6 @@ server {
         # compares Origin against this name, so it must be the one the browser
         # used. $http_host keeps the port and the exact spelling.
         proxy_set_header   Host              $http_host;
-        proxy_set_header   X-Real-IP         $remote_addr;
         proxy_set_header   X-Forwarded-For   $remote_addr;
         proxy_set_header   X-Forwarded-Proto $scheme;
         proxy_set_header   X-Forwarded-Host  $http_host;
@@ -238,18 +243,14 @@ server {
 
 ```caddyfile
 lanpaper.example.com {
-    reverse_proxy 127.0.0.1:8080 {
-        # Caddy passes a client-supplied X-Real-IP through unchanged, and
-        # Lanpaper prefers X-Real-IP over X-Forwarded-For. Always overwrite it.
-        header_up X-Real-IP {remote_host}
-    }
+    reverse_proxy 127.0.0.1:8080
 }
 ```
 
 Caddy sets `X-Forwarded-For`, `X-Forwarded-Proto` and `X-Forwarded-Host`
-itself and preserves `Host`. With any other proxy, make sure that both
-`X-Real-IP` and `X-Forwarded-For` are set by the proxy, never passed through
-from the client.
+itself and preserves `Host`. With any other proxy, make sure that
+`X-Forwarded-For` is appended to or overwritten by the proxy, never passed
+through from the client.
 
 ## Checks for contributors
 

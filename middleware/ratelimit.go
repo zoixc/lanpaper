@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"runtime/debug"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -153,21 +152,17 @@ func RateLimit(fn RateLimitFunc) func(http.HandlerFunc) http.HandlerFunc {
 }
 
 // clientIP returns the real client IP.
-// X-Real-IP and X-Forwarded-For are honoured only when the request originates
-// from the configured TrustedProxy, preventing IP spoofing.
-// Both headers are validated as proper IP addresses before use.
+//
+// Only a request from the configured TrustedProxy may supply the client
+// address, and then only through the rightmost X-Forwarded-For entry: the
+// address the trusted proxy itself saw. X-Real-IP is deliberately never read.
+// A proxy that appends to X-Forwarded-For but does not overwrite a client-sent
+// X-Real-IP lets that header through unchanged, so trusting it let a client
+// claim any address, including a private one for the "local" access level,
+// and escape the per-client rate limit and login lockout.
 func clientIP(r *http.Request) string {
 	if config.IsTrustedProxy(r.RemoteAddr) {
-		if xr := r.Header.Get("X-Real-IP"); xr != "" {
-			candidate := strings.TrimSpace(xr)
-			if net.ParseIP(candidate) != nil {
-				return candidate
-			}
-		}
 		if xf := r.Header.Get("X-Forwarded-For"); xf != "" {
-			// XFF is comma-separated. Take the rightmost (last) entry: it is
-			// the address the trusted proxy actually saw, whereas leftmost
-			// entries are client-supplied and trivially spoofed.
 			candidate := rightmostHeader(xf)
 			if net.ParseIP(candidate) != nil {
 				return candidate

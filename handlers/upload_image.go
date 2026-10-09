@@ -6,6 +6,7 @@
 package handlers
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"image"
@@ -143,6 +144,9 @@ func inspectMediaFile(r io.ReadSeeker, name string, size, maxBytes int64) (strin
 		if brand := strings.ToLower(string(head[8:12])); isoBMFFImageBrands[brand] {
 			return "", fmt.Errorf("unsupported image container %q", brand)
 		}
+		if !isMP4VideoFtyp(head) {
+			return "", fmt.Errorf("ftyp box declares no known video brand")
+		}
 		return "mp4", utils.ValidateFileType(head, "mp4")
 	}
 	ext, ok := mimeToExt[http.DetectContentType(head)]
@@ -160,6 +164,40 @@ func inspectMediaFile(r io.ReadSeeker, name string, size, maxBytes int64) (strin
 		return "", err
 	}
 	return ext, nil
+}
+
+// mp4VideoBrands are ftyp brands that mark a video container. A file is stored
+// as MP4 only when its major brand or one of its compatible brands is here, so
+// an arbitrary file that merely has "ftyp" at offset 4 is refused instead of
+// being served as video/mp4.
+var mp4VideoBrands = map[string]bool{
+	"isom": true, "iso2": true, "iso3": true, "iso4": true, "iso5": true, "iso6": true,
+	"mp41": true, "mp42": true, "mp71": true, "avc1": true,
+	"M4V ": true, "M4VH": true, "M4VP": true, "dash": true,
+	"3gp4": true, "3gp5": true, "3gp6": true, "3g2a": true, "qt  ": true,
+}
+
+// isMP4VideoFtyp reports whether head starts with an ftyp box whose major brand
+// (offset 8) or compatible brands (from offset 16, up to the box size) include a
+// known video brand. The box size must cover at least major and minor brand.
+func isMP4VideoFtyp(head []byte) bool {
+	if len(head) < 16 {
+		return false
+	}
+	size := int(binary.BigEndian.Uint32(head[0:4]))
+	if size < 16 {
+		return false
+	}
+	if mp4VideoBrands[string(head[8:12])] {
+		return true
+	}
+	end := min(size, len(head))
+	for off := 16; off+4 <= end; off += 4 {
+		if mp4VideoBrands[string(head[off:off+4])] {
+			return true
+		}
+	}
+	return false
 }
 
 // checkImageDimensions runs before any full image decode, including lossless

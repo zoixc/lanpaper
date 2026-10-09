@@ -198,13 +198,22 @@ delete anything. Keys come from the `PUBLISH_KEYS` environment variable only
 SHA-256 digests in memory — they never reach `config.json`. Wrong keys share
 the brute-force budget with admin logins, so guessing is locked out per client.
 
+A publish key can **add** media but never **replace** it. `POST /api/upload`
+with a key creates a new link and uploads its first file, or appends a playlist
+item with `mode=append`. A key that asks for the default `mode=replace` on a
+link that already has media gets `403 Publish keys cannot replace existing
+media`. Replacing a live file is an admin action, so a leaked key cannot deface
+links that are already in use.
+
 **Behind a reverse proxy**, set `TRUSTED_PROXY` to *only* the address the
 proxy reaches Lanpaper from — one IP or CIDR, or a comma-separated list when
 the proxy arrives through more than one hop (a Docker container, for example,
 sees the bridge gateway and not the proxy's LAN address:
 `TRUSTED_PROXY="192.168.20.1,172.24.0.1"`). Configure the proxy to
-**overwrite** `X-Real-IP`, `X-Forwarded-For`, `X-Forwarded-Proto` and
-`X-Forwarded-Host`, and to preserve the original `Host`. Without this:
+**append to or overwrite** `X-Forwarded-For`, and **overwrite**
+`X-Forwarded-Proto` and `X-Forwarded-Host`, and to preserve the original `Host`.
+Lanpaper reads only the rightmost `X-Forwarded-For` entry from the trusted
+proxy and never reads `X-Real-IP`. Without this:
 
 - every visitor appears to come from the proxy's (often private) address, so
   `local` links become reachable for everyone;
@@ -249,7 +258,7 @@ which have the highest priority.
 | `RATE_BURST` | `10` | Extra requests allowed per window |
 | `CORS_ORIGINS` | unset | Comma-separated browser origins allowed to read public media; `*` allows any origin |
 | `ALLOW_EMBED` | `false` | Lets other sites frame public media: drops `X-Frame-Options` and the CSP `sandbox` for `/{name}` only |
-| `PUBLISH_KEYS` | unset | Comma-separated API keys (16+ characters, max 32) that may upload and create links. Environment only — never written to `config.json` |
+| `PUBLISH_KEYS` | unset | Comma-separated API keys (16+ characters, max 32) that may create links and add media (`mode=append` or a new link), never replace an existing link's file. Environment only — never written to `config.json` |
 | `COMPRESSION_QUALITY` | `85` | JPEG/WebP quality, 1–100 |
 | `COMPRESSION_SCALE` | `100` | Stored image size as a percentage of the original, 1–100 |
 | `TRUSTED_PROXY` | unset | Address the reverse proxy connects from: an IP or CIDR, or a comma-separated list of them when there is more than one hop. Forwarded headers are trusted only from these. |

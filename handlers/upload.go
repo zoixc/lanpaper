@@ -111,6 +111,15 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	unlock := storage.LockLinks(name)
 	defer unlock()
 	prev, exists := storage.Global.Get(name)
+	// A publish key may add media — a new link, or a playlist item behind an
+	// existing one — but never replace the live file of a link that already
+	// has media: that would destroy content the URL is serving, and a leaked
+	// key would then be able to deface every link. Admin uploads are unaffected.
+	if exists && prev.HasImage && mode == uploadModeReplace &&
+		middleware.PublisherFingerprint(r) != "" {
+		http.Error(w, "Publish keys cannot replace existing media; use mode=append", http.StatusForbidden)
+		return
+	}
 	createdLink := false
 	if !exists {
 		if !autoCreate {
