@@ -9,8 +9,9 @@ Examples use `curl` and assume `ADMIN_PASS` is set in the shell.
   session cookie from `POST /api/session` or HTTP Basic Auth, with
   `ADMIN_USER` / `ADMIN_PASS`. `POST /api/session` takes
   `{"username":"…","password":"…"}` and returns `204` with the cookie;
-  `DELETE /api/session` signs out. Wrong passwords return `401` and share the
-  Basic Auth lockout (`429`).
+  `DELETE /api/session` signs out. Sessions are kept in `data/sessions.json`, so
+  they survive a restart. Wrong passwords return `401` and share the Basic Auth
+  lockout (`429`).
   - **Publish keys.** `PUBLISH_KEYS` (environment only, comma-separated, 16+
     characters, at most 32) authorizes *publishing* without the admin login:
     `POST /api/upload` and `POST /api/link`. Send the key as

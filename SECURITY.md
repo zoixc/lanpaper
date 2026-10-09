@@ -27,8 +27,9 @@ The admin panel is protected by a sign-in form that sets an HttpOnly session
 cookie (`SameSite=Lax`, 14 days, `Secure` over HTTPS). HTTP Basic Auth protects
 `/api/*`, the private previews and admin-only links, and scripts use it.
 
-- There are no sessions and no password database. Credentials come from the
-  environment (or `config.json`) and must be handled as secrets.
+- Sessions are stored as SHA-256 digests in `data/sessions.json` (mode 0600)
+  and expire after 14 days. There is no password database: credentials come
+  from the environment (or `config.json`) and must be handled as secrets.
 - If either credential is missing, admin routes return **503**. They never
   fall back to anonymous access.
 - `DISABLE_AUTH=true` is an explicit opt-out. Use it only if all three hold:

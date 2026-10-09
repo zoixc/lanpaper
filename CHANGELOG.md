@@ -30,9 +30,14 @@ Security hardening from an internal audit. Behaviour changes are listed under
 - **Sign-in form for the admin panel.** Installed PWAs have no Basic Auth
   password prompt, so on iOS they showed "Unauthorized" with no way to sign in,
   and deletes failed silently. `/admin` now shows a sign-in form that sets an
-  HttpOnly session cookie (`SameSite=Lax`, 14 days). Sessions live in memory, so
-  a restart signs everyone out. Basic Auth keeps working for scripts. An expired
-  session reloads into the sign-in form.
+  HttpOnly session cookie (`SameSite=Lax`, 14 days). Basic Auth keeps working
+  for scripts. An expired session reloads into the sign-in form.
+- **Sign out** in Settings → Account ends the session on the server as well.
+- **Sessions survive a restart.** Only SHA-256 digests are written, to
+  `data/sessions.json` (mode 0600, written atomically). A session that cannot be
+  saved is not issued, so a sign-in never succeeds without being persisted.
+- **Browser tests for sign-in** (`tests/e2e`, Playwright). CI runs them in the
+  `e2e` job on desktop and phone-sized viewports.
 
 ### Changed
 

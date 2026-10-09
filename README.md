@@ -355,11 +355,13 @@ read every `Warning:` the process prints at startup.
 
 Two properties worth knowing before sizing a host:
 
-- **Authentication uses sessions in memory.** The browser signs in once through
-  the form and keeps an HttpOnly cookie for 14 days. Scripts can still send the
-  admin password as HTTP Basic Auth on each request. Either way, TLS in front (or
-  `TLS_CERT_FILE`/`TLS_KEY_FILE`) keeps the password private. Failed logins are
-  counted per client and locked out for a while. A restart signs everyone out.
+- **Authentication uses sign-in sessions.** The browser signs in once through
+  the form and keeps an HttpOnly cookie for 14 days. Sessions are stored as
+  SHA-256 digests in `data/sessions.json` (mode 0600), so they survive a restart.
+  Settings → Account → Sign out ends a session at once. Scripts can still send
+  the admin password as HTTP Basic Auth on each request. Either way, TLS in front
+  (or `TLS_CERT_FILE`/`TLS_KEY_FILE`) keeps the password private. Failed logins
+  are counted per client and locked out for a while.
 - **Image work is bounded.** One image may hold 36 M pixels and at most 48 M
   decoded pixels may be in flight, so a burst of uploads queues instead of
   growing the process without limit. A 36 M pixel upload peaks at about 174 MB
