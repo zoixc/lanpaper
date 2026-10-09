@@ -190,6 +190,12 @@ func Load() {
 	envList("PUBLISH_KEYS", &Current.PublishKeys)
 
 	validate()
+	if Current.Rate.PublicPerMin == 0 {
+		log.Println("Warning: RATE_PUBLIC_PER_MIN=0 disables public download rate limiting; attacker-controlled traffic is unbounded.")
+	}
+	if Current.Rate.UploadPerMin == 0 {
+		log.Println("Warning: RATE_UPLOAD_PER_MIN=0 disables upload and regeneration request rate limiting.")
+	}
 
 	mode := "compressed"
 	if Current.Compression.Quality == 100 && Current.Compression.Scale == 100 {

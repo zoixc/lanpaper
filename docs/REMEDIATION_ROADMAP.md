@@ -151,9 +151,14 @@ Go CI executes every seed corpus.
 
 ## Phase 2 — resource governance and backend modularity
 
-### PR 16 — Rate-limiter model upgrade
+### PR 16 — Rate-limiter model upgrade **(implemented; full CI pending)**
 
-Move fixed windows to token buckets, separate login/publish/upload/download/regeneration budgets, add a global heavy-work ceiling and warnings for unsafe disabled limits. Preserve single-instance semantics explicitly.
+Replaced fixed windows with sharded continuously refilled token buckets whose
+capacity includes the configured burst while refill uses the sustained rate.
+Login, publish-key failure, upload/regeneration and public download namespaces
+remain independent; the existing global upload/decode ceilings bound heavy
+work. Startup now warns when public or upload limits are disabled. State remains
+explicitly single-instance and in-memory.
 
 ### PR 17 — Application composition root
 

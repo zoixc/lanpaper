@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Token-bucket rate limiting.** Public downloads, uploads/regeneration,
+  login failures and publish-key failures now use independent continuously
+  refilled budgets with bounded bursts and warnings for disabled limits.
 - **Security parser fuzzing.** Regression-seeded, size-bounded fuzz targets now
   cover multipart input, routes, forwarded/origin headers and persisted media
   metadata normalization.
