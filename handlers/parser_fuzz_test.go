@@ -43,7 +43,7 @@ func FuzzMultipartFields(f *testing.F) {
 		r.Header.Set("Content-Type", mw.FormDataContentType())
 		form, err := readUploadForm(r, 128<<10, nil)
 		if form != nil {
-			form.cleanup()
+			form.close()
 		}
 		_ = err
 	})
