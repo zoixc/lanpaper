@@ -339,7 +339,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		previewPath = storage.PreviewFilePath(name)
 		previewURL = "/api/preview/" + name
 	}
-	imagePub, err := publishStaged(imageStage, imagePath, maxBytes)
+	txn := &uploadTransaction{}
+	if err := txn.staged(); err != nil {
+		writeUploadError(w, err)
+		return
+	}
+	defer txn.rollback()
+	imagePub, err := txn.publish(imageStage, imagePath, maxBytes)
 	if err != nil {
 		writeUploadError(w, err)
 		return
@@ -361,11 +367,14 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			return nil
 		})
 		if err != nil {
-			imagePub.rollback()
 			writeStoreError(w, err)
 			return
 		}
-		imagePub.finish()
+		if err := txn.commit(); err != nil {
+			writeUploadError(w, err)
+			return
+		}
+		_ = txn.finalize()
 		linkCommitted = true
 		log.Printf("Appended playlist item #%d to %s (%s, %d KB)", itemID, name, saveExt, fi.Size()/1024)
 		w.Header().Set("Content-Type", "application/json")
@@ -373,11 +382,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var previewPub publishedFile
 	if previewStage != "" {
-		previewPub, err = publishStaged(previewStage, previewPath, maxBytes)
+		_, err = txn.publish(previewStage, previewPath, maxBytes)
 		if err != nil {
-			imagePub.rollback()
 			writeUploadError(w, err)
 			return
 		}
@@ -401,10 +408,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if err != nil {
-		if previewStage != "" {
-			previewPub.rollback()
-		}
-		imagePub.rollback()
 		writeUploadError(w, err)
 		return
 	}
@@ -423,11 +426,12 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	// The upload is published and stored: from here on the link is a real one
 	// and the deferred rollback must not run.
-	linkCommitted = true
-	imagePub.finish()
-	if previewStage != "" {
-		previewPub.finish()
+	if err := txn.commit(); err != nil {
+		writeUploadError(w, err)
+		return
 	}
+	_ = txn.finalize()
+	linkCommitted = true
 	// Cleanup of the previous extension/preview only after commit. In
 	// particular, a video replacing an image must not leave a stale preview.
 	if prev.HasImage {

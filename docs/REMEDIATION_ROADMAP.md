@@ -82,9 +82,13 @@ create, chmod, write, file sync/close, rename and directory open/sync/close.
 Session and wallpaper metadata persistence use it, with a fault-matrix test that
 does not rely on filesystem permissions.
 
-### PR 8 — Upload transaction fault matrix
+### PR 8 — Upload transaction fault matrix **(implemented; full CI pending)**
 
-Model `validate → stage → publish → commit → finalize/rollback`. Add tests for failure at every boundary, client disconnect and process interruption. No functional redesign yet.
+Made `validate → stage → publish → commit → finalize/rollback` an explicit
+state machine around the existing atomic media publication. Fault-matrix tests
+cover first/second publish failure, metadata-commit failure, reverse-order
+rollback, successful finalization and rejected out-of-order transitions; staged
+request files remain cleanup-owned until publication.
 
 ### PR 9 — Read-only storage audit command
 

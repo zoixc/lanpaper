@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Explicit upload transactions.** Upload publication now enforces ordered
+  validate, stage, publish, metadata commit and finalize/rollback boundaries,
+  with reverse-order rollback under injected failures.
 - **Durable persistence fault injection.** Session and wallpaper metadata now
   share a tested atomic-write path covering write, sync, close, rename and
   directory-sync failures without permission-dependent tests.
