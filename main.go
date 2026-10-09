@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -19,6 +20,7 @@ import (
 
 	"lanpaper/config"
 	"lanpaper/handlers"
+	"lanpaper/internal/observability"
 	"lanpaper/middleware"
 	"lanpaper/storage"
 
@@ -29,6 +31,7 @@ import (
 var Version = "dev"
 
 func main() {
+	observability.Configure(os.Stderr, slog.LevelInfo)
 	if len(os.Args) > 1 && os.Args[1] == "audit" {
 		os.Exit(runAudit(os.Args[2:], os.Stdout, os.Stderr))
 	}

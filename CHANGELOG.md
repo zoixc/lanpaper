@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Structured redacted logging.** Runtime logs now use console-readable
+  `log/slog` records with stable event names and centralized secret-attribute
+  redaction; legacy messages are bridged during migration.
 - **Offline storage repair.** `lanpaper repair --dry-run` plans safe changes;
   `--apply` quarantines unreferenced files, journals operations, backs up
   metadata and repairs recoverable references under an exclusive lock.

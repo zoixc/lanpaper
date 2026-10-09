@@ -108,9 +108,12 @@ fsynced JSONL operation journal, metadata backup, exclusive repair lock and
 recovery tests. Missing live media and invalid records remain manual rather
 than being guessed or deleted.
 
-### PR 11 — Structured logging
+### PR 11 — Structured logging **(implemented; full CI pending)**
 
-Adopt `log/slog`, stable event names and redaction tests. Never log query strings, tokens, cookies, passwords or proxy credentials. Keep console-readable defaults.
+Adopted console-readable `log/slog` output with stable event fields, an adapter
+for legacy call sites, named authentication events and centralized redaction of
+password, token, cookie, authorization, proxy-secret, URL and query attributes.
+Redaction and compatibility output are covered by tests.
 
 ### PR 12 — Operational metrics
 

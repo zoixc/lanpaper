@@ -5,11 +5,12 @@ package middleware
 import (
 	"crypto/sha256"
 	"crypto/subtle"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"lanpaper/config"
+	"lanpaper/internal/observability"
 )
 
 // Brute-force protection for admin credentials. After authMaxFailures wrong
@@ -75,9 +76,9 @@ func verifyAdminPassword(user, pass, key string) (authResult, time.Duration) {
 		return authOK, 0
 	}
 	if n := recordEvent("authfail", key, authFailWindow); n >= authMaxFailures {
-		log.Printf("Security: %s locked out after %d failed login attempts", key, n)
+		observability.Event(slog.LevelWarn, "auth_lockout", "client locked out after failed login attempts", "client", key, "failures", n)
 	} else {
-		log.Printf("Failed auth attempt from %s", key)
+		observability.Event(slog.LevelWarn, "auth_failure", "administrator authentication failed", "client", key)
 	}
 	return authInvalid, 0
 }
