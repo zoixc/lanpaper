@@ -229,5 +229,9 @@
   "sign_out_all": "Auf allen Geräten abmelden",
   "sign_out_all_confirm_title": "Überall abmelden?",
   "sign_out_all_confirm": "Alle Browsersitzungen werden sofort beendet. Auf jedem Gerät ist eine erneute Anmeldung erforderlich.",
-  "sign_out_all_error": "Nicht alle Sitzungen konnten sicher beendet werden. Prüfe den Serverspeicher und versuche es erneut."
+  "sign_out_all_error": "Nicht alle Sitzungen konnten sicher beendet werden. Prüfe den Serverspeicher und versuche es erneut.",
+  "sessions_loading": "Sitzungen werden geladen…",
+  "sessions_summary": "Aktive Browsersitzungen: {{count}} · diese Sitzung läuft am {{date}} ab",
+  "sessions_summary_basic": "Aktive Browsersitzungen: {{count}}",
+  "sessions_load_error": "Sitzungsinformationen konnten nicht geladen werden."
 }

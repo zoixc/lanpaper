@@ -2351,9 +2351,26 @@
        ======================================================== */
     const PALETTES = ['mono', 'indigo', 'sage', 'clay', 'graphite', 'ocean'];
 
+    async function loadSessionSummary(node) {
+        const summary = $('#sessionSummary', node);
+        if (!summary) return;
+        summary.textContent = t('sessions_loading');
+        try {
+            const sessions = await apiCall('/api/sessions');
+            const list = Array.isArray(sessions) ? sessions : [];
+            const current = list.find(function (item) { return item.current; });
+            summary.textContent = current
+                ? t('sessions_summary', { count: list.length, date: formatDate(current.expires) })
+                : t('sessions_summary_basic', { count: list.length });
+        } catch (_) {
+            summary.textContent = t('sessions_load_error');
+        }
+    }
+
     function openSettings() {
         const node = $('#tplSettings').content.firstElementChild.cloneNode(true);
         $$('[data-close]', node).forEach(b => b.addEventListener('click', () => closeOverlay()));
+        loadSessionSummary(node);
 
         /* Тема */
         $$('[data-theme-opt]', node).forEach(function (input) {

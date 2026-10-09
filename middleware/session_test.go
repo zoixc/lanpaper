@@ -28,7 +28,7 @@ func useSessionDir(t *testing.T) {
 
 func resetSessionStore() {
 	sessionStore.Lock()
-	sessionStore.expiry = make(map[[32]byte]time.Time)
+	sessionStore.expiry = make(map[[32]byte]sessionRecord)
 	sessionStore.Unlock()
 	persistSessions = persistLocked
 }
@@ -115,12 +115,79 @@ func TestSessionFileHoldsDigestsOnly(t *testing.T) {
 	if !strings.Contains(string(body), want) {
 		t.Fatal("digest missing from sessions.json")
 	}
+	var entries []persistedSession
+	if err := json.Unmarshal(body, &entries); err != nil || len(entries) != 1 {
+		t.Fatalf("session metadata: entries=%d err=%v", len(entries), err)
+	}
+	if entries[0].ID == "" || entries[0].CreatedAt <= 0 || entries[0].Expires <= entries[0].CreatedAt {
+		t.Fatalf("incomplete session metadata: %+v", entries[0])
+	}
 	info, err := os.Stat(sessionsPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if info.Mode().Perm() != 0o600 {
 		t.Fatalf("sessions.json mode %v, want 0600", info.Mode().Perm())
+	}
+}
+
+func TestSessionListMarksOnlyCurrentWithoutSensitiveMetadata(t *testing.T) {
+	useSessionDir(t)
+	first, err := issueSession(time.Now().Add(-time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := issueSession(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	list := listSessions(requestWithToken(first), time.Now())
+	if len(list) != 2 || list[0].CreatedAt < list[1].CreatedAt {
+		t.Fatalf("session list is incomplete or unsorted: %+v", list)
+	}
+	current := 0
+	for _, item := range list {
+		if item.ID == "" || item.CreatedAt <= 0 || item.Expires <= item.CreatedAt {
+			t.Fatalf("invalid lifecycle metadata: %+v", item)
+		}
+		if item.Current {
+			current++
+		}
+	}
+	if current != 1 || !HasAdminSession(requestWithToken(second)) {
+		t.Fatalf("current markers=%d or second session invalid", current)
+	}
+}
+
+func TestLegacySessionFileIsMigrated(t *testing.T) {
+	useSessionDir(t)
+	token := "legacy-session-token"
+	digest := tokenDigest(token)
+	legacy, err := json.Marshal([]persistedSession{{
+		Digest: hex.EncodeToString(digest[:]), Expires: time.Now().Add(time.Hour).Unix(),
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(sessionsPath, legacy, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := LoadSessions(); err != nil {
+		t.Fatal(err)
+	}
+	if !HasAdminSession(requestWithToken(token)) {
+		t.Fatal("legacy session did not survive metadata migration")
+	}
+	body, err := os.ReadFile(sessionsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var migrated []persistedSession
+	if err := json.Unmarshal(body, &migrated); err != nil || len(migrated) != 1 {
+		t.Fatalf("migrated file: entries=%d err=%v", len(migrated), err)
+	}
+	if migrated[0].ID == "" || migrated[0].CreatedAt <= 0 {
+		t.Fatalf("legacy metadata was not filled: %+v", migrated[0])
 	}
 }
 

@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -40,8 +41,8 @@ var sessionsPath = filepath.Join("data", "sessions.json")
 
 var sessionStore = struct {
 	sync.Mutex
-	expiry map[[sha256.Size]byte]time.Time
-}{expiry: make(map[[sha256.Size]byte]time.Time)}
+	expiry map[[sha256.Size]byte]sessionRecord
+}{expiry: make(map[[sha256.Size]byte]sessionRecord)}
 
 var errTooManySessions = errors.New("too many active sessions")
 
@@ -49,10 +50,28 @@ func tokenDigest(token string) [sha256.Size]byte {
 	return sha256.Sum256([]byte(token))
 }
 
-// persistedSession is one entry of data/sessions.json.
+type sessionRecord struct {
+	ID        string
+	CreatedAt time.Time
+	Expires   time.Time
+}
+
+// persistedSession is one entry of data/sessions.json. ID and CreatedAt were
+// added after the original digest/expiry format; zero values are migrated on
+// load without exposing the bearer token or collecting device information.
 type persistedSession struct {
-	Digest  string `json:"digest"`  // hex SHA-256 of the token
-	Expires int64  `json:"expires"` // Unix seconds
+	ID        string `json:"id,omitempty"`
+	Digest    string `json:"digest"` // hex SHA-256 of the token
+	CreatedAt int64  `json:"createdAt,omitempty"`
+	Expires   int64  `json:"expires"`
+}
+
+func randomSessionID() (string, error) {
+	raw := make([]byte, 16)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
 }
 
 // LoadSessions restores sessions saved by an earlier run. Expired and malformed
@@ -70,20 +89,44 @@ func LoadSessions() error {
 		return fmt.Errorf("%s: %w", sessionsPath, err)
 	}
 	now := time.Now()
-	sessionStore.Lock()
-	defer sessionStore.Unlock()
+	next := make(map[[sha256.Size]byte]sessionRecord)
+	migrated := false
 	for _, e := range entries {
 		raw, err := hex.DecodeString(e.Digest)
 		if err != nil || len(raw) != sha256.Size {
 			continue
 		}
 		exp := time.Unix(e.Expires, 0)
-		if !now.Before(exp) || len(sessionStore.expiry) >= maxSessions {
+		if !now.Before(exp) || len(next) >= maxSessions {
 			continue
+		}
+		id := e.ID
+		if id == "" {
+			id, err = randomSessionID()
+			if err != nil {
+				return err
+			}
+			migrated = true
+		}
+		created := time.Unix(e.CreatedAt, 0)
+		if e.CreatedAt <= 0 || created.After(exp) {
+			created = exp.Add(-sessionTTL)
+			migrated = true
 		}
 		var digest [sha256.Size]byte
 		copy(digest[:], raw)
-		sessionStore.expiry[digest] = exp
+		next[digest] = sessionRecord{ID: id, CreatedAt: created, Expires: exp}
+	}
+
+	sessionStore.Lock()
+	defer sessionStore.Unlock()
+	previous := sessionStore.expiry
+	sessionStore.expiry = next
+	if migrated {
+		if err := persistLocked(now); err != nil {
+			sessionStore.expiry = previous
+			return fmt.Errorf("migrate sessions: %w", err)
+		}
 	}
 	return nil
 }
@@ -97,9 +140,12 @@ var persistSessions = persistLocked
 // sessionStore.Lock.
 func persistLocked(now time.Time) error {
 	entries := make([]persistedSession, 0, len(sessionStore.expiry))
-	for digest, exp := range sessionStore.expiry {
-		if now.Before(exp) {
-			entries = append(entries, persistedSession{Digest: hex.EncodeToString(digest[:]), Expires: exp.Unix()})
+	for digest, record := range sessionStore.expiry {
+		if now.Before(record.Expires) {
+			entries = append(entries, persistedSession{
+				ID: record.ID, Digest: hex.EncodeToString(digest[:]),
+				CreatedAt: record.CreatedAt.Unix(), Expires: record.Expires.Unix(),
+			})
 		}
 	}
 	body, err := json.Marshal(entries)
@@ -153,8 +199,8 @@ func issueSession(now time.Time) (string, error) {
 	sessionStore.Lock()
 	defer sessionStore.Unlock()
 	if len(sessionStore.expiry) >= maxSessions {
-		for d, exp := range sessionStore.expiry {
-			if !now.Before(exp) {
+		for d, record := range sessionStore.expiry {
+			if !now.Before(record.Expires) {
 				delete(sessionStore.expiry, d)
 			}
 		}
@@ -162,7 +208,11 @@ func issueSession(now time.Time) (string, error) {
 			return "", errTooManySessions
 		}
 	}
-	sessionStore.expiry[digest] = now.Add(sessionTTL)
+	id, err := randomSessionID()
+	if err != nil {
+		return "", err
+	}
+	sessionStore.expiry[digest] = sessionRecord{ID: id, CreatedAt: now, Expires: now.Add(sessionTTL)}
 	if err := persistSessions(now); err != nil {
 		delete(sessionStore.expiry, digest)
 		return "", err
@@ -179,11 +229,11 @@ func sessionValid(r *http.Request, now time.Time) bool {
 	digest := tokenDigest(c.Value)
 	sessionStore.Lock()
 	defer sessionStore.Unlock()
-	exp, ok := sessionStore.expiry[digest]
+	record, ok := sessionStore.expiry[digest]
 	if !ok {
 		return false
 	}
-	if !now.Before(exp) {
+	if !now.Before(record.Expires) {
 		delete(sessionStore.expiry, digest)
 		return false
 	}
@@ -202,13 +252,13 @@ func revokeSession(r *http.Request) error {
 	digest := tokenDigest(c.Value)
 	sessionStore.Lock()
 	defer sessionStore.Unlock()
-	exp, exists := sessionStore.expiry[digest]
+	record, exists := sessionStore.expiry[digest]
 	if !exists {
 		return nil
 	}
 	delete(sessionStore.expiry, digest)
 	if err := persistSessions(time.Now()); err != nil {
-		sessionStore.expiry[digest] = exp
+		sessionStore.expiry[digest] = record
 		return err
 	}
 	return nil
@@ -224,7 +274,7 @@ func revokeAllSessions() error {
 		return nil
 	}
 	previous := sessionStore.expiry
-	sessionStore.expiry = make(map[[sha256.Size]byte]time.Time)
+	sessionStore.expiry = make(map[[sha256.Size]byte]sessionRecord)
 	if err := persistSessions(time.Now()); err != nil {
 		sessionStore.expiry = previous
 		return err
@@ -298,22 +348,59 @@ func HandleSession(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// HandleSessions revokes every browser session. Authentication is applied by
-// the route wrapper; keeping this operation separate from DELETE /api/session
-// prevents an unauthenticated request without a cookie from revoking others.
+// SessionInfo is the non-secret session lifecycle data returned to the panel.
+// It deliberately contains no token digest, IP address or user agent.
+type SessionInfo struct {
+	ID        string `json:"id"`
+	CreatedAt int64  `json:"createdAt"`
+	Expires   int64  `json:"expires"`
+	Current   bool   `json:"current"`
+}
+
+func listSessions(r *http.Request, now time.Time) []SessionInfo {
+	var current [sha256.Size]byte
+	hasCurrent := false
+	if cookie, err := r.Cookie(sessionCookieName); err == nil && cookie.Value != "" {
+		current = tokenDigest(cookie.Value)
+		hasCurrent = true
+	}
+	sessionStore.Lock()
+	defer sessionStore.Unlock()
+	out := make([]SessionInfo, 0, len(sessionStore.expiry))
+	for digest, record := range sessionStore.expiry {
+		if !now.Before(record.Expires) {
+			continue
+		}
+		out = append(out, SessionInfo{
+			ID: record.ID, CreatedAt: record.CreatedAt.Unix(), Expires: record.Expires.Unix(),
+			Current: hasCurrent && digest == current,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt > out[j].CreatedAt })
+	return out
+}
+
+// HandleSessions lists or revokes browser sessions. Authentication is applied
+// by the route wrapper; keeping this operation separate from DELETE
+// /api/session prevents a request without a valid admin credential from
+// observing or revoking other sessions.
 func HandleSessions(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodDelete {
-		w.Header().Set("Allow", "DELETE")
+	switch r.Method {
+	case http.MethodGet:
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(listSessions(r, time.Now()))
+	case http.MethodDelete:
+		if err := revokeAllSessions(); err != nil {
+			log.Printf("Session: could not save revoke-all operation: %v", err)
+			http.Error(w, "Could not sign out all sessions; try again", http.StatusInternalServerError)
+			return
+		}
+		http.SetCookie(w, sessionCookie(r, "", -1))
+		w.WriteHeader(http.StatusNoContent)
+	default:
+		w.Header().Set("Allow", "GET, DELETE")
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
 	}
-	if err := revokeAllSessions(); err != nil {
-		log.Printf("Session: could not save revoke-all operation: %v", err)
-		http.Error(w, "Could not sign out all sessions; try again", http.StatusInternalServerError)
-		return
-	}
-	http.SetCookie(w, sessionCookie(r, "", -1))
-	w.WriteHeader(http.StatusNoContent)
 }
 
 func handleSessionLogin(w http.ResponseWriter, r *http.Request) {

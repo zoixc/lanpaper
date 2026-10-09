@@ -229,5 +229,9 @@
   "sign_out_all": "Se déconnecter sur tous les appareils",
   "sign_out_all_confirm_title": "Se déconnecter partout ?",
   "sign_out_all_confirm": "Toutes les sessions de navigateur seront immédiatement fermées. Vous devrez vous reconnecter sur chaque appareil.",
-  "sign_out_all_error": "Impossible de fermer toutes les sessions de manière sûre. Vérifiez le stockage du serveur et réessayez."
+  "sign_out_all_error": "Impossible de fermer toutes les sessions de manière sûre. Vérifiez le stockage du serveur et réessayez.",
+  "sessions_loading": "Chargement des sessions…",
+  "sessions_summary": "Sessions de navigateur actives : {{count}} · cette session expire {{date}}",
+  "sessions_summary_basic": "Sessions de navigateur actives : {{count}}",
+  "sessions_load_error": "Impossible de charger les informations de session."
 }

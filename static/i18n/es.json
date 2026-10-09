@@ -229,5 +229,9 @@
   "sign_out_all": "Cerrar sesión en todos los dispositivos",
   "sign_out_all_confirm_title": "¿Cerrar sesión en todas partes?",
   "sign_out_all_confirm": "Todas las sesiones del navegador terminarán inmediatamente. Tendrás que iniciar sesión de nuevo en cada dispositivo.",
-  "sign_out_all_error": "No se pudieron cerrar todas las sesiones de forma segura. Comprueba el almacenamiento del servidor e inténtalo de nuevo."
+  "sign_out_all_error": "No se pudieron cerrar todas las sesiones de forma segura. Comprueba el almacenamiento del servidor e inténtalo de nuevo.",
+  "sessions_loading": "Cargando sesiones…",
+  "sessions_summary": "Sesiones de navegador activas: {{count}} · esta sesión caduca {{date}}",
+  "sessions_summary_basic": "Sesiones de navegador activas: {{count}}",
+  "sessions_load_error": "No se pudo cargar la información de las sesiones."
 }

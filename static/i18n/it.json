@@ -229,5 +229,9 @@
   "sign_out_all": "Esci da tutti i dispositivi",
   "sign_out_all_confirm_title": "Uscire ovunque?",
   "sign_out_all_confirm": "Tutte le sessioni del browser termineranno immediatamente. Dovrai accedere di nuovo su ogni dispositivo.",
-  "sign_out_all_error": "Impossibile terminare in modo sicuro tutte le sessioni. Controlla l’archiviazione del server e riprova."
+  "sign_out_all_error": "Impossibile terminare in modo sicuro tutte le sessioni. Controlla l’archiviazione del server e riprova.",
+  "sessions_loading": "Caricamento delle sessioni…",
+  "sessions_summary": "Sessioni browser attive: {{count}} · questa sessione scade {{date}}",
+  "sessions_summary_basic": "Sessioni browser attive: {{count}}",
+  "sessions_load_error": "Impossibile caricare le informazioni sulle sessioni."
 }

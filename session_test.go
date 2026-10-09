@@ -164,8 +164,43 @@ func TestRevokeAllSessionsFlow(t *testing.T) {
 		t.Fatal("two independent sessions were not issued")
 	}
 
+	// The session list exposes lifecycle metadata, marks only the caller and
+	// never exposes bearer tokens or digests.
+	req, _ := http.NewRequest(http.MethodGet, a.server.URL+"/api/sessions", nil)
+	req.AddCookie(first)
+	listed, err := a.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sessions []struct {
+		ID        string `json:"id"`
+		CreatedAt int64  `json:"createdAt"`
+		Expires   int64  `json:"expires"`
+		Current   bool   `json:"current"`
+	}
+	if err := json.NewDecoder(listed.Body).Decode(&sessions); err != nil {
+		listed.Body.Close()
+		t.Fatal(err)
+	}
+	listed.Body.Close()
+	if listed.StatusCode != http.StatusOK || len(sessions) != 2 {
+		t.Fatalf("session list: status=%d sessions=%d", listed.StatusCode, len(sessions))
+	}
+	current := 0
+	for _, item := range sessions {
+		if item.ID == "" || item.CreatedAt <= 0 || item.Expires <= item.CreatedAt {
+			t.Fatalf("invalid session metadata: %+v", item)
+		}
+		if item.Current {
+			current++
+		}
+	}
+	if current != 1 {
+		t.Fatalf("current session markers=%d, want 1", current)
+	}
+
 	// Unlike single-session logout, revoke-all must itself be authenticated.
-	req, _ := http.NewRequest(http.MethodDelete, a.server.URL+"/api/sessions", nil)
+	req, _ = http.NewRequest(http.MethodDelete, a.server.URL+"/api/sessions", nil)
 	req.Header.Set("Origin", a.server.URL)
 	unauthorized, err := a.client.Do(req)
 	if err != nil {
