@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Application composition root.** Production routes now originate from an
+  `App` dependency graph containing immutable configuration, stores, session
+  and limiter runtimes, services and structured logging.
 - **Token-bucket rate limiting.** Public downloads, uploads/regeneration,
   login failures and publish-key failures now use independent continuously
   refilled budgets with bounded bursts and warnings for disabled limits.

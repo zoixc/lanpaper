@@ -168,11 +168,9 @@ func main() {
 // newHandler is shared with the end-to-end HTTP tests, so tests exercise the
 // real compression, authentication, CSRF, panic-recovery and routing stack,
 // not just bare handlers.
-func newHandler() http.Handler {
-	return middleware.Metrics(middleware.Gzip(middleware.Recover(newMux())))
-}
+func newHandler() http.Handler { return NewApp().Handler() }
 
-func newMux() *http.ServeMux {
+func (a *App) mux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/static/", serveStaticAsset)
 	// The service worker must live at the root scope to control /admin and

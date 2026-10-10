@@ -165,9 +165,12 @@ It corrected non-representative export/import coverage, a fuzz compilation
 error and accessibility/viewport assumptions, and added missing session/media
 fuzz coverage.
 
-### PR 17 — Application composition root
+### PR 17 — Application composition root **(implemented; full CI pending)**
 
-Introduce an `App` struct holding immutable config, stores, sessions, limiters, logger and services. Build routes through `App.Handler()`. Migrate globals incrementally with compatibility adapters.
+Added `App` with copied immutable configuration, wallpaper services, session and
+limiter lifecycle interfaces and structured logger. The complete production
+route/middleware stack is now built by `App.Handler()`; `newHandler` is a narrow
+compatibility adapter while subsequent PRs replace package globals.
 
 ### PR 18 — Session and limiter instance isolation
 

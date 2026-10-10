@@ -58,6 +58,10 @@ func resetRateCounts() {
 		rateTable[i].mu.Unlock()
 	}
 }
+
+// CleanRateLimits runs one bounded cleanup pass for composition/maintenance.
+func CleanRateLimits(now time.Time) { cleanExpiredCounts(now) }
+
 func cleanExpiredCounts(now time.Time) {
 	defer func() {
 		if p := recover(); p != nil {
