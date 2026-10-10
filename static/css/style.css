@@ -1933,19 +1933,14 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
     position: sticky;
     top: 0;
     z-index: var(--z-appbar);
-    background: var(--glass);
-    -webkit-backdrop-filter: blur(18px) saturate(1.6);
-    backdrop-filter: blur(18px) saturate(1.6);
+    /* Follow the selected palette exactly. The former shared translucent
+       glass picked up a cold blue cast over several light and dark themes. */
+    background: var(--bg);
     border-bottom: 1px solid var(--border);
     /* Шапка липкая: тень вниз показывает, что содержимое уходит под неё,
        а не обрезается границей */
     box-shadow: var(--shadow-bar);
 }
-/* Если backdrop-filter не поддержан — фон должен быть плотным */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    .appbar { background: var(--bg); }
-}
-
 .appbar__inner {
     max-width: var(--maxw);
     margin: 0 auto;
@@ -1994,16 +1989,6 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-.brand__badge {
-    margin-left: 2px;
-    padding: 2px 6px;
-    border-radius: var(--r-xs);
-    background: var(--surface-2);
-    color: var(--text-3);
-    font-size: var(--t-2xs);
-    font-weight: var(--fw-semibold);
-    font-variant-numeric: tabular-nums;
 }
 .appbar__spacer { flex: 1; min-width: 0; }
 .appbar__actions { display: flex; align-items: center; gap: var(--s-2); flex: none; }
@@ -2156,8 +2141,16 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
 .foot a:hover { color: var(--text); text-decoration: none; }
 .foot a svg { width: 14px; height: 14px; }
 
-/* В подвале макета намеренно написано, что это макет */
-.foot .display { font-size: var(--t-2xs); color: var(--text-3); }
+/* Версия остаётся целиком видимой даже в узком подвале: GitHub может
+   переноситься отдельно, но номер релиза не сжимается и не обрезается. */
+.foot .display {
+    flex: none;
+    margin-left: auto;
+    white-space: nowrap;
+    font-size: var(--t-2xs);
+    color: var(--text-3);
+    font-variant-numeric: tabular-nums;
+}
 
 /* ============================================================
    ПЛАВАЮЩАЯ КНОПКА «НОВАЯ ССЫЛКА»

@@ -809,7 +809,6 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
         $('#pageCount').textContent = narrowed
             ? t('found', { shown: list.length, total: total })
             : String(total);
-        $('#brandCount').textContent = String(total);
         $('#selectAllBtn').hidden = !state.selecting;
         renderLoadMore(list);
         updateBulkbar();
