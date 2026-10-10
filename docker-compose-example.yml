@@ -88,6 +88,7 @@ services:
         limits:
           cpus: "2.0"
           memory: 1G
+          pids: 128
         reservations:
           cpus: "0.25"
           memory: 128M

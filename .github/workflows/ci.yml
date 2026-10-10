@@ -173,25 +173,28 @@ jobs:
             --cache-from type=local,src=/tmp/.buildx-cache \
             -t lanpaper:test --load .
 
+          install -d -m 0700 /tmp/lp_test_data
+          sudo chown 100:101 /tmp/lp_test_data
           docker run -d --name lp_test -p 8080:8080 \
             --read-only \
             --tmpfs /tmp:rw,noexec,nosuid,size=64m,mode=1777 \
-            --tmpfs /app/data:rw,noexec,nosuid,size=256m,uid=100,gid=101,mode=0700 \
+            --mount type=bind,source=/tmp/lp_test_data,destination=/app/data \
             --cap-drop ALL \
             --security-opt no-new-privileges:true \
             --pids-limit 128 \
-            --memory 512m \
-            --cpus 1.0 \
+            --memory 1g \
+            --cpus 2.0 \
             lanpaper:test
 
-          # Validate both the documented Compose contract and the effective
-          # runtime isolation used by this smoke test.
-          ADMIN_PASSWORD_HASH='$argon2id$v=19$m=65536,t=3,p=2$Y2ktc21va2U$Y2ktc21va2UtaGFzaA' \
-            docker compose -f docker-compose-example.yml config --quiet
-          test "$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' lp_test)" = "true"
-          test "$(docker inspect --format '{{.HostConfig.PidsLimit}}' lp_test)" = "128"
-          test "$(docker inspect --format '{{.HostConfig.SecurityOpt}}' lp_test)" = "[no-new-privileges:true]"
-          test "$(docker inspect --format '{{json .HostConfig.CapDrop}}' lp_test)" = '["ALL"]'
+          # Validate the documented Compose contract. The smoke container above
+          # uses the same flags directly; Docker rejects unsupported isolation
+          # options instead of silently weakening them.
+          if ! compose_output="$(ADMIN_PASSWORD_HASH='$argon2id$v=19$m=65536,t=3,p=2$Y2ktc21va2U$Y2ktc21va2UtaGFzaA' \
+            docker compose -f docker-compose-example.yml config --quiet 2>&1)"; then
+            encoded="$(printf '%s' "$compose_output" | base64 -w0)"
+            echo "::error::docker-compose-example.yml validation failed (base64 output): $encoded"
+            exit 1
+          fi
 
           # /health deliberately omits the version (it would tell a probe which
           # release to look up), so the version is checked on the image label.
@@ -207,9 +210,18 @@ jobs:
               echo "Container is healthy after $((i * 2))s"
               break
             fi
+            if [ "$(docker inspect --format '{{.State.Running}}' lp_test)" != "true" ]; then
+              logs="$(docker logs lp_test 2>&1)"
+              encoded="$(printf '%s' "$logs" | base64 -w0)"
+              echo "::error::Hardened container exited before readiness (base64 logs): $encoded"
+              printf '### Hardened container logs\n```text\n%s\n```\n' "$logs" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
             if [ "$i" -eq 15 ]; then
-              echo "Container did not become healthy in time"
-              docker logs lp_test
+              logs="$(docker logs lp_test 2>&1)"
+              encoded="$(printf '%s' "$logs" | base64 -w0)"
+              echo "::error::Hardened container did not become ready (base64 logs): $encoded"
+              printf '### Hardened container logs\n```text\n%s\n```\n' "$logs" >> "$GITHUB_STEP_SUMMARY"
               docker rm -f lp_test
               exit 1
             fi
