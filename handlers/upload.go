@@ -60,17 +60,6 @@ func (s *UploadService) Upload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	select {
-	case uploadSem <- struct{}{}:
-		defer func() { <-uploadSem }()
-	default:
-		// docs/API.md promises Retry-After on this 429: the slot frees up as
-		// soon as one of the running uploads finishes.
-		w.Header().Set("Retry-After", "5")
-		http.Error(w, "Too many concurrent uploads", http.StatusTooManyRequests)
-		return
-	}
-
 	maxBytes := int64(config.Current.MaxUploadMB) << 20
 	maxRequest := maxBytes + (1 << 20) // multipart headers and form fields
 	if r.ContentLength > maxRequest {
@@ -193,7 +182,21 @@ func (s *UploadService) Upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if u.Scheme == "http" || u.Scheme == "https" {
-			f, size, err := downloadToTemp(r.Context(), urlStr, maxBytes)
+			select {
+			case remoteFetchSem <- struct{}{}:
+			default:
+				w.Header().Set("Retry-After", "5")
+				http.Error(w, "Too many concurrent remote downloads", http.StatusTooManyRequests)
+				return
+			}
+			fetcher := s.Fetcher
+			if fetcher == nil {
+				fetcher = defaultRemoteFetcher
+			}
+			f, size, err := func() (*os.File, int64, error) {
+				defer func() { <-remoteFetchSem }()
+				return fetcher.Fetch(r.Context(), urlStr, maxBytes)
+			}()
 			if err != nil {
 				log.Printf("Download rejected: %v", err)
 				http.Error(w, "Failed to load media", http.StatusBadRequest)
@@ -231,6 +234,15 @@ func (s *UploadService) Upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		source, sourceSize, sourceName = form.file, fi.Size(), form.fileName
+	}
+
+	select {
+	case uploadSem <- struct{}{}:
+		defer func() { <-uploadSem }()
+	default:
+		w.Header().Set("Retry-After", "5")
+		http.Error(w, "Image processing capacity reached", http.StatusTooManyRequests)
+		return
 	}
 
 	ext, err := inspectMediaFile(source, sourceName, sourceSize, maxBytes)

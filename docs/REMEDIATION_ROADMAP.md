@@ -206,9 +206,13 @@ store and revalidated transaction, counter and error boundaries.
 It corrected an inaccurate per-App runtime ownership claim, marked remaining
 request-level isolation work explicitly, and bounded metrics disk-scan cost.
 
-### PR 21 — Remote fetcher interface
+### PR 21 — Remote fetcher interface **(implemented; full CI pending)**
 
-Inject resolver, transport and clock; retain IP pinning and per-redirect checks. Improve proxy tests, timeout tests and separate processing concurrency from network concurrency.
+Added `RemoteFetcher` with injected public-URL resolver, round tripper, clock and
+temporary directory while retaining per-hop IP pinning, SNI/Host preservation,
+redirect scheme/count checks and independent target/proxy TLS policy. Upload
+services own their fetcher. Remote-download and media-processing concurrency now
+use separate bounded semaphores so slow networks do not consume decode slots.
 
 ## Phase 3 — frontend maintainability and UX
 

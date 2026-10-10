@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Injected remote fetcher.** Resolver, transport, clock and temporary storage
+  are testable dependencies; network and media-processing concurrency have
+  independent bounds while SSRF pinning remains per redirect hop.
 - **History and playlist service.** History accounting, rollback/deletion and
   playlist metadata/file cleanup now have one injected invariant owner.
 - **Injected upload service.** Upload source processing, atomic publication and

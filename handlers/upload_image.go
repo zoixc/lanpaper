@@ -37,12 +37,14 @@ import (
 // The WebP encoder dependency also registers a decoder that reads the entire
 // compressed file into memory; never use image.Decode for WebP uploads.
 var uploadSem = make(chan struct{}, config.DefaultMaxConcurrentUploads)
+var remoteFetchSem = make(chan struct{}, config.DefaultMaxConcurrentUploads)
 
 func InitUploadSemaphore(n int) {
 	if n <= 0 || n > config.MaxConcurrentUploadsLimit {
 		n = config.DefaultMaxConcurrentUploads
 	}
 	uploadSem = make(chan struct{}, n)
+	remoteFetchSem = make(chan struct{}, n)
 }
 
 var (

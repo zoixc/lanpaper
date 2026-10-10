@@ -22,10 +22,28 @@ import (
 // vetted IP rather than handing its hostname to a proxy (or resolving it a
 // second time at dial). The original Host header and TLS SNI are preserved.
 // A new transport per hop also prevents cross-host reuse of a TLS connection.
-type safeRemoteTransport struct{}
+type URLResolver interface {
+	Resolve(context.Context, string) (net.IP, error)
+}
+type publicURLResolver struct{}
 
-func (safeRemoteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	ip, err := utils.ResolvePublicURL(req.Context(), req.URL.String())
+func (publicURLResolver) Resolve(ctx context.Context, raw string) (net.IP, error) {
+	return utils.ResolvePublicURL(ctx, raw)
+}
+
+type Clock interface{ Now() time.Time }
+type systemClock struct{}
+
+func (systemClock) Now() time.Time { return time.Now() }
+
+type safeRemoteTransport struct{ Resolver URLResolver }
+
+func (s safeRemoteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resolver := s.Resolver
+	if resolver == nil {
+		resolver = publicURLResolver{}
+	}
+	ip, err := resolver.Resolve(req.Context(), req.URL.String())
 	if err != nil {
 		return nil, err
 	}
@@ -101,10 +119,37 @@ func (safeRemoteTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	return resp, nil
 }
 
+type RemoteFetcher struct {
+	Resolver  URLResolver
+	Transport http.RoundTripper
+	Clock     Clock
+	TempDir   string
+}
+
+func NewRemoteFetcher() *RemoteFetcher {
+	return &RemoteFetcher{Resolver: publicURLResolver{}, Clock: systemClock{}, TempDir: config.MediaDir}
+}
+func (f *RemoteFetcher) transport() http.RoundTripper {
+	if f.Transport != nil {
+		return f.Transport
+	}
+	return safeRemoteTransport{Resolver: f.Resolver}
+}
+
+var defaultRemoteFetcher = NewRemoteFetcher()
+
+func downloadToTemp(ctx context.Context, raw string, maxBytes int64) (*os.File, int64, error) {
+	return defaultRemoteFetcher.Fetch(ctx, raw, maxBytes)
+}
+
 // downloadToTemp streams network responses to disk, not a MaxUploadMB-sized
 // byte slice in RAM. The caller closes and removes the returned temp file.
-func downloadToTemp(ctx context.Context, raw string, maxBytes int64) (*os.File, int64, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(config.DownloadTimeout)*time.Second)
+func (f *RemoteFetcher) Fetch(ctx context.Context, raw string, maxBytes int64) (*os.File, int64, error) {
+	clock := f.Clock
+	if clock == nil {
+		clock = systemClock{}
+	}
+	ctx, cancel := context.WithDeadline(ctx, clock.Now().Add(time.Duration(config.DownloadTimeout)*time.Second))
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, raw, nil)
 	if err != nil {
@@ -113,7 +158,7 @@ func downloadToTemp(ctx context.Context, raw string, maxBytes int64) (*os.File, 
 	req.Header.Set("User-Agent", "Lanpaper/1.0")
 	req.Header.Set("Accept", "image/*,video/mp4,video/webm;q=0.8")
 	client := &http.Client{
-		Transport: safeRemoteTransport{},
+		Transport: f.transport(),
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= config.MaxRedirects {
 				return errors.New("too many redirects")
@@ -136,24 +181,28 @@ func downloadToTemp(ctx context.Context, raw string, maxBytes int64) (*os.File, 
 	if resp.ContentLength > maxBytes {
 		return nil, 0, errMediaTooLarge
 	}
-	f, err := os.CreateTemp(config.MediaDir, ".download-*")
+	tempDir := f.TempDir
+	if tempDir == "" {
+		tempDir = config.MediaDir
+	}
+	tmp, err := os.CreateTemp(tempDir, ".download-*")
 	if err != nil {
 		return nil, 0, err
 	}
 	fail := func(err error) (*os.File, int64, error) {
-		f.Close()
-		os.Remove(f.Name())
+		tmp.Close()
+		os.Remove(tmp.Name())
 		return nil, 0, err
 	}
-	n, err := io.Copy(f, io.LimitReader(resp.Body, maxBytes+1))
+	n, err := io.Copy(tmp, io.LimitReader(resp.Body, maxBytes+1))
 	if err != nil {
 		return fail(err)
 	}
 	if n > maxBytes {
 		return fail(errMediaTooLarge)
 	}
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
+	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
 		return fail(err)
 	}
-	return f, n, nil
+	return tmp, n, nil
 }
