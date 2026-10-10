@@ -376,6 +376,12 @@ Two properties worth knowing before sizing a host:
   growing the process without limit. A 36 M pixel upload peaks at about 174 MB
   of memory with the pure Go WebP encoder.
 
+## SQLite migration
+
+The explicit JSON-to-SQLite staging command supports dry-run, verified backups,
+resumable batches and rollback without deleting `wallpapers.json`. Stop the
+server before running it and follow the [migration runbook](docs/SQLITE_MIGRATION.md).
+
 ## Storage scale
 
 The JSON metadata backend is supported through **10,000 links**. Installations

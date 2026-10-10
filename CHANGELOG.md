@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Resumable SQLite migration.** An explicit backup-first command now
+  validates and imports JSON metadata in checksummed, checkpointed transactions,
+  with dry-run, integrity verification and non-destructive rollback.
 - **SQLite metadata backend.** A normalized pure-Go backend now implements the
   store contract with WAL, strict foreign-key constraints, atomic transactions,
   integrity checks and online backup while media remains on the filesystem.

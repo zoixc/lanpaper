@@ -293,9 +293,14 @@ transactions and the shared store conformance contract. Integrity checking and
 online `VACUUM INTO` backup primitives are included. Media bytes remain in the
 existing filesystem layout.
 
-### PR 31 — JSON-to-SQLite migration
+### PR 31 — JSON-to-SQLite migration **(implemented; full CI pending)**
 
-Implement resumable, checksummed, backup-first migration with dry-run, rollback and downgrade documentation. Never delete the original JSON automatically.
+Added the explicit `migrate-sqlite` command with validation-only dry runs,
+SHA-256 source identity, fsynced and verified backup-first operation,
+deterministic bounded transactions, durable resumable checkpoints, integrity
+verification and rollback. JSON is never modified or deleted. Operational,
+interruption and downgrade guidance is in
+[`SQLITE_MIGRATION.md`](SQLITE_MIGRATION.md).
 
 ### PR 32 — Server-side pagination/filtering
 

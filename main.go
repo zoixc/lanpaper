@@ -38,6 +38,9 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "repair" {
 		os.Exit(runRepair(os.Args[2:], os.Stdout, os.Stderr))
 	}
+	if len(os.Args) > 1 && os.Args[1] == "migrate-sqlite" {
+		os.Exit(runSQLiteMigration(os.Args[2:], os.Stdout, os.Stderr))
+	}
 	if len(os.Args) == 2 && os.Args[1] == "hash-password" {
 		password, err := bufio.NewReader(os.Stdin).ReadString('\n')
 		if err != nil && password == "" {
