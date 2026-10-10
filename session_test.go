@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -81,8 +82,26 @@ func TestAdminShowsLoginFormWithoutSession(t *testing.T) {
 	if h.Get("Cache-Control") != "no-store" {
 		t.Fatalf("login page cache header = %q", h.Get("Cache-Control"))
 	}
-	// APIs still answer 401 for anyone without credentials.
+
+	// A browser may retain Basic credentials from an older Lanpaper release.
+	// They must not reopen the UI after Sign out: browsers do not expose a
+	// reliable API for clearing their Basic-auth cache. Basic remains valid for
+	// API clients below.
+	req, _ := http.NewRequest(http.MethodGet, a.server.URL+"/admin", nil)
+	req.SetBasicAuth("admin", "strong-test-password")
+	resp, err := a.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(raw), `id="loginForm"`) {
+		t.Fatalf("Basic-auth admin request reopened panel: status %d", resp.StatusCode)
+	}
+
+	// APIs still answer 401 without credentials and accept Basic for scripts.
 	a.expect(http.StatusUnauthorized, "GET", "/api/wallpapers", nil, false, nil)
+	a.expect(http.StatusOK, "GET", "/api/wallpapers", nil, true, nil)
 }
 
 func TestSessionLoginLogoutFlow(t *testing.T) {
@@ -133,6 +152,104 @@ func TestSessionLoginLogoutFlow(t *testing.T) {
 	}
 	if status, _, _ := a.get("/api/wallpapers", cookie); status != http.StatusUnauthorized {
 		t.Fatalf("revoked session still accepted: status %d", status)
+	}
+}
+
+func TestRevokeAllSessionsFlow(t *testing.T) {
+	a := setupApp(t)
+	// The session store is process-global today; isolate this integration test
+	// from sessions created by earlier main-package tests.
+	a.expect(http.StatusNoContent, http.MethodDelete, "/api/sessions", nil, true, nil)
+	origin := map[string]string{"Origin": a.server.URL}
+	first := sessionCookieFrom(t, loginRequest(t, a, "admin", "strong-test-password", origin))
+	second := sessionCookieFrom(t, loginRequest(t, a, "admin", "strong-test-password", origin))
+	if first == nil || second == nil || first.Value == second.Value {
+		t.Fatal("two independent sessions were not issued")
+	}
+
+	// The session list exposes lifecycle metadata, marks only the caller and
+	// never exposes bearer tokens or digests.
+	req, _ := http.NewRequest(http.MethodGet, a.server.URL+"/api/sessions", nil)
+	req.AddCookie(first)
+	listed, err := a.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sessions []struct {
+		ID        string `json:"id"`
+		CreatedAt int64  `json:"createdAt"`
+		Expires   int64  `json:"expires"`
+		Current   bool   `json:"current"`
+	}
+	if err := json.NewDecoder(listed.Body).Decode(&sessions); err != nil {
+		listed.Body.Close()
+		t.Fatal(err)
+	}
+	listed.Body.Close()
+	if listed.StatusCode != http.StatusOK || len(sessions) != 2 {
+		t.Fatalf("session list: status=%d sessions=%d", listed.StatusCode, len(sessions))
+	}
+	current := 0
+	for _, item := range sessions {
+		if item.ID == "" || item.CreatedAt <= 0 || item.Expires <= item.CreatedAt {
+			t.Fatalf("invalid session metadata: %+v", item)
+		}
+		if item.Current {
+			current++
+		}
+	}
+	if current != 1 {
+		t.Fatalf("current session markers=%d, want 1", current)
+	}
+
+	// Unlike single-session logout, revoke-all must itself be authenticated.
+	req, _ = http.NewRequest(http.MethodDelete, a.server.URL+"/api/sessions", nil)
+	req.Header.Set("Origin", a.server.URL)
+	unauthorized, err := a.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unauthorized.Body.Close()
+	if unauthorized.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated revoke-all: status %d, want 401", unauthorized.StatusCode)
+	}
+
+	// Cross-site requests are rejected before they can revoke any session.
+	req, _ = http.NewRequest(http.MethodDelete, a.server.URL+"/api/sessions", nil)
+	req.Header.Set("Origin", "https://evil.example")
+	req.Header.Set("Sec-Fetch-Site", "cross-site")
+	req.AddCookie(first)
+	crossSite, err := a.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	crossSite.Body.Close()
+	if crossSite.StatusCode != http.StatusForbidden {
+		t.Fatalf("cross-site revoke-all: status %d, want 403", crossSite.StatusCode)
+	}
+	if status, _, _ := a.get("/api/wallpapers", second); status != http.StatusOK {
+		t.Fatalf("cross-site revoke-all changed sessions: status %d", status)
+	}
+
+	req, _ = http.NewRequest(http.MethodDelete, a.server.URL+"/api/sessions", nil)
+	req.Header.Set("Origin", a.server.URL)
+	req.AddCookie(first)
+	out, err := a.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out.Body.Close()
+	if out.StatusCode != http.StatusNoContent {
+		t.Fatalf("revoke-all: status %d", out.StatusCode)
+	}
+	cleared := sessionCookieFrom(t, out)
+	if cleared == nil || cleared.MaxAge >= 0 {
+		t.Fatal("revoke-all did not clear the current browser cookie")
+	}
+	for _, cookie := range []*http.Cookie{first, second} {
+		if status, _, _ := a.get("/api/wallpapers", cookie); status != http.StatusUnauthorized {
+			t.Fatalf("revoked session still accepted: status %d", status)
+		}
 	}
 }
 

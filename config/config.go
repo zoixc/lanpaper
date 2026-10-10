@@ -41,8 +41,12 @@ type Config struct {
 	ExternalImageDir     string            `json:"externalImageDir"`
 	AdminUser            string            `json:"adminUser"`
 	AdminPass            string            `json:"adminPass"`
+	AdminPasswordHash    string            `json:"adminPasswordHash,omitempty"`
 	DisableAuth          bool              `json:"disableAuth,omitempty"`
+	MetricsEnabled       bool              `json:"metricsEnabled,omitempty"`
 	InsecureSkipVerify   bool              `json:"insecureSkipVerify,omitempty"`
+	RemoteSkipVerify     bool              `json:"remoteInsecureSkipVerify,omitempty"`
+	ProxySkipVerify      bool              `json:"proxyInsecureSkipVerify,omitempty"`
 	ProxyHost            string            `json:"proxyHost,omitempty"`
 	ProxyPort            string            `json:"proxyPort,omitempty"`
 	ProxyType            string            `json:"proxyType,omitempty"`
@@ -148,8 +152,18 @@ func Load() {
 	envString("EXTERNAL_IMAGE_DIR", &Current.ExternalImageDir)
 	envString("ADMIN_USER", &Current.AdminUser)
 	envString("ADMIN_PASS", &Current.AdminPass)
+	envString("ADMIN_PASSWORD_HASH", &Current.AdminPasswordHash)
 	envBool("DISABLE_AUTH", &Current.DisableAuth)
+	envBool("METRICS_ENABLED", &Current.MetricsEnabled)
 	envBool("INSECURE_SKIP_VERIFY", &Current.InsecureSkipVerify)
+	// The legacy switch keeps its old broad behaviour for one compatibility
+	// cycle; either specific environment variable can then override its side.
+	if Current.InsecureSkipVerify {
+		Current.RemoteSkipVerify = true
+		Current.ProxySkipVerify = true
+	}
+	envBool("REMOTE_INSECURE_SKIP_VERIFY", &Current.RemoteSkipVerify)
+	envBool("PROXY_INSECURE_SKIP_VERIFY", &Current.ProxySkipVerify)
 	envString("PROXY_HOST", &Current.ProxyHost)
 	envString("PROXY_PORT", &Current.ProxyPort)
 	envString("PROXY_TYPE", &Current.ProxyType)
@@ -176,6 +190,12 @@ func Load() {
 	envList("PUBLISH_KEYS", &Current.PublishKeys)
 
 	validate()
+	if Current.Rate.PublicPerMin == 0 {
+		log.Println("Warning: RATE_PUBLIC_PER_MIN=0 disables public download rate limiting; attacker-controlled traffic is unbounded.")
+	}
+	if Current.Rate.UploadPerMin == 0 {
+		log.Println("Warning: RATE_UPLOAD_PER_MIN=0 disables upload and regeneration request rate limiting.")
+	}
 
 	mode := "compressed"
 	if Current.Compression.Quality == 100 && Current.Compression.Scale == 100 {
@@ -201,11 +221,20 @@ func Load() {
 		}
 	}
 	if Current.InsecureSkipVerify {
-		log.Println("Warning: INSECURE_SKIP_VERIFY=true — certificates of downloaded media are not validated. Use it only for a trusted internal source with a self-signed certificate.")
+		log.Println("Warning: INSECURE_SKIP_VERIFY is deprecated and disables certificate validation for both remote media and the HTTPS proxy. Use the two specific settings instead.")
 	}
-	if Current.AdminPass != "" && len(Current.AdminPass) < MinRecommendedPassLen {
-		log.Printf("Warning: ADMIN_PASS is shorter than %d characters. Any internet-facing deployment needs a long random password.",
-			MinRecommendedPassLen)
+	if Current.RemoteSkipVerify {
+		log.Println("Warning: REMOTE_INSECURE_SKIP_VERIFY=true — certificates of downloaded media are not validated.")
+	}
+	if Current.ProxySkipVerify {
+		log.Println("Warning: PROXY_INSECURE_SKIP_VERIFY=true — the HTTPS proxy certificate is not validated.")
+	}
+	if Current.AdminPass != "" {
+		log.Println("Warning: plaintext ADMIN_PASS/adminPass is deprecated; migrate to ADMIN_PASSWORD_HASH.")
+		if len(Current.AdminPass) < MinRecommendedPassLen {
+			log.Printf("Warning: ADMIN_PASS is shorter than %d characters. Any internet-facing deployment needs a long random password.",
+				MinRecommendedPassLen)
+		}
 	}
 	if TLSMisconfigured() {
 		log.Println("Warning: TLS_CERT_FILE and TLS_KEY_FILE must be set together; ignoring both.")

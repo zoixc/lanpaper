@@ -498,7 +498,13 @@ func TestAppPublicAliasesCORSEmbedAndStats(t *testing.T) {
 	}
 	// An alias cannot bypass the access level of the link it resolves to.
 	a.expect(http.StatusOK, "PATCH", "/api/link/photo", []byte(`{"accessLevel":"auth"}`), true, jsonHeaders())
-	a.expect(http.StatusUnauthorized, "GET", "/photo.jpg", nil, false, nil)
+	if status, h, _ := a.request("GET", "/photo.jpg", nil, false, nil); status != http.StatusUnauthorized || h.Get("WWW-Authenticate") != "" {
+		t.Fatalf("auth media must return 401 without caching browser Basic credentials: status=%d challenge=%q", status, h.Get("WWW-Authenticate"))
+	}
+	a.expect(http.StatusOK, "GET", "/photo.jpg", nil, true, nil) // preemptive Basic for scripts
+	if status, _, _ := a.request("GET", "/photo.jpg", nil, true, map[string]string{"Sec-Fetch-Site": "same-origin"}); status != http.StatusUnauthorized {
+		t.Fatalf("browser-cached Basic reopened auth media after logout: status=%d", status)
+	}
 	a.expect(http.StatusOK, "PATCH", "/api/link/photo", []byte(`{"accessLevel":"public"}`), true, jsonHeaders())
 
 	// OPTIONS stays 405 until CORS is configured.

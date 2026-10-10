@@ -85,6 +85,24 @@ func TestBasicAuthDoesNotCountMissingCredentials(t *testing.T) {
 	}
 }
 
+func TestBrowserCachedBasicDoesNotSurviveSessionLogout(t *testing.T) {
+	resetLimiter(t)
+	withAdminCredentials(t)
+	r := adminRequest("192.0.2.2:1", "admin", "correct horse")
+	r.Header.Set("Sec-Fetch-Site", "same-origin")
+	w := serveAdmin(r)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("browser cached Basic fallback: status %d, want 401", w.Code)
+	}
+	if challenge := w.Header().Get("WWW-Authenticate"); challenge != "" {
+		t.Fatalf("browser received Basic challenge after session logout: %q", challenge)
+	}
+	// The same explicit credentials remain valid for a non-browser API client.
+	if w := serveAdmin(adminRequest("192.0.2.2:1", "admin", "correct horse")); w.Code != http.StatusNoContent {
+		t.Fatalf("script Basic auth was rejected: %d", w.Code)
+	}
+}
+
 func TestLinkAccessSharesBruteForceProtection(t *testing.T) {
 	resetLimiter(t)
 	withAdminCredentials(t)

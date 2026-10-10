@@ -5,6 +5,7 @@ package middleware
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -27,8 +28,9 @@ func useSessionDir(t *testing.T) {
 
 func resetSessionStore() {
 	sessionStore.Lock()
-	sessionStore.expiry = make(map[[32]byte]time.Time)
+	sessionStore.expiry = make(map[[32]byte]sessionRecord)
 	sessionStore.Unlock()
+	persistSessions = persistLocked
 }
 
 // simulateRestart forgets the in-memory sessions and loads them from disk, as a
@@ -113,12 +115,81 @@ func TestSessionFileHoldsDigestsOnly(t *testing.T) {
 	if !strings.Contains(string(body), want) {
 		t.Fatal("digest missing from sessions.json")
 	}
+	var entries []persistedSession
+	if err := json.Unmarshal(body, &entries); err != nil || len(entries) != 1 {
+		t.Fatalf("session metadata: entries=%d err=%v", len(entries), err)
+	}
+	if entries[0].ID == "" || entries[0].CreatedAt <= 0 || entries[0].Expires <= entries[0].CreatedAt {
+		t.Fatalf("incomplete session metadata: %+v", entries[0])
+	}
 	info, err := os.Stat(sessionsPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if info.Mode().Perm() != 0o600 {
 		t.Fatalf("sessions.json mode %v, want 0600", info.Mode().Perm())
+	}
+}
+
+func TestSessionListMarksOnlyCurrentWithoutSensitiveMetadata(t *testing.T) {
+	useSessionDir(t)
+	first, err := issueSession(time.Now().Add(-time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := issueSession(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	list := listSessions(requestWithToken(first), time.Now())
+	if len(list) != 2 || list[0].CreatedAt < list[1].CreatedAt {
+		t.Fatalf("session list is incomplete or unsorted: %+v", list)
+	}
+	current := 0
+	for _, item := range list {
+		if item.ID == "" || item.CreatedAt <= 0 || item.Expires <= item.CreatedAt {
+			t.Fatalf("invalid lifecycle metadata: %+v", item)
+		}
+		if item.Current {
+			current++
+		}
+	}
+	if current != 1 || !HasAdminSession(requestWithToken(second)) {
+		t.Fatalf("current markers=%d or second session invalid", current)
+	}
+}
+
+func TestLegacySessionFileIsMigrated(t *testing.T) {
+	useSessionDir(t)
+	token := "legacy-session-token"
+	digest := tokenDigest(token)
+	expiredDigest := tokenDigest("expired-legacy-token")
+	legacy, err := json.Marshal([]persistedSession{
+		{ID: "invalid", Digest: hex.EncodeToString(digest[:]), Expires: time.Now().Add(time.Hour).Unix()},
+		{Digest: hex.EncodeToString(expiredDigest[:]), Expires: time.Now().Add(-time.Hour).Unix()},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(sessionsPath, legacy, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := LoadSessions(); err != nil {
+		t.Fatal(err)
+	}
+	if !HasAdminSession(requestWithToken(token)) {
+		t.Fatal("legacy session did not survive metadata migration")
+	}
+	body, err := os.ReadFile(sessionsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var migrated []persistedSession
+	if err := json.Unmarshal(body, &migrated); err != nil || len(migrated) != 1 {
+		t.Fatalf("migrated file: entries=%d err=%v", len(migrated), err)
+	}
+	if !validSessionID(migrated[0].ID) || migrated[0].CreatedAt <= 0 {
+		t.Fatalf("legacy metadata was not normalized: %+v", migrated[0])
 	}
 }
 
@@ -141,10 +212,95 @@ func TestRevokedSessionStaysRevokedAfterRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	req := requestWithToken(token)
-	revokeSession(req)
+	if err := revokeSession(req); err != nil {
+		t.Fatal(err)
+	}
 	simulateRestart(t)
 	if HasAdminSession(req) {
 		t.Fatal("signed-out session came back after a restart")
+	}
+}
+
+func TestLogoutReportsPersistenceFailureAndCanBeRetried(t *testing.T) {
+	useSessionDir(t)
+	token, err := issueSession(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := requestWithToken(token)
+	req.Method = http.MethodDelete
+
+	persistSessions = func(time.Time) error { return errors.New("disk unavailable") }
+	rec := httptest.NewRecorder()
+	HandleSession(rec, req)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("failed durable logout: status %d, want 500", rec.Code)
+	}
+	if !HasAdminSession(requestWithToken(token)) {
+		t.Fatal("failed durable logout removed the in-memory session")
+	}
+	for _, cookie := range rec.Result().Cookies() {
+		if cookie.Name == sessionCookieName && cookie.MaxAge < 0 {
+			t.Fatal("failed durable logout cleared the cookie, preventing a retry")
+		}
+	}
+
+	persistSessions = persistLocked
+	retry := httptest.NewRecorder()
+	HandleSession(retry, req)
+	if retry.Code != http.StatusNoContent {
+		t.Fatalf("retried logout: status %d, want 204", retry.Code)
+	}
+	simulateRestart(t)
+	if HasAdminSession(requestWithToken(token)) {
+		t.Fatal("retried logout was not durable across restart")
+	}
+}
+
+func TestRevokeAllSessionsIsDurable(t *testing.T) {
+	useSessionDir(t)
+	first, err := issueSession(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := issueSession(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := revokeAllSessions(); err != nil {
+		t.Fatal(err)
+	}
+	for _, token := range []string{first, second} {
+		if HasAdminSession(requestWithToken(token)) {
+			t.Fatal("revoke-all left a session active")
+		}
+	}
+	simulateRestart(t)
+	for _, token := range []string{first, second} {
+		if HasAdminSession(requestWithToken(token)) {
+			t.Fatal("revoke-all session returned after restart")
+		}
+	}
+}
+
+func TestRevokeAllSessionsRollsBackOnPersistenceFailure(t *testing.T) {
+	useSessionDir(t)
+	first, err := issueSession(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := issueSession(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	persistSessions = func(time.Time) error { return errors.New("disk unavailable") }
+	if err := revokeAllSessions(); err == nil {
+		t.Fatal("revoke-all succeeded despite persistence failure")
+	}
+	for _, token := range []string{first, second} {
+		if !HasAdminSession(requestWithToken(token)) {
+			t.Fatal("failed revoke-all did not restore every session")
+		}
 	}
 }
 

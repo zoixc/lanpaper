@@ -8,6 +8,16 @@
    предлагать имя, которое сервер отвергнет, и не должна показывать
    состояние, которого нет.
    ============================================================ */
+import { request, ApiError } from './api.js';
+import { registerPanelFacade, getFeature } from './features.js';
+import { accessMeta, entryMeta as formatEntryMeta, entryTitle as formatEntryTitle,
+    panelSnapshot } from './feature-domain.js';
+import { createUploadFeature } from './upload-feature.js';
+import { createOverlayController } from './overlay-controller.js';
+import { observeConnectivity } from './operation-state.js';
+import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as linkMatchesQuery,
+    countFilteredLinks, resetIncrementalRender, selectVisibleLinks } from './state.js';
+
 (function () {
     'use strict';
 
@@ -254,39 +264,10 @@
     function validLinkName(name) {
         return LINK_NAME_RE.test(name) && RESERVED_NAMES.indexOf(name.toLowerCase()) < 0;
     }
-    /* Порция рендера: список из сотен ссылок не рисуем целиком — сначала
-       первая порция, остальное по кнопке. Это самая дорогая часть работы
-       (кадр + картинка + слушатели на каждую карточку). */
-    const CHUNK = 12;
-
-    const state = {
-        links: [],
-        dict: {},               /* строки текущего языка из /static/i18n */
-        config: {               /* настройки сервера (лимиты и подсказки) */
-            maxUploadMB: 50, playlistMax: 8, historyLimit: 3,
-            historyBudgetBytes: 0, langs: LANGS
-        },
-        busy: false,            /* защита от второго нажатия, пока идёт запрос */
-        query: '',
-        scope: 'name',          /* name — имя и файл, как в приложении; all — плюс доступ и вес */
-        filter: 'all',
-        access: 'any',
-        sort: 'date_desc',
-        view: 'grid',
-        theme: 'auto',
-        palette: 'mono',
-        lang: 'ru',
-        selecting: false,
-        selected: new Set(),
-        loading: true,
-        loadError: false,
-        shown: CHUNK,
-        reveal: null,          /* ссылки, которые нужно оставить на виду */
-        scrolledReveal: null,
-        pendingScroll: null,
-        lastDeleted: null,
-        panelTab: 'media'
-    };
+    const state = createAppState({ config: {
+        maxUploadMB: 50, playlistMax: 8, historyLimit: 3,
+        historyBudgetBytes: 0, langs: LANGS
+    }});
 
     /* Ключи настроек до 2.0 (theme, viewMode, sortBy, lang) читаются один
        раз как запасной вариант: панель, обновлённая с 0.12.x, не должна
@@ -496,48 +477,49 @@
        ======================================================== */
     /* Один вход для всех ручек: ошибку сервера превращаем в текст на языке
        панели, 401/403 — в объяснение, а не в «Failed to fetch». */
-    async function apiCall(url, method, body, isForm) {
-        const options = {
-            method: method || 'GET',
-            /* Явные учётные данные: WebKit без этого не отправляет
-               HTTP-авторизацию и отвечает 401 на панель под паролем. */
-            credentials: 'same-origin',
-            headers: isForm ? undefined : { 'Content-Type': 'application/json' }
-        };
-        if (body !== undefined && body !== null) {
-            options.body = isForm ? body : JSON.stringify(body);
-        }
-        let res;
+    async function apiCall(url, method, body, isForm, signal, retry) {
         try {
-            res = await fetch(url, options);
-        } catch (e) {
-            toast(t('network_error'), { type: 'error' });
-            throw e;
+            return await request(url, { method: method || 'GET', body, isForm, signal });
+        } catch (error) {
+            if (error instanceof ApiError && error.kind === 'authentication') {
+                /* Session expired or signed out elsewhere: the login form takes over. */
+                window.location.reload();
+            } else if (error instanceof ApiError && error.kind === 'network') {
+                toast(t('network_error'), {
+                    type: 'error',
+                    action: typeof retry === 'function' ? t('retry') : '',
+                    onAction: typeof retry === 'function' ? retry : null
+                });
+            } else if (!(error instanceof ApiError && error.kind === 'cancelled')) {
+                toast(translateServerError(error), { type: 'error' });
+            }
+            throw error;
         }
-        if (res.status === 401) {
-            /* Session expired or signed out elsewhere: the login form takes over. */
-            window.location.reload();
-            throw new Error('signed out');
-        }
-        if (!res.ok) {
-            const text = (await res.text().catch(() => '')).trim();
-            const err = new Error(text || ('HTTP ' + res.status));
-            err.status = res.status;
-            toast(translateServerError(err), { type: 'error' });
-            throw err;
-        }
-        if (res.status === 204) return null;
-        const type = res.headers.get('content-type') || '';
-        return type.indexOf('application/json') >= 0 ? res.json() : null;
     }
 
-    /* Выход: сервер отзывает сессию и снимает cookie. Дальше /admin показывает
-       форму входа. Если запрос не прошёл, всё равно уходим: cookie при этом
-       может остаться, но сессия истечёт сама. */
+    /* Выход считается завершённым только после того, как сервер надёжно
+       сохранил отзыв сессии. При ошибке остаёмся в панели: cookie и сессия ещё
+       действуют, поэтому пользователь может исправить storage и повторить. */
     async function signOut() {
         try {
             await apiCall('/api/session', 'DELETE');
-        } catch (_) { /* ошибка уже показана */ }
+        } catch (_) {
+            return; /* apiCall уже показал локализованную ошибку */
+        }
+        window.location.replace('/admin');
+    }
+
+    async function signOutAll() {
+        const confirmed = await openConfirm({
+            title: t('sign_out_all_confirm_title'),
+            text: t('sign_out_all_confirm')
+        });
+        if (!confirmed) return;
+        try {
+            await apiCall('/api/sessions', 'DELETE');
+        } catch (_) {
+            return; /* сессии восстановлены сервером; операцию можно повторить */
+        }
         window.location.replace('/admin');
     }
 
@@ -555,6 +537,8 @@
            до нажатия, а не после. */
         const full = /playlist is full \(max (\d+)/i.exec(text);
         if (full) state.config.playlistMax = Number(full[1]);
+        if (/could not sign out all sessions/i.test(text)) return t('sign_out_all_error');
+        if (/could not sign out/i.test(text)) return t('sign_out_error');
         if (/link already exists/i.test(text)) return t('link_taken');
         if (/link does not exist|link not found/i.test(text)) return t('link_gone');
         if (/invalid link name|invalid id/i.test(text)) return t('invalid_id');
@@ -568,42 +552,17 @@
         return text ? t('action_failed') + ': ' + text : t('action_failed');
     }
 
-    /* Запись ответа: история и плейлист всегда массивы, номер версии — не
-       меньше первого (записи до версионирования приходят с нулём). */
-    function normalizeLink(raw) {
-        const link = Object.assign({}, raw);
-        link.linkName = link.linkName || link.id || '';
-        link.history = Array.isArray(link.history) ? link.history : [];
-        link.items = Array.isArray(link.items) ? link.items : [];
-        link.currentVersion = Math.max(1, Number(link.currentVersion) || 1);
-        link.pinned = !!link.pinned;
-        link.hasImage = !!link.hasImage;
-        link.accessLevel = link.accessLevel || 'public';
-        link.category = link.category || 'other';
-        return link;
-    }
-
-    /* Вид медиа определяем по расширению файла: в API `mimeType` — это
-       расширение («png», «mp4»), а не строка вида «image/png», а `category` —
-       пользовательская категория (tech/life/work/other), которую ставят
-       ссылке, а не её файлу. Раньше панель искала видео и PNG в этих двух
-       полях: у любой ссылки, созданной вручную, category равно «other»,
-       поэтому видео открывалось как картинка (значка «играть» не было, а в
-       <img> тянулся сам видеофайл), у прозрачных PNG не было шахматного
-       фона, а в подписи вместо «PNG» стоял прочерк. */
-    function mediaExt(link) {
-        return String(link.mimeType || '').toLowerCase();
-    }
-    function isVideoMedia(link) {
-        const ext = mediaExt(link);
-        return ext === 'mp4' || ext === 'webm';
-    }
-
     async function fetchLinks() {
-        const res = await apiCall('/api/wallpapers');
-        /* Ручка отдаёт либо массив, либо конверт {data,...}: понимаем оба,
-           чтобы смена формы ответа не оставила панель пустой. */
-        const list = Array.isArray(res) ? res : (res && Array.isArray(res.data) ? res.data : []);
+        const pageSize = 200;
+        const list = [];
+        for (let page = 1; ; page += 1) {
+            const res = await apiCall('/api/wallpapers?page=' + page + '&page_size=' + pageSize);
+            const data = Array.isArray(res) ? res : (res && Array.isArray(res.data) ? res.data : []);
+            list.push(...data);
+            if (Array.isArray(res) || !res || page >= res.totalPages || data.length === 0) break;
+            // Yield between pages so large libraries do not monopolize the UI.
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
         state.links = list.map(normalizeLink);
         return state.links;
     }
@@ -633,56 +592,14 @@
     /* ========================================================
        6. ВЫБОРКА И СЕТКА
        ======================================================== */
-    const SORTS = {
-        date_desc: (a, b) => b.modTime - a.modTime,
-        date_asc: (a, b) => a.modTime - b.modTime,
-        name_asc: (a, b) => a.linkName.localeCompare(b.linkName, 'ru'),
-        name_desc: (a, b) => b.linkName.localeCompare(a.linkName, 'ru'),
-        size_desc: (a, b) => (b.sizeBytes + b.items.length * 1e6) - (a.sizeBytes + a.items.length * 1e6)
-    };
-    const FILTERS = {
-        all: () => true,
-        image: (l) => l.hasImage && !isVideoMedia(l),
-        video: (l) => isVideoMedia(l),
-        playlist: (l) => l.items.length > 0,
-        pinned: (l) => l.pinned
-    };
-
-    /* Что попадает в поиск. «Имя и файл» — как в приложении 0.12.1:
-       имя ссылки и тип файла. «Везде» добавляет уровень доступа, вес,
-       версию и размеры — так ищут, когда помнят не имя, а примету:
-       «локальная», «2 МБ», «png». */
-    function matchesQuery(link) {
-        const q = state.query.trim().toLowerCase();
-        if (!q) return true;
-        const parts = [link.linkName, link.mimeType, link.category];
-        if (state.scope === 'all') {
-            parts.push(t(accessMeta(link.accessLevel).key), formatBytes(link.sizeBytes),
-                String(link.sizeBytes), 'v' + link.currentVersion, String(link.width || ''),
-                String(link.height || ''), (link.items || []).length ? 'плейлист playlist' : '');
-        }
-        return parts.some(part => String(part || '').toLowerCase().includes(q));
-    }
-    function filterCount(key) {
-        return state.links.filter(l => matchesQuery(l)
-            && FILTERS[key](l)
-            && (state.access === 'any' || l.accessLevel === state.access)).length;
-    }
-    /* Смена выборки возвращает список к первой порции: иначе «Показать ещё»
-       относилось бы к прошлой выдаче. */
-    function resetShown() {
-        state.shown = CHUNK;
-        state.reveal = null;
-        state.scrolledReveal = null;
-    }
-
-    function visibleLinks() {
-        let list = state.links.filter(matchesQuery).filter(FILTERS[state.filter]);
-        if (state.access !== 'any') list = list.filter(l => l.accessLevel === state.access);
-        list.sort(SORTS[state.sort] || SORTS.date_desc);
-        list.sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned));
-        return list;
-    }
+    const selectorHelpers = () => ({
+        accessText: level => t(accessMeta(level).key),
+        formatBytes
+    });
+    function matchesQuery(link) { return linkMatchesQuery(state, link, selectorHelpers()); }
+    function filterCount(key) { return countFilteredLinks(state, key, selectorHelpers()); }
+    function resetShown() { resetIncrementalRender(state); }
+    function visibleLinks() { return selectVisibleLinks(state, selectorHelpers()); }
 
     const ratio = (l) => (l.width && l.height ? l.width / l.height : 0);
     function fitMode(link) {
@@ -695,14 +612,7 @@
         return 'cover';
     }
 
-    function accessMeta(level) {
-        return {
-            public: { icon: 'globe', key: 'access_public' },
-            local: { icon: 'lock', key: 'access_local' },
-            token: { icon: 'key', key: 'access_token' },
-            auth: { icon: 'user', key: 'access_auth' }
-        }[level] || { icon: 'globe', key: 'access_public' };
-    }
+
 
     /* Кадр ссылки берём у /api/preview (он отдаётся и для ссылок под
        авторизацией), а версию добавляем в адрес: после замены файла браузер
@@ -899,7 +809,6 @@
         $('#pageCount').textContent = narrowed
             ? t('found', { shown: list.length, total: total })
             : String(total);
-        $('#brandCount').textContent = String(total);
         $('#selectAllBtn').hidden = !state.selecting;
         renderLoadMore(list);
         updateBulkbar();
@@ -1164,72 +1073,38 @@
        ======================================================== */
     const host = () => $('#overlayHost');
     let currentOverlay = null;
-    let lastFocused = null;
+    const overlayController = createOverlayController({
+        document,
+        visualViewport: window.visualViewport,
+        host,
+        createScrim: onClick => h('div', { class: 'scrim', onclick: onClick }),
+        announce: message => {
+            const live = $('#overlayAnnouncements');
+            if (live) live.textContent = message;
+        },
+        onChange: function (active, depth, overlays) {
+            currentOverlay = active;
+            document.body.style.overflow = depth ? 'hidden' : '';
+            const settingsOpen = overlays.some(item => item.node.matches('[data-sheet="settings"]'));
+            document.body.classList.toggle('settings-open', settingsOpen);
+            setSettingsExpanded(settingsOpen);
+            if (!depth) closeMenu();
+        }
+    });
 
     function openOverlay(node, opts) {
-        // Запоминаем, откуда пришли: после закрытия фокус вернётся туда же.
-        const origin = document.activeElement;
-        closeOverlay(true);
-        lastFocused = (origin && origin !== document.body) ? origin : lastFocused;
-        const scrim = h('div', { class: 'scrim', onclick: () => { if (!(opts && opts.persistent)) closeOverlay(); } });
-        host().append(scrim, node);
-        /* Тексты шаблонов переводим здесь: <template> лежит вне документа,
-           и переводы, наложенные при запуске, до клона не дотягиваются. */
         applyTranslations(node);
-        currentOverlay = {
-            node: node, scrim: scrim, kind: (opts && opts.kind) || 'other',
-            /* Кто-то ждёт ответа «закрыли и не подтвердили» — например,
-               импорт списка: отмена должна вернуть управление, а не
-               оставить ожидание навсегда. */
-            onDismiss: (opts && opts.onDismiss) || null
-        };
-        document.body.style.overflow = 'hidden';
-        /* Шестерёнка в шапке поворачивается, пока открыт пульт настроек —
-           как в 0.12.1, где это делал класс .open у выпадашки. */
-        const settingsOpen = !!$('[data-sheet="settings"]');
-        document.body.classList.toggle('settings-open', settingsOpen);
-        setSettingsExpanded(settingsOpen);
         hydrateIcons(node);
-        const target = (opts && opts.focus) || node.querySelector('[autofocus], input, button');
-        setTimeout(() => target && target.focus({ preventScroll: true }), 40);
-        return node;
+        return overlayController.open(node, opts || {});
     }
-    /* Шестерёнка не только поворачивается, но и сообщает экранному диктору,
-       открыт ли пульт настроек: без aria-expanded кнопка «Настройки» звучит
-       одинаково до и после нажатия. */
     function setSettingsExpanded(open) {
         const gear = $('#settingsBtn');
         if (gear) gear.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
-    function closeOverlay(keepFocus) {
-        if (!currentOverlay) return;
-        const dismiss = currentOverlay.onDismiss;
-        currentOverlay.node.remove();
-        currentOverlay.scrim.remove();
-        currentOverlay = null;
-        if (dismiss) dismiss();
-        document.body.style.overflow = '';
-        const settingsOpen = !!$('[data-sheet="settings"]');
-        document.body.classList.toggle('settings-open', settingsOpen);
-        setSettingsExpanded(settingsOpen);
-        closeMenu();
-        if (!keepFocus && lastFocused && lastFocused.isConnected) lastFocused.focus({ preventScroll: true });
-        lastFocused = null;
-    }
+    function closeOverlay(keepFocus) { overlayController.close(keepFocus); }
     document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') {
-            if (openMenuEl) { closeMenu(); return; }
-            if (currentOverlay) { closeOverlay(); }
-        }
-        if (e.key === 'Tab' && currentOverlay) {
-            const focusables = $$('a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])', currentOverlay.node)
-                .filter(el => el.offsetParent !== null);
-            if (!focusables.length) return;
-            const first = focusables[0];
-            const last = focusables[focusables.length - 1];
-            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-        }
+        if (e.key === 'Escape' && openMenuEl) { closeMenu(); return; }
+        overlayController.keydown(e);
     });
     document.addEventListener('click', function (e) {
         if (openMenuEl && !openMenuEl.contains(e.target) && !e.target.closest('[aria-haspopup]')) closeMenu();
@@ -1872,15 +1747,9 @@
 
     /* Тип и вес файла для строк версий и плейлиста: сервер отдаёт расширение
        (ext), размер и время — этого достаточно, размеров кадра у него нет. */
-    function entryMeta(entry) {
-        return [
-            entry.ext ? String(entry.ext).toUpperCase() : '',
-            entry.sizeBytes ? formatBytes(entry.sizeBytes) : ''
-        ].filter(Boolean).join(' · ');
-    }
-    function entryTitle(entry) {
-        return entryMeta(entry) || formatBytes(entry.sizeBytes);
-    }
+    const entryMeta = entry => formatEntryMeta(entry, formatBytes);
+    const entryTitle = entry => formatEntryTitle(entry, formatBytes);
+
 
     function panelAccess(link) {
         const wrap = h('div', { class: 'stack' });
@@ -1946,85 +1815,14 @@
         $('#filePicker').click();
     }
 
-    async function compressFor(file) {
-        if (!STATE.compressor || !file.type.startsWith('image/')) return file;
-        try {
-            const smaller = await STATE.compressor.compress(file);
-            if (smaller && smaller.size < file.size) {
-                const info = ImageCompressor.getCompressionInfo(file.size, smaller.size);
-                toast(t('compression_saved', {
-                    percent: info.percent, saved: formatBytes(info.saved)
-                }), { type: 'info', duration: 3000 });
-                return smaller;
-            }
-        } catch (_) { /* сжатие не удалось — отправляем как есть */ }
-        return file;
-    }
-
-    async function uploadFileTo(link, file, mode, opts) {
-        if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-            toast(t('invalid_image'), { type: 'error' });
-            return false;
-        }
-        const quiet = !!(opts && opts.quiet);
-        const form = new FormData();
-        form.append('linkName', link.linkName);
-        if (mode === 'append') form.append('mode', 'append');
-        form.append('file', await compressFor(file));
-        /* Тост висит до конца загрузки: файл в 50 МБ уходит минутами, и
-           сообщение, исчезающее через полторы секунды, выглядело так, будто
-           ничего не происходит (и провоцировало повторную отправку). */
-        const busy = quiet ? null : toast(t('uploading'), { type: 'info', duration: 0 });
-        try {
-            const updated = await apiCall('/api/upload', 'POST', form, true);
-            applyLinkUpdate(updated);
-            if (!quiet) toast(t(mode === 'append' ? 'append_success' : 'upload_success'));
-            return true;
-        } catch (_) { return false; }   /* текст ошибки уже показан */
-        finally { if (busy) busy.dismissToast(); }
-    }
-
-    /* Несколько файлов на одну ссылку. В плейлист (append) идёт каждый файл —
-       ровно этого ждёт тот, кто выбрал пачку. Заменить текущий файл может
-       только один, поэтому в режиме replace берём первый, а о пропущенных
-       говорим: раньше они исчезали молча. Сервер принимает по одному файлу
-       за запрос, а порядок в плейлисте должен совпасть с порядком выбора,
-       поэтому запросы идут по очереди, а тосты — один в конце. */
-    async function uploadFilesTo(link, files, mode) {
-        if (mode !== 'append') {
-            if (files.length > 1) {
-                toast(t('upload_first_only', { count: files.length - 1 }), { type: 'info', duration: 4500 });
-            }
-            return uploadFileTo(link, files[0], mode);
-        }
-        let done = 0;
-        for (const file of files) {
-            if (await uploadFileTo(link, file, 'append', { quiet: true })) done += 1;
-        }
-        if (done) toast(t('append_many', { count: done }));
-        return done > 0;
-    }
-
-    async function uploadUrlTo(link, url, mode) {
-        const form = new FormData();
-        form.append('linkName', link.linkName);
-        if (mode === 'append') form.append('mode', 'append');
-        form.append('url', url);
-        const busy = toast(t('uploading'), { type: 'info', duration: 0 });
-        try {
-            const updated = await apiCall('/api/upload', 'POST', form, true);
-            applyLinkUpdate(updated);
-            toast(t(mode === 'append' ? 'append_success' : 'upload_success'));
-            return true;
-        } catch (_) { return false; }   /* текст ошибки уже показан */
-        finally { busy.dismissToast(); }
-    }
-
-    /* Файл из галереи сервера отдаётся ручкой загрузки как относительный
-       путь (url=): сервер сам копирует файл из своей папки. */
-    function uploadServerFileTo(link, path) {
-        return uploadUrlTo(link, path, 'replace');
-    }
+    const uploadFeature = createUploadFeature({
+        compressor: () => STATE.compressor,
+        t, toast, formatBytes, request: apiCall, applyUpdate: applyLinkUpdate
+    });
+    const uploadFileTo = (link, file, mode, opts) => uploadFeature.file(link, file, mode, opts);
+    const uploadFilesTo = (link, files, mode) => uploadFeature.files(link, files, mode);
+    const uploadUrlTo = (link, url, mode) => uploadFeature.url(link, url, mode);
+    const uploadServerFileTo = (link, path) => uploadFeature.url(link, path, 'replace');
 
     /* Ссылки из перетащенных файлов: имя файла становится адресом, поэтому
        негодные имена пропускаем, а не создаём ссылку с ошибкой в ответ. */
@@ -2315,7 +2113,6 @@
             $('[data-confirm]', node).addEventListener('click', function () {
                 answered = true;
                 closeOverlay(true);
-                lastFocused = null;
                 if (opts.onConfirm) opts.onConfirm();
                 resolve(true);
             });
@@ -2323,6 +2120,7 @@
                это отказ; ответ приходит ровно один раз. */
             openOverlay(node, {
                 focus: $('[data-confirm]', node),
+                stack: true, label: opts.title,
                 onDismiss: function () { if (!answered) resolve(false); }
             });
         });
@@ -2333,9 +2131,26 @@
        ======================================================== */
     const PALETTES = ['mono', 'indigo', 'sage', 'clay', 'graphite', 'ocean'];
 
+    async function loadSessionSummary(node) {
+        const summary = $('#sessionSummary', node);
+        if (!summary) return;
+        summary.textContent = t('sessions_loading');
+        try {
+            const sessions = await apiCall('/api/sessions');
+            const list = Array.isArray(sessions) ? sessions : [];
+            const current = list.find(function (item) { return item.current; });
+            summary.textContent = current
+                ? t('sessions_summary', { count: list.length, date: formatDate(current.expires) })
+                : t('sessions_summary_basic', { count: list.length });
+        } catch (_) {
+            summary.textContent = t('sessions_load_error');
+        }
+    }
+
     function openSettings() {
         const node = $('#tplSettings').content.firstElementChild.cloneNode(true);
         $$('[data-close]', node).forEach(b => b.addEventListener('click', () => closeOverlay()));
+        loadSessionSummary(node);
 
         /* Тема */
         $$('[data-theme-opt]', node).forEach(function (input) {
@@ -2387,15 +2202,19 @@
             btn.addEventListener('click', function () {
                 const act = btn.dataset.act;
                 if (act === 'export') {
-                    if (window.LanpaperBackup) window.LanpaperBackup.exportData();
+                    const feature = getFeature('link-list');
+                    if (feature) feature.exportData();
                 } else if (act === 'import') {
-                    if (window.LanpaperBackup) window.LanpaperBackup.triggerImport();
+                    const feature = getFeature('link-list');
+                    if (feature) feature.triggerImport();
                 } else if (act === 'install') {
                     promptInstall();
                 } else if (act === 'regen') {
                     regenPreviews(btn, $('span', btn));
                 } else if (act === 'signout') {
                     signOut();
+                } else if (act === 'signoutall') {
+                    signOutAll();
                 }
             });
         });
@@ -2589,6 +2408,18 @@
         const original = span ? span.textContent : '';
         btn.disabled = true;
         if (span) span.textContent = t('regen_running');
+        let polling = false;
+        const progressTimer = setInterval(async function () {
+            if (polling) return;
+            polling = true;
+            try {
+                const status = await request('/api/regenerate-previews');
+                if (span && status && status.running) {
+                    span.textContent = t('regen_progress', { done: status.completed, total: status.total });
+                }
+            } catch (_) { /* progress is best-effort; the POST owns errors */ }
+            finally { polling = false; }
+        }, 500);
         try {
             const result = await apiCall('/api/regenerate-previews', 'POST');
             if (result) {
@@ -2599,6 +2430,7 @@
             }
         } catch (_) { /* текст ошибки уже показан */ }
         finally {
+            clearInterval(progressTimer);
             btn.disabled = false;
             if (span && original) span.textContent = original;
         }
@@ -2642,6 +2474,12 @@
     }
 
     /* Перечитать список с сервера, не теряя состояние вида и выбранное. */
+    function updateConnectivity(online) {
+        document.documentElement.dataset.online = online ? 'true' : 'false';
+        const banner = $('#networkBanner');
+        if (banner) banner.classList.toggle('is-hidden', online);
+    }
+
     async function reloadLinks() {
         try {
             await fetchLinks();
@@ -2667,6 +2505,7 @@
     async function init() {
         loadPrefs();
         hydrateIcons(document);
+        observeConnectivity(window, updateConnectivity);
         await loadDict();
         applyTranslations();
         applyTheme();
@@ -2713,6 +2552,7 @@
             createLinksFromFiles(files);
         });
         $('#loadMoreBtn').addEventListener('click', showMore);
+        $('#networkRetryBtn').addEventListener('click', reloadLinks);
         $('#retryBtn').addEventListener('click', function () {
             state.loading = true;
             state.loadError = false;
@@ -2781,28 +2621,13 @@
         }
     }
 
-    /* Маленький публичный интерфейс: его использует export-import.js
-       (отдельный файл, который должен работать, даже если панель не
-       инициализировалась) и проверки стенда. */
-    window.LanpaperApp = {
-        STATE: STATE,
-        state: state,
-        t: t,
-        apiCall: apiCall,
-        toast: toast,
-        openConfirm: openConfirm,
-        openPanel: openPanel,
-        applyLinkUpdate: applyLinkUpdate,
-        normalizeLink: normalizeLink,
-        setLang: setLang,
-        reloadLinks: reloadLinks,
-        applyTheme: applyTheme,
-        applyView: applyView,
-        getVersions: (name) => apiCall('/api/link/' + encodeURIComponent(name) + '/history'),
-        formatBytes: formatBytes,
-        validLinkName: validLinkName,
-        openCreateDialog: openCreateDialog
-    };
+    /* Export/import sees only this capability facade: mutable panel state and
+       unrelated UI internals are intentionally not exposed on window. */
+    registerPanelFacade({
+        snapshot: () => panelSnapshot(state),
+        t, request: apiCall, toast, confirm: openConfirm,
+        validLinkName, reloadLinks
+    });
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();

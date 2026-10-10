@@ -182,9 +182,14 @@ func TestAppAuthenticationStaticAssetsAndCSRF(t *testing.T) {
 	if _, ok := storage.Global.Get("wrong"); ok {
 		t.Fatal("CSRF request mutated the store")
 	}
-	_, h, admin := a.request("GET", "/admin", nil, true, nil)
-	if !bytes.Contains(admin, []byte("/static/js/app.js")) || h.Get("Cache-Control") != "no-store" {
-		t.Fatalf("admin UI missing scripts or no-store: headers=%v", h)
+	login := loginRequest(t, a, "admin", "strong-test-password", map[string]string{"Origin": a.server.URL})
+	cookie := sessionCookieFrom(t, login)
+	if login.StatusCode != http.StatusNoContent || cookie == nil {
+		t.Fatalf("admin session login failed: status=%d", login.StatusCode)
+	}
+	status, h, adminText := a.get("/admin", cookie)
+	if status != http.StatusOK || !strings.Contains(adminText, "/static/js/app.js") || h.Get("Cache-Control") != "no-store" {
+		t.Fatalf("admin UI missing scripts or no-store: status=%d headers=%v", status, h)
 	}
 	status, h, css := a.request("GET", "/static/css/style.css", nil, false, nil)
 	if status != http.StatusOK || len(css) < 100 || h.Get("Cross-Origin-Resource-Policy") != "same-origin" {

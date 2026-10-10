@@ -68,7 +68,11 @@ func stagePath(dir, ext string) (string, error) {
 // to its previous contents. On a failed metadata commit, Rollback restores
 // the previous file even if the extension/path was unchanged. Hardlinks are
 // constant-time; the copy fallback supports filesystems without hardlinks.
-type publishedFile struct{ dst, backup string }
+type publishedFile struct {
+	dst, backup    string
+	rollbackAction func()
+	finishAction   func()
+}
 
 func publishStaged(stage, dst string, maxBytes int64) (publishedFile, error) {
 	p := publishedFile{dst: dst}
@@ -107,6 +111,10 @@ func publishStaged(stage, dst string, maxBytes int64) (publishedFile, error) {
 }
 
 func (p publishedFile) rollback() {
+	if p.rollbackAction != nil {
+		p.rollbackAction()
+		return
+	}
 	if p.backup != "" {
 		if err := os.Rename(p.backup, p.dst); err != nil {
 			log.Printf("Critical: could not restore media %s: %v", p.dst, err)
@@ -117,6 +125,10 @@ func (p publishedFile) rollback() {
 }
 
 func (p publishedFile) finish() {
+	if p.finishAction != nil {
+		p.finishAction()
+		return
+	}
 	if p.backup != "" {
 		if err := os.Remove(p.backup); err != nil && !os.IsNotExist(err) {
 			log.Printf("Error removing media backup %s: %v", p.backup, err)

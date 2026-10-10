@@ -224,5 +224,19 @@
   "view_grid": "Griglia",
   "view_list": "Elenco",
   "settings_account": "Account",
-  "sign_out": "Esci"
+  "sign_out": "Esci",
+  "sign_out_error": "Impossibile disconnettersi in modo sicuro. Controlla l’archiviazione del server e riprova.",
+  "sign_out_all": "Esci da tutti i dispositivi",
+  "sign_out_all_confirm_title": "Uscire ovunque?",
+  "sign_out_all_confirm": "Tutte le sessioni del browser termineranno immediatamente. Dovrai accedere di nuovo su ogni dispositivo.",
+  "sign_out_all_error": "Impossibile terminare in modo sicuro tutte le sessioni. Controlla l’archiviazione del server e riprova.",
+  "sessions_loading": "Caricamento delle sessioni…",
+  "sessions_summary": "Sessioni browser attive: {{count}} · questa sessione scade {{date}}",
+  "sessions_summary_basic": "Sessioni browser attive: {{count}}",
+  "sessions_load_error": "Impossibile caricare le informazioni sulle sessioni.",
+  "import_progress": "Importazione di {{done}} link su {{total}}",
+  "import_cancelled": "Importazione annullata",
+  "offline_now": "Sei offline. Le operazioni di rete potrebbero non riuscire finché la connessione non torna.",
+  "operation_in_progress": "Questa operazione è già in corso",
+  "regen_progress": "Anteprime: {{done}} di {{total}}"
 }

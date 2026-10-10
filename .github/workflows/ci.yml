@@ -10,6 +10,9 @@ on:
 # credentials come from repository secrets and are used on main only.
 permissions:
   contents: read
+  # Requested only by the main-branch signing step; no registry credentials or
+  # long-lived signing key are exposed to pull-request builds.
+  id-token: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -39,16 +42,39 @@ jobs:
 
       - name: Check formatting
         run: |
-          unformatted="$(gofmt -l .)"
+          unformatted="$(find . -path ./vendor -prune -o -name '*.go' -print0 | xargs -0 gofmt -l)"
           if [ -n "$unformatted" ]; then
-            echo "Run gofmt -w on:"; echo "$unformatted"; exit 1
+            echo "Run gofmt -w on:"
+            echo "$unformatted"
+            while IFS= read -r file; do
+              echo "::error file=${file}::File is not formatted; run gofmt -w ${file}"
+            done <<< "$unformatted"
+            exit 1
           fi
 
       - name: Vet
         run: go vet ./...
 
       - name: Test
-        run: go test -race -count=1 ./...
+        shell: bash
+        run: |
+          set +e
+          output="$(go test -race -count=1 ./... 2>&1)"
+          status=$?
+          printf '%s\n' "$output"
+          if [ "$status" -ne 0 ]; then
+            # Keep the failure visible through the Checks API even when a CI
+            # log-storage host is unavailable to the person investigating it.
+            diagnostic="$(printf '%s\n' "$output" | grep -E -C 4 -- '(^--- FAIL:|^FAIL[[:space:]]|panic:|WARNING: DATA RACE|_test\.go:[0-9]+:)' | tail -n 160)"
+            if [ -z "$diagnostic" ]; then
+              diagnostic="$(printf '%s\n' "$output" | tail -n 80)"
+            fi
+            diagnostic="${diagnostic//'%'/'%25'}"
+            diagnostic="${diagnostic//$'\r'/'%0D'}"
+            diagnostic="${diagnostic//$'\n'/'%0A'}"
+            echo "::error file=go.mod,line=1,title=Go tests failed::$diagnostic"
+            exit "$status"
+          fi
 
       - name: Build
         run: go build -trimpath -ldflags="-X main.Version=$(cat VERSION)" -o /dev/null .
@@ -69,7 +95,7 @@ jobs:
           node-version: lts/*
 
       - name: Syntax check
-        run: for f in static/js/*.js static/sw.js; do node --check "$f"; done
+        run: for f in static/js/*.js static/sw.js; do node --input-type=module --check < "$f"; done
 
       - name: Unit tests
         run: node --test tests/*.test.cjs
@@ -96,13 +122,22 @@ jobs:
         working-directory: tests/e2e
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium webkit
 
       - name: Sign-in browser tests
         working-directory: tests/e2e
         env:
           LANPAPER_BIN: ${{ runner.temp }}/lanpaper
-        run: npm test
+        run: |
+          set +e
+          set -o pipefail
+          npm test 2>&1 | tee "$RUNNER_TEMP/playwright.log"
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            detail="$(sed -n '/^  1) /,$p' "$RUNNER_TEMP/playwright.log" | tail -160 | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')"
+            echo "::error file=tests/e2e::${detail}"
+          fi
+          exit "$status"
 
   docker:
     needs: [ test, frontend, e2e ]
@@ -135,11 +170,34 @@ jobs:
           docker buildx build \
             --platform linux/amd64 \
             --build-arg VERSION="${VERSION}" \
+            --build-arg GO_IMAGE=public.ecr.aws/docker/library/golang:1.27-alpine \
+            --build-arg ALPINE_IMAGE=public.ecr.aws/docker/library/alpine:3.24 \
             --cache-to   type=local,dest=/tmp/.buildx-cache,mode=max \
             --cache-from type=local,src=/tmp/.buildx-cache \
             -t lanpaper:test --load .
 
-          docker run -d --name lp_test -p 8080:8080 lanpaper:test
+          install -d -m 0700 /tmp/lp_test_data
+          sudo chown 100:101 /tmp/lp_test_data
+          docker run -d --name lp_test -p 8080:8080 \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,size=64m,mode=1777 \
+            --mount type=bind,source=/tmp/lp_test_data,destination=/app/data \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --pids-limit 128 \
+            --memory 1g \
+            --cpus 2.0 \
+            lanpaper:test
+
+          # Validate the documented Compose contract. The smoke container above
+          # uses the same flags directly; Docker rejects unsupported isolation
+          # options instead of silently weakening them.
+          if ! compose_output="$(ADMIN_PASSWORD_HASH='$argon2id$v=19$m=65536,t=3,p=2$Y2ktc21va2U$Y2ktc21va2UtaGFzaA' \
+            docker compose -f docker-compose-example.yml config --quiet 2>&1)"; then
+            encoded="$(printf '%s' "$compose_output" | base64 -w0)"
+            echo "::error::docker-compose-example.yml validation failed (base64 output): $encoded"
+            exit 1
+          fi
 
           # /health deliberately omits the version (it would tell a probe which
           # release to look up), so the version is checked on the image label.
@@ -155,9 +213,18 @@ jobs:
               echo "Container is healthy after $((i * 2))s"
               break
             fi
+            if [ "$(docker inspect --format '{{.State.Running}}' lp_test)" != "true" ]; then
+              logs="$(docker logs lp_test 2>&1)"
+              encoded="$(printf '%s' "$logs" | base64 -w0)"
+              echo "::error::Hardened container exited before readiness (base64 logs): $encoded"
+              printf '### Hardened container logs\n```text\n%s\n```\n' "$logs" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
             if [ "$i" -eq 15 ]; then
-              echo "Container did not become healthy in time"
-              docker logs lp_test
+              logs="$(docker logs lp_test 2>&1)"
+              encoded="$(printf '%s' "$logs" | base64 -w0)"
+              echo "::error::Hardened container did not become ready (base64 logs): $encoded"
+              printf '### Hardened container logs\n```text\n%s\n```\n' "$logs" >> "$GITHUB_STEP_SUMMARY"
               docker rm -f lp_test
               exit 1
             fi
@@ -168,9 +235,77 @@ jobs:
 
           docker rm -f lp_test
 
+          # Disaster-recovery smoke test: create durable state, take a stopped
+          # full-volume backup, destroy the working copy, restore it, and prove
+          # that the application can read the restored record.
+          docker run -d --name lp_dr_source -p 8080:8080 \
+            --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m,mode=1777 \
+            --mount type=bind,source=/tmp/lp_test_data,destination=/app/data \
+            --cap-drop ALL --security-opt no-new-privileges:true \
+            --pids-limit 128 --memory 1g --cpus 2.0 \
+            -e DISABLE_AUTH=true lanpaper:test
+          for i in $(seq 1 15); do
+            curl -sf http://localhost:8080/health/ready >/dev/null && break
+            test "$i" -lt 15 || { docker logs lp_dr_source; exit 1; }
+            sleep 2
+          done
+          test "$(curl -sS -o /tmp/create.json -w '%{http_code}' \
+            -H 'Content-Type: application/json' \
+            -d '{"linkName":"restore-proof","accessLevel":"public"}' \
+            http://localhost:8080/api/link)" = "201"
+          docker stop --time 35 lp_dr_source
+          docker rm lp_dr_source
+          sudo tar --numeric-owner -C /tmp/lp_test_data -czf /tmp/lanpaper-backup.tar.gz .
+          sudo find /tmp/lp_test_data -mindepth 1 -delete
+          sudo tar --numeric-owner -C /tmp/lp_test_data -xzf /tmp/lanpaper-backup.tar.gz
+          sudo chown -R 100:101 /tmp/lp_test_data
+
+          docker run -d --name lp_dr_restore -p 8080:8080 \
+            --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m,mode=1777 \
+            --mount type=bind,source=/tmp/lp_test_data,destination=/app/data \
+            --cap-drop ALL --security-opt no-new-privileges:true \
+            --pids-limit 128 --memory 1g --cpus 2.0 \
+            -e DISABLE_AUTH=true lanpaper:test
+          for i in $(seq 1 15); do
+            curl -sf http://localhost:8080/health/ready >/dev/null && break
+            test "$i" -lt 15 || { docker logs lp_dr_restore; exit 1; }
+            sleep 2
+          done
+          curl -sf http://localhost:8080/api/wallpapers | \
+            jq -e 'any(.[]; .linkName == "restore-proof")' >/dev/null
+          docker stop --time 35 lp_dr_restore
+          docker rm lp_dr_restore
+
+      - name: Generate SPDX and CycloneDX SBOMs
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: lanpaper:test
+          format: spdx-json
+          output-file: lanpaper.spdx.json
+          upload-artifact: false
+
+      - name: Generate CycloneDX SBOM
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: lanpaper:test
+          format: cyclonedx-json
+          output-file: lanpaper.cyclonedx.json
+          upload-artifact: false
+
+      - name: Publish CI SBOM artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lanpaper-sbom
+          path: |
+            lanpaper.spdx.json
+            lanpaper.cyclonedx.json
+          if-no-files-found: error
+          retention-days: 14
+
       # On main: rebuild for amd64+arm64 and push, reusing the cache from above.
-      - name: Push to Docker Hub
+      - name: Push signed release inputs to Docker Hub
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: release-image
         env:
           VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
@@ -178,6 +313,22 @@ jobs:
             --platform linux/amd64,linux/arm64 \
             --build-arg VERSION="${VERSION}" \
             --cache-from type=local,src=/tmp/.buildx-cache \
+            --provenance=mode=max \
+            --sbom=true \
+            --metadata-file=/tmp/release-metadata.json \
             -t "ptabi/lanpaper:${VERSION}" \
             -t "ptabi/lanpaper:latest" \
             --push .
+          digest="$(jq -r '."containerimage.digest"' /tmp/release-metadata.json)"
+          test "$digest" != "null" && test -n "$digest"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Install cosign
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Keyless-sign release image index
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          DIGEST: ${{ steps.release-image.outputs.digest }}
+        run: cosign sign --yes "ptabi/lanpaper@${DIGEST}"

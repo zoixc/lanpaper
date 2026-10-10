@@ -5,6 +5,140 @@ Notable changes to Lanpaper. Docker images are published as
 
 ## [Unreleased]
 
+## [0.16.0] – 2026-10-10
+
+### Fixed
+
+- **Signing out cannot be undone by the browser's Basic-auth cache.** The
+  `/admin` page now accepts only sign-in sessions; HTTP Basic Auth remains
+  available to API scripts. Previously, a desktop browser that had cached
+  Basic credentials could reopen the panel immediately after session logout.
+- **Logout is now durable or explicitly fails.** If `sessions.json` cannot be
+  updated, the server keeps the current session, returns an error and lets the
+  user retry. It no longer reports success for a revocation that could be
+  undone by a restart.
+
+### Added
+
+- **Sign out on all devices.** Settings → Account can atomically revoke every
+  browser session. If persistence fails, all sessions remain valid and the
+  operation can be retried; partial revocation is never reported as success.
+- **Session lifecycle information.** Settings shows the number of active
+  browser sessions and the current session expiry. Persisted sessions now have
+  opaque IDs and creation timestamps; existing files migrate automatically
+  without collecting IP addresses or user agents.
+
+### Changed
+
+- **Tested disaster recovery.** A new runbook covers complete backup scope,
+  checksummed staged restores, drills, audit/repair, corruption and disk-full
+  response, credential rotation and safe version rollback. CI now restores a
+  destroyed data directory and verifies its durable record in a fresh image.
+- **Verifiable release images.** CI now emits SPDX and CycloneDX SBOM artifacts;
+  release images carry BuildKit SBOM/provenance attestations and a keyless
+  Sigstore signature over the immutable multi-platform digest. Digest-pinned
+  verification and deployment steps are documented.
+- **Hardened production container profile.** The maintained Compose example now
+  defaults to loopback-only exposure, a read-only root filesystem, bounded
+  temporary storage, zero Linux capabilities, no privilege escalation and
+  CPU/memory/PID limits. It requires an Argon2id credential instead of a
+  plaintext password; CI runs the official image under the same isolation.
+- **Bounded processing jobs.** Upload and preview work now shares explicit CPU
+  and decoded-memory budgets with cancellation-aware queues and pollable
+  regeneration progress, while durable publication remains synchronous.
+- **Bounded library queries.** The list API now supports validated pagination,
+  search, access/media filters and stable sorting; legacy arrays are capped
+  with explicit truncation headers and the panel loads bounded pages.
+- **Resumable SQLite migration.** An explicit backup-first command now
+  validates and imports JSON metadata in checksummed, checkpointed transactions,
+  with dry-run, integrity verification and non-destructive rollback.
+- **SQLite metadata backend.** A normalized pure-Go backend now implements the
+  store contract with WAL, strict foreign-key constraints, atomic transactions,
+  integrity checks and online backup while media remains on the filesystem.
+- **Wallpaper store boundary.** Application services now receive a
+  context-aware CRUD/list/transaction interface, with the durable JSON backend
+  covered by reusable conformance and atomic-transaction tests.
+- **Measured JSON-store limits.** Reproducible 1k/10k/50k benchmarks now
+  publish allocations, serialization and durable-write latency, with a 10k
+  supported ceiling and explicit SQLite migration triggers.
+- **Offline and retry UX.** The panel now announces connection loss, offers
+  reconnect/retry actions, suppresses duplicate uploads and keeps operation
+  progress visible without caching administrator or API responses.
+- **Validated bulk link import.** Link-list imports now dry-run before
+  mutation, persist in bounded atomic batches, expose progress/cancellation and
+  produce per-record reports without exporting or restoring token secrets.
+- **Accessible overlays.** Dialog stacking, inert backgrounds, focus
+  trap/restore, scroll locking, Escape dismissal, announcements and virtual
+  keyboard viewport changes now share one tested controller.
+- **Frontend feature modules.** Feature code now communicates through an
+  immutable capability registry; link-list import/export, upload orchestration,
+  and access/history/playlist/settings models are isolated from mutable panel
+  state and DOM composition.
+- **Frontend state selectors.** Link normalization, query/filter/access
+  selection, sorting and incremental-render transitions now live in a tested,
+  framework-free module separate from DOM composition.
+- **Frontend API module.** Requests, cancellation, typed errors, retryability
+  and session expiry now have one native ES-module implementation with optional
+  machine-readable server error codes.
+- **Injected remote fetcher.** Resolver, transport, clock and temporary storage
+  are testable dependencies; network and media-processing concurrency have
+  independent bounds while SSRF pinning remains per redirect hop.
+- **History and playlist service.** History accounting, rollback/deletion and
+  playlist metadata/file cleanup now have one injected invariant owner.
+- **Injected upload service.** Upload source processing, atomic publication and
+  metadata commit now flow through an App-owned service with typed stage errors.
+- **Explicit authentication runtime stores.** Session and token-bucket owners
+  can be constructed independently and are isolation-tested. The production
+  App references the actual process runtime until request-level injection is
+  completed; it no longer advertises unused per-App stores.
+- **Application composition root.** Production routes now originate from an
+  `App` dependency graph containing immutable configuration, stores, session
+  and limiter runtimes, services and structured logging.
+- **Token-bucket rate limiting.** Public downloads, uploads/regeneration,
+  login failures and publish-key failures now use independent continuously
+  refilled budgets with bounded bursts and warnings for disabled limits.
+- **Security parser fuzzing.** Regression-seeded, size-bounded fuzz targets now
+  cover multipart input, routes, forwarded/origin headers and persisted media
+  metadata normalization.
+- **Accessibility and WebKit CI.** Browser checks now include axe,
+  keyboard/focus restoration, narrow 200% zoom, long translations and Desktop
+  Safari-compatible WebKit behavior.
+- **Broader browser workflows.** Desktop and phone E2E now exercise the media
+  lifecycle, access/token changes, history, playlists, link-list migration,
+  deletion and multi-tab session expiration.
+- **Optional operational metrics.** `METRICS_ENABLED=true` exposes an
+  administrator-authenticated `/metrics` endpoint with bounded-cardinality
+  request, upload, session, persistence, rate-limit and disk signals.
+- **Structured redacted logging.** Runtime logs now use console-readable
+  `log/slog` records with stable event names and centralized secret-attribute
+  redaction; legacy messages are bridged during migration.
+- **Offline storage repair.** `lanpaper repair --dry-run` plans safe changes;
+  `--apply` quarantines unreferenced files, journals operations, backs up
+  metadata and repairs recoverable references under an exclusive lock.
+- **Read-only storage audit.** `lanpaper audit` reports missing, orphaned,
+  temporary, invalid and metadata-drifted media in text or JSON without
+  modifying storage.
+- **Explicit upload transactions.** Upload publication now enforces ordered
+  validate, stage, publish, metadata commit and finalize/rollback boundaries,
+  with reverse-order rollback under injected failures.
+- **Durable persistence fault injection.** Session and wallpaper metadata now
+  share a tested atomic-write path covering write, sync, close, rename and
+  directory-sync failures without permission-dependent tests.
+- **Argon2id administrator credentials.** `ADMIN_PASSWORD_HASH` now takes
+  precedence over the deprecated plaintext `ADMIN_PASS`/JSON `adminPass`.
+  `lanpaper hash-password` reads a password from standard input and emits a PHC
+  value. Credential rotation invalidates fingerprinted browser sessions;
+  legacy session files receive a one-time compatibility migration.
+- **Unsafe outbound TLS opt-outs are separated.** Self-signed remote media can
+  be enabled without also disabling HTTPS-proxy certificate verification, and
+  vice versa. The broad `INSECURE_SKIP_VERIFY` switch remains as a deprecated
+  compatibility alias for one release.
+- **Protected media no longer triggers a browser Basic-auth prompt.** `auth`
+  links accept the normal admin session cookie or a Basic `Authorization`
+  header sent preemptively by a script, but never issue `WWW-Authenticate`.
+  This prevents origin-wide cached browser credentials from continuing to
+  authorize API calls after session logout.
+
 ## [0.15.1] – 2026-10-09
 
 Security hardening from an internal audit. Behaviour changes are listed under

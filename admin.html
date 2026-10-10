@@ -46,7 +46,6 @@
                 <a class="brand" href="/admin">
                     <span class="brand__mark"><img src="/static/favicon.svg" alt="" width="30" height="30"></span>
                     <span class="brand__name">Lanpaper</span>
-                    <span class="brand__badge" id="brandCount">0</span>
                 </a>
 
                 <span class="appbar__spacer"></span>
@@ -100,6 +99,12 @@
 
         </div>
     </header>
+
+    <div class="network-banner is-hidden" id="networkBanner" role="status" aria-live="polite">
+        <svg data-icon="alert"></svg>
+        <span data-i18n="offline_now">You are offline. Changes are paused until the connection returns.</span>
+        <button class="btn btn--sm" id="networkRetryBtn" type="button" data-i18n="retry">Retry</button>
+    </div>
 
     <!-- ============================================================
          БИБЛИОТЕКА
@@ -172,7 +177,7 @@
                 <svg data-icon="github"></svg>
                 <span>GitHub</span>
             </a>
-            <span class="display" id="appVersion">v...</span>
+            <span class="display" id="appVersion">v—</span>
         </div>
     </footer>
 
@@ -190,10 +195,11 @@
 
 <!-- Слой оверлеев: затемнение + панель/диалог кладутся сюда -->
 <div id="overlayHost"></div>
+<div id="overlayAnnouncements" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
 
 <!-- Одно поле выбора файлов на всю страницу: его открывают кнопки
      «Файл с устройства», «Перетащить файлы» и быстрое создание -->
-<input type="file" id="filePicker" class="visually-hidden" multiple
+<input type="file" id="filePicker" class="visually-hidden" multiple aria-label="Choose media files"
        accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/tiff,video/mp4,video/webm">
 
 
@@ -360,9 +366,12 @@
 
             <div class="section">
                 <div class="section__head"><span class="section__title" data-i18n="settings_account">Аккаунт</span></div>
+                <p class="field-hint" id="sessionSummary" role="status" data-i18n="sessions_loading">Загружаем сеансы…</p>
                 <div class="stack stack--tight">
                     <button class="menu__item" type="button" data-act="signout" id="signOutBtn">
                         <svg data-icon="logout"></svg><span data-i18n="sign_out">Выйти</span></button>
+                    <button class="menu__item menu__item--danger" type="button" data-act="signoutall" id="signOutAllBtn">
+                        <svg data-icon="logout"></svg><span data-i18n="sign_out_all">Выйти на всех устройствах</span></button>
                 </div>
             </div>
 
@@ -455,7 +464,7 @@
 
 <script src="/static/js/settings-menu.js" defer></script>
 <script src="/static/js/compressor.js" defer></script>
-<script src="/static/js/app.js" defer></script>
-<script src="/static/js/export-import.js" defer></script>
+<script src="/static/js/app.js" type="module"></script>
+<script src="/static/js/export-import.js" type="module"></script>
 </body>
 </html>

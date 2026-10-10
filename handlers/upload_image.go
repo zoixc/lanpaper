@@ -20,7 +20,6 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"strings"
-	"sync"
 
 	"github.com/SeriousBug/webp-go-pure/std"
 	_ "golang.org/x/image/bmp"
@@ -30,51 +29,42 @@ import (
 	xwebp "golang.org/x/image/webp"
 
 	"lanpaper/config"
+	"lanpaper/internal/jobs"
 	"lanpaper/utils"
 )
 
 // WebP is explicitly decoded with the streaming x/image/webp decoder below.
 // The WebP encoder dependency also registers a decoder that reads the entire
 // compressed file into memory; never use image.Decode for WebP uploads.
-var uploadSem = make(chan struct{}, config.DefaultMaxConcurrentUploads)
+var processingPool = jobs.New(config.DefaultMaxConcurrentUploads, config.MaxDecodedPixelsInFlight)
+var remoteFetchSem = make(chan struct{}, config.DefaultMaxConcurrentUploads)
 
 func InitUploadSemaphore(n int) {
 	if n <= 0 || n > config.MaxConcurrentUploadsLimit {
 		n = config.DefaultMaxConcurrentUploads
 	}
-	uploadSem = make(chan struct{}, n)
+	processingPool = jobs.New(n, config.MaxDecodedPixelsInFlight)
+	remoteFetchSem = make(chan struct{}, n)
 }
 
 var (
 	errMediaTooLarge   = errors.New("media exceeds upload limit")
 	errImageBudgetBusy = errors.New("image processing capacity reached")
-	decodedPixels      = struct {
-		sync.Mutex
-		inFlight int64
-	}{}
 )
 
-// Enforce a shared memory budget for uploads AND preview regeneration. The
-// upload semaphore alone allows many near-limit images to decode at once.
+// Enforce one shared memory budget for uploads and preview jobs.
 func reserveDecodedPixels(pixels int64) (func(), error) {
 	if pixels <= 0 || pixels > config.MaxDecodedPixelsInFlight {
 		return nil, errImageBudgetBusy
 	}
-	decodedPixels.Lock()
-	if decodedPixels.inFlight+pixels > config.MaxDecodedPixelsInFlight {
-		decodedPixels.Unlock()
+	pool := processingPool
+	release, err := pool.ReserveMemory(pixels)
+	if err != nil {
 		return nil, errImageBudgetBusy
 	}
-	decodedPixels.inFlight += pixels
-	decodedPixels.Unlock()
 	return func() {
-		decodedPixels.Lock()
-		decodedPixels.inFlight -= pixels
-		idle := decodedPixels.inFlight == 0
-		decodedPixels.Unlock()
-		// A large decode leaves tens of MB of garbage that the runtime would
-		// keep resident for minutes. Hand it back once no image work is left.
-		if idle && pixels >= freeOSMemoryMinPixels {
+		release()
+		if pool.Snapshot().MemoryUsed == 0 && pixels >= freeOSMemoryMinPixels {
 			go debug.FreeOSMemory()
 		}
 	}, nil

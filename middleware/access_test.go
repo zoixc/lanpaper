@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"lanpaper/config"
 	"lanpaper/storage"
@@ -116,9 +117,27 @@ func TestAuthorizeLinkAccessAuth(t *testing.T) {
 		if w.Code != http.StatusUnauthorized {
 			t.Fatalf("status = %d, want 401", w.Code)
 		}
+		if challenge := w.Header().Get("WWW-Authenticate"); challenge != "" {
+			t.Fatalf("public media triggered browser Basic auth: %q", challenge)
+		}
 	})
 
-	t.Run("valid basic auth", func(t *testing.T) {
+	t.Run("valid browser session", func(t *testing.T) {
+		useSessionDir(t)
+		token, err := issueSession(time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		r := requestWithToken(token)
+		r.URL.Path = "/x"
+		r.RemoteAddr = "1.2.3.4:1"
+		w := httptest.NewRecorder()
+		if !AuthorizeLinkAccess(w, r, wp) {
+			t.Fatal("valid browser session must allow")
+		}
+	})
+
+	t.Run("valid preemptive basic auth", func(t *testing.T) {
 		r := httptest.NewRequest(http.MethodGet, "/x", nil)
 		r.SetBasicAuth("admin", "s3cret")
 		r.RemoteAddr = "1.2.3.4:1"

@@ -224,5 +224,19 @@
   "view_grid": "Kacheln",
   "view_list": "Liste",
   "settings_account": "Konto",
-  "sign_out": "Abmelden"
+  "sign_out": "Abmelden",
+  "sign_out_error": "Die sichere Abmeldung ist fehlgeschlagen. Prüfe den Serverspeicher und versuche es erneut.",
+  "sign_out_all": "Auf allen Geräten abmelden",
+  "sign_out_all_confirm_title": "Überall abmelden?",
+  "sign_out_all_confirm": "Alle Browsersitzungen werden sofort beendet. Auf jedem Gerät ist eine erneute Anmeldung erforderlich.",
+  "sign_out_all_error": "Nicht alle Sitzungen konnten sicher beendet werden. Prüfe den Serverspeicher und versuche es erneut.",
+  "sessions_loading": "Sitzungen werden geladen…",
+  "sessions_summary": "Aktive Browsersitzungen: {{count}} · diese Sitzung läuft am {{date}} ab",
+  "sessions_summary_basic": "Aktive Browsersitzungen: {{count}}",
+  "sessions_load_error": "Sitzungsinformationen konnten nicht geladen werden.",
+  "import_progress": "{{done}} von {{total}} Links werden importiert",
+  "import_cancelled": "Import abgebrochen",
+  "offline_now": "Sie sind offline. Netzwerkvorgänge können bis zur Wiederherstellung der Verbindung fehlschlagen.",
+  "operation_in_progress": "Dieser Vorgang läuft bereits",
+  "regen_progress": "Vorschauen: {{done}} von {{total}}"
 }

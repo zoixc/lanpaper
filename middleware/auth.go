@@ -5,11 +5,12 @@ package middleware
 import (
 	"crypto/sha256"
 	"crypto/subtle"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"lanpaper/config"
+	"lanpaper/internal/observability"
 )
 
 // Brute-force protection for admin credentials. After authMaxFailures wrong
@@ -40,11 +41,18 @@ const AuthRealm = `Basic realm="Admin", charset="UTF-8"`
 // checkAdminCredentials is the only place where admin credentials are
 // verified, for both the admin API and admin-protected public links.
 func checkAdminCredentials(r *http.Request) (authResult, time.Duration) {
-	if config.Current.DisableAuth || config.Current.AdminUser == "" || config.Current.AdminPass == "" {
+	if config.Current.DisableAuth || config.Current.AdminUser == "" || (config.Current.AdminPasswordHash == "" && config.Current.AdminPass == "") {
 		return authMissing, 0
 	}
 	if HasAdminSession(r) {
 		return authOK, 0
+	}
+	// Fetch Metadata identifies browser traffic. Never let an origin-wide
+	// cached Basic credential become a fallback after the browser session was
+	// revoked; non-browser API clients omit this browser-controlled header and
+	// may continue to send Basic credentials preemptively.
+	if r.Header.Get("Sec-Fetch-Site") != "" {
+		return authMissing, 0
 	}
 	user, pass, ok := r.BasicAuth()
 	if !ok {
@@ -63,14 +71,14 @@ func verifyAdminPassword(user, pass, key string) (authResult, time.Duration) {
 	// Evaluate both comparisons so the response time does not reveal
 	// whether the username alone was correct.
 	userOK := secureCompare(user, config.Current.AdminUser)
-	passOK := secureCompare(pass, config.Current.AdminPass)
+	passOK := configuredPasswordOK(pass)
 	if userOK && passOK {
 		return authOK, 0
 	}
 	if n := recordEvent("authfail", key, authFailWindow); n >= authMaxFailures {
-		log.Printf("Security: %s locked out after %d failed login attempts", key, n)
+		observability.Event(slog.LevelWarn, "auth_lockout", "client locked out after failed login attempts", "client", key, "failures", n)
 	} else {
-		log.Printf("Failed auth attempt from %s", key)
+		observability.Event(slog.LevelWarn, "auth_failure", "administrator authentication failed", "client", key)
 	}
 	return authInvalid, 0
 }
@@ -83,7 +91,7 @@ func MaybeBasicAuth(next http.HandlerFunc) http.HandlerFunc {
 			next(w, r)
 			return
 		}
-		if config.Current.AdminUser == "" || config.Current.AdminPass == "" {
+		if config.Current.AdminUser == "" || (config.Current.AdminPasswordHash == "" && config.Current.AdminPass == "") {
 			http.Error(w, "Admin credentials not configured", http.StatusServiceUnavailable)
 			return
 		}
@@ -93,7 +101,12 @@ func MaybeBasicAuth(next http.HandlerFunc) http.HandlerFunc {
 		case authLocked:
 			writeTooManyRequests(w, retry, "Too many failed login attempts")
 		default:
-			w.Header().Set("WWW-Authenticate", AuthRealm)
+			// A browser uses the session flow and must never be prompted into
+			// caching origin-wide Basic credentials. Script clients still receive
+			// the challenge that describes the supported authentication scheme.
+			if r.Header.Get("Sec-Fetch-Site") == "" {
+				w.Header().Set("WWW-Authenticate", AuthRealm)
+			}
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		}
 	}

@@ -3,6 +3,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"image"
@@ -17,6 +18,7 @@ import (
 	"time"
 
 	"lanpaper/config"
+	"lanpaper/internal/jobs"
 	"lanpaper/storage"
 	"lanpaper/utils"
 )
@@ -33,6 +35,51 @@ type RegeneratePreviewsResult struct {
 const maxFailedItems = 100
 
 var regenerating atomic.Bool
+
+type RegeneratePreviewsStatus struct {
+	Running   bool          `json:"running"`
+	Total     int           `json:"total"`
+	Completed int           `json:"completed"`
+	OK        int           `json:"ok"`
+	Skipped   int           `json:"skipped"`
+	Errors    int           `json:"errors"`
+	Pool      jobs.Snapshot `json:"pool"`
+}
+
+var regenerationProgress struct {
+	sync.RWMutex
+	status RegeneratePreviewsStatus
+}
+
+func setRegenerationStatus(status RegeneratePreviewsStatus) {
+	regenerationProgress.Lock()
+	regenerationProgress.status = status
+	regenerationProgress.Unlock()
+}
+
+func updateRegenerationStatus(outcome regenOutcome) {
+	regenerationProgress.Lock()
+	regenerationProgress.status.Completed++
+	switch outcome {
+	case regenOK:
+		regenerationProgress.status.OK++
+	case regenSkipped:
+		regenerationProgress.status.Skipped++
+	case regenFailed:
+		regenerationProgress.status.Errors++
+	}
+	regenerationProgress.status.Pool = processingPool.Snapshot()
+	regenerationProgress.Unlock()
+}
+
+func currentRegenerationStatus() RegeneratePreviewsStatus {
+	regenerationProgress.RLock()
+	status := regenerationProgress.status
+	regenerationProgress.RUnlock()
+	status.Running = regenerating.Load()
+	status.Pool = processingPool.Snapshot()
+	return status
+}
 
 // regenWorkers bounds how many previews are regenerated at once. Decoding
 // is limited by the shared pixel budget (reserveDecodedPixels), so the workers
@@ -58,7 +105,13 @@ const (
 // RegeneratePreviews rebuilds every preview from its stored image. Only one
 // run may be active at a time; a second request gets 429.
 func RegeneratePreviews(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(currentRegenerationStatus())
+		return
+	}
 	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "GET, POST")
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -66,12 +119,18 @@ func RegeneratePreviews(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Preview regeneration already running", http.StatusTooManyRequests)
 		return
 	}
-	defer regenerating.Store(false)
+	defer func() {
+		regenerating.Store(false)
+		status := currentRegenerationStatus()
+		status.Running = false
+		setRegenerationStatus(status)
+	}()
 	// A large library can take longer than the default write timeout.
 	extendDeadline(w, config.RegenerateTimeout*time.Second)
 
 	wallpapers := storage.Global.Snapshot()
 	result := RegeneratePreviewsResult{Total: len(wallpapers)}
+	setRegenerationStatus(RegeneratePreviewsStatus{Running: true, Total: len(wallpapers), Pool: processingPool.Snapshot()})
 	var mu sync.Mutex
 	jobs := make(chan *storage.Wallpaper)
 	var wg sync.WaitGroup
@@ -80,10 +139,22 @@ func RegeneratePreviews(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			defer wg.Done()
 			for snap := range jobs {
-				outcome, err := regenerateLink(snap)
+				outcome := regenFailed
+				err := processingPool.Run(r.Context(), 0, func(ctx context.Context) error {
+					if err := ctx.Err(); err != nil {
+						return err
+					}
+					var workErr error
+					outcome, workErr = regenerateLink(ctx, snap)
+					return workErr
+				})
+				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+					continue
+				}
 				if err != nil {
 					log.Printf("RegeneratePreviews: %s: %v", snap.LinkName, err)
 				}
+				updateRegenerationStatus(outcome)
 				mu.Lock()
 				switch outcome {
 				case regenSkipped:
@@ -123,7 +194,10 @@ feed:
 // regenerateLink regenerates one link's preview under the link's lock. The
 // snapshot may be stale by the time the job starts, so the current record is
 // read again under the lock.
-func regenerateLink(snap *storage.Wallpaper) (regenOutcome, error) {
+func regenerateLink(ctx context.Context, snap *storage.Wallpaper) (regenOutcome, error) {
+	if err := ctx.Err(); err != nil {
+		return regenFailed, err
+	}
 	if !snap.HasImage || isVideo(snap.MIMEType) {
 		return regenSkipped, nil
 	}
@@ -133,7 +207,7 @@ func regenerateLink(snap *storage.Wallpaper) (regenOutcome, error) {
 	if !exists || !wp.HasImage || isVideo(wp.MIMEType) {
 		return regenSkipped, nil
 	}
-	if err := regenPreview(wp); err != nil {
+	if err := regenPreview(ctx, wp); err != nil {
 		return regenFailed, err
 	}
 	return regenOK, nil
@@ -161,7 +235,7 @@ func decodeForRegen(f *os.File, ext string) (image.Image, func(), error) {
 	return nil, nil, lastErr
 }
 
-func regenPreview(wp *storage.Wallpaper) error {
+func regenPreview(ctx context.Context, wp *storage.Wallpaper) error {
 	f, err := storage.OpenMedia(wp.ImagePath)
 	if err != nil {
 		return err
@@ -191,9 +265,16 @@ func regenPreview(wp *storage.Wallpaper) error {
 	if err := savePreview(img, stage); err != nil {
 		return err
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	previewPath := storage.PreviewFilePath(wp.LinkName)
 	pub, err := publishStaged(stage, previewPath, int64(config.Current.MaxUploadMB)<<20)
 	if err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		pub.rollback()
 		return err
 	}
 	_, err = storage.Global.Update(wp.LinkName, func(current *storage.Wallpaper) error {

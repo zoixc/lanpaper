@@ -1,6 +1,10 @@
 # SPDX-License-Identifier: MIT
 # --- Stage 1: Builder ---
-FROM golang:1.27-alpine AS builder
+# Build args let CI use an authenticated/rate-limit-independent registry mirror
+# while release and local builds retain the familiar Docker Hub defaults.
+ARG GO_IMAGE=golang:1.27-alpine
+ARG ALPINE_IMAGE=alpine:3.24
+FROM ${GO_IMAGE} AS builder
 
 WORKDIR /src
 
@@ -22,7 +26,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     -o /out/lanpaper .
 
 # --- Stage 2: Runner ---
-FROM alpine:3.24
+FROM ${ALPINE_IMAGE}
 
 ARG VERSION=dev
 LABEL org.opencontainers.image.title="Lanpaper" \
@@ -53,7 +57,7 @@ COPY LICENSE THIRD-PARTY-NOTICES.md ./
 
 # Fail the build early if an application asset is missing.
 RUN for f in \
-      static/css/style.css static/js/app.js static/js/compressor.js \
+      static/css/style.css static/js/app.js static/js/api.js static/js/state.js static/js/features.js static/js/feature-domain.js static/js/upload-feature.js static/js/overlay-controller.js static/js/operation-state.js static/js/compressor.js \
       static/js/settings-menu.js static/js/export-import.js static/sw.js \
       static/manifest.json static/logo.svg static/favicon.svg \
       static/i18n/en.json static/icons/icon-512.png \

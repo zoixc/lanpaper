@@ -135,9 +135,9 @@ func TestUploadSemaphoreBoundsConcurrentRemoteDownloads(t *testing.T) {
 	previous := storage.Global
 	storage.Global = &storage.Store{}
 	t.Cleanup(func() { storage.Global = previous })
-	oldSem := uploadSem
+	oldPool, oldRemote := processingPool, remoteFetchSem
 	InitUploadSemaphore(1)
-	t.Cleanup(func() { uploadSem = oldSem })
+	t.Cleanup(func() { processingPool, remoteFetchSem = oldPool, oldRemote })
 	for _, name := range []string{"first", "second"} {
 		if err := storage.Global.Create(&storage.Wallpaper{ID: name, LinkName: name, AccessLevel: config.AccessPublic}); err != nil {
 			t.Fatal(err)

@@ -5,8 +5,8 @@ model, trust boundaries, reverse-proxy examples) and [API.md](API.md). It
 covers what to decide before the first request, how to run the process, and
 what to watch afterwards.
 
-Lanpaper is a single static binary with no database and no external services.
-That makes the deployment small, but it also means the operator owns three
+Lanpaper is a single static binary with local metadata storage and no required
+external services. That makes the deployment small, but it also means the operator owns three
 things the application cannot do alone: **TLS in front of it, backups of
 `data/`, and the network policy that decides who can reach it.**
 
@@ -32,7 +32,8 @@ Minimum for an internet-facing instance:
 
 ```sh
 ADMIN_USER=ops
-ADMIN_PASS="$(openssl rand -base64 24)"     # a short password only warns; the lockout is the real defence
+# Generate offline with: printf '%s' 'a unique password' | ./lanpaper hash-password
+ADMIN_PASSWORD_HASH='$argon2id$v=19$…'      # store the complete PHC value in a secret manager
 TRUSTED_PROXY=10.0.0.1                      # or the proxy's CIDR; a list is allowed: "10.0.0.1,172.18.0.1"
 MAX_UPLOAD_MB=50                            # what a client may push, 1–512
 HISTORY_LIMIT=3                             # 0 = no archives, i.e. pre-0.12 behaviour
@@ -47,13 +48,14 @@ PUBLISH_KEYS="$(openssl rand -hex 24)"      # only if automation publishes
 
 Notes that matter in production:
 
-- **Secrets come from the environment**, never from `config.json`.
-  `ADMIN_PASS` and `PUBLISH_KEYS` are deliberately not serialized; the TLS
-  *paths* may live in `config.json`, the key file itself must not.
+- **Secrets come from a secret manager or a mode-0600 environment file**, never
+  from source control or `config.json`. Prefer `ADMIN_PASSWORD_HASH`; deprecated
+  plaintext `ADMIN_PASS` exists only for migration. `PUBLISH_KEYS` is also not
+  serialized. TLS *paths* may live in `config.json`, but key material must not.
 - `DISABLE_AUTH=true` only makes sense behind a proxy that authenticates every
   request. With it enabled, `auth`-level links are refused (403) rather than
   served, because Lanpaper can no longer tell who is asking.
-- `INSECURE_SKIP_VERIFY=true` disables certificate validation for URL
+- `REMOTE_INSECURE_SKIP_VERIFY=true` disables certificate validation for URL
   downloads. It is logged loudly at startup and should not survive a review.
 - Every out-of-range value is clamped and logged, so a typo degrades one
   setting instead of the service.
@@ -66,17 +68,29 @@ Notes that matter in production:
 docker run -d --name lanpaper \
   -p 127.0.0.1:8080:8080 \
   -v /srv/lanpaper/data:/app/data \
-  -e ADMIN_USER -e ADMIN_PASS -e TRUSTED_PROXY=172.17.0.1 \
-  --read-only --tmpfs /tmp \
-  --security-opt no-new-privileges:true \
-  --restart unless-stopped \
+  -e ADMIN_USER -e ADMIN_PASSWORD_HASH -e TRUSTED_PROXY=172.17.0.1 \
+  --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m,mode=1777 \
+  --cap-drop ALL --security-opt no-new-privileges:true \
+  --pids-limit 128 --memory 1g --cpus 2 \
+  --stop-timeout 35 --restart unless-stopped \
   ptabi/lanpaper:latest
 ```
 
-The image runs as uid 100 / gid 101 and only `/app/data` needs to be writable.
-A `HEALTHCHECK` against `/health` is built in. See
-[docker-compose-example.yml](../docker-compose-example.yml) for the compose
-variant, including a proxy.
+The image runs as uid 100 / gid 101. `/app/data` is the sole required writable
+persistent path; create it with that ownership and back it up as one unit.
+`/tmp` is bounded and non-executable. The limits above are a starting point:
+size memory and CPU for your configured upload/decode limits, then monitor
+pressure rather than removing the bounds. A built-in `HEALTHCHECK` probes
+`/health`; stop timeout 35 seconds gives the server's 30-second graceful drain
+room to complete before Docker kills it.
+
+The maintained [docker-compose-example.yml](../docker-compose-example.yml)
+binds to loopback for a host reverse proxy, requires an Argon2id hash, and
+encodes the same filesystem, privilege, PID, resource and shutdown boundaries.
+For a proxy in the same Compose project, remove `ports`, attach both services to
+an internal network and use `expose: ["8080"]`; only the proxy should publish
+host ports. Do not set `DISABLE_AUTH` merely because a reverse proxy terminates
+TLS—it is valid only when that proxy authenticates every request.
 
 ### systemd (binary)
 
@@ -180,29 +194,42 @@ without credentials.
   fine into the tens of thousands of links, but do not script thousands of
   mutations per second against one instance.
 
+## Storage audit
+
+Run `./lanpaper audit` with the application stopped or against a filesystem
+snapshot. Exit status 0 means clean, 1 means issues were found, and 2 means the
+audit could not complete. Use `--json` for automation and `--root DIR` when the
+Lanpaper data directory is mounted elsewhere. The command never mutates files.
+
+For recoverable findings, stop Lanpaper and review `./lanpaper repair
+--dry-run`. Apply exactly that plan with `./lanpaper repair --apply`. Files are
+moved to timestamped `data/quarantine/` directories rather than deleted;
+metadata is backed up and every operation is recorded in a fsynced
+`data/repair-*.jsonl` journal. Keep both until a subsequent audit and service
+smoke test pass. Missing live media and structurally invalid records require
+manual restore from backup.
+
 ## 6. Back up and restore
 
-```sh
-# Consistent enough for a live instance: metadata is renamed atomically,
-# media files are never modified in place.
-tar -C /srv/lanpaper -czf "lanpaper-$(date +%F).tar.gz" data
-```
+Back up the complete `data/` tree after a graceful stop, or archive an atomic
+volume snapshot when downtime is unacceptable. A plain tar of a changing live
+volume is not guaranteed to keep metadata, media and SQLite sidecars from the
+same point in time. Keep encrypted backups outside the container's writable
+layer and perform a quarterly restore drill.
 
-Restore = stop the service, unpack `data/`, start. Verify with
-`GET /health/ready` and one known link. If you cannot afford any window at all,
-snapshot the volume instead of tarring it.
-
-Keep the backup **outside** the container's writable layer and test a restore
-once per quarter: an untested backup is a rumour.
+The step-by-step [disaster-recovery runbook](DISASTER_RECOVERY.md) covers backup
+scope and checksums, staged restore and audit, corruption/repair, disk-full
+response, credential rotation and version rollback.
 
 ## 7. Pre-launch checklist
 
 - [ ] TLS terminates somewhere, and `TRUSTED_PROXY` matches that hop
-- [ ] `ADMIN_PASS` is long and random; credentials are in a secret store, not in git
+- [ ] `ADMIN_PASSWORD_HASH` contains a generated Argon2id PHC value; credentials are in a secret store, not in git
+- [ ] Deprecated plaintext `ADMIN_PASS`/`adminPass` has been removed after migration
 - [ ] `data/` is on a volume that survives container replacement, and is backed up
 - [ ] `MAX_UPLOAD_MB`, `MAX_IMAGES`, `HISTORY_MAX_MB`, `PLAYLIST_MAX` reflect the intended use
 - [ ] `DISABLE_AUTH` is `false` unless the proxy authenticates every request
-- [ ] `INSECURE_SKIP_VERIFY` is `false`
+- [ ] `REMOTE_INSECURE_SKIP_VERIFY` and `PROXY_INSECURE_SKIP_VERIFY` are `false`
 - [ ] `CORS_ORIGINS`/`ALLOW_EMBED` are set only if a real consumer needs them
 - [ ] Publish keys are long and random. Rotating one means restarting with a
       new `PUBLISH_KEYS`; per-key revocation is on the [roadmap](../ROADMAP.md)

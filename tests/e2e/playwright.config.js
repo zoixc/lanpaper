@@ -33,5 +33,14 @@ module.exports = defineConfig({
       name: 'phone',
       use: { ...devices['Pixel 5'] },
     },
+    {
+      name: 'webkit',
+      use: {
+        ...devices['Desktop Safari'],
+        // CI may point Chromium projects at the system browser. WebKit must
+        // always use the Playwright-managed binary.
+        launchOptions: {},
+      },
+    },
   ],
 });

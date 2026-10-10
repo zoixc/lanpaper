@@ -17,6 +17,8 @@ import (
 	"sync"
 
 	"lanpaper/config"
+	"lanpaper/internal/atomicfile"
+	appmetrics "lanpaper/internal/metrics"
 	"lanpaper/utils"
 )
 
@@ -128,6 +130,38 @@ func (s *Store) commit(next map[string]*Wallpaper) error {
 	s.sortedSnap = nil
 	s.Unlock()
 	return nil
+}
+
+// CreateBatch persists a bounded group with one durable commit. Existing names
+// are reported and left untouched; either every new record is published or
+// none is. Callers validate the complete request before invoking this method.
+func (s *Store) CreateBatch(wallpapers []*Wallpaper) (created, existing []string, err error) {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	s.RLock()
+	next := maps.Clone(s.wallpapers)
+	if next == nil {
+		next = make(map[string]*Wallpaper)
+	}
+	generation := s.generation + 1
+	for _, wp := range wallpapers {
+		if _, ok := next[wp.LinkName]; ok {
+			existing = append(existing, wp.LinkName)
+			continue
+		}
+		clone := *wp
+		clone.Version = generation
+		next[wp.LinkName] = &clone
+		created = append(created, wp.LinkName)
+	}
+	s.RUnlock()
+	if len(created) == 0 {
+		return created, existing, nil
+	}
+	if err := s.commit(next); err != nil {
+		return nil, existing, err
+	}
+	return created, existing, nil
 }
 
 func (s *Store) Create(wp *Wallpaper) error {
@@ -332,41 +366,16 @@ func atomicWrite(path string, data map[string]*Wallpaper) error {
 	if err != nil {
 		return fmt.Errorf("marshal: %w", err)
 	}
-	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, ".wallpapers-*.json")
+	err = atomicfile.Write(atomicfile.OSFS{}, path, ".wallpapers-*.json", body)
+	if atomicfile.IsCommitted(err) {
+		appmetrics.PersistenceFailure()
+		log.Printf("Warning: wallpaper metadata was renamed but directory durability could not be confirmed: %v", err)
+		return nil
+	}
 	if err != nil {
-		return fmt.Errorf("create temp: %w", err)
+		appmetrics.PersistenceFailure()
 	}
-	tmpName := tmp.Name()
-	if _, err := tmp.Write(body); err != nil {
-		tmp.Close()
-		os.Remove(tmpName)
-		return fmt.Errorf("write temp: %w", err)
-	}
-	if err := tmp.Sync(); err != nil {
-		tmp.Close()
-		os.Remove(tmpName)
-		return fmt.Errorf("sync temp: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		os.Remove(tmpName)
-		return fmt.Errorf("close temp: %w", err)
-	}
-	if err := os.Rename(tmpName, path); err != nil {
-		os.Remove(tmpName)
-		return fmt.Errorf("rename temp: %w", err)
-	}
-	syncDir(dir)
-	return nil
-}
-
-// syncDir makes a completed rename durable. Some filesystems (network or
-// FUSE mounts) do not support syncing directories, so this is best effort.
-func syncDir(dir string) {
-	if d, err := os.Open(dir); err == nil {
-		_ = d.Sync()
-		d.Close()
-	}
+	return err
 }
 
 // MediaPath returns the canonical on-disk path for a link's media file.

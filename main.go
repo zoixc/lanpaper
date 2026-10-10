@@ -3,11 +3,14 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,6 +20,7 @@ import (
 
 	"lanpaper/config"
 	"lanpaper/handlers"
+	"lanpaper/internal/observability"
 	"lanpaper/middleware"
 	"lanpaper/storage"
 
@@ -27,13 +31,35 @@ import (
 var Version = "dev"
 
 func main() {
+	observability.Configure(os.Stderr, slog.LevelInfo)
+	if len(os.Args) > 1 && os.Args[1] == "audit" {
+		os.Exit(runAudit(os.Args[2:], os.Stdout, os.Stderr))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "repair" {
+		os.Exit(runRepair(os.Args[2:], os.Stdout, os.Stderr))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "migrate-sqlite" {
+		os.Exit(runSQLiteMigration(os.Args[2:], os.Stdout, os.Stderr))
+	}
+	if len(os.Args) == 2 && os.Args[1] == "hash-password" {
+		password, err := bufio.NewReader(os.Stdin).ReadString('\n')
+		if err != nil && password == "" {
+			log.Fatalf("Read password from stdin: %v", err)
+		}
+		hash, err := middleware.GeneratePasswordHash(strings.TrimRight(password, "\r\n"))
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(hash)
+		return
+	}
 	_ = godotenv.Load()
 	config.Load()
 
 	if config.Current.DisableAuth {
 		log.Println("Warning: admin authentication explicitly disabled — protect /admin and /api/* at the reverse proxy.")
-	} else if config.Current.AdminUser == "" || config.Current.AdminPass == "" {
-		log.Println("Warning: admin credentials missing; admin endpoints will return 503. Set ADMIN_USER and ADMIN_PASS or explicitly set DISABLE_AUTH=true behind an auth proxy.")
+	} else if config.Current.AdminUser == "" || (config.Current.AdminPasswordHash == "" && config.Current.AdminPass == "") {
+		log.Println("Warning: admin credentials missing; admin endpoints will return 503. Set ADMIN_USER and ADMIN_PASSWORD_HASH (or migration-only ADMIN_PASS) or explicitly set DISABLE_AUTH=true behind an auth proxy.")
 	}
 
 	handlers.InitUploadSemaphore(config.Current.MaxConcurrentUploads)
@@ -145,11 +171,9 @@ func main() {
 // newHandler is shared with the end-to-end HTTP tests, so tests exercise the
 // real compression, authentication, CSRF, panic-recovery and routing stack,
 // not just bare handlers.
-func newHandler() http.Handler {
-	return middleware.Gzip(middleware.Recover(newMux()))
-}
+func newHandler() http.Handler { return NewApp().Handler() }
 
-func newMux() *http.ServeMux {
+func (a *App) mux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/static/", serveStaticAsset)
 	// The service worker must live at the root scope to control /admin and
@@ -172,21 +196,24 @@ func newMux() *http.ServeMux {
 	mux.HandleFunc("/manifest.webmanifest", redirectToStaticAsset("manifest.json"))
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/health/ready", readyHandler)
+	mux.HandleFunc("/metrics", middleware.WithSecurity(middleware.MetricsEndpoint))
 	mux.HandleFunc("/admin", middleware.WithSecurity(middleware.AdminPage(serveAdminPage, serveLoginPage)))
 	mux.HandleFunc("/api/session", middleware.WithSecurity(middleware.HandleSession))
+	mux.HandleFunc("/api/sessions", middleware.WithSecurity(middleware.MaybeBasicAuth(middleware.HandleSessions)))
 	mux.HandleFunc("/api/wallpapers", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Wallpapers)))
-	mux.HandleFunc("/api/compression-config", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.GetCompressionConfig)))
+	mux.HandleFunc("/api/import/links", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.BulkImportLinks)))
+	mux.HandleFunc("/api/compression-config", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.GetCompressionConfig(Version))))
 	mux.HandleFunc("/api/preview/", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.AdminPreview)))
 	// Publish keys (PUBLISH_KEYS) are accepted on the two routes an automation
 	// needs: pushing media and creating the link to push it into. Everything
 	// else on these routes still requires the admin login.
-	mux.HandleFunc("/api/link/", middleware.WithSecurity(middleware.PublishOrAdmin(middleware.AllowPublishCreateLink, handleLinkRoutes)))
+	mux.HandleFunc("/api/link/", middleware.WithSecurity(middleware.PublishOrAdmin(middleware.AllowPublishCreateLink, a.handleLinkRoutes)))
 	mux.HandleFunc("/api/link", middleware.WithSecurity(middleware.PublishOrAdmin(middleware.AllowPublishCreateLink, handlers.Link)))
 	mux.HandleFunc("/api/upload",
 		middleware.WithSecurity(middleware.PublishOrAdmin(middleware.AllowPublishUpload,
 			middleware.RateLimit(func() (int, int) {
 				return config.Current.Rate.UploadPerMin, config.Current.Rate.Burst
-			})(postOnly(handlers.Upload)),
+			})(postOnly(a.Services.Upload.Upload)),
 		)),
 	)
 	mux.HandleFunc("/api/external-images", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImages)))
@@ -194,9 +221,9 @@ func newMux() *http.ServeMux {
 	mux.HandleFunc("/api/regenerate-previews",
 		middleware.WithSecurity(middleware.MaybeBasicAuth(
 			middleware.RateLimit(func() (int, int) {
-				// Regen is CPU-heavy — reuse the upload budget.
+				// POST is CPU-heavy; GET exposes only bounded progress state.
 				return config.Current.Rate.UploadPerMin, config.Current.Rate.Burst
-			})(postOnly(handlers.RegeneratePreviews)),
+			})(handlers.RegeneratePreviews),
 		)),
 	)
 	mux.HandleFunc("/", middleware.WithPublicSecurity(middleware.PublicRateLimit(handlers.Public)))
@@ -229,17 +256,17 @@ func postOnly(next http.HandlerFunc) http.HandlerFunc {
 // handleLinkRoutes dispatches the sub-resources of /api/link/{name}. Every
 // branch keeps its method, so a GET to /pin or a POST to /history still ends up
 // in the handler that answers 405 for it.
-func handleLinkRoutes(w http.ResponseWriter, r *http.Request) {
+func (a *App) handleLinkRoutes(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	switch {
 	case r.Method == http.MethodPost && strings.HasSuffix(path, "/pin"):
 		handlers.TogglePin(w, r)
 	case r.Method == http.MethodGet && strings.HasSuffix(path, "/history"):
-		handlers.LinkHistory(w, r)
+		a.Services.Library.LinkHistory(w, r)
 	case r.Method == http.MethodPost && strings.HasSuffix(path, "/rollback"):
-		handlers.RollbackLink(w, r)
+		a.Services.Library.RollbackLink(w, r)
 	case r.Method == http.MethodDelete && strings.Contains(path, "/history/"):
-		handlers.DeleteHistoryVersion(w, r)
+		a.Services.Library.DeleteHistoryVersion(w, r)
 	default:
 		handlers.Link(w, r)
 	}

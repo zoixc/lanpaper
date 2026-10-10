@@ -56,7 +56,8 @@ link, which is handy for digital frames, smart TVs, kiosks and other displays.
   with optional built-in TLS (`TLS_CERT_FILE` + `TLS_KEY_FILE`),
   HTTP/HTTPS/SOCKS5 proxy support for outbound downloads, health and readiness
   probes, graceful shutdown, and a `robots.txt` that keeps crawlers off mutable
-  media URLs. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+  media URLs. See [deployment](docs/DEPLOYMENT.md) and the tested
+  [disaster-recovery runbook](docs/DISASTER_RECOVERY.md).
 
 ## Quick start
 
@@ -64,7 +65,10 @@ link, which is handy for digital frames, smart TVs, kiosks and other displays.
 
 ```sh
 cp docker-compose-example.yml docker-compose.yml
-printf 'ADMIN_PASS=%s\n' "$(openssl rand -hex 24)" > .env
+read -rsp 'New admin password: ' ADMIN_PASS; echo
+printf '%s' "$ADMIN_PASS" | docker run --rm -i ptabi/lanpaper:latest hash-password | \
+  sed 's/^/ADMIN_PASSWORD_HASH=/' > .env
+unset ADMIN_PASS
 chmod 600 .env
 mkdir -p data && sudo chown 100:101 data   # the container runs as uid 100 / gid 101
 docker compose up -d
@@ -73,21 +77,23 @@ docker compose up -d
 Open <http://localhost:8080/admin> and log in as `admin` with the generated
 password from `.env`.
 
-- The example publishes port 8080 on all interfaces. Put HTTPS in front
-  (see [SECURITY.md](SECURITY.md#reverse-proxy-examples)) before exposing it
-  to the internet.
-- To expose it only to a local reverse proxy, bind the port as
-  `127.0.0.1:8080:8080`.
+- The hardened example binds port 8080 to loopback for a local HTTPS reverse
+  proxy (see [SECURITY.md](SECURITY.md#reverse-proxy-examples)). Deliberately
+  change the binding only for a firewalled LAN deployment.
 - Keep `.env` private; Git ignores it.
+- Release images carry digest-bound SBOM/provenance attestations and a keyless
+  signature; see [verification instructions](docs/SUPPLY_CHAIN.md).
 
 ### Docker run
 
 ```sh
-: "${ADMIN_PASS:?Set a unique, long ADMIN_PASS in your shell first}"
+: "${ADMIN_PASSWORD_HASH:?Set a generated Argon2id PHC hash first}"
 mkdir -p data && sudo chown 100:101 data
-docker run -d --name lanpaper -p 8080:8080 \
-  --cap-drop ALL --security-opt no-new-privileges:true --stop-timeout 35 \
-  -e ADMIN_USER=admin -e ADMIN_PASS="$ADMIN_PASS" \
+docker run -d --name lanpaper -p 127.0.0.1:8080:8080 \
+  --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m,mode=1777 \
+  --cap-drop ALL --security-opt no-new-privileges:true \
+  --pids-limit 128 --memory 1g --cpus 2 --stop-timeout 35 \
+  -e ADMIN_USER=admin -e ADMIN_PASSWORD_HASH="$ADMIN_PASSWORD_HASH" \
   -v "$(pwd)/data:/app/data" ptabi/lanpaper:latest
 ```
 
@@ -132,8 +138,8 @@ A new link has no media until the first upload.
 | --- | --- |
 | `public` (default) | Anyone who knows the URL |
 | `local` | Clients on loopback, private/LAN, link-local, CGNAT or IPv6 ULA networks |
-| `token` | Requests with a valid `?token=` or `X-Access-Token` header; admin Basic Auth also works |
-| `auth` | Admin Basic Auth only |
+| `token` | Requests with a valid `?token=` or `X-Access-Token`; an admin session or preemptive Basic Auth from non-browser clients also works |
+| `auth` | Admin session or preemptive Basic Auth from non-browser clients; the route never opens a browser password prompt |
 
 Tokens:
 
@@ -243,7 +249,9 @@ which have the highest priority.
 | Environment variable | Default | Notes |
 | --- | --- | --- |
 | `PORT` | `8080` | Listening port |
-| `ADMIN_USER`, `ADMIN_PASS` | unset | Both required. Missing credentials deny admin access (503). |
+| `ADMIN_USER` | unset | Required unless authentication is explicitly disabled. |
+| `ADMIN_PASSWORD_HASH` | unset | Preferred Argon2id administrator credential. Generate with `printf '%s' 'password' \| ./lanpaper hash-password`. Quote the resulting `$...` value in shells/Compose. |
+| `ADMIN_PASS` | unset | Deprecated plaintext migration fallback. Ignored when `ADMIN_PASSWORD_HASH` is set; planned for removal after one compatibility cycle. |
 | `DISABLE_AUTH` | `false` | Explicit opt-out for an external auth proxy. Dangerous if misused. |
 | `MAX_UPLOAD_MB` | `50` | Per file, 1–512 MiB |
 | `MAX_IMAGES` | `0` | `0` = unlimited. Otherwise the oldest non-pinned media is pruned. |
@@ -266,7 +274,10 @@ which have the highest priority.
 | `PROXY_TYPE` | `http` | Outbound proxy type: `http`, `https` or `socks5` |
 | `PROXY_HOST`, `PROXY_PORT` | unset | Optional outbound proxy for URL downloads |
 | `PROXY_USERNAME`, `PROXY_PASSWORD` | unset | Proxy credentials (aliases: `PROXY_USER`, `PROXY_PASS`) |
-| `INSECURE_SKIP_VERIFY` | `false` | Skips outbound TLS verification. Development only. |
+| `METRICS_ENABLED` | `false` | Enables the authenticated `/metrics` Prometheus endpoint. |
+| `REMOTE_INSECURE_SKIP_VERIFY` | `false` | Skips downloaded-media TLS verification. Development only. |
+| `PROXY_INSECURE_SKIP_VERIFY` | `false` | Skips HTTPS-proxy TLS verification. Development only. |
+| `INSECURE_SKIP_VERIFY` | `false` | Deprecated alias that enables both unsafe settings. |
 
 A `.env` file in the working directory is loaded as well. Variables that are
 already set in the environment take precedence over it.
@@ -306,7 +317,10 @@ already set in the environment take precedence over it.
 
 ## API
 
-Admin endpoints accept the sign-in session cookie or HTTP Basic Auth. A
+Admin API endpoints accept the sign-in session cookie or HTTP Basic Auth from
+non-browser scripts. Browser requests use sessions only. The `/admin` page
+accepts only the session cookie so signing out cannot be
+undone by credentials retained in the browser's Basic-auth cache. A
 `PUBLISH_KEYS` API key also works for the two publishing routes (`POST /api/upload`, `POST /api/link`). The full reference,
 with request and response formats, is in [docs/API.md](docs/API.md).
 
@@ -358,14 +372,29 @@ Two properties worth knowing before sizing a host:
 - **Authentication uses sign-in sessions.** The browser signs in once through
   the form and keeps an HttpOnly cookie for 14 days. Sessions are stored as
   SHA-256 digests in `data/sessions.json` (mode 0600), so they survive a restart.
-  Settings → Account → Sign out ends a session at once. Scripts can still send
-  the admin password as HTTP Basic Auth on each request. Either way, TLS in front
+  Settings → Account → Sign out ends the current session at once; “Sign out on
+  all devices” durably revokes every browser session. Scripts can still send
+  the admin password as HTTP Basic Auth on each API request. Either way, TLS in front
   (or `TLS_CERT_FILE`/`TLS_KEY_FILE`) keeps the password private. Failed logins
   are counted per client and locked out for a while.
 - **Image work is bounded.** One image may hold 36 M pixels and at most 48 M
   decoded pixels may be in flight, so a burst of uploads queues instead of
   growing the process without limit. A 36 M pixel upload peaks at about 174 MB
   of memory with the pure Go WebP encoder.
+
+## SQLite migration
+
+The explicit JSON-to-SQLite staging command supports dry-run, verified backups,
+resumable batches and rollback without deleting `wallpapers.json`. Stop the
+server before running it and follow the [migration runbook](docs/SQLITE_MIGRATION.md).
+
+## Storage scale
+
+The JSON metadata backend is supported through **10,000 links**. Installations
+approaching that size should plan the SQLite migration, especially when metadata
+mutations exceed 250 ms p95 or `wallpapers.json` exceeds 25 MB. The 10k–50k
+range is transitional; production use above 50k is unsupported on JSON. See the
+[raw benchmark results and methodology](docs/STORAGE_SCALE_BENCHMARK.md).
 
 ## Backups and upgrades
 
@@ -374,11 +403,14 @@ Back up the whole persistent `data/` directory: `wallpapers.json`, `media/`,
 (playlist files). Skipping the last two loses only the extra copies: the live
 media of every link stays in `media/`.
 
-The browser's JSON export is **not** a media backup:
+The browser's **link-list export** is not a media backup:
 
-- It contains link names and UI preferences, without access tokens.
-- Importing it only creates the missing links. It never replaces media or
-  existing links.
+- It contains link names, non-secret metadata and UI preferences. Access
+  tokens are never exported or restored; imported token links get fresh tokens.
+- Import validates every record before mutation, creates missing links in
+  bounded batches, and never replaces existing links or media.
+- The progress notification can cancel between batches. A per-record JSON
+  report is downloaded after the operation.
 
 **Upgrading from 0.11.x:**
 

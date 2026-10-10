@@ -8,6 +8,30 @@ HTTPS.
 Deployment, hardening and operations (topology, systemd/Docker, backups,
 capacity, what to alert on) live in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
+## Operational metrics
+
+`/metrics` is disabled unless `METRICS_ENABLED=true` and uses the same
+administrator authentication policy as other machine endpoints. Metrics use
+only fixed status classes and latency buckets: URLs, link names, client
+addresses, tokens, cookies and credentials are never labels.
+
+## Administrator credential storage
+
+Use `ADMIN_PASSWORD_HASH` for new deployments. Generate an Argon2id PHC value
+without placing the password in argv:
+
+```sh
+printf '%s' 'a long unique password' | ./lanpaper hash-password
+```
+
+Store the output in a secret store and quote it so the shell does not expand
+its `$` characters. `ADMIN_PASS` and JSON `adminPass` remain as deprecated
+migration inputs for one compatibility cycle. A configured hash takes
+precedence over plaintext. Changing either active credential invalidates all
+persisted browser sessions after their credential fingerprint has been
+migrated; pre-fingerprint session files are upgraded once without a forced
+logout.
+
 ## Reporting a vulnerability
 
 If private vulnerability reporting is enabled for this repository, use
@@ -25,11 +49,16 @@ profile.
 
 The admin panel is protected by a sign-in form that sets an HttpOnly session
 cookie (`SameSite=Lax`, 14 days, `Secure` over HTTPS). HTTP Basic Auth protects
-`/api/*`, the private previews and admin-only links, and scripts use it.
+`/api/*`, the private previews and admin-only links for non-browser scripts.
+Requests carrying browser Fetch Metadata never fall back from an expired or
+revoked session to origin-wide cached Basic credentials.
 
 - Sessions are stored as SHA-256 digests in `data/sessions.json` (mode 0600)
-  and expire after 14 days. There is no password database: credentials come
-  from the environment (or `config.json`) and must be handled as secrets.
+  and expire after 14 days. The account settings can durably revoke the current
+  session or every browser session. If the updated file cannot be saved, the
+  operation fails without partially revoking sessions and can be retried.
+  There is no password database: credentials come from the environment (or
+  `config.json`) and must be handled as secrets.
 - If either credential is missing, admin routes return **503**. They never
   fall back to anonymous access.
 - `DISABLE_AUTH=true` is an explicit opt-out. Use it only if all three hold:
@@ -63,7 +92,8 @@ deliberately narrow credential:
 | `POST /api/upload` with `mode=append`, or with `autoCreate=1` for a link that does not exist yet | allowed |
 | `POST /api/upload` with `mode=replace` (the default) on a link that already has media | `403` — only an admin login may replace a live file |
 | `POST /api/link` | allowed |
-| everything else under `/admin` and `/api/*` | falls back to Basic Auth, so a key alone gets `401` |
+| everything else under `/api/*` | falls back to Basic Auth, so a key alone gets `401` |
+| `/admin` browser page | requires a sign-in session; Basic Auth is intentionally ignored so browser-cached credentials cannot defeat sign-out |
 
 - **Environment only.** Keys are read from `PUBLISH_KEYS`, never from
   `config.json`, and the field is not serializable, so an exported or backed-up
@@ -88,8 +118,8 @@ deliberately narrow credential:
 | --- | --- |
 | `public` | Anyone. |
 | `local` | Decided by the client IP. |
-| `token` | A generated 256-bit secret, or admin credentials. |
-| `auth` | Admin Basic Auth. |
+| `token` | A generated 256-bit secret, an admin session, or preemptive Basic Auth from non-browser clients. |
+| `auth` | Admin session or preemptive Basic Auth from non-browser clients. No Basic challenge is sent on public media routes, so a browser does not cache origin-wide credentials that can defeat session logout. |
 
 Previews of private links are available only through the admin API. With
 built-in auth disabled, `auth`-level public URLs stay unavailable.
@@ -168,7 +198,7 @@ reverse-proxy access logs.
 2. **Trust your outbound proxy.** For plain-HTTP targets, Lanpaper sends an
    absolute request URI with the vetted IP, plus the original `Host` header.
    A proxy that routes by `Host` instead can defeat DNS pinning.
-   `INSECURE_SKIP_VERIFY=true` disables outbound TLS verification; do not
+   `REMOTE_INSECURE_SKIP_VERIFY=true` or `PROXY_INSECURE_SKIP_VERIFY=true` disables the corresponding outbound TLS verification; do not
    enable it in production.
 3. **Treat uploaded media as untrusted.** Decoders and media players can have
    bugs. Keep Lanpaper, the base image and browsers updated. Add scanning or

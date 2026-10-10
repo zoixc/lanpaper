@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"lanpaper/config"
+	appmetrics "lanpaper/internal/metrics"
 	"lanpaper/middleware"
 	"lanpaper/storage"
 	"lanpaper/utils"
@@ -52,22 +53,13 @@ func formFlag(raw string) bool {
 	return false
 }
 
-func Upload(w http.ResponseWriter, r *http.Request) {
+func (s *UploadService) Upload(w http.ResponseWriter, r *http.Request) {
+	finishMetric := appmetrics.BeginUpload()
+	defer finishMetric()
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	select {
-	case uploadSem <- struct{}{}:
-		defer func() { <-uploadSem }()
-	default:
-		// docs/API.md promises Retry-After on this 429: the slot frees up as
-		// soon as one of the running uploads finishes.
-		w.Header().Set("Retry-After", "5")
-		http.Error(w, "Too many concurrent uploads", http.StatusTooManyRequests)
-		return
-	}
-
 	maxBytes := int64(config.Current.MaxUploadMB) << 20
 	maxRequest := maxBytes + (1 << 20) // multipart headers and form fields
 	if r.ContentLength > maxRequest {
@@ -113,7 +105,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	unlock := storage.LockLinks(name)
 	defer unlock()
-	prev, exists := storage.Global.Get(name)
+	prev, exists := s.Store.Get(name)
 	// A publish key may add media — a new link, or a playlist item behind an
 	// existing one — but never replace the live file of a link that already
 	// has media: that would destroy content the URL is serving, and a leaked
@@ -129,7 +121,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Link does not exist", http.StatusBadRequest)
 			return
 		}
-		created, err := createLinkForUpload(name, form)
+		created, err := s.createLinkForUpload(name, form)
 		if err != nil {
 			if errors.Is(err, errInvalidLinkDefaults) {
 				http.Error(w, "Invalid access level or category", http.StatusBadRequest)
@@ -148,7 +140,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	if createdLink {
 		defer func() {
 			if !linkCommitted {
-				rollbackCreatedLink(name)
+				s.rollbackCreatedLink(name)
 			}
 		}()
 	}
@@ -190,7 +182,21 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if u.Scheme == "http" || u.Scheme == "https" {
-			f, size, err := downloadToTemp(r.Context(), urlStr, maxBytes)
+			select {
+			case remoteFetchSem <- struct{}{}:
+			default:
+				w.Header().Set("Retry-After", "5")
+				http.Error(w, "Too many concurrent remote downloads", http.StatusTooManyRequests)
+				return
+			}
+			fetcher := s.Fetcher
+			if fetcher == nil {
+				fetcher = defaultRemoteFetcher
+			}
+			f, size, err := func() (*os.File, int64, error) {
+				defer func() { <-remoteFetchSem }()
+				return fetcher.Fetch(r.Context(), urlStr, maxBytes)
+			}()
 			if err != nil {
 				log.Printf("Download rejected: %v", err)
 				http.Error(w, "Failed to load media", http.StatusBadRequest)
@@ -229,6 +235,14 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 		source, sourceSize, sourceName = form.file, fi.Size(), form.fileName
 	}
+
+	releaseCPU, err := processingPool.TryAcquire(r.Context())
+	if err != nil {
+		w.Header().Set("Retry-After", "5")
+		http.Error(w, "Image processing capacity reached", http.StatusTooManyRequests)
+		return
+	}
+	defer releaseCPU()
 
 	ext, err := inspectMediaFile(source, sourceName, sourceSize, maxBytes)
 	if err != nil {
@@ -339,9 +353,15 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		previewPath = storage.PreviewFilePath(name)
 		previewURL = "/api/preview/" + name
 	}
-	imagePub, err := publishStaged(imageStage, imagePath, maxBytes)
-	if err != nil {
+	txn := &uploadTransaction{}
+	if err := txn.staged(); err != nil {
 		writeUploadError(w, err)
+		return
+	}
+	defer txn.rollback()
+	imagePub, err := txn.publish(imageStage, imagePath, maxBytes)
+	if err != nil {
+		writeUploadError(w, &UploadError{Stage: "publish media", Err: err})
 		return
 	}
 
@@ -356,16 +376,19 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			ModTime:   fi.ModTime().Unix(),
 			AddedAt:   time.Now().Unix(),
 		}
-		appended, err := storage.Global.Update(name, func(wp *storage.Wallpaper) error {
+		appended, err := s.Store.Update(name, func(wp *storage.Wallpaper) error {
 			wp.Items = storage.AppendItem(wp.Items, item)
 			return nil
 		})
 		if err != nil {
-			imagePub.rollback()
 			writeStoreError(w, err)
 			return
 		}
-		imagePub.finish()
+		if err := txn.commit(); err != nil {
+			writeUploadError(w, err)
+			return
+		}
+		_ = txn.finalize()
 		linkCommitted = true
 		log.Printf("Appended playlist item #%d to %s (%s, %d KB)", itemID, name, saveExt, fi.Size()/1024)
 		w.Header().Set("Content-Type", "application/json")
@@ -373,12 +396,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var previewPub publishedFile
 	if previewStage != "" {
-		previewPub, err = publishStaged(previewStage, previewPath, maxBytes)
+		_, err = txn.publish(previewStage, previewPath, maxBytes)
 		if err != nil {
-			imagePub.rollback()
-			writeUploadError(w, err)
+			writeUploadError(w, &UploadError{Stage: "publish preview", Err: err})
 			return
 		}
 	}
@@ -396,15 +417,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	if newWP.CreatedAt == 0 {
 		newWP.CreatedAt = fi.ModTime().Unix()
 	}
-	updated, err := storage.Global.Update(name, func(wp *storage.Wallpaper) error {
+	updated, err := s.Store.Update(name, func(wp *storage.Wallpaper) error {
 		*wp = newWP
 		return nil
 	})
 	if err != nil {
-		if previewStage != "" {
-			previewPub.rollback()
-		}
-		imagePub.rollback()
 		writeUploadError(w, err)
 		return
 	}
@@ -423,11 +440,12 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	// The upload is published and stored: from here on the link is a real one
 	// and the deferred rollback must not run.
-	linkCommitted = true
-	imagePub.finish()
-	if previewStage != "" {
-		previewPub.finish()
+	if err := txn.commit(); err != nil {
+		writeUploadError(w, err)
+		return
 	}
+	_ = txn.finalize()
+	linkCommitted = true
 	// Cleanup of the previous extension/preview only after commit. In
 	// particular, a video replacing an image must not leave a stale preview.
 	if prev.HasImage {
@@ -462,7 +480,7 @@ var errInvalidLinkDefaults = errors.New("invalid access level or category")
 // createLinkForUpload creates the link an upload targets when the client set
 // autoCreate, so a webhook or a publish key can push media in one request
 // instead of create-then-upload. The caller holds the link lock.
-func createLinkForUpload(name string, form *uploadForm) (*storage.Wallpaper, error) {
+func (s *UploadService) createLinkForUpload(name string, form *uploadForm) (*storage.Wallpaper, error) {
 	rawLevel := strings.TrimSpace(form.value("accessLevel"))
 	if rawLevel != "" && !isValidAccessLevel(rawLevel) {
 		return nil, errInvalidLinkDefaults
@@ -482,14 +500,14 @@ func createLinkForUpload(name string, form *uploadForm) (*storage.Wallpaper, err
 	if level == config.AccessToken {
 		wp.AccessToken = generateAccessToken()
 	}
-	if err := storage.Global.Create(wp); err != nil {
+	if err := s.Store.Create(wp); err != nil {
 		return nil, err
 	}
-	created, exists := storage.Global.Get(name)
+	created, exists := s.Store.Get(name)
 	if !exists {
 		// The store accepted the entry but cannot read it back: drop it rather
 		// than fail the upload with a link nobody asked for left behind.
-		_, _ = storage.Global.DeleteEntry(name)
+		_, _ = s.Store.DeleteEntry(name)
 		return nil, storage.ErrNotFound
 	}
 	return created, nil
@@ -499,8 +517,8 @@ func createLinkForUpload(name string, form *uploadForm) (*storage.Wallpaper, err
 // upload that then failed. The caller holds the link lock; taking it again here
 // would deadlock, so the cleanup is limited to the store, the per-link
 // directories and the counters of a link that never served a byte.
-func rollbackCreatedLink(name string) {
-	if _, err := storage.Global.DeleteEntry(name); err != nil {
+func (s *UploadService) rollbackCreatedLink(name string) {
+	if _, err := s.Store.DeleteEntry(name); err != nil {
 		log.Printf("Upload: could not roll back the auto-created link %s: %v", name, err)
 		return
 	}

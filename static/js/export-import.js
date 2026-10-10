@@ -1,21 +1,23 @@
 // SPDX-License-Identifier: MIT
+import { getPanelFacade, registerFeature } from './features.js';
+
 /**
  * Export and import of the link list and the panel settings.
  *
- * The backup holds link metadata only: media files are not embedded and
+ * The link-list export holds metadata only: media files are not embedded and
  * access tokens are never written to the file. Importing re-creates the links
  * the server does not have yet and leaves every existing link (and its media)
  * untouched.
  *
  * The file stays independent of app.js internals: it goes through the small
- * public interface in window.LanpaperApp, so a panel that failed to start
+ * public interface in the panel capability facade, so a panel that failed to start
  * gives a clear message here instead of a half-working dialog.
  */
 (function () {
     'use strict';
 
-    function app() { return window.LanpaperApp; }
-    function ready() { const a = app(); return !!(a && a.state && a.apiCall); }
+    function app() { return getPanelFacade(); }
+    function ready() { const a = app(); return !!a; }
     function t(key, vars) { return ready() ? app().t(key, vars) : key; }
     function say(key, type) { if (ready()) app().toast(t(key), { type: type || 'info' }); }
 
@@ -26,18 +28,19 @@
         if (!ready()) return;
         const a = app();
         try {
+            const snapshot = a.snapshot();
             const payload = {
                 version: '1.0.0',
                 exportDate: new Date().toISOString(),
                 settings: {
-                    lang: a.state.lang,
-                    theme: a.state.theme,
-                    view: a.state.view,
-                    sort: a.state.sort
+                    lang: snapshot.lang,
+                    theme: snapshot.theme,
+                    view: snapshot.view,
+                    sort: snapshot.sort
                 },
                 // Access tokens are secrets and an import never restores them,
-                // so they are left out of the backup file entirely.
-                wallpapers: a.state.links.map(function (link) {
+                // so they are left out of the link-list file entirely.
+                wallpapers: snapshot.links.map(function (link) {
                     const copy = Object.assign({}, link);
                     delete copy.accessToken;
                     return copy;
@@ -48,7 +51,7 @@
             const url = URL.createObjectURL(blob);
             const anchor = document.createElement('a');
             anchor.href = url;
-            anchor.download = 'lanpaper-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+            anchor.download = 'lanpaper-link-list-' + new Date().toISOString().slice(0, 10) + '.json';
             document.body.appendChild(anchor);
             anchor.click();
             anchor.remove();
@@ -91,93 +94,111 @@
     }
 
     /**
-     * Read a backup file and create the links the server is missing.
+     * Read a link-list file and create the links the server is missing.
      */
     async function importData(file) {
         if (!ready()) return;
         const a = app();
+        let progress = null;
         try {
-            // A backup describes links; a file far larger than that is not one.
-            if (file.size > 10 * 1024 * 1024) throw new Error('Backup too large');
+            // A link-list export describes links; a file far larger than that is not one.
+            if (file.size > 10 * 1024 * 1024) throw new Error('Link-list export too large');
             const data = JSON.parse(await file.text());
 
             if (!Array.isArray(data.wallpapers) || data.wallpapers.length > 5000) {
-                throw new Error('Invalid backup: missing or too many links');
+                throw new Error('Invalid link-list export: missing or too many links');
             }
+            const records = [];
             const names = new Set();
             for (const link of data.wallpapers) {
                 const name = link && (link.linkName || link.id);
-                // The same rule the server applies to a link name: a name that
-                // fails here is rejected before a single request is made.
-                if (typeof name !== 'string' || !a.validLinkName(name)) {
-                    throw new Error('Invalid link name in backup');
+                if (typeof name !== 'string' || !a.validLinkName(name) || names.has(name)) {
+                    throw new Error('Invalid or duplicate link name in link-list export');
                 }
                 names.add(name);
+                // Secrets are deliberately excluded. A token link receives a
+                // newly generated token from the server.
+                records.push({ linkName: name, category: link.category || '', accessLevel: link.accessLevel || '' });
             }
 
-            /* Считаем не то, сколько ссылок в файле, а сколько появится:
-               импорт создаёт только отсутствующие, и обещать «200 ссылок»,
-               когда создастся три, — обман. */
-            const missing = await missingLinks(Array.from(names));
-            if (!missing.length) {
+            // Validate every bounded batch before creating the first record.
+            const validation = await submitBatches(records, true);
+            const readyCount = validation.results.filter(item => item.status === 'ready').length;
+            if (!readyCount) {
                 a.toast(t('import_nothing'), { type: 'info' });
                 return;
             }
-            const confirmed = await a.openConfirm({
+            const confirmed = await a.confirm({
                 title: t('import_confirm_title'),
-                text: t('import_confirm', { count: missing.length })
+                text: t('import_confirm', { count: readyCount })
             });
             if (!confirmed) return;
 
-            a.toast(t('sync_in_progress'), { type: 'info' });
-            const result = await createMissingLinks(missing);
+            const controller = new AbortController();
+            progress = a.toast(t('import_progress', { done: 0, total: records.length }), {
+                type: 'info', duration: 0, action: t('cancel'), onAction: () => controller.abort()
+            });
+            const result = await submitBatches(records, false, controller.signal, function (done) {
+                const text = progress.querySelector('.toast__text');
+                if (text) text.textContent = t('import_progress', { done, total: records.length });
+            });
+            progress.dismissToast();
+            progress = null;
+            downloadReport(result);
             await a.reloadLinks();
-            /* В файле лежат ещё уровни доступа, категории и настройки, но
-               импорт их не применяет (см. README, «Backups and upgrades»),
-               поэтому и тост говорит только о созданных ссылках. */
-            if (result.failed) {
-                a.toast(t('import_partial', { count: result.failed }), { type: 'error' });
-            } else {
-                a.toast(t('import_success', { count: result.success }), { type: 'success' });
-            }
+            if (result.failed) a.toast(t('import_partial', { count: result.failed }), { type: 'error' });
+            else a.toast(t('import_success', { count: result.created }), { type: 'success' });
         } catch (error) {
+            if (progress) progress.dismissToast();
+            if ((error && error.name === 'AbortError') || (error && error.kind === 'cancelled')) {
+                if (error.importReport) downloadReport(error.importReport);
+                await a.reloadLinks();
+                say('import_cancelled', 'info');
+                return;
+            }
             console.error('[Import] Error:', error);
             say('import_error', 'error');
         }
     }
 
-    /**
-     * Names from the backup that the server does not have yet.
-     */
-    async function missingLinks(importedNames) {
+    async function submitBatches(records, dryRun, signal, onProgress) {
         const a = app();
-        const response = await a.apiCall('/api/wallpapers');
-        const list = Array.isArray(response) ? response : ((response && response.data) || []);
-        const present = new Set(list.map((link) => link.linkName || link.id));
-        return importedNames.filter((name) => !present.has(name));
-    }
-
-    /**
-     * Create the links the server is missing, one request each.
-     */
-    async function createMissingLinks(missing) {
-        const a = app();
-        const results = [];
-        for (const linkName of missing) {
+        const report = { dryRun, total: records.length, created: 0, skipped: 0, failed: 0, results: [] };
+        for (let offset = 0; offset < records.length; offset += 100) {
+            const batch = records.slice(offset, offset + 100);
+            let response;
             try {
-                await a.apiCall('/api/link', 'POST', { linkName: linkName });
-                results.push({ success: true, linkName: linkName });
+                response = await a.request('/api/import/links', 'POST', { records: batch, dryRun }, false, signal);
             } catch (error) {
-                results.push({ success: false, linkName: linkName, error: error.message });
+                report.cancelled = !!(error && (error.name === 'AbortError' || error.kind === 'cancelled'));
+                report.processed = report.results.length;
+                error.importReport = report;
+                throw error;
             }
+            report.created += response.created || 0;
+            report.skipped += response.skipped || 0;
+            response.results.forEach(item => report.results.push(Object.assign({}, item, { index: item.index + offset })));
+            if (onProgress) onProgress(Math.min(offset + batch.length, records.length));
         }
-        return {
-            total: missing.length,
-            success: results.filter((r) => r.success).length,
-            failed: results.filter((r) => !r.success).length,
-            results: results
-        };
+        report.failed = report.results.filter(item => item.status === 'invalid').length;
+        return report;
     }
 
-    window.LanpaperBackup = { exportData: exportData, triggerImport: triggerImport, importData: importData };
+    function downloadReport(report) {
+        const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = 'lanpaper-link-list-import-report-' + new Date().toISOString().slice(0, 10) + '.json';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    const feature = { exportData, triggerImport, importData };
+    registerFeature('link-list', feature);
+    /* Temporary test/automation compatibility; unlike the old panel facade,
+       this surface is limited to the three link-list actions. */
+    window.LanpaperBackup = feature;
 })();

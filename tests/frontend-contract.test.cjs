@@ -56,6 +56,12 @@ test('every element id the scripts use exists in the panel', () => {
   assert.ok(used.size > 20, `only ${used.size} ids found; the selector patterns probably stopped matching`);
 });
 
+test('sign out redirects only after durable server success', () => {
+  assert.match(scriptSource,
+    /async function signOut\(\)[\s\S]*?catch \(_\) \{[\s\S]*?return;[\s\S]*?window\.location\.replace\('\/admin'\)/,
+    'a failed session revocation must remain retryable instead of redirecting');
+});
+
 test('every API path the scripts call is routed in main.go', () => {
   // The catch-all "/" matches every path by prefix, so it is not evidence that
   // a specific API path is routed.
@@ -148,13 +154,10 @@ test('the media kind comes from mimeType, never from the user category', () => {
   assert.doesNotMatch(scriptSource,
     /category === 'video'|category !== 'video'|category === 'gif'|mimeType === 'image\/|mimeType\.split\('\/'\)/,
     'the media kind is read out of category, or mimeType is treated as a MIME string again');
-  const ext = scriptSource.match(/function mediaExt\(link\) \{([\s\S]*?)\n    \}/);
-  assert.ok(ext, 'mediaExt() disappeared');
-  assert.match(ext[1], /mimeType/, `mediaExt() no longer reads mimeType: ${ext[1]}`);
-  const helper = scriptSource.match(/function isVideoMedia\(link\) \{([\s\S]*?)\n    \}/);
-  assert.ok(helper, 'isVideoMedia() disappeared');
-  assert.match(helper[1], /mp4/);
-  assert.match(helper[1], /webm/);
+  assert.match(scriptSource, /mediaExt[^\n]*mimeType/,
+    'mediaExt() disappeared or no longer reads mimeType');
+  assert.match(scriptSource, /isVideoMedia[^\n]*mp4[^\n]*webm/,
+    'isVideoMedia() disappeared or no longer recognizes mp4/webm');
   const hasFrame = scriptSource.match(/function hasFrame\(link\) \{([\s\S]*?)\n    \}/);
   assert.ok(hasFrame && /isVideoMedia\(link\)/.test(hasFrame[1]),
     'hasFrame() no longer excludes videos, so a tile pulls the movie into an <img>');
@@ -269,7 +272,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v11/,
+  assert.match(code, /lanpaper-static-v12/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 
@@ -299,9 +302,9 @@ test('copying reports the truth, and the upload toast stays until the upload end
   assert.match(toasts[1], /return box;/, 'toast() does not hand the node back for dismissal');
   assert.ok(!/toast\(t\('uploading'\), \{ type: 'info', duration: 1[0-9]{3} \}\)/.test(scriptSource),
     'an upload toast is still dismissed on a fixed short timer');
-  const uploads = scriptSource.match(/const busy = [^\n]*toast\(t\('uploading'\), \{ type: 'info', duration: 0 \}\)/g) || [];
+  const uploads = scriptSource.match(/(?:const )?busy = [^\n]*(?:deps\.)?toast\((?:deps\.)?t\('uploading'\), \{ type: 'info', duration: 0 \}\)/g) || [];
   assert.equal(uploads.length, 2, `expected both upload paths to hold their toast, found ${uploads.length}`);
-  assert.equal((scriptSource.match(/finally \{ (?:if \(busy\) )?busy[^\n]*dismissToast\(\)/g) || []).length, 2,
+  assert.equal((scriptSource.match(/busy\.dismissToast\(\)/g) || []).length, 2,
     'an upload path never dismisses its toast');
 });
 
