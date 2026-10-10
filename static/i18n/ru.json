@@ -233,5 +233,7 @@
   "sessions_loading": "Загружаем сеансы…",
   "sessions_summary": "Активных сеансов: {{count}} · текущий истекает {{date}}",
   "sessions_summary_basic": "Активных сеансов: {{count}}",
-  "sessions_load_error": "Не удалось загрузить сведения о сеансах."
+  "sessions_load_error": "Не удалось загрузить сведения о сеансах.",
+  "import_progress": "Импортировано {{done}} из {{total}} ссылок",
+  "import_cancelled": "Импорт отменён"
 }

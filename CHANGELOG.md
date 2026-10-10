@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Validated bulk link import.** Link-list imports now dry-run before
+  mutation, persist in bounded atomic batches, expose progress/cancellation and
+  produce per-record reports without exporting or restoring token secrets.
 - **Accessible overlays.** Dialog stacking, inert backgrounds, focus
   trap/restore, scroll locking, Escape dismissal, announcements and virtual
   keyboard viewport changes now share one tested controller.

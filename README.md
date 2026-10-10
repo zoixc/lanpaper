@@ -383,11 +383,14 @@ Back up the whole persistent `data/` directory: `wallpapers.json`, `media/`,
 (playlist files). Skipping the last two loses only the extra copies: the live
 media of every link stays in `media/`.
 
-The browser's JSON export is **not** a media backup:
+The browser's **link-list export** is not a media backup:
 
-- It contains link names and UI preferences, without access tokens.
-- Importing it only creates the missing links. It never replaces media or
-  existing links.
+- It contains link names, non-secret metadata and UI preferences. Access
+  tokens are never exported or restored; imported token links get fresh tokens.
+- Import validates every record before mutation, creates missing links in
+  bounded batches, and never replaces existing links or media.
+- The progress notification can cancel between batches. A per-record JSON
+  report is downloaded after the operation.
 
 **Upgrading from 0.11.x:**
 

@@ -132,6 +132,38 @@ func (s *Store) commit(next map[string]*Wallpaper) error {
 	return nil
 }
 
+// CreateBatch persists a bounded group with one durable commit. Existing names
+// are reported and left untouched; either every new record is published or
+// none is. Callers validate the complete request before invoking this method.
+func (s *Store) CreateBatch(wallpapers []*Wallpaper) (created, existing []string, err error) {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	s.RLock()
+	next := maps.Clone(s.wallpapers)
+	if next == nil {
+		next = make(map[string]*Wallpaper)
+	}
+	generation := s.generation + 1
+	for _, wp := range wallpapers {
+		if _, ok := next[wp.LinkName]; ok {
+			existing = append(existing, wp.LinkName)
+			continue
+		}
+		clone := *wp
+		clone.Version = generation
+		next[wp.LinkName] = &clone
+		created = append(created, wp.LinkName)
+	}
+	s.RUnlock()
+	if len(created) == 0 {
+		return created, existing, nil
+	}
+	if err := s.commit(next); err != nil {
+		return nil, existing, err
+	}
+	return created, existing, nil
+}
+
 func (s *Store) Create(wp *Wallpaper) error {
 	s.writeMu.Lock()
 	defer s.writeMu.Unlock()

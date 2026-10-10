@@ -247,9 +247,14 @@ scroll lock, Escape/scrim dismissal and live-region announcements in an
 injected controller. Visual-viewport resize handling keeps the focused field
 visible above mobile virtual keyboards; focused tests cover nesting and Escape.
 
-### PR 26 — Bulk import API and progress UI
+### PR 26 — Bulk import API and progress UI **(implemented; full CI pending)**
 
-Add validate-first/dry-run bulk import with bounded transaction batches, progress, cancellation and per-record report. Keep access tokens excluded. Rename UI language consistently from full “backup” to “link-list export”.
+Added an admin-only validate-first/dry-run API with atomic batches capped at
+100 records, machine-readable validation codes and per-record results. The UI
+dry-runs every batch before mutation, reports progress, supports cancellation
+between batches and downloads a combined report. Link-list exports never carry
+secrets; imported token links receive fresh tokens. UI and documentation now
+consistently distinguish a link-list export from a media backup.
 
 ### PR 27 — Offline and retry UX
 

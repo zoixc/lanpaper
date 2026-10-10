@@ -198,6 +198,7 @@ func (a *App) mux() *http.ServeMux {
 	mux.HandleFunc("/api/session", middleware.WithSecurity(middleware.HandleSession))
 	mux.HandleFunc("/api/sessions", middleware.WithSecurity(middleware.MaybeBasicAuth(middleware.HandleSessions)))
 	mux.HandleFunc("/api/wallpapers", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.Wallpapers)))
+	mux.HandleFunc("/api/import/links", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.BulkImportLinks)))
 	mux.HandleFunc("/api/compression-config", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.GetCompressionConfig)))
 	mux.HandleFunc("/api/preview/", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.AdminPreview)))
 	// Publish keys (PUBLISH_KEYS) are accepted on the two routes an automation

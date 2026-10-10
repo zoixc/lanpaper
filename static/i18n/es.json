@@ -233,5 +233,7 @@
   "sessions_loading": "Cargando sesiones…",
   "sessions_summary": "Sesiones de navegador activas: {{count}} · esta sesión caduca {{date}}",
   "sessions_summary_basic": "Sesiones de navegador activas: {{count}}",
-  "sessions_load_error": "No se pudo cargar la información de las sesiones."
+  "sessions_load_error": "No se pudo cargar la información de las sesiones.",
+  "import_progress": "Importando {{done}} de {{total}} enlaces",
+  "import_cancelled": "Importación cancelada"
 }

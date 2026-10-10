@@ -233,5 +233,7 @@
   "sessions_loading": "Loading sessions…",
   "sessions_summary": "Active browser sessions: {{count}} · this session expires {{date}}",
   "sessions_summary_basic": "Active browser sessions: {{count}}",
-  "sessions_load_error": "Could not load session information."
+  "sessions_load_error": "Could not load session information.",
+  "import_progress": "Importing {{done}} of {{total}} links",
+  "import_cancelled": "Import cancelled"
 }

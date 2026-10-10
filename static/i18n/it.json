@@ -233,5 +233,7 @@
   "sessions_loading": "Caricamento delle sessioni…",
   "sessions_summary": "Sessioni browser attive: {{count}} · questa sessione scade {{date}}",
   "sessions_summary_basic": "Sessioni browser attive: {{count}}",
-  "sessions_load_error": "Impossibile caricare le informazioni sulle sessioni."
+  "sessions_load_error": "Impossibile caricare le informazioni sulle sessioni.",
+  "import_progress": "Importazione di {{done}} link su {{total}}",
+  "import_cancelled": "Importazione annullata"
 }

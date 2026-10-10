@@ -233,5 +233,7 @@
   "sessions_loading": "Sitzungen werden geladen…",
   "sessions_summary": "Aktive Browsersitzungen: {{count}} · diese Sitzung läuft am {{date}} ab",
   "sessions_summary_basic": "Aktive Browsersitzungen: {{count}}",
-  "sessions_load_error": "Sitzungsinformationen konnten nicht geladen werden."
+  "sessions_load_error": "Sitzungsinformationen konnten nicht geladen werden.",
+  "import_progress": "{{done}} von {{total}} Links werden importiert",
+  "import_cancelled": "Import abgebrochen"
 }
