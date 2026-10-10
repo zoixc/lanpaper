@@ -39,7 +39,7 @@ jobs:
 
       - name: Check formatting
         run: |
-          unformatted="$(gofmt -l .)"
+          unformatted="$(find . -path ./vendor -prune -o -name '*.go' -print0 | xargs -0 gofmt -l)"
           if [ -n "$unformatted" ]; then
             echo "Run gofmt -w on:"
             echo "$unformatted"

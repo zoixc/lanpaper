@@ -4,7 +4,7 @@ Lanpaper (this repository) is licensed under the MIT License — see
 [LICENSE](LICENSE). This file lists everything that is **not** written by the
 Lanpaper authors but is compiled into, or shipped with, a release.
 
-Every component below is permissively licensed (MIT, BSD-3-Clause, OFL-1.1).
+Every component below is permissively licensed (MIT, MIT-0, BSD-3-Clause, OFL-1.1).
 **There is no copyleft component** — no GPL, LGPL, AGPL or MPL code is linked
 into the binary or served by it — so Lanpaper may be offered as a hosted
 service, bundled with proprietary software, or redistributed under an
@@ -17,6 +17,9 @@ BSD-3-Clause, not using a contributor's name to endorse a derived product.
 | [SeriousBug/webp-go-pure](https://github.com/SeriousBug/webp-go-pure) | v1.2.0 | MIT | WebP **encoding** (thumbnails and re-encoded media) | linked into the binary |
 | [golang.org/x/image](https://github.com/golang/image) | v0.46.0 | BSD-3-Clause | BMP/TIFF decoding, WebP **decoding**, bilinear resizing | linked into the binary |
 | [joho/godotenv](https://github.com/joho/godotenv) | v1.5.1 | MIT | loading an optional `.env` file at startup | linked into the binary |
+| [ncruces/go-sqlite3](https://github.com/ncruces/go-sqlite3) | v0.35.6 | MIT | pure-Go SQLite metadata backend and `database/sql` driver | linked into the binary |
+| [ncruces/go-sqlite3-wasm](https://github.com/ncruces/go-sqlite3-wasm) | v6.3.35304 | MIT-0 | embedded SQLite WASM runtime | linked into the binary |
+| [ncruces/julianday](https://github.com/ncruces/julianday) | v1.0.0 | MIT | SQLite date/time support | linked into the binary |
 | Go standard library | per the build toolchain | BSD-3-Clause | HTTP server, JSON, crypto, image codecs | linked into the binary |
 | [Golos Text](https://github.com/googlefonts/golos-text) | as shipped (`@fontsource-variable/golos-text` 5.3.0) | SIL OFL 1.1 | the whole interface, one variable font (latin + cyrillic subsets) | `static/fonts/golos-text-*.woff2` |
 
@@ -53,6 +56,8 @@ as "Lanpaper" without permission.
 Copyright (c) 2013 John Barton                                  (godotenv)
 Copyright (c) 2026 MITH@mmk                                     (webp-go-pure)
 Copyright (c) 2026 Kaan Barmore-Genc                            (webp-go-pure)
+Copyright (c) 2023 Nuno Cruces                                   (go-sqlite3)
+Copyright (c) 2022 Nuno Cruces                                   (julianday)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **SQLite metadata backend.** A normalized pure-Go backend now implements the
+  store contract with WAL, strict foreign-key constraints, atomic transactions,
+  integrity checks and online backup while media remains on the filesystem.
 - **Wallpaper store boundary.** Application services now receive a
   context-aware CRUD/list/transaction interface, with the durable JSON backend
   covered by reusable conformance and atomic-transaction tests.

@@ -285,9 +285,13 @@ composition root now exposes the interface. Shared conformance tests cover
 independent reads, CRUD, cancellation, rollback, multi-record commit and the
 single-durable-write transaction guarantee.
 
-### PR 30 — SQLite schema and implementation
+### PR 30 — SQLite schema and implementation **(implemented; full CI pending)**
 
-Add normalized metadata/history/playlist schema, WAL, transactions, integrity constraints and backup primitives. Keep media bytes on the filesystem.
+Added the pure-Go `SQLiteWallpaperStore` with normalized wallpaper, history,
+playlist and rotation tables; strict checks, foreign keys, WAL, full-sync
+transactions and the shared store conformance contract. Integrity checking and
+online `VACUUM INTO` backup primitives are included. Media bytes remain in the
+existing filesystem layout.
 
 ### PR 31 — JSON-to-SQLite migration
 
