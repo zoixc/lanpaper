@@ -302,7 +302,7 @@ test('copying reports the truth, and the upload toast stays until the upload end
   assert.match(toasts[1], /return box;/, 'toast() does not hand the node back for dismissal');
   assert.ok(!/toast\(t\('uploading'\), \{ type: 'info', duration: 1[0-9]{3} \}\)/.test(scriptSource),
     'an upload toast is still dismissed on a fixed short timer');
-  const uploads = scriptSource.match(/const busy = [^\n]*toast\(t\('uploading'\), \{ type: 'info', duration: 0 \}\)/g) || [];
+  const uploads = scriptSource.match(/const busy = [^\n]*(?:deps\.)?toast\((?:deps\.)?t\('uploading'\), \{ type: 'info', duration: 0 \}\)/g) || [];
   assert.equal(uploads.length, 2, `expected both upload paths to hold their toast, found ${uploads.length}`);
   assert.equal((scriptSource.match(/finally \{ (?:if \(busy\) )?busy[^\n]*dismissToast\(\)/g) || []).length, 2,
     'an upload path never dismisses its toast');

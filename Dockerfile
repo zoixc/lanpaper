@@ -57,7 +57,7 @@ COPY LICENSE THIRD-PARTY-NOTICES.md ./
 
 # Fail the build early if an application asset is missing.
 RUN for f in \
-      static/css/style.css static/js/app.js static/js/api.js static/js/state.js static/js/compressor.js \
+      static/css/style.css static/js/app.js static/js/api.js static/js/state.js static/js/features.js static/js/feature-domain.js static/js/upload-feature.js static/js/compressor.js \
       static/js/settings-menu.js static/js/export-import.js static/sw.js \
       static/manifest.json static/logo.svg static/favicon.svg \
       static/i18n/en.json static/icons/icon-512.png \

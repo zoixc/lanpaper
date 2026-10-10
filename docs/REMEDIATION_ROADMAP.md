@@ -231,9 +231,14 @@ and incremental-render transitions into the framework-free `state.js` module.
 The existing plain-DOM card renderer consumes those selectors, while focused
 state-transition tests cover combined filtering, pin ordering and render resets.
 
-### PR 24 — Feature modules
+### PR 24 — Feature modules **(implemented; full CI pending)**
 
-Split upload, access, history, playlist, settings and dialogs. Reduce the root `app.js` to composition/startup and remove the broad `window.LanpaperApp` surface in favour of a narrow facade.
+Added a module-local feature registry and immutable capability facade. Link-list
+export/import is a registered feature and no longer depends on the broad
+`window.LanpaperApp` object or mutable panel state. Upload orchestration now
+lives in an injected controller; access, history, playlist and settings/export
+models are isolated in `feature-domain.js`. `app.js` retains DOM composition,
+while dialog lifecycle moves next to the dedicated overlay controller in PR 25.
 
 ### PR 25 — Accessible overlay controller
 

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import { getPanelFacade, registerFeature } from './features.js';
 
 /**
  * Export and import of the link list and the panel settings.
@@ -9,14 +10,14 @@
  * untouched.
  *
  * The file stays independent of app.js internals: it goes through the small
- * public interface in window.LanpaperApp, so a panel that failed to start
+ * public interface in the panel capability facade, so a panel that failed to start
  * gives a clear message here instead of a half-working dialog.
  */
 (function () {
     'use strict';
 
-    function app() { return window.LanpaperApp; }
-    function ready() { const a = app(); return !!(a && a.state && a.apiCall); }
+    function app() { return getPanelFacade(); }
+    function ready() { const a = app(); return !!a; }
     function t(key, vars) { return ready() ? app().t(key, vars) : key; }
     function say(key, type) { if (ready()) app().toast(t(key), { type: type || 'info' }); }
 
@@ -27,18 +28,19 @@
         if (!ready()) return;
         const a = app();
         try {
+            const snapshot = a.snapshot();
             const payload = {
                 version: '1.0.0',
                 exportDate: new Date().toISOString(),
                 settings: {
-                    lang: a.state.lang,
-                    theme: a.state.theme,
-                    view: a.state.view,
-                    sort: a.state.sort
+                    lang: snapshot.lang,
+                    theme: snapshot.theme,
+                    view: snapshot.view,
+                    sort: snapshot.sort
                 },
                 // Access tokens are secrets and an import never restores them,
                 // so they are left out of the backup file entirely.
-                wallpapers: a.state.links.map(function (link) {
+                wallpapers: snapshot.links.map(function (link) {
                     const copy = Object.assign({}, link);
                     delete copy.accessToken;
                     return copy;
@@ -124,7 +126,7 @@
                 a.toast(t('import_nothing'), { type: 'info' });
                 return;
             }
-            const confirmed = await a.openConfirm({
+            const confirmed = await a.confirm({
                 title: t('import_confirm_title'),
                 text: t('import_confirm', { count: missing.length })
             });
@@ -152,7 +154,7 @@
      */
     async function missingLinks(importedNames) {
         const a = app();
-        const response = await a.apiCall('/api/wallpapers');
+        const response = await a.request('/api/wallpapers');
         const list = Array.isArray(response) ? response : ((response && response.data) || []);
         const present = new Set(list.map((link) => link.linkName || link.id));
         return importedNames.filter((name) => !present.has(name));
@@ -166,7 +168,7 @@
         const results = [];
         for (const linkName of missing) {
             try {
-                await a.apiCall('/api/link', 'POST', { linkName: linkName });
+                await a.request('/api/link', 'POST', { linkName: linkName });
                 results.push({ success: true, linkName: linkName });
             } catch (error) {
                 results.push({ success: false, linkName: linkName, error: error.message });
@@ -180,5 +182,9 @@
         };
     }
 
-    window.LanpaperBackup = { exportData: exportData, triggerImport: triggerImport, importData: importData };
+    const feature = { exportData, triggerImport, importData };
+    registerFeature('link-list', feature);
+    /* Temporary test/automation compatibility; unlike the old panel facade,
+       this surface is limited to the three link-list actions. */
+    window.LanpaperBackup = feature;
 })();

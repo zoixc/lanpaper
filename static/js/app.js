@@ -9,6 +9,10 @@
    состояние, которого нет.
    ============================================================ */
 import { request, ApiError } from './api.js';
+import { registerPanelFacade, getFeature } from './features.js';
+import { accessMeta, entryMeta as formatEntryMeta, entryTitle as formatEntryTitle,
+    panelSnapshot } from './feature-domain.js';
+import { createUploadFeature } from './upload-feature.js';
 import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as linkMatchesQuery,
     countFilteredLinks, resetIncrementalRender, selectVisibleLinks } from './state.js';
 
@@ -596,14 +600,7 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
         return 'cover';
     }
 
-    function accessMeta(level) {
-        return {
-            public: { icon: 'globe', key: 'access_public' },
-            local: { icon: 'lock', key: 'access_local' },
-            token: { icon: 'key', key: 'access_token' },
-            auth: { icon: 'user', key: 'access_auth' }
-        }[level] || { icon: 'globe', key: 'access_public' };
-    }
+
 
     /* Кадр ссылки берём у /api/preview (он отдаётся и для ссылок под
        авторизацией), а версию добавляем в адрес: после замены файла браузер
@@ -1773,15 +1770,9 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
 
     /* Тип и вес файла для строк версий и плейлиста: сервер отдаёт расширение
        (ext), размер и время — этого достаточно, размеров кадра у него нет. */
-    function entryMeta(entry) {
-        return [
-            entry.ext ? String(entry.ext).toUpperCase() : '',
-            entry.sizeBytes ? formatBytes(entry.sizeBytes) : ''
-        ].filter(Boolean).join(' · ');
-    }
-    function entryTitle(entry) {
-        return entryMeta(entry) || formatBytes(entry.sizeBytes);
-    }
+    const entryMeta = entry => formatEntryMeta(entry, formatBytes);
+    const entryTitle = entry => formatEntryTitle(entry, formatBytes);
+
 
     function panelAccess(link) {
         const wrap = h('div', { class: 'stack' });
@@ -1847,85 +1838,14 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
         $('#filePicker').click();
     }
 
-    async function compressFor(file) {
-        if (!STATE.compressor || !file.type.startsWith('image/')) return file;
-        try {
-            const smaller = await STATE.compressor.compress(file);
-            if (smaller && smaller.size < file.size) {
-                const info = ImageCompressor.getCompressionInfo(file.size, smaller.size);
-                toast(t('compression_saved', {
-                    percent: info.percent, saved: formatBytes(info.saved)
-                }), { type: 'info', duration: 3000 });
-                return smaller;
-            }
-        } catch (_) { /* сжатие не удалось — отправляем как есть */ }
-        return file;
-    }
-
-    async function uploadFileTo(link, file, mode, opts) {
-        if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-            toast(t('invalid_image'), { type: 'error' });
-            return false;
-        }
-        const quiet = !!(opts && opts.quiet);
-        const form = new FormData();
-        form.append('linkName', link.linkName);
-        if (mode === 'append') form.append('mode', 'append');
-        form.append('file', await compressFor(file));
-        /* Тост висит до конца загрузки: файл в 50 МБ уходит минутами, и
-           сообщение, исчезающее через полторы секунды, выглядело так, будто
-           ничего не происходит (и провоцировало повторную отправку). */
-        const busy = quiet ? null : toast(t('uploading'), { type: 'info', duration: 0 });
-        try {
-            const updated = await apiCall('/api/upload', 'POST', form, true);
-            applyLinkUpdate(updated);
-            if (!quiet) toast(t(mode === 'append' ? 'append_success' : 'upload_success'));
-            return true;
-        } catch (_) { return false; }   /* текст ошибки уже показан */
-        finally { if (busy) busy.dismissToast(); }
-    }
-
-    /* Несколько файлов на одну ссылку. В плейлист (append) идёт каждый файл —
-       ровно этого ждёт тот, кто выбрал пачку. Заменить текущий файл может
-       только один, поэтому в режиме replace берём первый, а о пропущенных
-       говорим: раньше они исчезали молча. Сервер принимает по одному файлу
-       за запрос, а порядок в плейлисте должен совпасть с порядком выбора,
-       поэтому запросы идут по очереди, а тосты — один в конце. */
-    async function uploadFilesTo(link, files, mode) {
-        if (mode !== 'append') {
-            if (files.length > 1) {
-                toast(t('upload_first_only', { count: files.length - 1 }), { type: 'info', duration: 4500 });
-            }
-            return uploadFileTo(link, files[0], mode);
-        }
-        let done = 0;
-        for (const file of files) {
-            if (await uploadFileTo(link, file, 'append', { quiet: true })) done += 1;
-        }
-        if (done) toast(t('append_many', { count: done }));
-        return done > 0;
-    }
-
-    async function uploadUrlTo(link, url, mode) {
-        const form = new FormData();
-        form.append('linkName', link.linkName);
-        if (mode === 'append') form.append('mode', 'append');
-        form.append('url', url);
-        const busy = toast(t('uploading'), { type: 'info', duration: 0 });
-        try {
-            const updated = await apiCall('/api/upload', 'POST', form, true);
-            applyLinkUpdate(updated);
-            toast(t(mode === 'append' ? 'append_success' : 'upload_success'));
-            return true;
-        } catch (_) { return false; }   /* текст ошибки уже показан */
-        finally { busy.dismissToast(); }
-    }
-
-    /* Файл из галереи сервера отдаётся ручкой загрузки как относительный
-       путь (url=): сервер сам копирует файл из своей папки. */
-    function uploadServerFileTo(link, path) {
-        return uploadUrlTo(link, path, 'replace');
-    }
+    const uploadFeature = createUploadFeature({
+        compressor: () => STATE.compressor,
+        t, toast, formatBytes, request: apiCall, applyUpdate: applyLinkUpdate
+    });
+    const uploadFileTo = (link, file, mode, opts) => uploadFeature.file(link, file, mode, opts);
+    const uploadFilesTo = (link, files, mode) => uploadFeature.files(link, files, mode);
+    const uploadUrlTo = (link, url, mode) => uploadFeature.url(link, url, mode);
+    const uploadServerFileTo = (link, path) => uploadFeature.url(link, path, 'replace');
 
     /* Ссылки из перетащенных файлов: имя файла становится адресом, поэтому
        негодные имена пропускаем, а не создаём ссылку с ошибкой в ответ. */
@@ -2305,9 +2225,11 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
             btn.addEventListener('click', function () {
                 const act = btn.dataset.act;
                 if (act === 'export') {
-                    if (window.LanpaperBackup) window.LanpaperBackup.exportData();
+                    const feature = getFeature('link-list');
+                    if (feature) feature.exportData();
                 } else if (act === 'import') {
-                    if (window.LanpaperBackup) window.LanpaperBackup.triggerImport();
+                    const feature = getFeature('link-list');
+                    if (feature) feature.triggerImport();
                 } else if (act === 'install') {
                     promptInstall();
                 } else if (act === 'regen') {
@@ -2701,28 +2623,13 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
         }
     }
 
-    /* Маленький публичный интерфейс: его использует export-import.js
-       (отдельный файл, который должен работать, даже если панель не
-       инициализировалась) и проверки стенда. */
-    window.LanpaperApp = {
-        STATE: STATE,
-        state: state,
-        t: t,
-        apiCall: apiCall,
-        toast: toast,
-        openConfirm: openConfirm,
-        openPanel: openPanel,
-        applyLinkUpdate: applyLinkUpdate,
-        normalizeLink: normalizeLink,
-        setLang: setLang,
-        reloadLinks: reloadLinks,
-        applyTheme: applyTheme,
-        applyView: applyView,
-        getVersions: (name) => apiCall('/api/link/' + encodeURIComponent(name) + '/history'),
-        formatBytes: formatBytes,
-        validLinkName: validLinkName,
-        openCreateDialog: openCreateDialog
-    };
+    /* Export/import sees only this capability facade: mutable panel state and
+       unrelated UI internals are intentionally not exposed on window. */
+    registerPanelFacade({
+        snapshot: () => panelSnapshot(state),
+        t, request: apiCall, toast, confirm: openConfirm,
+        validLinkName, reloadLinks
+    });
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();

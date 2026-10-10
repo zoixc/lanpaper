@@ -28,6 +28,10 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Frontend feature modules.** Feature code now communicates through an
+  immutable capability registry; link-list import/export, upload orchestration,
+  and access/history/playlist/settings models are isolated from mutable panel
+  state and DOM composition.
 - **Frontend state selectors.** Link normalization, query/filter/access
   selection, sorting and incremental-render transitions now live in a tested,
   framework-free module separate from DOM composition.
