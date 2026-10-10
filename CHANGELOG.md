@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Offline and retry UX.** The panel now announces connection loss, offers
+  reconnect/retry actions, suppresses duplicate uploads and keeps operation
+  progress visible without caching administrator or API responses.
 - **Validated bulk link import.** Link-list imports now dry-run before
   mutation, persist in bounded atomic batches, expose progress/cancellation and
   produce per-record reports without exporting or restoring token secrets.

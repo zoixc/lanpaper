@@ -258,9 +258,12 @@ between batches and downloads a combined report. Link-list exports never carry
 secrets; imported token links receive fresh tokens. UI and documentation now
 consistently distinguish a link-list export from a media backup.
 
-### PR 27 — Offline and retry UX
+### PR 27 — Offline and retry UX **(implemented; full CI pending)**
 
-Add online/offline state, retry actions for recoverable operations, duplicate-submission guards and operation progress without caching admin/API responses in the service worker.
+Added an announced online/offline banner, explicit reconnect action, retry
+capabilities for recoverable uploads, keyed duplicate-submission guards and
+long-operation progress. The service worker cache generation was bumped while
+its network-only admin/API/media policy remains enforced and contract-tested.
 
 ## Phase 4 — measured storage evolution
 

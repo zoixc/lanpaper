@@ -235,5 +235,7 @@
   "sessions_summary_basic": "Sessioni browser attive: {{count}}",
   "sessions_load_error": "Impossibile caricare le informazioni sulle sessioni.",
   "import_progress": "Importazione di {{done}} link su {{total}}",
-  "import_cancelled": "Importazione annullata"
+  "import_cancelled": "Importazione annullata",
+  "offline_now": "Sei offline. Le modifiche attendono la connessione.",
+  "operation_in_progress": "Questa operazione è già in corso"
 }

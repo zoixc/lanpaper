@@ -2401,3 +2401,20 @@ body.is-selecting .grid .card__open { display: none; }
     cursor: pointer;
 }
 .login-card__submit:disabled { opacity: 0.6; cursor: progress; }
+
+/* Connection state is explicit; admin/API responses remain network-only. */
+.network-banner {
+    position: sticky;
+    top: 0;
+    z-index: 45;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 8px 16px;
+    color: var(--text);
+    background: var(--surface, #fff);
+    border-bottom: 1px solid var(--border);
+}
+.network-banner > svg { width: 18px; height: 18px; flex: 0 0 auto; }
+.network-banner.is-hidden { display: none; }

@@ -235,5 +235,7 @@
   "sessions_summary_basic": "Aktive Browsersitzungen: {{count}}",
   "sessions_load_error": "Sitzungsinformationen konnten nicht geladen werden.",
   "import_progress": "{{done}} von {{total}} Links werden importiert",
-  "import_cancelled": "Import abgebrochen"
+  "import_cancelled": "Import abgebrochen",
+  "offline_now": "Sie sind offline. Änderungen warten auf die Verbindung.",
+  "operation_in_progress": "Dieser Vorgang läuft bereits"
 }

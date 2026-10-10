@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: MIT */
 import { uploadForm } from './feature-domain.js';
+import { createOperationState } from './operation-state.js';
 
 export function createUploadFeature(deps) {
+    const operations = createOperationState();
     async function compress(file) {
         if (!deps.compressor() || !file.type.startsWith('image/')) return file;
         try {
@@ -19,19 +21,29 @@ export function createUploadFeature(deps) {
     }
 
     async function file(link, source, mode, opts) {
-        if (!source.type.startsWith('image/') && !source.type.startsWith('video/')) {
-            deps.toast(deps.t('invalid_image'), { type: 'error' });
+        const key = 'file:' + link.linkName;
+        if (!operations.begin(key)) {
+            if (!(opts && opts.quiet)) deps.toast(deps.t('operation_in_progress'), { type: 'info' });
             return false;
         }
-        const quiet = !!(opts && opts.quiet);
-        const form = uploadForm(link.linkName, mode, 'file', await compress(source));
-        const busy = quiet ? null : deps.toast(deps.t('uploading'), { type: 'info', duration: 0 });
+        let busy = null;
         try {
-            deps.applyUpdate(await deps.request('/api/upload', 'POST', form, true));
+            if (!source.type.startsWith('image/') && !source.type.startsWith('video/')) {
+                deps.toast(deps.t('invalid_image'), { type: 'error' });
+                return false;
+            }
+            const quiet = !!(opts && opts.quiet);
+            const form = uploadForm(link.linkName, mode, 'file', await compress(source));
+            busy = quiet ? null : deps.toast(deps.t('uploading'), { type: 'info', duration: 0 });
+            deps.applyUpdate(await deps.request('/api/upload', 'POST', form, true, undefined,
+                () => file(link, source, mode, opts)));
             if (!quiet) deps.toast(deps.t(mode === 'append' ? 'append_success' : 'upload_success'));
             return true;
         } catch (_) { return false; }
-        finally { if (busy) busy.dismissToast(); }
+        finally {
+            operations.end(key);
+            if (busy) busy.dismissToast();
+        }
     }
 
     async function files(link, sources, mode) {
@@ -50,14 +62,20 @@ export function createUploadFeature(deps) {
     }
 
     async function url(link, value, mode) {
+        const key = 'url:' + link.linkName;
+        if (!operations.begin(key)) {
+            deps.toast(deps.t('operation_in_progress'), { type: 'info' });
+            return false;
+        }
         const form = uploadForm(link.linkName, mode, 'url', value);
         const busy = deps.toast(deps.t('uploading'), { type: 'info', duration: 0 });
         try {
-            deps.applyUpdate(await deps.request('/api/upload', 'POST', form, true));
+            deps.applyUpdate(await deps.request('/api/upload', 'POST', form, true, undefined,
+                () => url(link, value, mode)));
             deps.toast(deps.t(mode === 'append' ? 'append_success' : 'upload_success'));
             return true;
         } catch (_) { return false; }
-        finally { busy.dismissToast(); }
+        finally { operations.end(key); busy.dismissToast(); }
     }
 
     return Object.freeze({ file, files, url });

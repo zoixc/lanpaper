@@ -30,6 +30,7 @@ var staticAssets = map[string]bool{
 	"js/feature-domain.js":            true,
 	"js/upload-feature.js":            true,
 	"js/overlay-controller.js":        true,
+	"js/operation-state.js":           true,
 	"js/prepaint.js":                  true,
 	"js/settings-menu.js":             true,
 	"js/state.js":                     true,

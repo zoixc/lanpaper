@@ -14,6 +14,7 @@ import { accessMeta, entryMeta as formatEntryMeta, entryTitle as formatEntryTitl
     panelSnapshot } from './feature-domain.js';
 import { createUploadFeature } from './upload-feature.js';
 import { createOverlayController } from './overlay-controller.js';
+import { observeConnectivity } from './operation-state.js';
 import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as linkMatchesQuery,
     countFilteredLinks, resetIncrementalRender, selectVisibleLinks } from './state.js';
 
@@ -476,7 +477,7 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
        ======================================================== */
     /* Один вход для всех ручек: ошибку сервера превращаем в текст на языке
        панели, 401/403 — в объяснение, а не в «Failed to fetch». */
-    async function apiCall(url, method, body, isForm, signal) {
+    async function apiCall(url, method, body, isForm, signal, retry) {
         try {
             return await request(url, { method: method || 'GET', body, isForm, signal });
         } catch (error) {
@@ -484,7 +485,11 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
                 /* Session expired or signed out elsewhere: the login form takes over. */
                 window.location.reload();
             } else if (error instanceof ApiError && error.kind === 'network') {
-                toast(t('network_error'), { type: 'error' });
+                toast(t('network_error'), {
+                    type: 'error',
+                    action: typeof retry === 'function' ? t('retry') : '',
+                    onAction: typeof retry === 'function' ? retry : null
+                });
             } else if (!(error instanceof ApiError && error.kind === 'cancelled')) {
                 toast(translateServerError(error), { type: 'error' });
             }
@@ -2451,6 +2456,12 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
     }
 
     /* Перечитать список с сервера, не теряя состояние вида и выбранное. */
+    function updateConnectivity(online) {
+        document.documentElement.dataset.online = online ? 'true' : 'false';
+        const banner = $('#networkBanner');
+        if (banner) banner.classList.toggle('is-hidden', online);
+    }
+
     async function reloadLinks() {
         try {
             await fetchLinks();
@@ -2476,6 +2487,7 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
     async function init() {
         loadPrefs();
         hydrateIcons(document);
+        observeConnectivity(window, updateConnectivity);
         await loadDict();
         applyTranslations();
         applyTheme();
@@ -2522,6 +2534,7 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
             createLinksFromFiles(files);
         });
         $('#loadMoreBtn').addEventListener('click', showMore);
+        $('#networkRetryBtn').addEventListener('click', reloadLinks);
         $('#retryBtn').addEventListener('click', function () {
             state.loading = true;
             state.loadError = false;

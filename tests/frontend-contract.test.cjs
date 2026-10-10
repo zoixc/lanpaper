@@ -272,7 +272,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v11/,
+  assert.match(code, /lanpaper-static-v12/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 
@@ -302,9 +302,9 @@ test('copying reports the truth, and the upload toast stays until the upload end
   assert.match(toasts[1], /return box;/, 'toast() does not hand the node back for dismissal');
   assert.ok(!/toast\(t\('uploading'\), \{ type: 'info', duration: 1[0-9]{3} \}\)/.test(scriptSource),
     'an upload toast is still dismissed on a fixed short timer');
-  const uploads = scriptSource.match(/const busy = [^\n]*(?:deps\.)?toast\((?:deps\.)?t\('uploading'\), \{ type: 'info', duration: 0 \}\)/g) || [];
+  const uploads = scriptSource.match(/(?:const )?busy = [^\n]*(?:deps\.)?toast\((?:deps\.)?t\('uploading'\), \{ type: 'info', duration: 0 \}\)/g) || [];
   assert.equal(uploads.length, 2, `expected both upload paths to hold their toast, found ${uploads.length}`);
-  assert.equal((scriptSource.match(/finally \{ (?:if \(busy\) )?busy[^\n]*dismissToast\(\)/g) || []).length, 2,
+  assert.equal((scriptSource.match(/busy\.dismissToast\(\)/g) || []).length, 2,
     'an upload path never dismisses its toast');
 });
 

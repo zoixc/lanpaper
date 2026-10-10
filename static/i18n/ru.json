@@ -235,5 +235,7 @@
   "sessions_summary_basic": "Активных сеансов: {{count}}",
   "sessions_load_error": "Не удалось загрузить сведения о сеансах.",
   "import_progress": "Импортировано {{done}} из {{total}} ссылок",
-  "import_cancelled": "Импорт отменён"
+  "import_cancelled": "Импорт отменён",
+  "offline_now": "Нет подключения. Изменения приостановлены до восстановления связи.",
+  "operation_in_progress": "Эта операция уже выполняется"
 }
