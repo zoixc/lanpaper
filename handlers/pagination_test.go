@@ -52,8 +52,8 @@ func TestWallpaperPaginationFilteringAndSorting(t *testing.T) {
 }
 
 func TestLegacyWallpaperResponseIsBounded(t *testing.T) {
-	seedWallpapers(t)
-	for index := 0; index <= CompatibilityResultLimit; index++ {
+	seedWallpapers(t, &storage.Wallpaper{ID: "w00000", LinkName: "w00000", AccessLevel: config.AccessPublic})
+	for index := 1; index <= CompatibilityResultLimit; index++ {
 		name := fmt.Sprintf("w%05d", index)
 		storage.Global.Set(name, &storage.Wallpaper{ID: name, LinkName: name, AccessLevel: config.AccessPublic})
 	}

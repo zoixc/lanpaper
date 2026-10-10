@@ -298,10 +298,14 @@ func (tx *sqliteTransaction) Rename(oldName, newName string) (*Wallpaper, error)
 	if _, exists := tx.Get(newName); exists {
 		return nil, ErrExists
 	}
-	if _, err := tx.tx.ExecContext(tx.ctx, `UPDATE wallpapers SET link_name=?,image_url=? WHERE link_name=?`, newName, "/"+newName, oldName); err != nil {
+	preview := wallpaper.Preview
+	if preview != "" {
+		preview = "/api/preview/" + newName
+	}
+	if _, err := tx.tx.ExecContext(tx.ctx, `UPDATE wallpapers SET link_name=?,image_url=?,preview=? WHERE link_name=?`, newName, "/"+newName, preview, oldName); err != nil {
 		return nil, err
 	}
-	wallpaper.ID, wallpaper.LinkName, wallpaper.ImageURL = newName, newName, "/"+newName
+	wallpaper.ID, wallpaper.LinkName, wallpaper.ImageURL, wallpaper.Preview = newName, newName, "/"+newName, preview
 	deriveWallpaperPaths(wallpaper)
 	return wallpaper, nil
 }

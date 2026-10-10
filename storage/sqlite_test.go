@@ -31,6 +31,7 @@ func TestSQLiteNormalizedRelationsIntegrityAndBackup(t *testing.T) {
 	defer store.Close()
 	wallpaper := &Wallpaper{
 		ID: "wall", LinkName: "wall", Category: "work", AccessLevel: "token", AccessToken: "secret",
+		HasImage: true, MIMEType: "png", ImageURL: "/wall", Preview: "/api/preview/wall",
 		History: []HistoryEntry{{Version: 2, Ext: "png", SizeBytes: 12, ModTime: 3, SavedAt: 4}},
 		Items:   []PlaylistItem{{ID: 1, Ext: "webp", SizeBytes: 7, ModTime: 8, AddedAt: 9}},
 		Rotate:  &RotateConfig{Enabled: true, Interval: 30, Order: "random"},
@@ -44,6 +45,10 @@ func TestSQLiteNormalizedRelationsIntegrityAndBackup(t *testing.T) {
 	}
 	if len(loaded.History) != 1 || loaded.History[0].SavedAt != 4 || len(loaded.Items) != 1 || loaded.Rotate == nil || loaded.Rotate.Order != "random" {
 		t.Fatalf("relations did not round trip: %+v", loaded)
+	}
+	renamed, err := store.Rename(ctx, "wall", "renamed")
+	if err != nil || renamed.Preview != "/api/preview/renamed" || renamed.ImagePath != MediaPath("renamed", "png") {
+		t.Fatalf("rename paths: wallpaper=%+v err=%v", renamed, err)
 	}
 	if err := store.IntegrityCheck(ctx); err != nil {
 		t.Fatal(err)
@@ -61,7 +66,7 @@ func TestSQLiteNormalizedRelationsIntegrityAndBackup(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer copyStore.Close()
-	if value, ok, err := copyStore.Get(ctx, "wall"); err != nil || !ok || value.AccessToken != "secret" {
+	if value, ok, err := copyStore.Get(ctx, "renamed"); err != nil || !ok || value.AccessToken != "secret" {
 		t.Fatalf("backup record: value=%+v ok=%v err=%v", value, ok, err)
 	}
 }

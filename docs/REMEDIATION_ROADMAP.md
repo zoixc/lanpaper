@@ -310,6 +310,8 @@ pages while retaining its local selectors and current UX. Legacy clients keep
 the bare array contract, bounded to 10,000 records with explicit truncation
 headers.
 
+**Retrospective 29–32 completed:** [`RETROSPECTIVE_PR29_PR32.md`](RETROSPECTIVE_PR29_PR32.md).
+
 ### PR 33 — Background processing pool
 
 Move decode/preview/regeneration work into bounded jobs with cancellation, progress and independent CPU/memory budgets. Do not acknowledge publication before its required durable state exists.

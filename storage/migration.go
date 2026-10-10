@@ -127,6 +127,17 @@ func durableCopy(source, destination string) error {
 	if err := out.Close(); err != nil {
 		return err
 	}
+	dir, err := os.Open(filepath.Dir(destination))
+	if err != nil {
+		return err
+	}
+	if err := dir.Sync(); err != nil {
+		_ = dir.Close()
+		return err
+	}
+	if err := dir.Close(); err != nil {
+		return err
+	}
 	ok = true
 	return nil
 }
