@@ -12,6 +12,9 @@ on:
 # Creating the GitHub release is the only write this workflow needs.
 permissions:
   contents: write
+  # Sigstore exchanges this short-lived token for the release image's keyless
+  # signing certificate. No long-lived signing key is stored in GitHub.
+  id-token: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -50,7 +53,9 @@ jobs:
 
       - name: Check formatting
         run: |
-          unformatted="$(gofmt -l .)"
+          # Vendored generated sources are upstream artifacts and are excluded
+          # from the project's formatting policy, exactly as in CI.
+          unformatted="$(find . -path ./vendor -prune -o -name '*.go' -print0 | xargs -0 gofmt -l)"
           if [ -n "$unformatted" ]; then
             echo "Run gofmt -w on:"; echo "$unformatted"; exit 1
           fi
@@ -63,8 +68,9 @@ jobs:
 
       - name: Build
         run: |
+          version="$(cat VERSION)"
           go build -trimpath -buildvcs=false \
-            -ldflags="-s -w -X main.Version=${VERSION}" -o /dev/null .
+            -ldflags="-s -w -X main.Version=${version}" -o /dev/null .
 
       - name: Vulnerability check
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
@@ -97,16 +103,31 @@ jobs:
 
       # Semver tags plus :latest, so "ptabi/lanpaper:0.12" keeps working for
       # anyone who pins a minor and ":latest" always points at a released tag.
-      - name: Build and push
+      - name: Build and push with attestations
+        id: release-image
         run: |
           version="$(cat VERSION)"
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             --build-arg VERSION="${version}" \
+            --provenance=mode=max \
+            --sbom=true \
+            --metadata-file=/tmp/release-metadata.json \
             -t "ptabi/lanpaper:${version}" \
             -t "ptabi/lanpaper:${version%.*}" \
             -t "ptabi/lanpaper:latest" \
             --push .
+          digest="$(jq -r '."containerimage.digest"' /tmp/release-metadata.json)"
+          test "$digest" != "null" && test -n "$digest"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Keyless-sign release image index
+        env:
+          DIGEST: ${{ steps.release-image.outputs.digest }}
+        run: cosign sign --yes "ptabi/lanpaper@${DIGEST}"
 
   release:
     needs: [verify, image]

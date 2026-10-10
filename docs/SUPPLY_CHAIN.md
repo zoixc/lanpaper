@@ -27,17 +27,27 @@ Install [cosign](https://docs.sigstore.dev/cosign/system_config/installation/),
 then constrain both the GitHub Actions issuer and the exact trusted workflow:
 
 ```sh
+# For an image selected from main:
 cosign verify \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-identity \
     'https://github.com/zoixc/lanpaper/.github/workflows/ci.yml@refs/heads/main' \
   "$REF"
+
+# For a semver release tag (replace 0.16.0 with the selected tag):
+cosign verify \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity \
+    'https://github.com/zoixc/lanpaper/.github/workflows/release.yml@refs/tags/0.16.0' \
+  "$REF"
 ```
 
-The command must report a verified Rekor transparency-log entry and the
-expected certificate identity. Do not weaken the identity to an organization-
-wide wildcard: another repository or workflow must not be trusted to publish
-Lanpaper.
+The command must report a verified Rekor transparency-log entry and the exact
+expected certificate identity. `latest` is normally replaced by the tag release
+workflow, while a main-branch image is signed by CI; resolve the digest and
+choose the identity for the publication being verified. Do not weaken identity
+to an organization-wide wildcard: another repository or workflow must not be
+trusted to publish Lanpaper.
 
 ## Inspect SBOM and provenance attestations
 
