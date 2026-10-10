@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: MIT
-# Copy to docker-compose.yml. Set ADMIN_PASS in your shell or an untracked
-# .env file before starting; the example must never deploy with a known password.
+# Copy to docker-compose.yml. Set ADMIN_PASSWORD_HASH in a secret-backed
+# environment or an untracked, mode-0600 .env file before starting. Generate it
+# with: printf '%s' 'your password' | docker run --rm -i ptabi/lanpaper:latest hash-password
+# The example never embeds or falls back to a known credential.
 #
 # The container runs as the unprivileged user uid 100 / gid 101. Create the
 # data directory with that owner before the first start (Linux):
@@ -11,12 +13,13 @@ services:
     container_name: lanpaper
     restart: unless-stopped
     ports:
-      # Change to "127.0.0.1:8080:8080" when only a local reverse proxy needs it.
-      - "8080:8080"
+      # Proxy-only by default. Remove 127.0.0.1 only for a deliberately
+      # firewalled LAN deployment; never publish plaintext directly online.
+      - "127.0.0.1:8080:8080"
     environment:
       PORT: "8080"
       ADMIN_USER: "${ADMIN_USER:-admin}"
-      ADMIN_PASS: "${ADMIN_PASS:?Set a strong ADMIN_PASS in your shell or private .env file}"
+      ADMIN_PASSWORD_HASH: "${ADMIN_PASSWORD_HASH:?Set an Argon2id hash via a secret-backed environment or private .env file}"
       MAX_UPLOAD_MB: "200"
       MAX_IMAGES: "100"
       MAX_CONCURRENT_UPLOADS: "2"
@@ -69,9 +72,25 @@ services:
       # - ./certs:/app/certs:ro
       # To browse a host gallery, uncomment this AND EXTERNAL_IMAGE_DIR above:
       # - ./external/images:/app/gallery:ro
-    # Hardening: the service needs no Linux capabilities and never escalates.
+    # Hardened runtime: the image and application assets stay immutable. Only
+    # the explicitly mounted data directory and bounded temporary filesystem
+    # are writable.
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
     cap_drop: [ ALL ]
     security_opt: [ "no-new-privileges:true" ]
+    pids_limit: 128
+    mem_limit: 1g
+    cpus: 2.0
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 128M
     # Lets in-flight uploads finish on "docker compose down" (the server
     # waits up to 30 s for active requests).
     stop_grace_period: 35s

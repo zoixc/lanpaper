@@ -173,7 +173,25 @@ jobs:
             --cache-from type=local,src=/tmp/.buildx-cache \
             -t lanpaper:test --load .
 
-          docker run -d --name lp_test -p 8080:8080 lanpaper:test
+          docker run -d --name lp_test -p 8080:8080 \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,size=64m,mode=1777 \
+            --tmpfs /app/data:rw,noexec,nosuid,size=256m,uid=100,gid=101,mode=0700 \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --pids-limit 128 \
+            --memory 512m \
+            --cpus 1.0 \
+            lanpaper:test
+
+          # Validate both the documented Compose contract and the effective
+          # runtime isolation used by this smoke test.
+          ADMIN_PASSWORD_HASH='$argon2id$v=19$m=65536,t=3,p=2$Y2ktc21va2U$Y2ktc21va2UtaGFzaA' \
+            docker compose -f docker-compose-example.yml config --quiet
+          test "$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' lp_test)" = "true"
+          test "$(docker inspect --format '{{.HostConfig.PidsLimit}}' lp_test)" = "128"
+          test "$(docker inspect --format '{{.HostConfig.SecurityOpt}}' lp_test)" = "[no-new-privileges:true]"
+          test "$(docker inspect --format '{{json .HostConfig.CapDrop}}' lp_test)" = '["ALL"]'
 
           # /health deliberately omits the version (it would tell a probe which
           # release to look up), so the version is checked on the image label.

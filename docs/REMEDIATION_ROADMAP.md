@@ -323,9 +323,13 @@ progress consumed by the settings UI.
 
 ## Phase 5 — release and supply-chain hardening
 
-### PR 34 — Hardened deployment profile
+### PR 34 — Hardened deployment profile **(implemented; full CI pending)**
 
-Add read-only-root, no-new-privileges, dropped capabilities, explicit writable mounts and resource-limit examples. Test the official image under that profile.
+The production Compose contract now binds to loopback, requires an Argon2id
+credential, keeps the root filesystem read-only, bounds `/tmp`, drops all
+capabilities, prevents privilege escalation and sets CPU, memory and PID limits.
+Only `/app/data` remains writable. CI boots and health-checks the official image
+with equivalent isolation and validates the documented Compose configuration.
 
 ### PR 35 — SBOM, provenance and image signing
 

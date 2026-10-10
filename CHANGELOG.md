@@ -28,6 +28,11 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Hardened production container profile.** The maintained Compose example now
+  defaults to loopback-only exposure, a read-only root filesystem, bounded
+  temporary storage, zero Linux capabilities, no privilege escalation and
+  CPU/memory/PID limits. It requires an Argon2id credential instead of a
+  plaintext password; CI runs the official image under the same isolation.
 - **Bounded processing jobs.** Upload and preview work now shares explicit CPU
   and decoded-memory budgets with cancellation-aware queues and pollable
   regeneration progress, while durable publication remains synchronous.
