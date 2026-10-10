@@ -267,9 +267,13 @@ its network-only admin/API/media policy remains enforced and contract-tested.
 
 ## Phase 4 — measured storage evolution
 
-### PR 28 — Storage scale benchmarks and supported limits
+### PR 28 — Storage scale benchmarks and supported limits **(implemented; full CI pending)**
 
-Benchmark 1k/10k/50k records for list/create/update/rename/delete, allocations and persistence latency. Publish an evidence-based supported range and migration trigger.
+Added reproducible 1k/10k/50k benchmarks for list/create/update/rename/delete,
+JSON serialization and durable atomic persistence. Published the raw runner
+results and an evidence-based 10k supported ceiling, 10k–50k transitional
+range, 50k hard migration boundary and latency/file-size migration triggers in
+[`STORAGE_SCALE_BENCHMARK.md`](STORAGE_SCALE_BENCHMARK.md).
 
 ### PR 29 — `WallpaperStore` abstraction
 

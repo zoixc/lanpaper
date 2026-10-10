@@ -376,6 +376,14 @@ Two properties worth knowing before sizing a host:
   growing the process without limit. A 36 M pixel upload peaks at about 174 MB
   of memory with the pure Go WebP encoder.
 
+## Storage scale
+
+The JSON metadata backend is supported through **10,000 links**. Installations
+approaching that size should plan the SQLite migration, especially when metadata
+mutations exceed 250 ms p95 or `wallpapers.json` exceeds 25 MB. The 10k–50k
+range is transitional; production use above 50k is unsupported on JSON. See the
+[raw benchmark results and methodology](docs/STORAGE_SCALE_BENCHMARK.md).
+
 ## Backups and upgrades
 
 Back up the whole persistent `data/` directory: `wallpapers.json`, `media/`,

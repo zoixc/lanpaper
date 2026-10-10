@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Measured JSON-store limits.** Reproducible 1k/10k/50k benchmarks now
+  publish allocations, serialization and durable-write latency, with a 10k
+  supported ceiling and explicit SQLite migration triggers.
 - **Offline and retry UX.** The panel now announces connection loss, offers
   reconnect/retry actions, suppresses duplicate uploads and keeps operation
   progress visible without caching administrator or API responses.
