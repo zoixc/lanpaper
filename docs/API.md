@@ -144,11 +144,16 @@ first), then links with media (newest first), then empty links.
 | --- | --- |
 | `category` | Filter by category (case-insensitive). |
 | `has_image` | `true`/`1` or `false`/`0`. Any other value returns `400`. |
-| `sort` | `created` or `updated`; any other value returns `400`. Pinned links stay first. |
-| `order` | `desc` (default) or `asc`. |
+| `access` | `public`, `local`, `token` or `auth`. |
+| `kind` | `image`, `video`, `playlist` or `pinned`. |
+| `q` | Case-insensitive search over name, category, media type and access level. |
+| `sort` | `created`, `updated`, `name` or `size`. Pinned links stay first. |
+| `order` | `desc` (default) or `asc`; any other value returns `400`. |
 | `page`, `page_size` | Optional pagination. `page_size` defaults to 50, maximum 200. |
 
-- Without `page`, the response is a JSON array of link objects.
+- Without `page`, the backward-compatible response remains a JSON array, but
+  is bounded to 10,000 records. A truncated response includes
+  `X-Lanpaper-Truncated: true` and `X-Lanpaper-Result-Limit: 10000`.
 - With `page`, the response is
   `{"data": [...], "total": n, "page": p, "pageSize": s, "totalPages": t}`.
   An invalid page number returns `400`.

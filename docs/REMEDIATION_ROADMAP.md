@@ -302,9 +302,13 @@ verification and rollback. JSON is never modified or deleted. Operational,
 interruption and downgrade guidance is in
 [`SQLITE_MIGRATION.md`](SQLITE_MIGRATION.md).
 
-### PR 32 — Server-side pagination/filtering
+### PR 32 — Server-side pagination/filtering **(implemented; full CI pending)**
 
-Add backward-compatible pagination, filtering and sorting; update the modular frontend. Preserve a bounded compatibility response for older clients.
+Expanded the paginated envelope with validated access/kind/search filters and
+created/updated/name/size sorting. The modular frontend loads bounded 200-record
+pages while retaining its local selectors and current UX. Legacy clients keep
+the bare array contract, bounded to 10,000 records with explicit truncation
+headers.
 
 ### PR 33 — Background processing pool
 

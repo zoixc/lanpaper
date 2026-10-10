@@ -23,8 +23,9 @@ import (
 )
 
 const (
-	DefaultPageSize = 50
-	MaxPageSize     = 200
+	DefaultPageSize          = 50
+	MaxPageSize              = 200
+	CompatibilityResultLimit = 10_000
 	// maxJSONBody limits request bodies on JSON endpoints (requests carry
 	// nothing larger than a link name and a category).
 	maxJSONBody = 64 << 10 // 64 KB
@@ -106,12 +107,55 @@ func Wallpapers(w http.ResponseWriter, r *http.Request) {
 		}
 		wallpapers = out
 	}
+	if access := q.Get("access"); access != "" {
+		if !isValidAccessLevel(access) {
+			http.Error(w, "Invalid access", http.StatusBadRequest)
+			return
+		}
+		out := wallpapers[:0]
+		for _, wp := range wallpapers {
+			if wp.AccessLevel == storage.NormalizeAccessLevel(access) {
+				out = append(out, wp)
+			}
+		}
+		wallpapers = out
+	}
+	if kind := strings.ToLower(q.Get("kind")); kind != "" {
+		if kind != "image" && kind != "video" && kind != "playlist" && kind != "pinned" {
+			http.Error(w, "Invalid kind", http.StatusBadRequest)
+			return
+		}
+		out := wallpapers[:0]
+		for _, wp := range wallpapers {
+			match := kind == "image" && wp.HasImage && !config.IsVideoExt(wp.MIMEType)
+			match = match || kind == "video" && config.IsVideoExt(wp.MIMEType)
+			match = match || kind == "playlist" && len(wp.Items) > 0
+			match = match || kind == "pinned" && wp.IsPinned
+			if match {
+				out = append(out, wp)
+			}
+		}
+		wallpapers = out
+	}
+	if search := strings.ToLower(strings.TrimSpace(q.Get("q"))); search != "" {
+		out := wallpapers[:0]
+		for _, wp := range wallpapers {
+			haystack := strings.ToLower(strings.Join([]string{wp.LinkName, wp.Category, wp.MIMEType, wp.AccessLevel}, " "))
+			if strings.Contains(haystack, search) {
+				out = append(out, wp)
+			}
+		}
+		wallpapers = out
+	}
+	order := strings.ToLower(q.Get("order"))
+	if order != "" && order != "asc" && order != "desc" {
+		http.Error(w, "Invalid order", http.StatusBadRequest)
+		return
+	}
 	if sf := q.Get("sort"); sf != "" {
-		// Anything but the two documented values is a client error: silently
-		// falling back to "created" hid typos and sorted by the wrong field.
 		switch strings.ToLower(sf) {
-		case "created", "updated":
-			sortWallpapers(wallpapers, sf, q.Get("order") != "asc")
+		case "created", "updated", "name", "size":
+			sortWallpapers(wallpapers, sf, order != "asc")
 		default:
 			http.Error(w, "Invalid sort", http.StatusBadRequest)
 			return
@@ -139,6 +183,13 @@ func Wallpapers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Legacy clients receive the historical bare array, bounded to prevent one
+	// forgotten pagination flag from allocating an unbounded response.
+	if len(wallpapers) > CompatibilityResultLimit {
+		wallpapers = wallpapers[:CompatibilityResultLimit]
+		w.Header().Set("X-Lanpaper-Truncated", "true")
+		w.Header().Set("X-Lanpaper-Result-Limit", strconv.Itoa(CompatibilityResultLimit))
+	}
 	if err := json.NewEncoder(w).Encode(toResponses(wallpapers)); err != nil {
 		log.Printf("Error encoding wallpapers response: %v", err)
 	}
@@ -191,20 +242,35 @@ func toResponses(wps []*storage.Wallpaper) []WallpaperResponse {
 // entries at the top, consistent with the default storage ordering.
 func sortWallpapers(wps []*storage.Wallpaper, field string, desc bool) {
 	sort.SliceStable(wps, func(i, j int) bool {
-		// Pinned entries always sort first regardless of the requested field.
 		if wps[i].IsPinned != wps[j].IsPinned {
 			return wps[i].IsPinned
 		}
-		var vi, vj int64
-		if field == "updated" {
-			vi, vj = wps[i].ModTime, wps[j].ModTime
-		} else {
-			vi, vj = wps[i].CreatedAt, wps[j].CreatedAt
+		if field == "name" {
+			left, right := strings.ToLower(wps[i].LinkName), strings.ToLower(wps[j].LinkName)
+			if left == right {
+				return wps[i].LinkName < wps[j].LinkName
+			}
+			if desc {
+				return left > right
+			}
+			return left < right
+		}
+		var left, right int64
+		switch field {
+		case "updated":
+			left, right = wps[i].ModTime, wps[j].ModTime
+		case "size":
+			left, right = wps[i].SizeBytes, wps[j].SizeBytes
+		default:
+			left, right = wps[i].CreatedAt, wps[j].CreatedAt
+		}
+		if left == right {
+			return wps[i].LinkName < wps[j].LinkName
 		}
 		if desc {
-			return vi > vj
+			return left > right
 		}
-		return vi < vj
+		return left < right
 	})
 }
 

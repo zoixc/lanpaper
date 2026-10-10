@@ -553,10 +553,16 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
     }
 
     async function fetchLinks() {
-        const res = await apiCall('/api/wallpapers');
-        /* Ручка отдаёт либо массив, либо конверт {data,...}: понимаем оба,
-           чтобы смена формы ответа не оставила панель пустой. */
-        const list = Array.isArray(res) ? res : (res && Array.isArray(res.data) ? res.data : []);
+        const pageSize = 200;
+        const list = [];
+        for (let page = 1; ; page += 1) {
+            const res = await apiCall('/api/wallpapers?page=' + page + '&page_size=' + pageSize);
+            const data = Array.isArray(res) ? res : (res && Array.isArray(res.data) ? res.data : []);
+            list.push(...data);
+            if (Array.isArray(res) || !res || page >= res.totalPages || data.length === 0) break;
+            // Yield between pages so large libraries do not monopolize the UI.
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
         state.links = list.map(normalizeLink);
         return state.links;
     }

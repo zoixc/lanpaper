@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Bounded library queries.** The list API now supports validated pagination,
+  search, access/media filters and stable sorting; legacy arrays are capped
+  with explicit truncation headers and the panel loads bounded pages.
 - **Resumable SQLite migration.** An explicit backup-first command now
   validates and imports JSON metadata in checksummed, checkpointed transactions,
   with dry-run, integrity verification and non-destructive rollback.
