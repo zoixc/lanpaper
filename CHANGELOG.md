@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Wallpaper store boundary.** Application services now receive a
+  context-aware CRUD/list/transaction interface, with the durable JSON backend
+  covered by reusable conformance and atomic-transaction tests.
 - **Measured JSON-store limits.** Reproducible 1k/10k/50k benchmarks now
   publish allocations, serialization and durable-write latency, with a 10k
   supported ceiling and explicit SQLite migration triggers.

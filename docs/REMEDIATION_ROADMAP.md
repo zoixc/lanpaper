@@ -258,7 +258,7 @@ between batches and downloads a combined report. Link-list exports never carry
 secrets; imported token links receive fresh tokens. UI and documentation now
 consistently distinguish a link-list export from a media backup.
 
-### PR 27 — Offline and retry UX **(implemented; full CI pending)**
+### PR 27 — Offline and retry UX **(implemented and CI-verified)**
 
 Added an announced online/offline banner, explicit reconnect action, retry
 capabilities for recoverable uploads, keyed duplicate-submission guards and
@@ -267,7 +267,7 @@ its network-only admin/API/media policy remains enforced and contract-tested.
 
 ## Phase 4 — measured storage evolution
 
-### PR 28 — Storage scale benchmarks and supported limits **(implemented; full CI pending)**
+### PR 28 — Storage scale benchmarks and supported limits **(implemented and CI-verified)**
 
 Added reproducible 1k/10k/50k benchmarks for list/create/update/rename/delete,
 JSON serialization and durable atomic persistence. Published the raw runner
@@ -277,9 +277,13 @@ range, 50k hard migration boundary and latency/file-size migration triggers in
 
 **Retrospective 25–28 completed:** [`RETROSPECTIVE_PR25_PR28.md`](RETROSPECTIVE_PR25_PR28.md).
 
-### PR 29 — `WallpaperStore` abstraction
+### PR 29 — `WallpaperStore` abstraction **(implemented and CI-verified)**
 
-Introduce context-aware CRUD/list transaction interfaces while retaining the JSON implementation. Add conformance tests shared by all implementations.
+Introduced context-aware CRUD/list and atomic transaction interfaces, with the
+existing JSON store retained behind `JSONWallpaperStore`. The application
+composition root now exposes the interface. Shared conformance tests cover
+independent reads, CRUD, cancellation, rollback, multi-record commit and the
+single-durable-write transaction guarantee.
 
 ### PR 30 — SQLite schema and implementation
 
