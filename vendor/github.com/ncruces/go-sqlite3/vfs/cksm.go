@@ -56,7 +56,7 @@ func (c *cksmFile) WriteAt(p []byte, off int64) (n int, err error) {
 	return c.File.WriteAt(p, off)
 }
 
-func (c *cksmFile) Pragma(name string, value string) (string, error) {
+func (c *cksmFile) Pragma(name, value string) (string, error) {
 	switch name {
 	case "checksum_verification":
 		b, ok := util.ParseBool(value)
@@ -105,6 +105,16 @@ func (c *cksmFile) init(header *[100]byte) {
 func (c *cksmFile) SharedMemory() SharedMemory {
 	if f, ok := c.File.(FileSharedMemory); ok {
 		return f.SharedMemory()
+	}
+	return nil
+}
+
+func (c *cksmFile) MemoryMapper() MemoryMapper {
+	if c.verifyCksm {
+		return nil
+	}
+	if f, ok := c.File.(FileMemoryMapper); ok {
+		return f.MemoryMapper()
 	}
 	return nil
 }

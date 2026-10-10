@@ -94,6 +94,7 @@ docker run -d --name lanpaper -p 127.0.0.1:8080:8080 \
   --cap-drop ALL --security-opt no-new-privileges:true \
   --pids-limit 128 --memory 1g --cpus 2 --stop-timeout 35 \
   -e ADMIN_USER=admin -e ADMIN_PASSWORD_HASH="$ADMIN_PASSWORD_HASH" \
+  -e GOMEMLIMIT=768MiB \
   -v "$(pwd)/data:/app/data" ptabi/lanpaper:latest
 ```
 

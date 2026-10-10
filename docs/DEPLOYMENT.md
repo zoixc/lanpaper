@@ -69,6 +69,7 @@ docker run -d --name lanpaper \
   -p 127.0.0.1:8080:8080 \
   -v /srv/lanpaper/data:/app/data \
   -e ADMIN_USER -e ADMIN_PASSWORD_HASH -e TRUSTED_PROXY=172.17.0.1 \
+  -e GOMEMLIMIT=768MiB \
   --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m,mode=1777 \
   --cap-drop ALL --security-opt no-new-privileges:true \
   --pids-limit 128 --memory 1g --cpus 2 \

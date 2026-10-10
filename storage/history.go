@@ -320,7 +320,8 @@ func TrimHistoryBudget(maxMB int) {
 		return
 	}
 
-	snap := Global.GetAll()
+	// Read-only use of the records: the shared snapshot is sufficient.
+	snap := Global.Snapshot()
 	// Recompute from the snapshot first: the check above may have been based on
 	// a stale counter, and this pass is the self-healing point.
 	var total int64

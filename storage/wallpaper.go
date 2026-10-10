@@ -745,7 +745,9 @@ func PruneOldImages(max int) {
 		return
 	}
 	var candidates []*Wallpaper
-	for _, wp := range Global.GetAll() {
+	// Read-only pass: the shared snapshot is enough, and it avoids deep-copying
+	// every record (Items and History included) after each upload.
+	for _, wp := range Global.Snapshot() {
 		if wp.HasImage && !wp.IsPinned {
 			candidates = append(candidates, wp)
 		}

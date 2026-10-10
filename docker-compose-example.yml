@@ -21,6 +21,10 @@ services:
       ADMIN_USER: "${ADMIN_USER:-admin}"
       ADMIN_PASSWORD_HASH: "${ADMIN_PASSWORD_HASH:?Set an Argon2id hash via a secret-backed environment or private .env file}"
       MAX_UPLOAD_MB: "200"
+      # Soft memory target below the 1 GiB container limit: the Go runtime
+      # returns memory after peaks instead of holding it until the next
+      # container restart.
+      GOMEMLIMIT: "768MiB"
       MAX_IMAGES: "100"
       MAX_CONCURRENT_UPLOADS: "2"
       COMPRESSION_QUALITY: "85"

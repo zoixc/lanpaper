@@ -13,6 +13,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -123,12 +124,41 @@ func serveHTMLPage(w http.ResponseWriter, r *http.Request, file string) {
 		http.NotFound(w, r)
 		return
 	}
-	page, err := io.ReadAll(f)
+	body, err := versionedPageBody(f, file, fi)
 	if err != nil {
 		http.Error(w, "Admin page unavailable", http.StatusInternalServerError)
 		return
 	}
-	http.ServeContent(w, r, file, fi.ModTime(), bytes.NewReader(versionStaticRefs(page)))
+	http.ServeContent(w, r, file, fi.ModTime(), bytes.NewReader(body))
+}
+
+// versionedPages keeps the versioned HTML of each page. The asset hashes are
+// fixed for the life of the process, so the result only changes when the file
+// itself does: the cache key is its modification time and size.
+var versionedPages = struct {
+	sync.Mutex
+	pages map[string]versionedPage
+}{pages: make(map[string]versionedPage)}
+
+type versionedPage struct {
+	modTime time.Time
+	size    int64
+	body    []byte
+}
+
+func versionedPageBody(f *os.File, file string, fi os.FileInfo) ([]byte, error) {
+	versionedPages.Lock()
+	defer versionedPages.Unlock()
+	if c, ok := versionedPages.pages[file]; ok && c.modTime.Equal(fi.ModTime()) && c.size == fi.Size() {
+		return c.body, nil
+	}
+	page, err := io.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+	body := versionStaticRefs(page)
+	versionedPages.pages[file] = versionedPage{modTime: fi.ModTime(), size: fi.Size(), body: body}
+	return body, nil
 }
 
 // openStaticAsset opens a file below static/ through os.Root, so the path

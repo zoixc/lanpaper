@@ -9,30 +9,32 @@ import (
 )
 
 type Memory struct {
-	Buf []byte
-	Max int64
-	com int
+	Buf       []byte
+	Max       int64
+	regions   []*MappedRegion
+	committed int
 }
 
 func (m *Memory) Slice() *[]byte {
 	return &m.Buf
 }
 
-func (m *Memory) Grow(delta, _ int64) int64 {
+func (m *Memory) Grow(delta, max int64) int64 {
 	if m.Buf == nil {
 		m.allocate(uint64(m.Max) << 16)
 	}
 
-	len := len(m.Buf)
-	old := int64(len >> 16)
+	len := int64(len(m.Buf))
+	old := len >> 16
 	if delta == 0 {
 		return old
 	}
 	new := old + delta
-	if new > m.Max {
+	max = min(max, m.Max, int64(math.MaxInt)>>16)
+	if new > max || new < old {
 		return -1
 	}
-	m.reallocate(uint64(new) << 16)
+	m.commit(uint64(new) << 16)
 	return old
 }
 
@@ -56,8 +58,8 @@ func (m *Memory) allocate(max uint64) {
 	m.Buf = b[:0]
 }
 
-func (m *Memory) reallocate(size uint64) {
-	com := uint64(m.com)
+func (m *Memory) commit(size uint64) {
+	com := uint64(m.committed)
 	res := uint64(cap(m.Buf))
 	if com < size && size <= res {
 		// Grow geometrically, round up to the page size.
@@ -67,11 +69,11 @@ func (m *Memory) reallocate(size uint64) {
 		new = (new + rnd) &^ rnd
 
 		// Commit additional memory up to new bytes.
-		err := unix.Mprotect(m.Buf[m.com:new], unix.PROT_READ|unix.PROT_WRITE)
+		err := unix.Mprotect(m.Buf[m.committed:new], unix.PROT_READ|unix.PROT_WRITE)
 		if err != nil {
 			panic(err)
 		}
-		m.com = int(new)
+		m.committed = int(new)
 	}
 	m.Buf = m.Buf[:size]
 }
@@ -79,6 +81,7 @@ func (m *Memory) reallocate(size uint64) {
 func (m *Memory) Close() error {
 	err := unix.Munmap(m.Buf[:cap(m.Buf)])
 	m.Buf = nil
-	m.com = 0
+	m.regions = nil
+	m.committed = 0
 	return err
 }
