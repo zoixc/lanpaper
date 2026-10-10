@@ -172,14 +172,15 @@ limiter lifecycle interfaces and structured logger. The complete production
 route/middleware stack is now built by `App.Handler()`; `newHandler` is a narrow
 compatibility adapter while subsequent PRs replace package globals.
 
-### PR 18 — Session and limiter instance isolation **(implemented; full CI pending)**
+### PR 18 — Session and limiter instance isolation **(partially implemented; request injection remains)**
 
 Introduced independently constructible `SessionStore` and `RateStore` owners,
-with instance-scoped session counting, token admission, cleanup and reset.
-`NewApp` now injects fresh stores rather than process-global adapters; isolation
-tests prove sessions and exhausted limiter buckets cannot cross instances. The
-package defaults remain narrow compatibility adapters for legacy direct-handler
-tests during service extraction.
+with instance-scoped session counting, token admission, cleanup and reset;
+isolation tests prove their mutable maps do not cross instances. The 1–20
+retrospective found that request middleware still consumes the process runtime,
+so `NewApp` now truthfully references that runtime rather than advertising
+unused fresh stores. Context/closure injection through every auth and limiter
+handler remains required before multiple isolated Apps are supported.
 
 ### PR 19 — Upload service extraction **(implemented; full CI pending)**
 
@@ -200,6 +201,10 @@ entry points preserve the API contract.
 **Retrospective 17–20 completed:** [`RETROSPECTIVE_PR17_PR20.md`](RETROSPECTIVE_PR17_PR20.md).
 It corrected compatibility services that captured a stale replaceable global
 store and revalidated transaction, counter and error boundaries.
+
+**Comprehensive PR 1–20 retrospective:** [`RETROSPECTIVE_PR1_PR20.md`](RETROSPECTIVE_PR1_PR20.md).
+It corrected an inaccurate per-App runtime ownership claim, marked remaining
+request-level isolation work explicitly, and bounded metrics disk-scan cost.
 
 ### PR 21 — Remote fetcher interface
 

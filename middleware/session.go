@@ -66,6 +66,10 @@ func (s *SessionStore) ActiveCount(now time.Time) int {
 
 var sessionStore = NewSessionStore()
 
+// DefaultSessionStore is the process runtime used by compatibility middleware
+// and the single supported on-disk data root.
+func DefaultSessionStore() *SessionStore { return sessionStore }
+
 var errTooManySessions = errors.New("too many active sessions")
 
 func tokenDigest(token string) [sha256.Size]byte {

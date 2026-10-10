@@ -5,9 +5,20 @@ package middleware
 import (
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"lanpaper/config"
 )
+
+func TestDiskUsageMetricIsCached(t *testing.T) {
+	now := time.Now()
+	diskMetricCache.Lock()
+	diskMetricCache.at, diskMetricCache.bytes = now, 123
+	diskMetricCache.Unlock()
+	if got := diskUsageMetric(now.Add(time.Second)); got != 123 {
+		t.Fatalf("cached disk usage=%d", got)
+	}
+}
 
 func TestDisabledMetricsDoesNotAdvertiseAuthentication(t *testing.T) {
 	old := config.Current

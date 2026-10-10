@@ -51,6 +51,10 @@ func (s *RateStore) Reset() {
 }
 
 var defaultRateStore = NewRateStore()
+
+// DefaultRateStore is the process runtime used by compatibility middleware.
+func DefaultRateStore() *RateStore { return defaultRateStore }
+
 var rateTable = &defaultRateStore.table // compatibility view for existing tests
 
 func shardIndex(key string) uint32 {

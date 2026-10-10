@@ -32,9 +32,10 @@ Notable changes to Lanpaper. Docker images are published as
   playlist metadata/file cleanup now have one injected invariant owner.
 - **Injected upload service.** Upload source processing, atomic publication and
   metadata commit now flow through an App-owned service with typed stage errors.
-- **Instance-owned authentication runtime.** Applications now construct
-  independent session and token-bucket stores, with tests preventing mutable
-  state from leaking between instances.
+- **Explicit authentication runtime stores.** Session and token-bucket owners
+  can be constructed independently and are isolation-tested. The production
+  App references the actual process runtime until request-level injection is
+  completed; it no longer advertises unused per-App stores.
 - **Application composition root.** Production routes now originate from an
   `App` dependency graph containing immutable configuration, stores, session
   and limiter runtimes, services and structured logging.

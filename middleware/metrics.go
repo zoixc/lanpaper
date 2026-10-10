@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"lanpaper/config"
@@ -52,6 +53,31 @@ func MetricsEndpoint(w http.ResponseWriter, r *http.Request) {
 	MaybeBasicAuth(HandleMetrics)(w, r)
 }
 
+var diskMetricCache struct {
+	sync.Mutex
+	at    time.Time
+	bytes int64
+}
+
+func diskUsageMetric(now time.Time) int64 {
+	diskMetricCache.Lock()
+	defer diskMetricCache.Unlock()
+	if now.Sub(diskMetricCache.at) < 30*time.Second {
+		return diskMetricCache.bytes
+	}
+	var bytes int64
+	_ = filepath.WalkDir("data", func(path string, d os.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			if info, e := d.Info(); e == nil {
+				bytes += info.Size()
+			}
+		}
+		return nil
+	})
+	diskMetricCache.at, diskMetricCache.bytes = now, bytes
+	return bytes
+}
+
 func HandleMetrics(w http.ResponseWriter, r *http.Request) {
 	if !config.Current.MetricsEnabled {
 		http.NotFound(w, r)
@@ -62,17 +88,8 @@ func HandleMetrics(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	var disk int64
-	_ = filepath.WalkDir("data", func(path string, d os.DirEntry, err error) error {
-		if err == nil && !d.IsDir() {
-			if info, e := d.Info(); e == nil {
-				disk += info.Size()
-			}
-		}
-		return nil
-	})
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4")
-	appmetrics.WritePrometheus(w, ActiveSessionCount(), disk)
+	appmetrics.WritePrometheus(w, ActiveSessionCount(), diskUsageMetric(time.Now()))
 }
 
 func ActiveSessionCount() int { return sessionStore.ActiveCount(time.Now()) }

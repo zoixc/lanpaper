@@ -23,11 +23,12 @@ injected references.
 
 ## Boundary review
 
-- `App` is the only production route composition root and owns service,
+- `App` is the only production route composition root and describes service,
   session, limiter and logger dependencies.
-- Session and limiter constructors produce independent mutable stores. Package
-  defaults remain compatibility surfaces for direct middleware tests; they are
-  not shared by the App dependency graph.
+- Session and limiter constructors produce independent mutable stores. The
+  comprehensive 1–20 review later found request middleware still consumes the
+  process defaults; App now references those actual defaults until context-level
+  injection is completed.
 - Upload publication still follows stage, publish, metadata commit and reverse
   rollback ordering. `UploadError` adds machine-testable stage context without
   changing the generic HTTP error body.

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"lanpaper/config"
+	"lanpaper/middleware"
 )
 
 func TestAppCapturesImmutableConfigurationAndDependencies(t *testing.T) {
@@ -24,10 +25,10 @@ func TestAppCapturesImmutableConfigurationAndDependencies(t *testing.T) {
 	}
 }
 
-func TestAppInstancesOwnIndependentRuntimeState(t *testing.T) {
-	first, second := NewApp(), NewApp()
-	if first.Sessions == second.Sessions || first.Limiters == second.Limiters {
-		t.Fatal("application instances share mutable authentication or limiter state")
+func TestAppUsesTheRuntimeConsumedByCompatibilityMiddleware(t *testing.T) {
+	app := NewApp()
+	if app.Sessions != middleware.DefaultSessionStore() || app.Limiters != middleware.DefaultRateStore() {
+		t.Fatal("App advertises runtime stores that its compatibility middleware does not consume")
 	}
 }
 
