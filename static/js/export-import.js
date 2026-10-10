@@ -151,6 +151,8 @@ import { getPanelFacade, registerFeature } from './features.js';
         } catch (error) {
             if (progress) progress.dismissToast();
             if ((error && error.name === 'AbortError') || (error && error.kind === 'cancelled')) {
+                if (error.importReport) downloadReport(error.importReport);
+                await a.reloadLinks();
                 say('import_cancelled', 'info');
                 return;
             }
@@ -164,7 +166,15 @@ import { getPanelFacade, registerFeature } from './features.js';
         const report = { dryRun, total: records.length, created: 0, skipped: 0, failed: 0, results: [] };
         for (let offset = 0; offset < records.length; offset += 100) {
             const batch = records.slice(offset, offset + 100);
-            const response = await a.request('/api/import/links', 'POST', { records: batch, dryRun }, false, signal);
+            let response;
+            try {
+                response = await a.request('/api/import/links', 'POST', { records: batch, dryRun }, false, signal);
+            } catch (error) {
+                report.cancelled = !!(error && (error.name === 'AbortError' || error.kind === 'cancelled'));
+                report.processed = report.results.length;
+                error.importReport = report;
+                throw error;
+            }
             report.created += response.created || 0;
             report.skipped += response.skipped || 0;
             response.results.forEach(item => report.results.push(Object.assign({}, item, { index: item.index + offset })));

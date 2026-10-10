@@ -60,14 +60,14 @@ without populating the browser's origin-wide Basic credential cache.
 It found and corrected legacy-ID normalization, stale startup cleanup and the
 remaining cached-Basic fallback on browser API requests.
 
-### PR 5 — Hashed administrator credentials **(implemented; full CI pending)**
+### PR 5 — Hashed administrator credentials **(implemented and CI-verified)**
 
 Added `ADMIN_PASSWORD_HASH` using bounded Argon2id PHC verification, a
 standard-input hash-generation command, password-rotation session invalidation
 and deprecation warnings for plaintext `adminPass`. `ADMIN_PASS` remains a
 documented migration path for one compatibility cycle.
 
-### PR 6 — Split insecure TLS controls **(implemented; full CI pending)**
+### PR 6 — Split insecure TLS controls **(implemented and CI-verified)**
 
 Added independent `REMOTE_INSECURE_SKIP_VERIFY` and
 `PROXY_INSECURE_SKIP_VERIFY` controls, retained the broad switch as a deprecated
@@ -75,14 +75,14 @@ compatibility alias, and tested that target opt-out cannot weaken proxy TLS.
 
 ## Phase 1 — recovery, testing and observability
 
-### PR 7 — Persistence fault-injection framework **(implemented; full CI pending)**
+### PR 7 — Persistence fault-injection framework **(implemented and CI-verified)**
 
 Introduced a shared durable atomic-write primitive with deterministic seams for
 create, chmod, write, file sync/close, rename and directory open/sync/close.
 Session and wallpaper metadata persistence use it, with a fault-matrix test that
 does not rely on filesystem permissions.
 
-### PR 8 — Upload transaction fault matrix **(implemented; full CI pending)**
+### PR 8 — Upload transaction fault matrix **(implemented and CI-verified)**
 
 Made `validate → stage → publish → commit → finalize/rollback` an explicit
 state machine around the existing atomic media publication. Fault-matrix tests
@@ -94,28 +94,28 @@ request files remain cleanup-owned until publication.
 It found and corrected post-rename durability errors that could otherwise leave
 memory behind the already-renamed on-disk state.
 
-### PR 9 — Read-only storage audit command **(implemented; full CI pending)**
+### PR 9 — Read-only storage audit command **(implemented and CI-verified)**
 
 Added `lanpaper audit [--json] [--root DIR]` reporting missing referenced files,
 orphans, stale temporary files, invalid types/permissions and history/playlist
 size drift. Audits use a read-only filesystem walk and return a nonzero status
 when inconsistencies are found.
 
-### PR 10 — Explicit repair command **(implemented; full CI pending)**
+### PR 10 — Explicit repair command **(implemented and CI-verified)**
 
 Added explicit `lanpaper repair --dry-run|--apply`, timestamped quarantine,
 fsynced JSONL operation journal, metadata backup, exclusive repair lock and
 recovery tests. Missing live media and invalid records remain manual rather
 than being guessed or deleted.
 
-### PR 11 — Structured logging **(implemented; full CI pending)**
+### PR 11 — Structured logging **(implemented and CI-verified)**
 
 Adopted console-readable `log/slog` output with stable event fields, an adapter
 for legacy call sites, named authentication events and centralized redaction of
 password, token, cookie, authorization, proxy-secret, URL and query attributes.
 Redaction and compatibility output are covered by tests.
 
-### PR 12 — Operational metrics **(implemented; full CI pending)**
+### PR 12 — Operational metrics **(implemented and CI-verified)**
 
 Added the opt-in, administrator-authenticated `/metrics` endpoint with bounded
 Prometheus status-class and latency-bucket counters, active uploads, bounded
@@ -126,7 +126,7 @@ and data-directory usage. No paths, link names, clients or tokens are labels.
 It corrected ignored audit traversal failures, non-durable repair metadata
 replacement and authentication disclosure on the disabled metrics endpoint.
 
-### PR 13 — Broader browser E2E **(implemented; full CI pending)**
+### PR 13 — Broader browser E2E **(implemented and CI-verified)**
 
 Added desktop/phone browser workflows covering create, repeated upload, rename,
 access changes, token rotation, history, playlist append, token-safe link-list
@@ -134,14 +134,14 @@ export/import semantics and delete. Multi-tab tests verify that logout expires
 other tabs without a cached Basic-auth fallback; persistence rollback remains
 covered by deterministic integration tests.
 
-### PR 14 — Accessibility and cross-browser CI **(implemented; full CI pending)**
+### PR 14 — Accessibility and cross-browser CI **(implemented and CI-verified)**
 
 Added axe serious/critical checks, keyboard-only create-dialog focus checks,
 200% zoom at a 320 px viewport, long German settings labels and a Desktop
 Safari/WebKit project. CI installs and runs both Chromium and WebKit; focus
 restoration and existing live-region semantics are asserted directly.
 
-### PR 15 — Security fuzzing **(implemented; full CI pending)**
+### PR 15 — Security fuzzing **(implemented and CI-verified)**
 
 Added bounded, regression-seeded Go fuzz targets for multipart fields and file
 bytes, route selectors, Origin/Forwarded/X-Forwarded-For handling and security
@@ -151,7 +151,7 @@ Go CI executes every seed corpus.
 
 ## Phase 2 — resource governance and backend modularity
 
-### PR 16 — Rate-limiter model upgrade **(implemented; full CI pending)**
+### PR 16 — Rate-limiter model upgrade **(implemented and CI-verified)**
 
 Replaced fixed windows with sharded continuously refilled token buckets whose
 capacity includes the configured burst while refill uses the sustained rate.
@@ -165,7 +165,7 @@ It corrected non-representative export/import coverage, a fuzz compilation
 error and accessibility/viewport assumptions, and added missing session/media
 fuzz coverage.
 
-### PR 17 — Application composition root **(implemented; full CI pending)**
+### PR 17 — Application composition root **(implemented and CI-verified)**
 
 Added `App` with copied immutable configuration, wallpaper services, session and
 limiter lifecycle interfaces and structured logger. The complete production
@@ -182,7 +182,7 @@ so `NewApp` now truthfully references that runtime rather than advertising
 unused fresh stores. Context/closure injection through every auth and limiter
 handler remains required before multiple isolated Apps are supported.
 
-### PR 19 — Upload service extraction **(implemented; full CI pending)**
+### PR 19 — Upload service extraction **(implemented and CI-verified)**
 
 Extracted `UploadService` with injected wallpaper storage as the owner of source
 resolution, inspection, processing, publication and metadata commit. The App
@@ -190,7 +190,7 @@ route uses the service directly while the old handler name is a compatibility
 adapter. Typed stage errors preserve underlying causes and the existing HTTP
 response contract.
 
-### PR 20 — History and playlist service extraction **(implemented; full CI pending)**
+### PR 20 — History and playlist service extraction **(implemented and CI-verified)**
 
 Added injected `LibraryService` for history listing/rollback/deletion and
 playlist metadata/file removal. Store-scoped history deletion preserves byte
@@ -206,7 +206,7 @@ store and revalidated transaction, counter and error boundaries.
 It corrected an inaccurate per-App runtime ownership claim, marked remaining
 request-level isolation work explicitly, and bounded metrics disk-scan cost.
 
-### PR 21 — Remote fetcher interface **(implemented; full CI pending)**
+### PR 21 — Remote fetcher interface **(implemented and CI-verified)**
 
 Added `RemoteFetcher` with injected public-URL resolver, round tripper, clock and
 temporary directory while retaining per-hop IP pinning, SNI/Host preservation,
@@ -216,7 +216,7 @@ use separate bounded semaphores so slow networks do not consume decode slots.
 
 ## Phase 3 — frontend maintainability and UX
 
-### PR 22 — Frontend API/error module **(implemented; full CI pending)**
+### PR 22 — Frontend API/error module **(implemented and CI-verified)**
 
 Extracted fetch/serialization/decoding into native `api.js` with typed
 `ApiError`, cancellation, retryability, optional `X-Error-Code` machine codes
@@ -224,14 +224,14 @@ and centralized session-expiry handling. The panel and export/import scripts now
 load as ordered native modules; legacy server text remains only as a display
 fallback where endpoints do not yet emit codes.
 
-### PR 23 — Frontend state and rendering modules **(implemented; full CI pending)**
+### PR 23 — Frontend state and rendering modules **(implemented and CI-verified)**
 
 Extracted state defaults, API-record normalization, filters, selectors, sorting
 and incremental-render transitions into the framework-free `state.js` module.
 The existing plain-DOM card renderer consumes those selectors, while focused
 state-transition tests cover combined filtering, pin ordering and render resets.
 
-### PR 24 — Feature modules **(implemented; full CI pending)**
+### PR 24 — Feature modules **(implemented and CI-verified)**
 
 Added a module-local feature registry and immutable capability facade. Link-list
 export/import is a registered feature and no longer depends on the broad
@@ -240,14 +240,16 @@ lives in an injected controller; access, history, playlist and settings/export
 models are isolated in `feature-domain.js`. `app.js` retains DOM composition,
 while dialog lifecycle moves next to the dedicated overlay controller in PR 25.
 
-### PR 25 — Accessible overlay controller **(implemented; full CI pending)**
+**Retrospective 21–24 completed:** [`RETROSPECTIVE_PR21_PR24.md`](RETROSPECTIVE_PR21_PR24.md).
+
+### PR 25 — Accessible overlay controller **(implemented and CI-verified)**
 
 Centralized nested dialog stacking, background inertness, focus trap/restore,
 scroll lock, Escape/scrim dismissal and live-region announcements in an
 injected controller. Visual-viewport resize handling keeps the focused field
 visible above mobile virtual keyboards; focused tests cover nesting and Escape.
 
-### PR 26 — Bulk import API and progress UI **(implemented; full CI pending)**
+### PR 26 — Bulk import API and progress UI **(implemented and CI-verified)**
 
 Added an admin-only validate-first/dry-run API with atomic batches capped at
 100 records, machine-readable validation codes and per-record results. The UI
