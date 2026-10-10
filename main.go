@@ -165,6 +165,10 @@ func main() {
 			log.Printf("Shutdown error: %v", err)
 		}
 	}
+	// Close after the HTTP server has drained, so no request can still write.
+	if err := storage.Global.Close(); err != nil {
+		log.Printf("Warning: closing metadata database: %v", err)
+	}
 	log.Println("Server stopped.")
 }
 

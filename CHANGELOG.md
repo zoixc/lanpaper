@@ -17,6 +17,15 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Metadata is stored in SQLite (`data/wallpapers.db`).** Every change is one
+  transaction that writes only the changed link and its history, playlist and
+  rotation rows, instead of rewriting the whole JSON file. One change in a
+  3,000-link library takes about 3.5 ms (about 21 ms before). Reads still come
+  from memory, and a failed write is never published to readers. On the first
+  start, an existing `wallpapers.json` is imported automatically after a
+  checksum-verified backup. The original file is kept and never written again.
+  `recovery audit` and `recovery repair` work on the database when it exists.
+  Sessions remain in `data/sessions.json`.
 - **Successful Basic-auth verifications are cached for five minutes.** Scripts
   that send the same credentials on every request no longer pay one Argon2
   evaluation (tens to over a hundred milliseconds of CPU, depending on load) per

@@ -1,7 +1,16 @@
 # JSON-to-SQLite migration
 
-The migration is explicit and offline. The server does not silently switch
-storage formats or delete `wallpapers.json`.
+The server now uses SQLite for metadata. On its first start with an existing
+`data/wallpapers.json` and no `data/wallpapers.db`, it imports the JSON file
+automatically: it verifies the checksum, makes a durable backup named
+`wallpapers.json.pre-sqlite-<UTC time>.bak`, writes the database in batches and
+keeps the original JSON file. An interrupted import is resumed on the next start
+from its checkpoint.
+
+This page describes the manual `migrate-sqlite` command, which is still useful
+for dry runs, for checking an installation before upgrading, and for staging a
+database somewhere other than the default location. The command is explicit and
+offline and never deletes `wallpapers.json`.
 
 ## Before migrating
 
@@ -68,3 +77,13 @@ running server's backend. Downgrade at this roadmap stage therefore means
 removing the staged SQLite files and continuing with the untouched JSON source.
 Do not start independent writers against both metadata files. Media files stay
 compatible because both backends use the same filesystem layout.
+
+## Going back to a JSON-only version
+
+Versions before the SQLite backend read only `data/wallpapers.json`. After the
+upgrade that file is a snapshot from the moment of import, so those versions
+would show stale data and would not see later changes. To go back, stop the
+server, then either restore the whole `data/` directory from a backup taken
+before the upgrade, or copy the newest state out of the database and into
+`wallpapers.json` with `recovery` tooling. Do not run an old binary against a
+directory that has changed since the upgrade.

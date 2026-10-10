@@ -4,9 +4,9 @@
 //
 // The store is copy-on-write: readers take an RLock and get a shallow clone of
 // a record or of the sorted snapshot, writers clone the map, apply the edit and
-// commit it through atomicWrite, which writes a temporary sibling, fsyncs it,
-// renames it over data/wallpapers.json and fsyncs the directory. A crash
-// therefore leaves either the old file or the new one, never a truncated one.
+// commit it. A commit writes only the records that changed, in one SQLite
+// transaction on data/wallpapers.db (synchronous=FULL in WAL mode). A crash
+// therefore leaves either the old state or the new one, never a partial record.
 // Because snapshots are shared, a caller must never mutate a slice it got from
 // Get or GetAll — build a new one inside an Update closure.
 //

@@ -133,26 +133,21 @@ func ApplyRepair(plan RepairPlan) (err error) {
 		}
 	}
 	if metaChanged {
-		metadataOp := Operation{"commit-metadata", "data/wallpapers.json", "durable atomic replacement"}
+		metaLabel := "data/wallpapers.json"
+		if storage.MetadataDatabaseExists(plan.Root) {
+			metaLabel = "data/wallpapers.db"
+		}
+		metadataOp := Operation{"commit-metadata", metaLabel, "durable atomic replacement"}
 		if err := record(metadataOp, "started", nil); err != nil {
 			return err
 		}
-		metaPath := filepath.Join(dataDir, "wallpapers.json")
-		body, err := json.MarshalIndent(records, "", "  ")
-		if err != nil {
-			return err
-		}
-		backup := filepath.Join(qdir, "data", "wallpapers.json.before-repair")
-		if err := os.MkdirAll(filepath.Dir(backup), 0o700); err != nil {
-			return err
-		}
-		if original, readErr := os.ReadFile(metaPath); readErr == nil {
-			if err := atomicfile.Write(atomicfile.OSFS{}, backup, ".metadata-backup-*", original, 0o600); err != nil && !atomicfile.IsCommitted(err) {
+		if storage.MetadataDatabaseExists(plan.Root) {
+			backup := filepath.Join(qdir, "data", "wallpapers.db.before-repair")
+			if err := storage.RepairMetadataDatabase(plan.Root, records, backup); err != nil {
 				_ = record(metadataOp, "failed", err)
 				return err
 			}
-		}
-		if err := atomicfile.Write(atomicfile.OSFS{}, metaPath, ".repair-metadata-*", body, 0o600); err != nil && !atomicfile.IsCommitted(err) {
+		} else if err := writeLegacyMetadata(dataDir, qdir, records); err != nil {
 			_ = record(metadataOp, "failed", err)
 			return err
 		}
@@ -164,16 +159,7 @@ func ApplyRepair(plan RepairPlan) (err error) {
 }
 
 func readRecords(root string) (map[string]*storage.Wallpaper, error) {
-	body, err := os.ReadFile(filepath.Join(root, "data", "wallpapers.json"))
-	if os.IsNotExist(err) {
-		return map[string]*storage.Wallpaper{}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	var records map[string]*storage.Wallpaper
-	err = json.Unmarshal(body, &records)
-	return records, err
+	return storage.ReadMetadataRecords(root)
 }
 func updateRecord(records map[string]*storage.Wallpaper, path string, size int64, remove bool) bool {
 	parts := strings.Split(filepath.ToSlash(path), "/")
@@ -228,4 +214,28 @@ func updateRecord(records map[string]*storage.Wallpaper, path string, size int64
 		}
 	}
 	return false
+}
+
+// writeLegacyMetadata rewrites wallpapers.json for installations that have not
+// been imported into SQLite. The previous file is copied into the quarantine
+// directory first.
+func writeLegacyMetadata(dataDir, qdir string, records map[string]*storage.Wallpaper) error {
+	metaPath := filepath.Join(dataDir, "wallpapers.json")
+	body, err := json.MarshalIndent(records, "", "  ")
+	if err != nil {
+		return err
+	}
+	backup := filepath.Join(qdir, "data", "wallpapers.json.before-repair")
+	if err := os.MkdirAll(filepath.Dir(backup), 0o700); err != nil {
+		return err
+	}
+	if original, readErr := os.ReadFile(metaPath); readErr == nil {
+		if err := atomicfile.Write(atomicfile.OSFS{}, backup, ".metadata-backup-*", original, 0o600); err != nil && !atomicfile.IsCommitted(err) {
+			return err
+		}
+	}
+	if err := atomicfile.Write(atomicfile.OSFS{}, metaPath, ".repair-metadata-*", body, 0o600); err != nil && !atomicfile.IsCommitted(err) {
+		return err
+	}
+	return nil
 }
