@@ -240,9 +240,12 @@ lives in an injected controller; access, history, playlist and settings/export
 models are isolated in `feature-domain.js`. `app.js` retains DOM composition,
 while dialog lifecycle moves next to the dedicated overlay controller in PR 25.
 
-### PR 25 — Accessible overlay controller
+### PR 25 — Accessible overlay controller **(implemented; full CI pending)**
 
-Centralize dialog stacking, focus trap/restore, scroll lock, Escape handling and live-region announcements. Verify nested dialogs and mobile virtual keyboard behaviour.
+Centralized nested dialog stacking, background inertness, focus trap/restore,
+scroll lock, Escape/scrim dismissal and live-region announcements in an
+injected controller. Visual-viewport resize handling keeps the focused field
+visible above mobile virtual keyboards; focused tests cover nesting and Escape.
 
 ### PR 26 — Bulk import API and progress UI
 

@@ -13,6 +13,7 @@ import { registerPanelFacade, getFeature } from './features.js';
 import { accessMeta, entryMeta as formatEntryMeta, entryTitle as formatEntryTitle,
     panelSnapshot } from './feature-domain.js';
 import { createUploadFeature } from './upload-feature.js';
+import { createOverlayController } from './overlay-controller.js';
 import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as linkMatchesQuery,
     countFilteredLinks, resetIncrementalRender, selectVisibleLinks } from './state.js';
 
@@ -1062,72 +1063,38 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
        ======================================================== */
     const host = () => $('#overlayHost');
     let currentOverlay = null;
-    let lastFocused = null;
+    const overlayController = createOverlayController({
+        document,
+        visualViewport: window.visualViewport,
+        host,
+        createScrim: onClick => h('div', { class: 'scrim', onclick: onClick }),
+        announce: message => {
+            const live = $('#overlayAnnouncements');
+            if (live) live.textContent = message;
+        },
+        onChange: function (active, depth, overlays) {
+            currentOverlay = active;
+            document.body.style.overflow = depth ? 'hidden' : '';
+            const settingsOpen = overlays.some(item => item.node.matches('[data-sheet="settings"]'));
+            document.body.classList.toggle('settings-open', settingsOpen);
+            setSettingsExpanded(settingsOpen);
+            if (!depth) closeMenu();
+        }
+    });
 
     function openOverlay(node, opts) {
-        // Запоминаем, откуда пришли: после закрытия фокус вернётся туда же.
-        const origin = document.activeElement;
-        closeOverlay(true);
-        lastFocused = (origin && origin !== document.body) ? origin : lastFocused;
-        const scrim = h('div', { class: 'scrim', onclick: () => { if (!(opts && opts.persistent)) closeOverlay(); } });
-        host().append(scrim, node);
-        /* Тексты шаблонов переводим здесь: <template> лежит вне документа,
-           и переводы, наложенные при запуске, до клона не дотягиваются. */
         applyTranslations(node);
-        currentOverlay = {
-            node: node, scrim: scrim, kind: (opts && opts.kind) || 'other',
-            /* Кто-то ждёт ответа «закрыли и не подтвердили» — например,
-               импорт списка: отмена должна вернуть управление, а не
-               оставить ожидание навсегда. */
-            onDismiss: (opts && opts.onDismiss) || null
-        };
-        document.body.style.overflow = 'hidden';
-        /* Шестерёнка в шапке поворачивается, пока открыт пульт настроек —
-           как в 0.12.1, где это делал класс .open у выпадашки. */
-        const settingsOpen = !!$('[data-sheet="settings"]');
-        document.body.classList.toggle('settings-open', settingsOpen);
-        setSettingsExpanded(settingsOpen);
         hydrateIcons(node);
-        const target = (opts && opts.focus) || node.querySelector('[autofocus], input, button');
-        setTimeout(() => target && target.focus({ preventScroll: true }), 40);
-        return node;
+        return overlayController.open(node, opts || {});
     }
-    /* Шестерёнка не только поворачивается, но и сообщает экранному диктору,
-       открыт ли пульт настроек: без aria-expanded кнопка «Настройки» звучит
-       одинаково до и после нажатия. */
     function setSettingsExpanded(open) {
         const gear = $('#settingsBtn');
         if (gear) gear.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
-    function closeOverlay(keepFocus) {
-        if (!currentOverlay) return;
-        const dismiss = currentOverlay.onDismiss;
-        currentOverlay.node.remove();
-        currentOverlay.scrim.remove();
-        currentOverlay = null;
-        if (dismiss) dismiss();
-        document.body.style.overflow = '';
-        const settingsOpen = !!$('[data-sheet="settings"]');
-        document.body.classList.toggle('settings-open', settingsOpen);
-        setSettingsExpanded(settingsOpen);
-        closeMenu();
-        if (!keepFocus && lastFocused && lastFocused.isConnected) lastFocused.focus({ preventScroll: true });
-        lastFocused = null;
-    }
+    function closeOverlay(keepFocus) { overlayController.close(keepFocus); }
     document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') {
-            if (openMenuEl) { closeMenu(); return; }
-            if (currentOverlay) { closeOverlay(); }
-        }
-        if (e.key === 'Tab' && currentOverlay) {
-            const focusables = $$('a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])', currentOverlay.node)
-                .filter(el => el.offsetParent !== null);
-            if (!focusables.length) return;
-            const first = focusables[0];
-            const last = focusables[focusables.length - 1];
-            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-        }
+        if (e.key === 'Escape' && openMenuEl) { closeMenu(); return; }
+        overlayController.keydown(e);
     });
     document.addEventListener('click', function (e) {
         if (openMenuEl && !openMenuEl.contains(e.target) && !e.target.closest('[aria-haspopup]')) closeMenu();
@@ -2136,7 +2103,6 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
             $('[data-confirm]', node).addEventListener('click', function () {
                 answered = true;
                 closeOverlay(true);
-                lastFocused = null;
                 if (opts.onConfirm) opts.onConfirm();
                 resolve(true);
             });
@@ -2144,6 +2110,7 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
                это отказ; ответ приходит ровно один раз. */
             openOverlay(node, {
                 focus: $('[data-confirm]', node),
+                stack: true, label: opts.title,
                 onDismiss: function () { if (!answered) resolve(false); }
             });
         });

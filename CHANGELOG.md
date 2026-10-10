@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Accessible overlays.** Dialog stacking, inert backgrounds, focus
+  trap/restore, scroll locking, Escape dismissal, announcements and virtual
+  keyboard viewport changes now share one tested controller.
 - **Frontend feature modules.** Feature code now communicates through an
   immutable capability registry; link-list import/export, upload orchestration,
   and access/history/playlist/settings models are isolated from mutable panel

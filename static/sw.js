@@ -14,6 +14,7 @@ const STATIC_ASSETS = [
   '/static/js/features.js',
   '/static/js/feature-domain.js',
   '/static/js/upload-feature.js',
+  '/static/js/overlay-controller.js',
   '/static/js/export-import.js',
   '/static/js/settings-menu.js',
   '/static/js/compressor.js',
