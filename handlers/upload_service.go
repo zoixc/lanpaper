@@ -31,7 +31,6 @@ func NewUploadService(store *storage.Store) *UploadService {
 	return &UploadService{Store: store}
 }
 
-var defaultUploadService = NewUploadService(storage.Global)
-
-// Upload is the compatibility HTTP entry point used by existing routing.
-func Upload(w http.ResponseWriter, r *http.Request) { defaultUploadService.Upload(w, r) }
+// Upload is the compatibility HTTP entry point used by direct handler tests.
+// Resolve storage.Global at call time because legacy tests replace that pointer.
+func Upload(w http.ResponseWriter, r *http.Request) { NewUploadService(storage.Global).Upload(w, r) }

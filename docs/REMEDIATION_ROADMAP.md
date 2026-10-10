@@ -197,6 +197,10 @@ accounting; playlist bytes are removed only after metadata commit. App routes
 use the service directly, typed errors retain not-found causes, and compatibility
 entry points preserve the API contract.
 
+**Retrospective 17–20 completed:** [`RETROSPECTIVE_PR17_PR20.md`](RETROSPECTIVE_PR17_PR20.md).
+It corrected compatibility services that captured a stale replaceable global
+store and revalidated transaction, counter and error boundaries.
+
 ### PR 21 — Remote fetcher interface
 
 Inject resolver, transport and clock; retain IP pinning and per-redirect checks. Improve proxy tests, timeout tests and separate processing concurrency from network concurrency.

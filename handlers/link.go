@@ -224,7 +224,7 @@ func Link(w http.ResponseWriter, r *http.Request) {
 			}
 			if req.RemoveItem != nil {
 				var mutationErr error
-				removedItem, mutationErr = defaultLibraryService.removePlaylistMetadata(wp, removeID)
+				removedItem, mutationErr = defaultLibraryService().removePlaylistMetadata(wp, removeID)
 				if mutationErr != nil {
 					return mutationErr
 				}
@@ -246,7 +246,7 @@ func Link(w http.ResponseWriter, r *http.Request) {
 		// The item file is removed only after the metadata commit, so a failed
 		// save can never leave a listed item without its bytes.
 		if removedItem.ID > 0 {
-			if removeErr := defaultLibraryService.cleanupPlaylistItem(name, removedItem); removeErr != nil {
+			if removeErr := defaultLibraryService().cleanupPlaylistItem(name, removedItem); removeErr != nil {
 				log.Printf("Could not remove playlist item from %s: %v", name, removeErr)
 			}
 			log.Printf("Removed playlist item #%d from %s", removedItem.ID, name)

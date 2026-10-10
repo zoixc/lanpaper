@@ -20,7 +20,9 @@ func NewLibraryService(store *storage.Store) *LibraryService {
 	return &LibraryService{Store: store}
 }
 
-var defaultLibraryService = NewLibraryService(storage.Global)
+func defaultLibraryService() *LibraryService {
+	return NewLibraryService(storage.Global)
+}
 
 type LibraryError struct {
 	Operation string
@@ -74,8 +76,8 @@ func IsLibraryNotFound(err error) bool {
 	return errors.Is(err, storage.ErrNotFound) || errors.Is(err, errItemNotFound)
 }
 
-func LinkHistory(w http.ResponseWriter, r *http.Request)  { defaultLibraryService.LinkHistory(w, r) }
-func RollbackLink(w http.ResponseWriter, r *http.Request) { defaultLibraryService.RollbackLink(w, r) }
+func LinkHistory(w http.ResponseWriter, r *http.Request)  { defaultLibraryService().LinkHistory(w, r) }
+func RollbackLink(w http.ResponseWriter, r *http.Request) { defaultLibraryService().RollbackLink(w, r) }
 func DeleteHistoryVersion(w http.ResponseWriter, r *http.Request) {
-	defaultLibraryService.DeleteHistoryVersion(w, r)
+	defaultLibraryService().DeleteHistoryVersion(w, r)
 }
