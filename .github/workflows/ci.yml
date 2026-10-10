@@ -235,6 +235,47 @@ jobs:
 
           docker rm -f lp_test
 
+          # Disaster-recovery smoke test: create durable state, take a stopped
+          # full-volume backup, destroy the working copy, restore it, and prove
+          # that the application can read the restored record.
+          docker run -d --name lp_dr_source -p 8080:8080 \
+            --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m,mode=1777 \
+            --mount type=bind,source=/tmp/lp_test_data,destination=/app/data \
+            --cap-drop ALL --security-opt no-new-privileges:true \
+            --pids-limit 128 --memory 1g --cpus 2.0 \
+            -e DISABLE_AUTH=true lanpaper:test
+          for i in $(seq 1 15); do
+            curl -sf http://localhost:8080/health/ready >/dev/null && break
+            test "$i" -lt 15 || { docker logs lp_dr_source; exit 1; }
+            sleep 2
+          done
+          test "$(curl -sS -o /tmp/create.json -w '%{http_code}' \
+            -H 'Content-Type: application/json' \
+            -d '{"linkName":"restore-proof","accessLevel":"public"}' \
+            http://localhost:8080/api/link)" = "201"
+          docker stop --time 35 lp_dr_source
+          docker rm lp_dr_source
+          sudo tar --numeric-owner -C /tmp/lp_test_data -czf /tmp/lanpaper-backup.tar.gz .
+          sudo find /tmp/lp_test_data -mindepth 1 -delete
+          sudo tar --numeric-owner -C /tmp/lp_test_data -xzf /tmp/lanpaper-backup.tar.gz
+          sudo chown -R 100:101 /tmp/lp_test_data
+
+          docker run -d --name lp_dr_restore -p 8080:8080 \
+            --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m,mode=1777 \
+            --mount type=bind,source=/tmp/lp_test_data,destination=/app/data \
+            --cap-drop ALL --security-opt no-new-privileges:true \
+            --pids-limit 128 --memory 1g --cpus 2.0 \
+            -e DISABLE_AUTH=true lanpaper:test
+          for i in $(seq 1 15); do
+            curl -sf http://localhost:8080/health/ready >/dev/null && break
+            test "$i" -lt 15 || { docker logs lp_dr_restore; exit 1; }
+            sleep 2
+          done
+          curl -sf http://localhost:8080/api/wallpapers | \
+            jq -e 'any(.[]; .linkName == "restore-proof")' >/dev/null
+          docker stop --time 35 lp_dr_restore
+          docker rm lp_dr_restore
+
       - name: Generate SPDX and CycloneDX SBOMs
         uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:

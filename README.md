@@ -56,7 +56,8 @@ link, which is handy for digital frames, smart TVs, kiosks and other displays.
   with optional built-in TLS (`TLS_CERT_FILE` + `TLS_KEY_FILE`),
   HTTP/HTTPS/SOCKS5 proxy support for outbound downloads, health and readiness
   probes, graceful shutdown, and a `robots.txt` that keeps crawlers off mutable
-  media URLs. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+  media URLs. See [deployment](docs/DEPLOYMENT.md) and the tested
+  [disaster-recovery runbook](docs/DISASTER_RECOVERY.md).
 
 ## Quick start
 

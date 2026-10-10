@@ -211,18 +211,15 @@ manual restore from backup.
 
 ## 6. Back up and restore
 
-```sh
-# Consistent enough for a live instance: metadata is renamed atomically,
-# media files are never modified in place.
-tar -C /srv/lanpaper -czf "lanpaper-$(date +%F).tar.gz" data
-```
+Back up the complete `data/` tree after a graceful stop, or archive an atomic
+volume snapshot when downtime is unacceptable. A plain tar of a changing live
+volume is not guaranteed to keep metadata, media and SQLite sidecars from the
+same point in time. Keep encrypted backups outside the container's writable
+layer and perform a quarterly restore drill.
 
-Restore = stop the service, unpack `data/`, start. Verify with
-`GET /health/ready` and one known link. If you cannot afford any window at all,
-snapshot the volume instead of tarring it.
-
-Keep the backup **outside** the container's writable layer and test a restore
-once per quarter: an untested backup is a rumour.
+The step-by-step [disaster-recovery runbook](DISASTER_RECOVERY.md) covers backup
+scope and checksums, staged restore and audit, corruption/repair, disk-full
+response, credential rotation and version rollback.
 
 ## 7. Pre-launch checklist
 

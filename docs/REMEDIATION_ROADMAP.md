@@ -338,9 +338,13 @@ images publish BuildKit SBOM and max-mode provenance attestations and are
 keyless-signed at their immutable digest with Sigstore. Verification and
 digest-pinned deployment are documented in [`SUPPLY_CHAIN.md`](SUPPLY_CHAIN.md).
 
-### PR 36 — Disaster-recovery runbook
+### PR 36 — Disaster-recovery runbook **(implemented; full CI pending)**
 
-Document backup scope, restore drills, audit/repair usage, password/session rotation, corrupted metadata handling, disk-full response and version rollback. Add a CI restore smoke test.
+[`DISASTER_RECOVERY.md`](DISASTER_RECOVERY.md) defines whole-volume backup and
+verified staged restore, quarterly drills, audit/repair and quarantine handling,
+disk-full response, credential/session rotation and safe digest rollback. CI
+creates durable state in the hardened image, destroys it, restores a stopped
+archive and verifies the restored record through a fresh container.
 
 ## Dependency chain
 

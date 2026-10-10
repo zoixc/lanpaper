@@ -28,6 +28,10 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Tested disaster recovery.** A new runbook covers complete backup scope,
+  checksummed staged restores, drills, audit/repair, corruption and disk-full
+  response, credential rotation and safe version rollback. CI now restores a
+  destroyed data directory and verifies its durable record in a fresh image.
 - **Verifiable release images.** CI now emits SPDX and CycloneDX SBOM artifacts;
   release images carry BuildKit SBOM/provenance attestations and a keyless
   Sigstore signature over the immutable multi-platform digest. Digest-pinned
