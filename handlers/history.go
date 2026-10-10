@@ -3,6 +3,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
@@ -279,7 +280,7 @@ func (s *LibraryService) rollbackToVersion(wp *storage.Wallpaper, entry storage.
 
 	if config.IsVideoExt(entry.Ext) {
 		removeFiles("", wp.PreviewPath)
-	} else if regenErr := regenPreview(updated); regenErr != nil {
+	} else if regenErr := regenPreview(context.Background(), updated); regenErr != nil {
 		// The URL already serves the restored file; only the panel thumbnail is
 		// stale until the next regeneration, so this is logged, not returned.
 		log.Printf("Rollback: preview regeneration failed for %s: %v", wp.LinkName, regenErr)

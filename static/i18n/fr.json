@@ -237,5 +237,6 @@
   "import_progress": "Importation de {{done}} liens sur {{total}}",
   "import_cancelled": "Importation annulée",
   "offline_now": "Vous êtes hors ligne. Les opérations réseau peuvent échouer jusqu’au retour de la connexion.",
-  "operation_in_progress": "Cette opération est déjà en cours"
+  "operation_in_progress": "Cette opération est déjà en cours",
+  "regen_progress": "Aperçus : {{done}} sur {{total}}"
 }

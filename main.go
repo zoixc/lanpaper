@@ -221,9 +221,9 @@ func (a *App) mux() *http.ServeMux {
 	mux.HandleFunc("/api/regenerate-previews",
 		middleware.WithSecurity(middleware.MaybeBasicAuth(
 			middleware.RateLimit(func() (int, int) {
-				// Regen is CPU-heavy — reuse the upload budget.
+				// POST is CPU-heavy; GET exposes only bounded progress state.
 				return config.Current.Rate.UploadPerMin, config.Current.Rate.Burst
-			})(postOnly(handlers.RegeneratePreviews)),
+			})(handlers.RegeneratePreviews),
 		)),
 	)
 	mux.HandleFunc("/", middleware.WithPublicSecurity(middleware.PublicRateLimit(handlers.Public)))

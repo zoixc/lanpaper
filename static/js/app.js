@@ -2409,6 +2409,18 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
         const original = span ? span.textContent : '';
         btn.disabled = true;
         if (span) span.textContent = t('regen_running');
+        let polling = false;
+        const progressTimer = setInterval(async function () {
+            if (polling) return;
+            polling = true;
+            try {
+                const status = await request('/api/regenerate-previews');
+                if (span && status && status.running) {
+                    span.textContent = t('regen_progress', { done: status.completed, total: status.total });
+                }
+            } catch (_) { /* progress is best-effort; the POST owns errors */ }
+            finally { polling = false; }
+        }, 500);
         try {
             const result = await apiCall('/api/regenerate-previews', 'POST');
             if (result) {
@@ -2419,6 +2431,7 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
             }
         } catch (_) { /* текст ошибки уже показан */ }
         finally {
+            clearInterval(progressTimer);
             btn.disabled = false;
             if (span && original) span.textContent = original;
         }

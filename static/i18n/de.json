@@ -237,5 +237,6 @@
   "import_progress": "{{done}} von {{total}} Links werden importiert",
   "import_cancelled": "Import abgebrochen",
   "offline_now": "Sie sind offline. Netzwerkvorgänge können bis zur Wiederherstellung der Verbindung fehlschlagen.",
-  "operation_in_progress": "Dieser Vorgang läuft bereits"
+  "operation_in_progress": "Dieser Vorgang läuft bereits",
+  "regen_progress": "Vorschauen: {{done}} von {{total}}"
 }

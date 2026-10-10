@@ -237,5 +237,6 @@
   "import_progress": "Импортировано {{done}} из {{total}} ссылок",
   "import_cancelled": "Импорт отменён",
   "offline_now": "Нет подключения. Сетевые операции могут завершаться ошибкой до восстановления связи.",
-  "operation_in_progress": "Эта операция уже выполняется"
+  "operation_in_progress": "Эта операция уже выполняется",
+  "regen_progress": "Превью: {{done}} из {{total}}"
 }

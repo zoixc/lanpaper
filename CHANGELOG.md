@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Bounded processing jobs.** Upload and preview work now shares explicit CPU
+  and decoded-memory budgets with cancellation-aware queues and pollable
+  regeneration progress, while durable publication remains synchronous.
 - **Bounded library queries.** The list API now supports validated pagination,
   search, access/media filters and stable sorting; legacy arrays are capped
   with explicit truncation headers and the panel loads bounded pages.

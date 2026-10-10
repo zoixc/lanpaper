@@ -236,14 +236,13 @@ func (s *UploadService) Upload(w http.ResponseWriter, r *http.Request) {
 		source, sourceSize, sourceName = form.file, fi.Size(), form.fileName
 	}
 
-	select {
-	case uploadSem <- struct{}{}:
-		defer func() { <-uploadSem }()
-	default:
+	releaseCPU, err := processingPool.TryAcquire(r.Context())
+	if err != nil {
 		w.Header().Set("Retry-After", "5")
 		http.Error(w, "Image processing capacity reached", http.StatusTooManyRequests)
 		return
 	}
+	defer releaseCPU()
 
 	ext, err := inspectMediaFile(source, sourceName, sourceSize, maxBytes)
 	if err != nil {

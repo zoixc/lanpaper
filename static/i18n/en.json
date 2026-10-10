@@ -237,5 +237,6 @@
   "import_progress": "Importing {{done}} of {{total}} links",
   "import_cancelled": "Import cancelled",
   "offline_now": "You are offline. Network operations may fail until the connection returns.",
-  "operation_in_progress": "This operation is already in progress"
+  "operation_in_progress": "This operation is already in progress",
+  "regen_progress": "Previews: {{done}} of {{total}}"
 }

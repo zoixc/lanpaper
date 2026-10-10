@@ -312,9 +312,14 @@ headers.
 
 **Retrospective 29–32 completed:** [`RETROSPECTIVE_PR29_PR32.md`](RETROSPECTIVE_PR29_PR32.md).
 
-### PR 33 — Background processing pool
+### PR 33 — Background processing pool **(implemented; full CI pending)**
 
-Move decode/preview/regeneration work into bounded jobs with cancellation, progress and independent CPU/memory budgets. Do not acknowledge publication before its required durable state exists.
+Added a shared bounded processing pool with independent CPU slots and decoded
+pixel memory reservations, cancellation-aware waiting and observable queue,
+active, completion and memory counters. Upload publication still waits for its
+full durable transaction. Preview regeneration runs through bounded workers,
+checks cancellation before publication/metadata commit and exposes pollable
+progress consumed by the settings UI.
 
 ## Phase 5 — release and supply-chain hardening
 
