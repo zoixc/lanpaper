@@ -201,10 +201,14 @@ func ArchiveReplaced(prev *Wallpaper, backupPath, ext string, limit int) (*Wallp
 // RemoveHistoryEntry drops one archived version from a link's metadata and
 // deletes its file. The caller must hold the link lock.
 func RemoveHistoryEntry(linkName string, version uint64) (*Wallpaper, error) {
+	return Global.RemoveHistoryEntry(linkName, version)
+}
+
+func (s *Store) RemoveHistoryEntry(linkName string, version uint64) (*Wallpaper, error) {
 	if !utils.IsValidLinkName(linkName) {
 		return nil, errors.New("invalid link name")
 	}
-	wp, exists := Global.Get(linkName)
+	wp, exists := s.Get(linkName)
 	if !exists {
 		return nil, ErrNotFound
 	}
@@ -212,7 +216,7 @@ func RemoveHistoryEntry(linkName string, version uint64) (*Wallpaper, error) {
 	if !found {
 		return nil, ErrNotFound
 	}
-	updated, err := Global.Update(linkName, func(wp *Wallpaper) error {
+	updated, err := s.Update(linkName, func(wp *Wallpaper) error {
 		kept, ok := WithoutHistoryVersion(wp.History, version)
 		if !ok {
 			return ErrNotFound

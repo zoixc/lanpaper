@@ -28,6 +28,8 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **History and playlist service.** History accounting, rollback/deletion and
+  playlist metadata/file cleanup now have one injected invariant owner.
 - **Injected upload service.** Upload source processing, atomic publication and
   metadata commit now flow through an App-owned service with typed stage errors.
 - **Instance-owned authentication runtime.** Applications now construct

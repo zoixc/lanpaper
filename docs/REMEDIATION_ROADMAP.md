@@ -189,9 +189,13 @@ route uses the service directly while the old handler name is a compatibility
 adapter. Typed stage errors preserve underlying causes and the existing HTTP
 response contract.
 
-### PR 20 — History and playlist service extraction
+### PR 20 — History and playlist service extraction **(implemented; full CI pending)**
 
-Encapsulate history byte accounting and playlist mutations so handlers cannot directly violate counters or file/metadata invariants.
+Added injected `LibraryService` for history listing/rollback/deletion and
+playlist metadata/file removal. Store-scoped history deletion preserves byte
+accounting; playlist bytes are removed only after metadata commit. App routes
+use the service directly, typed errors retain not-found causes, and compatibility
+entry points preserve the API contract.
 
 ### PR 21 — Remote fetcher interface
 

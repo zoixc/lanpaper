@@ -203,7 +203,7 @@ func (a *App) mux() *http.ServeMux {
 	// Publish keys (PUBLISH_KEYS) are accepted on the two routes an automation
 	// needs: pushing media and creating the link to push it into. Everything
 	// else on these routes still requires the admin login.
-	mux.HandleFunc("/api/link/", middleware.WithSecurity(middleware.PublishOrAdmin(middleware.AllowPublishCreateLink, handleLinkRoutes)))
+	mux.HandleFunc("/api/link/", middleware.WithSecurity(middleware.PublishOrAdmin(middleware.AllowPublishCreateLink, a.handleLinkRoutes)))
 	mux.HandleFunc("/api/link", middleware.WithSecurity(middleware.PublishOrAdmin(middleware.AllowPublishCreateLink, handlers.Link)))
 	mux.HandleFunc("/api/upload",
 		middleware.WithSecurity(middleware.PublishOrAdmin(middleware.AllowPublishUpload,
@@ -252,17 +252,17 @@ func postOnly(next http.HandlerFunc) http.HandlerFunc {
 // handleLinkRoutes dispatches the sub-resources of /api/link/{name}. Every
 // branch keeps its method, so a GET to /pin or a POST to /history still ends up
 // in the handler that answers 405 for it.
-func handleLinkRoutes(w http.ResponseWriter, r *http.Request) {
+func (a *App) handleLinkRoutes(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	switch {
 	case r.Method == http.MethodPost && strings.HasSuffix(path, "/pin"):
 		handlers.TogglePin(w, r)
 	case r.Method == http.MethodGet && strings.HasSuffix(path, "/history"):
-		handlers.LinkHistory(w, r)
+		a.Services.Library.LinkHistory(w, r)
 	case r.Method == http.MethodPost && strings.HasSuffix(path, "/rollback"):
-		handlers.RollbackLink(w, r)
+		a.Services.Library.RollbackLink(w, r)
 	case r.Method == http.MethodDelete && strings.Contains(path, "/history/"):
-		handlers.DeleteHistoryVersion(w, r)
+		a.Services.Library.DeleteHistoryVersion(w, r)
 	default:
 		handlers.Link(w, r)
 	}

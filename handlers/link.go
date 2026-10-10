@@ -223,12 +223,11 @@ func Link(w http.ResponseWriter, r *http.Request) {
 				wp.Rotate = storage.NormalizeRotatePtr(&rotate, len(wp.Items) > 0)
 			}
 			if req.RemoveItem != nil {
-				items, item, found := storage.WithoutItem(wp.Items, removeID)
-				if !found {
-					return errItemNotFound
+				var mutationErr error
+				removedItem, mutationErr = defaultLibraryService.removePlaylistMetadata(wp, removeID)
+				if mutationErr != nil {
+					return mutationErr
 				}
-				wp.Items = items
-				removedItem = item
 			}
 			return nil
 		})
@@ -247,12 +246,9 @@ func Link(w http.ResponseWriter, r *http.Request) {
 		// The item file is removed only after the metadata commit, so a failed
 		// save can never leave a listed item without its bytes.
 		if removedItem.ID > 0 {
-			path := storage.ItemPath(name, removedItem.ID, removedItem.Ext)
-			if removeErr := os.Remove(path); removeErr != nil && !os.IsNotExist(removeErr) {
-				log.Printf("Could not remove playlist item %s: %v", path, removeErr)
+			if removeErr := defaultLibraryService.cleanupPlaylistItem(name, removedItem); removeErr != nil {
+				log.Printf("Could not remove playlist item from %s: %v", name, removeErr)
 			}
-			// Succeeds only when no other item remains in the directory.
-			_ = os.Remove(storage.ItemsDirPath(name))
 			log.Printf("Removed playlist item #%d from %s", removedItem.ID, name)
 		}
 		w.Header().Set("Content-Type", "application/json")

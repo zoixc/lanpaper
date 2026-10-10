@@ -15,6 +15,7 @@ import (
 type AppServices struct {
 	Wallpapers *storage.Store
 	Upload     *handlers.UploadService
+	Library    *handlers.LibraryService
 }
 
 // App is the composition root. Configuration is copied at construction so the
@@ -30,7 +31,7 @@ type App struct {
 }
 
 func NewApp() *App {
-	return &App{Config: config.Current, Sessions: middleware.NewSessionStore(), Limiters: middleware.NewRateStore(), Logger: slog.Default(), Services: AppServices{Wallpapers: storage.Global, Upload: handlers.NewUploadService(storage.Global)}}
+	return &App{Config: config.Current, Sessions: middleware.NewSessionStore(), Limiters: middleware.NewRateStore(), Logger: slog.Default(), Services: AppServices{Wallpapers: storage.Global, Upload: handlers.NewUploadService(storage.Global), Library: handlers.NewLibraryService(storage.Global)}}
 }
 
 func (a *App) Handler() http.Handler {

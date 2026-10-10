@@ -30,7 +30,7 @@ type historyResponse struct {
 }
 
 // LinkHistory handles GET /api/link/{name}/history.
-func LinkHistory(w http.ResponseWriter, r *http.Request) {
+func (s *LibraryService) LinkHistory(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -40,7 +40,7 @@ func LinkHistory(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid or missing link name", http.StatusBadRequest)
 		return
 	}
-	wp, exists := storage.Global.Get(name)
+	wp, exists := s.Store.Get(name)
 	if !exists {
 		http.Error(w, "Link not found", http.StatusNotFound)
 		return
@@ -92,7 +92,7 @@ var errVersionFileMissing = errors.New("archived file is missing")
 // RollbackLink handles POST /api/link/{name}/rollback and restores an archived
 // version as the file the URL serves. The version that was live is archived by
 // the same operation, so a rollback is itself reversible.
-func RollbackLink(w http.ResponseWriter, r *http.Request) {
+func (s *LibraryService) RollbackLink(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -116,7 +116,7 @@ func RollbackLink(w http.ResponseWriter, r *http.Request) {
 
 	unlock := storage.LockLinks(name)
 	defer unlock()
-	wp, exists := storage.Global.Get(name)
+	wp, exists := s.Store.Get(name)
 	if !exists {
 		http.Error(w, "Link not found", http.StatusNotFound)
 		return
@@ -126,7 +126,7 @@ func RollbackLink(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Version not found", http.StatusNotFound)
 		return
 	}
-	updated, err := rollbackToVersion(wp, entry)
+	updated, err := s.rollbackToVersion(wp, entry)
 	if err != nil {
 		if errors.Is(err, errVersionFileMissing) {
 			http.Error(w, "Version not found", http.StatusNotFound)
@@ -143,7 +143,7 @@ func RollbackLink(w http.ResponseWriter, r *http.Request) {
 
 // rollbackToVersion swaps an archived file with the live one and records both
 // moves in one metadata commit. The caller holds the link lock.
-func rollbackToVersion(wp *storage.Wallpaper, entry storage.HistoryEntry) (*storage.Wallpaper, error) {
+func (s *LibraryService) rollbackToVersion(wp *storage.Wallpaper, entry storage.HistoryEntry) (*storage.Wallpaper, error) {
 	if !isValidLinkName(wp.LinkName) || !validStoredExt(entry.Ext) {
 		return nil, errors.New("invalid rollback target")
 	}
@@ -233,7 +233,7 @@ func rollbackToVersion(wp *storage.Wallpaper, entry storage.HistoryEntry) (*stor
 	limit := config.Current.History.Limit
 
 	var dropped []storage.HistoryEntry
-	updated, err := storage.Global.Update(wp.LinkName, func(cur *storage.Wallpaper) error {
+	updated, err := s.Store.Update(wp.LinkName, func(cur *storage.Wallpaper) error {
 		before := storage.HistoryBytes(cur.History)
 		// The restored version leaves the archive...
 		kept, _ := storage.WithoutHistoryVersion(cur.History, entry.Version)
@@ -283,7 +283,7 @@ func rollbackToVersion(wp *storage.Wallpaper, entry storage.HistoryEntry) (*stor
 		// The URL already serves the restored file; only the panel thumbnail is
 		// stale until the next regeneration, so this is logged, not returned.
 		log.Printf("Rollback: preview regeneration failed for %s: %v", wp.LinkName, regenErr)
-	} else if fresh, ok := storage.Global.Get(wp.LinkName); ok {
+	} else if fresh, ok := s.Store.Get(wp.LinkName); ok {
 		updated = fresh
 	}
 	storage.DeleteHistoryFiles(wp.LinkName, dropped)
@@ -292,7 +292,7 @@ func rollbackToVersion(wp *storage.Wallpaper, entry storage.HistoryEntry) (*stor
 
 // DeleteHistoryVersion handles DELETE /api/link/{name}/history/{version} and
 // drops one archived version, freeing its disk space immediately.
-func DeleteHistoryVersion(w http.ResponseWriter, r *http.Request) {
+func (s *LibraryService) DeleteHistoryVersion(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -304,7 +304,7 @@ func DeleteHistoryVersion(w http.ResponseWriter, r *http.Request) {
 	}
 	unlock := storage.LockLinks(name)
 	defer unlock()
-	updated, err := storage.RemoveHistoryEntry(name, version)
+	updated, err := s.RemoveHistory(name, version)
 	if err != nil {
 		writeStoreError(w, err)
 		return
