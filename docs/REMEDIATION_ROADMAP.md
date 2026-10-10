@@ -285,7 +285,7 @@ composition root now exposes the interface. Shared conformance tests cover
 independent reads, CRUD, cancellation, rollback, multi-record commit and the
 single-durable-write transaction guarantee.
 
-### PR 30 — SQLite schema and implementation **(implemented; full CI pending)**
+### PR 30 — SQLite schema and implementation **(implemented and CI-verified)**
 
 Added the pure-Go `SQLiteWallpaperStore` with normalized wallpaper, history,
 playlist and rotation tables; strict checks, foreign keys, WAL, full-sync
@@ -293,7 +293,7 @@ transactions and the shared store conformance contract. Integrity checking and
 online `VACUUM INTO` backup primitives are included. Media bytes remain in the
 existing filesystem layout.
 
-### PR 31 — JSON-to-SQLite migration **(implemented; full CI pending)**
+### PR 31 — JSON-to-SQLite migration **(implemented and CI-verified)**
 
 Added the explicit `migrate-sqlite` command with validation-only dry runs,
 SHA-256 source identity, fsynced and verified backup-first operation,
@@ -302,7 +302,7 @@ verification and rollback. JSON is never modified or deleted. Operational,
 interruption and downgrade guidance is in
 [`SQLITE_MIGRATION.md`](SQLITE_MIGRATION.md).
 
-### PR 32 — Server-side pagination/filtering **(implemented; full CI pending)**
+### PR 32 — Server-side pagination/filtering **(implemented and CI-verified)**
 
 Expanded the paginated envelope with validated access/kind/search filters and
 created/updated/name/size sorting. The modular frontend loads bounded 200-record
@@ -312,7 +312,7 @@ headers.
 
 **Retrospective 29–32 completed:** [`RETROSPECTIVE_PR29_PR32.md`](RETROSPECTIVE_PR29_PR32.md).
 
-### PR 33 — Background processing pool **(implemented; full CI pending)**
+### PR 33 — Background processing pool **(implemented and CI-verified)**
 
 Added a shared bounded processing pool with independent CPU slots and decoded
 pixel memory reservations, cancellation-aware waiting and observable queue,
@@ -323,7 +323,7 @@ progress consumed by the settings UI.
 
 ## Phase 5 — release and supply-chain hardening
 
-### PR 34 — Hardened deployment profile **(implemented; full CI pending)**
+### PR 34 — Hardened deployment profile **(implemented and CI-verified)**
 
 The production Compose contract now binds to loopback, requires an Argon2id
 credential, keeps the root filesystem read-only, bounds `/tmp`, drops all
@@ -331,14 +331,14 @@ capabilities, prevents privilege escalation and sets CPU, memory and PID limits.
 Only `/app/data` remains writable. CI boots and health-checks the official image
 with equivalent isolation and validates the documented Compose configuration.
 
-### PR 35 — SBOM, provenance and image signing **(implemented; full CI pending)**
+### PR 35 — SBOM, provenance and image signing **(implemented and CI-verified)**
 
 CI generates downloadable SPDX and CycloneDX SBOMs. Main-branch multi-platform
 images publish BuildKit SBOM and max-mode provenance attestations and are
 keyless-signed at their immutable digest with Sigstore. Verification and
 digest-pinned deployment are documented in [`SUPPLY_CHAIN.md`](SUPPLY_CHAIN.md).
 
-### PR 36 — Disaster-recovery runbook **(implemented; full CI pending)**
+### PR 36 — Disaster-recovery runbook **(implemented and CI-verified)**
 
 [`DISASTER_RECOVERY.md`](DISASTER_RECOVERY.md) defines whole-volume backup and
 verified staged restore, quarterly drills, audit/repair and quarantine handling,
