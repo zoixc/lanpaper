@@ -28,6 +28,10 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Verifiable release images.** CI now emits SPDX and CycloneDX SBOM artifacts;
+  release images carry BuildKit SBOM/provenance attestations and a keyless
+  Sigstore signature over the immutable multi-platform digest. Digest-pinned
+  verification and deployment steps are documented.
 - **Hardened production container profile.** The maintained Compose example now
   defaults to loopback-only exposure, a read-only root filesystem, bounded
   temporary storage, zero Linux capabilities, no privilege escalation and

@@ -64,7 +64,10 @@ link, which is handy for digital frames, smart TVs, kiosks and other displays.
 
 ```sh
 cp docker-compose-example.yml docker-compose.yml
-printf 'ADMIN_PASS=%s\n' "$(openssl rand -hex 24)" > .env
+read -rsp 'New admin password: ' ADMIN_PASS; echo
+printf '%s' "$ADMIN_PASS" | docker run --rm -i ptabi/lanpaper:latest hash-password | \
+  sed 's/^/ADMIN_PASSWORD_HASH=/' > .env
+unset ADMIN_PASS
 chmod 600 .env
 mkdir -p data && sudo chown 100:101 data   # the container runs as uid 100 / gid 101
 docker compose up -d
@@ -73,21 +76,23 @@ docker compose up -d
 Open <http://localhost:8080/admin> and log in as `admin` with the generated
 password from `.env`.
 
-- The example publishes port 8080 on all interfaces. Put HTTPS in front
-  (see [SECURITY.md](SECURITY.md#reverse-proxy-examples)) before exposing it
-  to the internet.
-- To expose it only to a local reverse proxy, bind the port as
-  `127.0.0.1:8080:8080`.
+- The hardened example binds port 8080 to loopback for a local HTTPS reverse
+  proxy (see [SECURITY.md](SECURITY.md#reverse-proxy-examples)). Deliberately
+  change the binding only for a firewalled LAN deployment.
 - Keep `.env` private; Git ignores it.
+- Release images carry digest-bound SBOM/provenance attestations and a keyless
+  signature; see [verification instructions](docs/SUPPLY_CHAIN.md).
 
 ### Docker run
 
 ```sh
-: "${ADMIN_PASS:?Set a unique, long ADMIN_PASS in your shell first}"
+: "${ADMIN_PASSWORD_HASH:?Set a generated Argon2id PHC hash first}"
 mkdir -p data && sudo chown 100:101 data
-docker run -d --name lanpaper -p 8080:8080 \
-  --cap-drop ALL --security-opt no-new-privileges:true --stop-timeout 35 \
-  -e ADMIN_USER=admin -e ADMIN_PASS="$ADMIN_PASS" \
+docker run -d --name lanpaper -p 127.0.0.1:8080:8080 \
+  --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m,mode=1777 \
+  --cap-drop ALL --security-opt no-new-privileges:true \
+  --pids-limit 128 --memory 1g --cpus 2 --stop-timeout 35 \
+  -e ADMIN_USER=admin -e ADMIN_PASSWORD_HASH="$ADMIN_PASSWORD_HASH" \
   -v "$(pwd)/data:/app/data" ptabi/lanpaper:latest
 ```
 

@@ -331,9 +331,12 @@ capabilities, prevents privilege escalation and sets CPU, memory and PID limits.
 Only `/app/data` remains writable. CI boots and health-checks the official image
 with equivalent isolation and validates the documented Compose configuration.
 
-### PR 35 — SBOM, provenance and image signing
+### PR 35 — SBOM, provenance and image signing **(implemented; full CI pending)**
 
-Generate SPDX/CycloneDX SBOMs, publish build provenance, sign release images and document verification.
+CI generates downloadable SPDX and CycloneDX SBOMs. Main-branch multi-platform
+images publish BuildKit SBOM and max-mode provenance attestations and are
+keyless-signed at their immutable digest with Sigstore. Verification and
+digest-pinned deployment are documented in [`SUPPLY_CHAIN.md`](SUPPLY_CHAIN.md).
 
 ### PR 36 — Disaster-recovery runbook
 

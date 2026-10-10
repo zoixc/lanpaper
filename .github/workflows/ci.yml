@@ -10,6 +10,9 @@ on:
 # credentials come from repository secrets and are used on main only.
 permissions:
   contents: read
+  # Requested only by the main-branch signing step; no registry credentials or
+  # long-lived signing key are exposed to pull-request builds.
+  id-token: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -232,9 +235,36 @@ jobs:
 
           docker rm -f lp_test
 
+      - name: Generate SPDX and CycloneDX SBOMs
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: lanpaper:test
+          format: spdx-json
+          output-file: lanpaper.spdx.json
+          upload-artifact: false
+
+      - name: Generate CycloneDX SBOM
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: lanpaper:test
+          format: cyclonedx-json
+          output-file: lanpaper.cyclonedx.json
+          upload-artifact: false
+
+      - name: Publish CI SBOM artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lanpaper-sbom
+          path: |
+            lanpaper.spdx.json
+            lanpaper.cyclonedx.json
+          if-no-files-found: error
+          retention-days: 14
+
       # On main: rebuild for amd64+arm64 and push, reusing the cache from above.
-      - name: Push to Docker Hub
+      - name: Push signed release inputs to Docker Hub
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: release-image
         env:
           VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
@@ -242,6 +272,22 @@ jobs:
             --platform linux/amd64,linux/arm64 \
             --build-arg VERSION="${VERSION}" \
             --cache-from type=local,src=/tmp/.buildx-cache \
+            --provenance=mode=max \
+            --sbom=true \
+            --metadata-file=/tmp/release-metadata.json \
             -t "ptabi/lanpaper:${VERSION}" \
             -t "ptabi/lanpaper:latest" \
             --push .
+          digest="$(jq -r '."containerimage.digest"' /tmp/release-metadata.json)"
+          test "$digest" != "null" && test -n "$digest"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Install cosign
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Keyless-sign release image index
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          DIGEST: ${{ steps.release-image.outputs.digest }}
+        run: cosign sign --yes "ptabi/lanpaper@${DIGEST}"
