@@ -133,7 +133,7 @@ func TestUploadSemaphoreBoundsConcurrentRemoteDownloads(t *testing.T) {
 		t.Fatal(err)
 	}
 	previous := storage.Global
-	storage.Global = &storage.Store{}
+	storage.Global = loadedStore(t)
 	t.Cleanup(func() { storage.Global = previous })
 	oldPool, oldRemote := processingPool, remoteFetchSem
 	InitUploadSemaphore(1)
@@ -263,7 +263,7 @@ func TestInspectMediaFileAcceptsAllMP4Brands(t *testing.T) {
 func TestMissingGalleryFilesReturnNotFound(t *testing.T) {
 	setupRemoteTest(t)
 	originalStore := storage.Global
-	storage.Global = &storage.Store{}
+	storage.Global = loadedStore(t)
 	t.Cleanup(func() { storage.Global = originalStore })
 
 	config.Current.ExternalImageDir = t.TempDir()

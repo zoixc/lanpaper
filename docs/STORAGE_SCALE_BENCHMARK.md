@@ -70,11 +70,15 @@ Measured on the same machine with `BenchmarkSingleUpdate` (`storage/database_ben
 one `Store.Update` that toggles the access level of one link, with the library
 pre-filled to the stated size. Three iterations, one CPU at 2.6 GHz.
 
-| Records | SQLite (`syncRecords`) | JSON full rewrite |
+| Records | SQLite (`syncRecords`), three runs | JSON full rewrite, three runs |
 |---:|---:|---:|
-| 100 | 1.1 ms | 2.1 ms |
-| 1,000 | 1.5 ms | 8.1 ms |
-| 3,000 | 3.5 ms | 21.2 ms |
+| 100 | 1.1 ms, 1.2 ms | 1.8 ms, 2.1 ms |
+| 1,000 | 1.1 ms, 1.5 ms | 8.0 ms, 8.1 ms |
+| 3,000 | 2.0 ms, 3.5 ms | 11.9 ms, 21.2 ms |
+
+Each row is 30 iterations of the benchmark, run on the sandbox machine, which is
+noisy: the same configuration varied by up to about 2x between runs. Read the
+ratio, not the absolute values.
 
 SQLite cost grows much more slowly because only the changed rows are written.
 The residual growth comes from in-memory bookkeeping and the fsync of the WAL.

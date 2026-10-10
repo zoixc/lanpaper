@@ -18,7 +18,7 @@ func useGlobalStore(t *testing.T) {
 	t.Helper()
 	testStorageDir(t)
 	savedStore, savedBytes := Global, historyBytesTotal.Load()
-	Global = &Store{}
+	Global = &Store{legacyJSON: true}
 	ResetHistoryCounters()
 	t.Cleanup(func() {
 		Global = savedStore

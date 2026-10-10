@@ -8,7 +8,7 @@ import (
 )
 
 func snapshotStore(n int) *Store {
-	s := &Store{wallpapers: make(map[string]*Wallpaper, n)}
+	s := &Store{legacyJSON: true, wallpapers: make(map[string]*Wallpaper, n)}
 	for i := 0; i < n; i++ {
 		name := fmt.Sprintf("link-%02d", i)
 		s.wallpapers[name] = &Wallpaper{ID: name, LinkName: name, CreatedAt: int64(i)}

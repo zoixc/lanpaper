@@ -394,8 +394,8 @@ dry runs, backups, resumable batches and rollback, is described in the
 ## Storage scale
 
 Metadata is kept in memory for reads and written to SQLite one changed link at a
-time. A single change in a 3,000-link library takes about 3.5 ms against about
-21 ms with the former full-file JSON rewrite. The full library is still held in
+time. A single change in a 3,000-link library takes about 2 ms against about
+12–21 ms with the former full-file JSON rewrite (timings vary between runs). The full library is still held in
 memory, so memory use grows with the number of links. Raw results and methodology
 are in [docs/STORAGE_SCALE_BENCHMARK.md](docs/STORAGE_SCALE_BENCHMARK.md).
 ## Backups and upgrades

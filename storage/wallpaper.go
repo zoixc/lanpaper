@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"lanpaper/config"
 	"lanpaper/internal/atomicfile"
@@ -78,7 +79,26 @@ type Store struct {
 	// db is the durable SQLite backend. It is nil only for stores that were
 	// never loaded (tests and in-memory use); those fall back to the JSON file.
 	db *SQLiteWallpaperStore
+	// legacyJSON lets an unloaded store persist to wallpapers.json. Only test
+	// stores set it. A production store that was never loaded refuses to
+	// write, so it can never silently fork metadata into the legacy file.
+	legacyJSON bool
 }
+
+// commitFailure, when set, makes every commit fail with the stored error. It is
+// the fault seam for tests that check rollback after a metadata write error.
+var commitFailure atomic.Pointer[error]
+
+// SetCommitFailure makes all metadata commits fail with err until the returned
+// function is called. Tests use it to check that failed writes are rolled back.
+func SetCommitFailure(err error) (restore func()) {
+	commitFailure.Store(&err)
+	return func() { commitFailure.Store(nil) }
+}
+
+// ErrStoreNotLoaded is returned when a change is committed before Load opened
+// the metadata database.
+var ErrStoreNotLoaded = errors.New("metadata store is not loaded")
 
 // dataFile is the legacy JSON metadata file. It is read once, to import an
 // existing installation, and never written by the running server again.
@@ -666,10 +686,16 @@ func sanitizeMediaLists(wp *Wallpaper) {
 // changed since the last commit; without one it rewrites the legacy JSON file.
 // The caller holds writeMu.
 func (s *Store) persist(next map[string]*Wallpaper) error {
-	if s.db == nil {
+	if injected := commitFailure.Load(); injected != nil && *injected != nil {
+		return *injected
+	}
+	if s.db != nil {
+		return s.db.syncRecords(context.Background(), s.wallpapers, next)
+	}
+	if s.legacyJSON {
 		return writeFile(dataFile, next)
 	}
-	return s.db.syncRecords(context.Background(), s.wallpapers, next)
+	return ErrStoreNotLoaded
 }
 
 // Load opens the SQLite metadata database and loads every record into memory.
@@ -703,6 +729,7 @@ func (s *Store) Load() error {
 		s.db.Close()
 	}
 	s.db = db
+	s.legacyJSON = false
 	s.Lock()
 	s.generation++
 	for _, wp := range m {

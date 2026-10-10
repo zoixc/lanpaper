@@ -36,7 +36,7 @@ func benchStore(b *testing.B, n int, sqlite bool) *Store {
 	if err := os.MkdirAll("data", 0o700); err != nil {
 		b.Fatal(err)
 	}
-	s := &Store{wallpapers: make(map[string]*Wallpaper)}
+	s := &Store{wallpapers: make(map[string]*Wallpaper), legacyJSON: !sqlite}
 	if sqlite {
 		if err := s.Load(); err != nil {
 			b.Fatal(err)

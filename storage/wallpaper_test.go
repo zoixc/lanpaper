@@ -36,7 +36,7 @@ func testStorageDir(t *testing.T) {
 
 func TestStoreCommitsAtomicallyAndReturnsCopies(t *testing.T) {
 	testStorageDir(t)
-	s := &Store{}
+	s := &Store{legacyJSON: true}
 	if err := s.Create(&Wallpaper{ID: "a", LinkName: "a", Category: "other", AccessLevel: config.AccessToken, AccessToken: "secret"}); err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestStoreCommitsAtomicallyAndReturnsCopies(t *testing.T) {
 	if persisted, err := os.ReadFile(dataFile); err != nil || !bytes.Equal(persisted, original) {
 		t.Fatalf("failed transaction modified disk: %v", err)
 	}
-	loaded := &Store{}
+	loaded := &Store{legacyJSON: true}
 	if err := loaded.Load(); err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestStoreCommitsAtomicallyAndReturnsCopies(t *testing.T) {
 // the store behind its back.
 func TestStoreSnapshotsDoNotShareSlices(t *testing.T) {
 	testStorageDir(t)
-	s := &Store{}
+	s := &Store{legacyJSON: true}
 	created := &Wallpaper{
 		ID: "p", LinkName: "p", Category: "other", AccessLevel: config.AccessPublic,
 		Items:   []PlaylistItem{{ID: 1, Ext: "jpg"}, {ID: 2, Ext: "png"}},
@@ -136,7 +136,7 @@ func TestStoreSnapshotsDoNotShareSlices(t *testing.T) {
 
 func TestStoreLoadRefusesCorruptAndUnsafeData(t *testing.T) {
 	testStorageDir(t)
-	s := &Store{}
+	s := &Store{legacyJSON: true}
 	if err := s.Create(&Wallpaper{LinkName: "keep", Category: "other"}); err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +179,7 @@ func TestStoreLoadRefusesCorruptAndUnsafeData(t *testing.T) {
 
 func TestConcurrentUpdatesAndSnapshots(t *testing.T) {
 	testStorageDir(t)
-	s := &Store{}
+	s := &Store{legacyJSON: true}
 	if err := s.Create(&Wallpaper{LinkName: "counter", Category: "other"}); err != nil {
 		t.Fatal(err)
 	}
@@ -201,7 +201,7 @@ func TestConcurrentUpdatesAndSnapshots(t *testing.T) {
 	if wp, _ := s.Get("counter"); wp.SizeBytes != 200 {
 		t.Fatalf("lost updates or snapshot escaped cache: %d", wp.SizeBytes)
 	}
-	loaded := &Store{}
+	loaded := &Store{legacyJSON: true}
 	if err := loaded.Load(); err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +213,7 @@ func TestConcurrentUpdatesAndSnapshots(t *testing.T) {
 func TestLegacyMigrationNeverFollowsFileSymlink(t *testing.T) {
 	testStorageDir(t)
 	oldGlobal := Global
-	Global = &Store{}
+	Global = &Store{legacyJSON: true}
 	t.Cleanup(func() { Global = oldGlobal })
 	outside := filepath.Join(t.TempDir(), "private.png")
 	if err := os.WriteFile(outside, []byte("secret"), 0600); err != nil {
@@ -241,7 +241,7 @@ func TestLegacyMigrationNeverFollowsFileSymlink(t *testing.T) {
 func TestPruneKeepsLinksAndTheirAccessControls(t *testing.T) {
 	testStorageDir(t)
 	oldGlobal := Global
-	Global = &Store{}
+	Global = &Store{legacyJSON: true}
 	t.Cleanup(func() { Global = oldGlobal })
 	for index, name := range []string{"old", "new"} {
 		path := MediaPath(name, "png")

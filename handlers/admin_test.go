@@ -22,7 +22,7 @@ func seedWallpapers(t *testing.T, wps ...*storage.Wallpaper) {
 		t.Fatal(err)
 	}
 	previous := storage.Global
-	storage.Global = &storage.Store{}
+	storage.Global = loadedStore(t)
 	t.Cleanup(func() { storage.Global = previous })
 	for _, wp := range wps {
 		if err := storage.Global.Create(wp); err != nil {

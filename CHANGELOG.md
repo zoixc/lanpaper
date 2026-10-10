@@ -20,7 +20,7 @@ Notable changes to Lanpaper. Docker images are published as
 - **Metadata is stored in SQLite (`data/wallpapers.db`).** Every change is one
   transaction that writes only the changed link and its history, playlist and
   rotation rows, instead of rewriting the whole JSON file. One change in a
-  3,000-link library takes about 3.5 ms (about 21 ms before). Reads still come
+  3,000-link library takes about 2 ms (12–21 ms before, depending on the run). Reads still come
   from memory, and a failed write is never published to readers. On the first
   start, an existing `wallpapers.json` is imported automatically after a
   checksum-verified backup. The original file is kept and never written again.

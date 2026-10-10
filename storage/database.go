@@ -117,3 +117,15 @@ func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
+
+// NewLoadedStore returns a Store loaded from the SQLite database under the
+// current working directory, creating an empty database if none exists. Tests
+// use it so they exercise the real backend rather than a stand-in.
+func NewLoadedStore() (*Store, error) {
+	s := &Store{wallpapers: make(map[string]*Wallpaper)}
+	if err := s.Load(); err != nil {
+		_ = s.Close()
+		return nil, err
+	}
+	return s, nil
+}
