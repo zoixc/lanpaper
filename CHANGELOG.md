@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Frontend state selectors.** Link normalization, query/filter/access
+  selection, sorting and incremental-render transitions now live in a tested,
+  framework-free module separate from DOM composition.
 - **Frontend API module.** Requests, cancellation, typed errors, retryability
   and session expiry now have one native ES-module implementation with optional
   machine-readable server error codes.

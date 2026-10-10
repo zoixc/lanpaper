@@ -9,6 +9,8 @@
    состояние, которого нет.
    ============================================================ */
 import { request, ApiError } from './api.js';
+import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as linkMatchesQuery,
+    countFilteredLinks, resetIncrementalRender, selectVisibleLinks } from './state.js';
 
 (function () {
     'use strict';
@@ -256,39 +258,10 @@ import { request, ApiError } from './api.js';
     function validLinkName(name) {
         return LINK_NAME_RE.test(name) && RESERVED_NAMES.indexOf(name.toLowerCase()) < 0;
     }
-    /* Порция рендера: список из сотен ссылок не рисуем целиком — сначала
-       первая порция, остальное по кнопке. Это самая дорогая часть работы
-       (кадр + картинка + слушатели на каждую карточку). */
-    const CHUNK = 12;
-
-    const state = {
-        links: [],
-        dict: {},               /* строки текущего языка из /static/i18n */
-        config: {               /* настройки сервера (лимиты и подсказки) */
-            maxUploadMB: 50, playlistMax: 8, historyLimit: 3,
-            historyBudgetBytes: 0, langs: LANGS
-        },
-        busy: false,            /* защита от второго нажатия, пока идёт запрос */
-        query: '',
-        scope: 'name',          /* name — имя и файл, как в приложении; all — плюс доступ и вес */
-        filter: 'all',
-        access: 'any',
-        sort: 'date_desc',
-        view: 'grid',
-        theme: 'auto',
-        palette: 'mono',
-        lang: 'ru',
-        selecting: false,
-        selected: new Set(),
-        loading: true,
-        loadError: false,
-        shown: CHUNK,
-        reveal: null,          /* ссылки, которые нужно оставить на виду */
-        scrolledReveal: null,
-        pendingScroll: null,
-        lastDeleted: null,
-        panelTab: 'media'
-    };
+    const state = createAppState({ config: {
+        maxUploadMB: 50, playlistMax: 8, historyLimit: 3,
+        historyBudgetBytes: 0, langs: LANGS
+    }});
 
     /* Ключи настроек до 2.0 (theme, viewMode, sortBy, lang) читаются один
        раз как запасной вариант: панель, обновлённая с 0.12.x, не должна
@@ -569,37 +542,6 @@ import { request, ApiError } from './api.js';
         return text ? t('action_failed') + ': ' + text : t('action_failed');
     }
 
-    /* Запись ответа: история и плейлист всегда массивы, номер версии — не
-       меньше первого (записи до версионирования приходят с нулём). */
-    function normalizeLink(raw) {
-        const link = Object.assign({}, raw);
-        link.linkName = link.linkName || link.id || '';
-        link.history = Array.isArray(link.history) ? link.history : [];
-        link.items = Array.isArray(link.items) ? link.items : [];
-        link.currentVersion = Math.max(1, Number(link.currentVersion) || 1);
-        link.pinned = !!link.pinned;
-        link.hasImage = !!link.hasImage;
-        link.accessLevel = link.accessLevel || 'public';
-        link.category = link.category || 'other';
-        return link;
-    }
-
-    /* Вид медиа определяем по расширению файла: в API `mimeType` — это
-       расширение («png», «mp4»), а не строка вида «image/png», а `category` —
-       пользовательская категория (tech/life/work/other), которую ставят
-       ссылке, а не её файлу. Раньше панель искала видео и PNG в этих двух
-       полях: у любой ссылки, созданной вручную, category равно «other»,
-       поэтому видео открывалось как картинка (значка «играть» не было, а в
-       <img> тянулся сам видеофайл), у прозрачных PNG не было шахматного
-       фона, а в подписи вместо «PNG» стоял прочерк. */
-    function mediaExt(link) {
-        return String(link.mimeType || '').toLowerCase();
-    }
-    function isVideoMedia(link) {
-        const ext = mediaExt(link);
-        return ext === 'mp4' || ext === 'webm';
-    }
-
     async function fetchLinks() {
         const res = await apiCall('/api/wallpapers');
         /* Ручка отдаёт либо массив, либо конверт {data,...}: понимаем оба,
@@ -634,56 +576,14 @@ import { request, ApiError } from './api.js';
     /* ========================================================
        6. ВЫБОРКА И СЕТКА
        ======================================================== */
-    const SORTS = {
-        date_desc: (a, b) => b.modTime - a.modTime,
-        date_asc: (a, b) => a.modTime - b.modTime,
-        name_asc: (a, b) => a.linkName.localeCompare(b.linkName, 'ru'),
-        name_desc: (a, b) => b.linkName.localeCompare(a.linkName, 'ru'),
-        size_desc: (a, b) => (b.sizeBytes + b.items.length * 1e6) - (a.sizeBytes + a.items.length * 1e6)
-    };
-    const FILTERS = {
-        all: () => true,
-        image: (l) => l.hasImage && !isVideoMedia(l),
-        video: (l) => isVideoMedia(l),
-        playlist: (l) => l.items.length > 0,
-        pinned: (l) => l.pinned
-    };
-
-    /* Что попадает в поиск. «Имя и файл» — как в приложении 0.12.1:
-       имя ссылки и тип файла. «Везде» добавляет уровень доступа, вес,
-       версию и размеры — так ищут, когда помнят не имя, а примету:
-       «локальная», «2 МБ», «png». */
-    function matchesQuery(link) {
-        const q = state.query.trim().toLowerCase();
-        if (!q) return true;
-        const parts = [link.linkName, link.mimeType, link.category];
-        if (state.scope === 'all') {
-            parts.push(t(accessMeta(link.accessLevel).key), formatBytes(link.sizeBytes),
-                String(link.sizeBytes), 'v' + link.currentVersion, String(link.width || ''),
-                String(link.height || ''), (link.items || []).length ? 'плейлист playlist' : '');
-        }
-        return parts.some(part => String(part || '').toLowerCase().includes(q));
-    }
-    function filterCount(key) {
-        return state.links.filter(l => matchesQuery(l)
-            && FILTERS[key](l)
-            && (state.access === 'any' || l.accessLevel === state.access)).length;
-    }
-    /* Смена выборки возвращает список к первой порции: иначе «Показать ещё»
-       относилось бы к прошлой выдаче. */
-    function resetShown() {
-        state.shown = CHUNK;
-        state.reveal = null;
-        state.scrolledReveal = null;
-    }
-
-    function visibleLinks() {
-        let list = state.links.filter(matchesQuery).filter(FILTERS[state.filter]);
-        if (state.access !== 'any') list = list.filter(l => l.accessLevel === state.access);
-        list.sort(SORTS[state.sort] || SORTS.date_desc);
-        list.sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned));
-        return list;
-    }
+    const selectorHelpers = () => ({
+        accessText: level => t(accessMeta(level).key),
+        formatBytes
+    });
+    function matchesQuery(link) { return linkMatchesQuery(state, link, selectorHelpers()); }
+    function filterCount(key) { return countFilteredLinks(state, key, selectorHelpers()); }
+    function resetShown() { resetIncrementalRender(state); }
+    function visibleLinks() { return selectVisibleLinks(state, selectorHelpers()); }
 
     const ratio = (l) => (l.width && l.height ? l.width / l.height : 0);
     function fitMode(link) {

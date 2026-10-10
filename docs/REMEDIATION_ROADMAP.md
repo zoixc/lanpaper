@@ -224,9 +224,12 @@ and centralized session-expiry handling. The panel and export/import scripts now
 load as ordered native modules; legacy server text remains only as a display
 fallback where endpoints do not yet emit codes.
 
-### PR 23 — Frontend state and rendering modules
+### PR 23 — Frontend state and rendering modules **(implemented; full CI pending)**
 
-Extract state/selectors, cards, filters and incremental rendering. Preserve plain DOM and no runtime framework. Add DOM-level tests for state transitions.
+Extracted state defaults, API-record normalization, filters, selectors, sorting
+and incremental-render transitions into the framework-free `state.js` module.
+The existing plain-DOM card renderer consumes those selectors, while focused
+state-transition tests cover combined filtering, pin ordering and render resets.
 
 ### PR 24 — Feature modules
 

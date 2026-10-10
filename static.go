@@ -28,6 +28,7 @@ var staticAssets = map[string]bool{
 	"js/export-import.js":             true,
 	"js/prepaint.js":                  true,
 	"js/settings-menu.js":             true,
+	"js/state.js":                     true,
 	"sw.js":                           true,
 	"manifest.json":                   true,
 	"favicon.svg":                     true,

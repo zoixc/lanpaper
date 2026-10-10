@@ -154,13 +154,10 @@ test('the media kind comes from mimeType, never from the user category', () => {
   assert.doesNotMatch(scriptSource,
     /category === 'video'|category !== 'video'|category === 'gif'|mimeType === 'image\/|mimeType\.split\('\/'\)/,
     'the media kind is read out of category, or mimeType is treated as a MIME string again');
-  const ext = scriptSource.match(/function mediaExt\(link\) \{([\s\S]*?)\n    \}/);
-  assert.ok(ext, 'mediaExt() disappeared');
-  assert.match(ext[1], /mimeType/, `mediaExt() no longer reads mimeType: ${ext[1]}`);
-  const helper = scriptSource.match(/function isVideoMedia\(link\) \{([\s\S]*?)\n    \}/);
-  assert.ok(helper, 'isVideoMedia() disappeared');
-  assert.match(helper[1], /mp4/);
-  assert.match(helper[1], /webm/);
+  assert.match(scriptSource, /mediaExt[^\n]*mimeType/,
+    'mediaExt() disappeared or no longer reads mimeType');
+  assert.match(scriptSource, /isVideoMedia[^\n]*mp4[^\n]*webm/,
+    'isVideoMedia() disappeared or no longer recognizes mp4/webm');
   const hasFrame = scriptSource.match(/function hasFrame\(link\) \{([\s\S]*?)\n    \}/);
   assert.ok(hasFrame && /isVideoMedia\(link\)/.test(hasFrame[1]),
     'hasFrame() no longer excludes videos, so a tile pulls the movie into an <img>');
