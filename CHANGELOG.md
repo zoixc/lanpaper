@@ -5,6 +5,8 @@ Notable changes to Lanpaper. Docker images are published as
 
 ## [Unreleased]
 
+## [0.16.0] – 2026-10-10
+
 ### Fixed
 
 - **Signing out cannot be undone by the browser's Basic-auth cache.** The
