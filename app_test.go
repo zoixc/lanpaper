@@ -19,7 +19,7 @@ func TestAppCapturesImmutableConfigurationAndDependencies(t *testing.T) {
 	if app.Config.Port != "1111" {
 		t.Fatalf("captured port=%q", app.Config.Port)
 	}
-	if app.Services.Wallpapers == nil || app.Sessions == nil || app.Limiters == nil || app.Logger == nil {
+	if app.Services.Wallpapers == nil || app.Services.Upload == nil || app.Sessions == nil || app.Limiters == nil || app.Logger == nil {
 		t.Fatal("composition root has nil dependencies")
 	}
 }

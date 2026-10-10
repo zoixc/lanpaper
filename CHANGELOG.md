@@ -28,6 +28,8 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Injected upload service.** Upload source processing, atomic publication and
+  metadata commit now flow through an App-owned service with typed stage errors.
 - **Instance-owned authentication runtime.** Applications now construct
   independent session and token-bucket stores, with tests preventing mutable
   state from leaking between instances.

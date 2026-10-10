@@ -53,7 +53,7 @@ func formFlag(raw string) bool {
 	return false
 }
 
-func Upload(w http.ResponseWriter, r *http.Request) {
+func (s *UploadService) Upload(w http.ResponseWriter, r *http.Request) {
 	finishMetric := appmetrics.BeginUpload()
 	defer finishMetric()
 	if r.Method != http.MethodPost {
@@ -116,7 +116,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	unlock := storage.LockLinks(name)
 	defer unlock()
-	prev, exists := storage.Global.Get(name)
+	prev, exists := s.Store.Get(name)
 	// A publish key may add media — a new link, or a playlist item behind an
 	// existing one — but never replace the live file of a link that already
 	// has media: that would destroy content the URL is serving, and a leaked
@@ -132,7 +132,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Link does not exist", http.StatusBadRequest)
 			return
 		}
-		created, err := createLinkForUpload(name, form)
+		created, err := s.createLinkForUpload(name, form)
 		if err != nil {
 			if errors.Is(err, errInvalidLinkDefaults) {
 				http.Error(w, "Invalid access level or category", http.StatusBadRequest)
@@ -151,7 +151,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	if createdLink {
 		defer func() {
 			if !linkCommitted {
-				rollbackCreatedLink(name)
+				s.rollbackCreatedLink(name)
 			}
 		}()
 	}
@@ -350,7 +350,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	defer txn.rollback()
 	imagePub, err := txn.publish(imageStage, imagePath, maxBytes)
 	if err != nil {
-		writeUploadError(w, err)
+		writeUploadError(w, &UploadError{Stage: "publish media", Err: err})
 		return
 	}
 
@@ -365,7 +365,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			ModTime:   fi.ModTime().Unix(),
 			AddedAt:   time.Now().Unix(),
 		}
-		appended, err := storage.Global.Update(name, func(wp *storage.Wallpaper) error {
+		appended, err := s.Store.Update(name, func(wp *storage.Wallpaper) error {
 			wp.Items = storage.AppendItem(wp.Items, item)
 			return nil
 		})
@@ -388,7 +388,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	if previewStage != "" {
 		_, err = txn.publish(previewStage, previewPath, maxBytes)
 		if err != nil {
-			writeUploadError(w, err)
+			writeUploadError(w, &UploadError{Stage: "publish preview", Err: err})
 			return
 		}
 	}
@@ -406,7 +406,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	if newWP.CreatedAt == 0 {
 		newWP.CreatedAt = fi.ModTime().Unix()
 	}
-	updated, err := storage.Global.Update(name, func(wp *storage.Wallpaper) error {
+	updated, err := s.Store.Update(name, func(wp *storage.Wallpaper) error {
 		*wp = newWP
 		return nil
 	})
@@ -469,7 +469,7 @@ var errInvalidLinkDefaults = errors.New("invalid access level or category")
 // createLinkForUpload creates the link an upload targets when the client set
 // autoCreate, so a webhook or a publish key can push media in one request
 // instead of create-then-upload. The caller holds the link lock.
-func createLinkForUpload(name string, form *uploadForm) (*storage.Wallpaper, error) {
+func (s *UploadService) createLinkForUpload(name string, form *uploadForm) (*storage.Wallpaper, error) {
 	rawLevel := strings.TrimSpace(form.value("accessLevel"))
 	if rawLevel != "" && !isValidAccessLevel(rawLevel) {
 		return nil, errInvalidLinkDefaults
@@ -489,14 +489,14 @@ func createLinkForUpload(name string, form *uploadForm) (*storage.Wallpaper, err
 	if level == config.AccessToken {
 		wp.AccessToken = generateAccessToken()
 	}
-	if err := storage.Global.Create(wp); err != nil {
+	if err := s.Store.Create(wp); err != nil {
 		return nil, err
 	}
-	created, exists := storage.Global.Get(name)
+	created, exists := s.Store.Get(name)
 	if !exists {
 		// The store accepted the entry but cannot read it back: drop it rather
 		// than fail the upload with a link nobody asked for left behind.
-		_, _ = storage.Global.DeleteEntry(name)
+		_, _ = s.Store.DeleteEntry(name)
 		return nil, storage.ErrNotFound
 	}
 	return created, nil
@@ -506,8 +506,8 @@ func createLinkForUpload(name string, form *uploadForm) (*storage.Wallpaper, err
 // upload that then failed. The caller holds the link lock; taking it again here
 // would deadlock, so the cleanup is limited to the store, the per-link
 // directories and the counters of a link that never served a byte.
-func rollbackCreatedLink(name string) {
-	if _, err := storage.Global.DeleteEntry(name); err != nil {
+func (s *UploadService) rollbackCreatedLink(name string) {
+	if _, err := s.Store.DeleteEntry(name); err != nil {
 		log.Printf("Upload: could not roll back the auto-created link %s: %v", name, err)
 		return
 	}

@@ -209,7 +209,7 @@ func (a *App) mux() *http.ServeMux {
 		middleware.WithSecurity(middleware.PublishOrAdmin(middleware.AllowPublishUpload,
 			middleware.RateLimit(func() (int, int) {
 				return config.Current.Rate.UploadPerMin, config.Current.Rate.Burst
-			})(postOnly(handlers.Upload)),
+			})(postOnly(a.Services.Upload.Upload)),
 		)),
 	)
 	mux.HandleFunc("/api/external-images", middleware.WithSecurity(middleware.MaybeBasicAuth(handlers.ExternalImages)))

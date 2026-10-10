@@ -181,9 +181,13 @@ tests prove sessions and exhausted limiter buckets cannot cross instances. The
 package defaults remain narrow compatibility adapters for legacy direct-handler
 tests during service extraction.
 
-### PR 19 — Upload service extraction
+### PR 19 — Upload service extraction **(implemented; full CI pending)**
 
-Extract source resolution, inspection, image processing and publish transaction from the HTTP handler. Add typed errors and preserve the existing API response contract.
+Extracted `UploadService` with injected wallpaper storage as the owner of source
+resolution, inspection, processing, publication and metadata commit. The App
+route uses the service directly while the old handler name is a compatibility
+adapter. Typed stage errors preserve underlying causes and the existing HTTP
+response contract.
 
 ### PR 20 — History and playlist service extraction
 
