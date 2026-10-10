@@ -172,9 +172,14 @@ limiter lifecycle interfaces and structured logger. The complete production
 route/middleware stack is now built by `App.Handler()`; `newHandler` is a narrow
 compatibility adapter while subsequent PRs replace package globals.
 
-### PR 18 — Session and limiter instance isolation
+### PR 18 — Session and limiter instance isolation **(implemented; full CI pending)**
 
-Move the remaining global session/rate state into injected stores. Remove test reset globals and allow multiple isolated app instances in one process.
+Introduced independently constructible `SessionStore` and `RateStore` owners,
+with instance-scoped session counting, token admission, cleanup and reset.
+`NewApp` now injects fresh stores rather than process-global adapters; isolation
+tests prove sessions and exhausted limiter buckets cannot cross instances. The
+package defaults remain narrow compatibility adapters for legacy direct-handler
+tests during service extraction.
 
 ### PR 19 — Upload service extraction
 

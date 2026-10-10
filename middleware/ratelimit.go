@@ -33,15 +33,50 @@ type rateShard struct {
 	counts map[string]*bucket
 }
 
-var rateTable [rateShards]rateShard
+// RateStore owns limiter buckets and can be instantiated independently.
+type RateStore struct{ table [rateShards]rateShard }
 
-func shardFor(key string) *rateShard {
+func NewRateStore() *RateStore { return &RateStore{} }
+func (s *RateStore) Clean(now time.Time) {
+	for i := range s.table {
+		cleanRateShard(&s.table[i], now)
+	}
+}
+func (s *RateStore) Reset() {
+	for i := range s.table {
+		s.table[i].mu.Lock()
+		s.table[i].counts = nil
+		s.table[i].mu.Unlock()
+	}
+}
+
+var defaultRateStore = NewRateStore()
+var rateTable = &defaultRateStore.table // compatibility view for existing tests
+
+func shardIndex(key string) uint32 {
 	h := uint32(2166136261)
 	for i := 0; i < len(key); i++ {
 		h ^= uint32(key[i])
 		h *= 16777619
 	}
-	return &rateTable[h%rateShards]
+	return h % rateShards
+}
+func shardFor(key string) *rateShard             { return &rateTable[shardIndex(key)] }
+func (s *RateStore) shard(key string) *rateShard { return &s.table[shardIndex(key)] }
+
+// Allow is the instance-scoped token-bucket primitive used by injected apps.
+func (s *RateStore) Allow(namespace, key string, capacity, refill int, span time.Duration) (bool, time.Duration) {
+	now := time.Now()
+	id := namespace + ":" + key
+	sh := s.shard(id)
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
+	b := currentBucket(sh, id, capacity, refill, span, now)
+	if b.tokens < 1 {
+		return false, tokenRetry(b)
+	}
+	b.tokens--
+	return true, 0
 }
 
 func StartCleaner() {
@@ -69,14 +104,17 @@ func cleanExpiredCounts(now time.Time) {
 		}
 	}()
 	for i := range rateTable {
-		sh := &rateTable[i]
-		sh.mu.Lock()
-		for key, b := range sh.counts {
-			if now.Sub(b.lastSeen) >= b.idle {
-				delete(sh.counts, key)
-			}
+		cleanRateShard(&rateTable[i], now)
+	}
+}
+
+func cleanRateShard(sh *rateShard, now time.Time) {
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
+	for key, b := range sh.counts {
+		if now.Sub(b.lastSeen) >= b.idle {
+			delete(sh.counts, key)
 		}
-		sh.mu.Unlock()
 	}
 }
 

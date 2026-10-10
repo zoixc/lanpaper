@@ -24,6 +24,13 @@ func TestAppCapturesImmutableConfigurationAndDependencies(t *testing.T) {
 	}
 }
 
+func TestAppInstancesOwnIndependentRuntimeState(t *testing.T) {
+	first, second := NewApp(), NewApp()
+	if first.Sessions == second.Sessions || first.Limiters == second.Limiters {
+		t.Fatal("application instances share mutable authentication or limiter state")
+	}
+}
+
 func TestAppHandlerBuildsRealRouteStack(t *testing.T) {
 	app := NewApp()
 	request := httptest.NewRequest(http.MethodGet, "/health", nil)

@@ -75,15 +75,4 @@ func HandleMetrics(w http.ResponseWriter, r *http.Request) {
 	appmetrics.WritePrometheus(w, ActiveSessionCount(), disk)
 }
 
-func ActiveSessionCount() int {
-	sessionStore.Lock()
-	defer sessionStore.Unlock()
-	now := time.Now()
-	count := 0
-	for _, record := range sessionStore.expiry {
-		if now.Before(record.Expires) {
-			count++
-		}
-	}
-	return count
-}
+func ActiveSessionCount() int { return sessionStore.ActiveCount(time.Now()) }

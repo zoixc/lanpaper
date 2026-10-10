@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Instance-owned authentication runtime.** Applications now construct
+  independent session and token-bucket stores, with tests preventing mutable
+  state from leaking between instances.
 - **Application composition root.** Production routes now originate from an
   `App` dependency graph containing immutable configuration, stores, session
   and limiter runtimes, services and structured logging.

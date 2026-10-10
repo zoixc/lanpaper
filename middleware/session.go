@@ -41,10 +41,30 @@ const (
 // sessionsPath is a variable so tests can point it at a temporary directory.
 var sessionsPath = filepath.Join("data", "sessions.json")
 
-var sessionStore = struct {
+// SessionStore owns browser-session state. The package-level default remains a
+// compatibility adapter for handlers not yet constructed through App.
+type SessionStore struct {
 	sync.Mutex
 	expiry map[[sha256.Size]byte]sessionRecord
-}{expiry: make(map[[sha256.Size]byte]sessionRecord)}
+}
+
+func NewSessionStore() *SessionStore {
+	return &SessionStore{expiry: make(map[[sha256.Size]byte]sessionRecord)}
+}
+
+func (s *SessionStore) ActiveCount(now time.Time) int {
+	s.Lock()
+	defer s.Unlock()
+	count := 0
+	for _, record := range s.expiry {
+		if now.Before(record.Expires) {
+			count++
+		}
+	}
+	return count
+}
+
+var sessionStore = NewSessionStore()
 
 var errTooManySessions = errors.New("too many active sessions")
 

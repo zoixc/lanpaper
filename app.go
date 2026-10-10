@@ -5,26 +5,11 @@ package main
 import (
 	"log/slog"
 	"net/http"
-	"time"
 
 	"lanpaper/config"
 	"lanpaper/middleware"
 	"lanpaper/storage"
 )
-
-// SessionRuntime and LimiterRuntime are the narrow lifecycle views needed by
-// application composition. Request-level injection is completed incrementally;
-// the default adapters preserve the existing package API in the meantime.
-type SessionRuntime interface{ ActiveCount() int }
-type LimiterRuntime interface{ Clean(time.Time) }
-
-type defaultSessions struct{}
-
-func (defaultSessions) ActiveCount() int { return middleware.ActiveSessionCount() }
-
-type defaultLimiters struct{}
-
-func (defaultLimiters) Clean(now time.Time) { middleware.CleanRateLimits(now) }
 
 type AppServices struct {
 	Wallpapers *storage.Store
@@ -36,14 +21,14 @@ type AppServices struct {
 // at a time without changing the route contract.
 type App struct {
 	Config   config.Config
-	Sessions SessionRuntime
-	Limiters LimiterRuntime
+	Sessions *middleware.SessionStore
+	Limiters *middleware.RateStore
 	Logger   *slog.Logger
 	Services AppServices
 }
 
 func NewApp() *App {
-	return &App{Config: config.Current, Sessions: defaultSessions{}, Limiters: defaultLimiters{}, Logger: slog.Default(), Services: AppServices{Wallpapers: storage.Global}}
+	return &App{Config: config.Current, Sessions: middleware.NewSessionStore(), Limiters: middleware.NewRateStore(), Logger: slog.Default(), Services: AppServices{Wallpapers: storage.Global}}
 }
 
 func (a *App) Handler() http.Handler {
