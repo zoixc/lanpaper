@@ -236,6 +236,6 @@
   "sessions_load_error": "Could not load session information.",
   "import_progress": "Importing {{done}} of {{total}} links",
   "import_cancelled": "Import cancelled",
-  "offline_now": "You are offline. Changes are paused until the connection returns.",
+  "offline_now": "You are offline. Network operations may fail until the connection returns.",
   "operation_in_progress": "This operation is already in progress"
 }

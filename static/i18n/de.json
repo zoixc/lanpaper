@@ -236,6 +236,6 @@
   "sessions_load_error": "Sitzungsinformationen konnten nicht geladen werden.",
   "import_progress": "{{done}} von {{total}} Links werden importiert",
   "import_cancelled": "Import abgebrochen",
-  "offline_now": "Sie sind offline. Änderungen warten auf die Verbindung.",
+  "offline_now": "Sie sind offline. Netzwerkvorgänge können bis zur Wiederherstellung der Verbindung fehlschlagen.",
   "operation_in_progress": "Dieser Vorgang läuft bereits"
 }

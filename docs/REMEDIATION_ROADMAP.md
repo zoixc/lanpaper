@@ -275,6 +275,8 @@ results and an evidence-based 10k supported ceiling, 10k–50k transitional
 range, 50k hard migration boundary and latency/file-size migration triggers in
 [`STORAGE_SCALE_BENCHMARK.md`](STORAGE_SCALE_BENCHMARK.md).
 
+**Retrospective 25–28 completed:** [`RETROSPECTIVE_PR25_PR28.md`](RETROSPECTIVE_PR25_PR28.md).
+
 ### PR 29 — `WallpaperStore` abstraction
 
 Introduce context-aware CRUD/list transaction interfaces while retaining the JSON implementation. Add conformance tests shared by all implementations.

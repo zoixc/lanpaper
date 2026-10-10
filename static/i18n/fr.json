@@ -236,6 +236,6 @@
   "sessions_load_error": "Impossible de charger les informations de session.",
   "import_progress": "Importation de {{done}} liens sur {{total}}",
   "import_cancelled": "Importation annulée",
-  "offline_now": "Vous êtes hors ligne. Les modifications attendent la connexion.",
+  "offline_now": "Vous êtes hors ligne. Les opérations réseau peuvent échouer jusqu’au retour de la connexion.",
   "operation_in_progress": "Cette opération est déjà en cours"
 }

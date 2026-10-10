@@ -19,7 +19,7 @@ test('upload feature suppresses a duplicate submission for the same link', async
   const source = new Blob(['png'], { type: 'image/png' });
   const first = feature.file({ linkName: 'wall' }, source, 'replace');
   await new Promise(resolve => setTimeout(resolve, 0));
-  assert.equal(await feature.file({ linkName: 'wall' }, source, 'replace'), false);
+  assert.equal(await feature.url({ linkName: 'wall' }, 'https://example.test/wall.png', 'replace'), false);
   assert.equal(requests, 1);
   release();
   assert.equal(await first, true);

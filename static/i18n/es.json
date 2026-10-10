@@ -236,6 +236,6 @@
   "sessions_load_error": "No se pudo cargar la información de las sesiones.",
   "import_progress": "Importando {{done}} de {{total}} enlaces",
   "import_cancelled": "Importación cancelada",
-  "offline_now": "No tienes conexión. Los cambios esperan a que vuelva la conexión.",
+  "offline_now": "No tienes conexión. Las operaciones de red pueden fallar hasta que vuelva la conexión.",
   "operation_in_progress": "Esta operación ya está en curso"
 }

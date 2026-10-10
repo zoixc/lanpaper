@@ -21,7 +21,7 @@ export function createUploadFeature(deps) {
     }
 
     async function file(link, source, mode, opts) {
-        const key = 'file:' + link.linkName;
+        const key = 'upload:' + link.linkName;
         if (!operations.begin(key)) {
             if (!(opts && opts.quiet)) deps.toast(deps.t('operation_in_progress'), { type: 'info' });
             return false;
@@ -62,7 +62,7 @@ export function createUploadFeature(deps) {
     }
 
     async function url(link, value, mode) {
-        const key = 'url:' + link.linkName;
+        const key = 'upload:' + link.linkName;
         if (!operations.begin(key)) {
             deps.toast(deps.t('operation_in_progress'), { type: 'info' });
             return false;
