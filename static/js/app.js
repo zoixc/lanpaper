@@ -8,6 +8,8 @@
    предлагать имя, которое сервер отвергнет, и не должна показывать
    состояние, которого нет.
    ============================================================ */
+import { request, ApiError } from './api.js';
+
 (function () {
     'use strict';
 
@@ -496,39 +498,20 @@
        ======================================================== */
     /* Один вход для всех ручек: ошибку сервера превращаем в текст на языке
        панели, 401/403 — в объяснение, а не в «Failed to fetch». */
-    async function apiCall(url, method, body, isForm) {
-        const options = {
-            method: method || 'GET',
-            /* Явные учётные данные: WebKit без этого не отправляет
-               HTTP-авторизацию и отвечает 401 на панель под паролем. */
-            credentials: 'same-origin',
-            headers: isForm ? undefined : { 'Content-Type': 'application/json' }
-        };
-        if (body !== undefined && body !== null) {
-            options.body = isForm ? body : JSON.stringify(body);
-        }
-        let res;
+    async function apiCall(url, method, body, isForm, signal) {
         try {
-            res = await fetch(url, options);
-        } catch (e) {
-            toast(t('network_error'), { type: 'error' });
-            throw e;
+            return await request(url, { method: method || 'GET', body, isForm, signal });
+        } catch (error) {
+            if (error instanceof ApiError && error.kind === 'authentication') {
+                /* Session expired or signed out elsewhere: the login form takes over. */
+                window.location.reload();
+            } else if (error instanceof ApiError && error.kind === 'network') {
+                toast(t('network_error'), { type: 'error' });
+            } else if (!(error instanceof ApiError && error.kind === 'cancelled')) {
+                toast(translateServerError(error), { type: 'error' });
+            }
+            throw error;
         }
-        if (res.status === 401) {
-            /* Session expired or signed out elsewhere: the login form takes over. */
-            window.location.reload();
-            throw new Error('signed out');
-        }
-        if (!res.ok) {
-            const text = (await res.text().catch(() => '')).trim();
-            const err = new Error(text || ('HTTP ' + res.status));
-            err.status = res.status;
-            toast(translateServerError(err), { type: 'error' });
-            throw err;
-        }
-        if (res.status === 204) return null;
-        const type = res.headers.get('content-type') || '';
-        return type.indexOf('application/json') >= 0 ? res.json() : null;
     }
 
     /* Выход считается завершённым только после того, как сервер надёжно

@@ -22,6 +22,7 @@ import (
 var staticAssets = map[string]bool{
 	"css/style.css":                   true,
 	"js/app.js":                       true,
+	"js/api.js":                       true,
 	"js/login.js":                     true,
 	"js/compressor.js":                true,
 	"js/export-import.js":             true,

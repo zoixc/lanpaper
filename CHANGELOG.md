@@ -28,6 +28,9 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Frontend API module.** Requests, cancellation, typed errors, retryability
+  and session expiry now have one native ES-module implementation with optional
+  machine-readable server error codes.
 - **Injected remote fetcher.** Resolver, transport, clock and temporary storage
   are testable dependencies; network and media-processing concurrency have
   independent bounds while SSRF pinning remains per redirect hop.

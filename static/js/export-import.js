@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+
 /**
  * Export and import of the link list and the panel settings.
  *

@@ -92,7 +92,7 @@ jobs:
           node-version: lts/*
 
       - name: Syntax check
-        run: for f in static/js/*.js static/sw.js; do node --check "$f"; done
+        run: for f in static/js/*.js static/sw.js; do node --input-type=module --check < "$f"; done
 
       - name: Unit tests
         run: node --test tests/*.test.cjs

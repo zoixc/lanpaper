@@ -216,9 +216,13 @@ use separate bounded semaphores so slow networks do not consume decode slots.
 
 ## Phase 3 — frontend maintainability and UX
 
-### PR 22 — Frontend API/error module
+### PR 22 — Frontend API/error module **(implemented; full CI pending)**
 
-Extract API calls, typed errors, cancellation and authentication-expiry handling into a native ES module. Remove server-English regex matching where machine-readable error codes can be introduced compatibly.
+Extracted fetch/serialization/decoding into native `api.js` with typed
+`ApiError`, cancellation, retryability, optional `X-Error-Code` machine codes
+and centralized session-expiry handling. The panel and export/import scripts now
+load as ordered native modules; legacy server text remains only as a display
+fallback where endpoints do not yet emit codes.
 
 ### PR 23 — Frontend state and rendering modules
 

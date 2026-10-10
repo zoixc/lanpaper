@@ -9,6 +9,7 @@ const STATIC_ASSETS = [
   '/static/css/style.css',
   '/static/js/prepaint.js',
   '/static/js/app.js',
+  '/static/js/api.js',
   '/static/js/export-import.js',
   '/static/js/settings-menu.js',
   '/static/js/compressor.js',
