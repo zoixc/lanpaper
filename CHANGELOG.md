@@ -3,6 +3,44 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
+## [Unreleased]
+
+### Changed
+
+- **Downscaling is an order of magnitude cheaper, so uploads no longer spike
+  the CPU.** Fitting the admin preview and scaling a stored image used to run a
+  bilinear kernel widened to the scale factor, which calls `At()` — and a
+  colour conversion — for every source sample; the kernel support grows as the
+  scale shrinks, so a big downscale cost tens of interface calls per
+  destination pixel. Measured on a 12 MP photo, the 640x360 preview took about
+  470 ms of CPU and halving a 24 MP photo about 1.1 s, several times the JPEG
+  decode (176 ms) or the WebP encode next to them. Both now go through a box
+  average computed on raw pixel rows (JPEG-encoded sources are reduced plane by
+  plane in YCbCr, with no RGB round-trip at all), which touches every source
+  pixel exactly once: the same preview costs about 18 ms instead of 470 ms, and
+  the 24 MP halving about 73 ms instead of 1.1 s. The whole non-lossless upload
+  path therefore drops by roughly 40% of its CPU. The two filters do not
+  produce identical pixels — on real photos they differ by a mean of 1.5 levels
+  of 255, which the JPEG encoder's rounding then absorbs — and the box average
+  is the more faithful of the two, because every source pixel contributes with
+  equal weight. Paletted, 16-bit and generic images keep the kernel path, and
+  `handlers/downscale_bench_test.go` keeps both measured. End to end (release
+  build, 2.6 GHz x86-64), uploading a 12 MP JPEG 4130x3070 and 3.2 MB costs the
+  server 0.61 s of CPU instead of 1.10 s: the request is single-threaded, so the
+  CPU peak it produces is halved.
+- **Preview WebP encoding uses effort 1 instead of 3.** On the preview the two
+  presets produce the same bytes (34,830 vs 34,866 for a 12 MP photo), while
+  effort 3 takes twice as long: about 105 ms instead of 50 ms per preview.
+  Effort 3 only paid off on flat graphics, and those previews were a few
+  kilobytes to begin with. A box-filtered thumbnail does keep more detail than
+  the wider kernel blur did, so a preview is now roughly 20% larger in bytes
+  (about 6 KB on a 640x360 photo) — the encoder's effort setting does not
+  change that.
+- **A stored JPEG is re-encoded from the YCbCr planes** of the downscaled
+  image, so the encoder's own fast path reads them directly. The stored file is
+  about 0.2% smaller and measurably no worse than the previous RGBA round-trip.
+
+
 ## [0.17.0] – 2026-10-11
 
 **Upgrade notes — read before deploying**

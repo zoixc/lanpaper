@@ -251,11 +251,11 @@ func scaleImage(src image.Image, scalePercent int) image.Image {
 	return resize(src, float64(scalePercent)/100)
 }
 
-// resize downscales src by scale with a bilinear kernel widened to the scale
-// factor (so every source pixel contributes). It uses Kernel.Transform, not
-// Kernel.Scale: Scale allocates a dstWidth x srcHeight float64 buffer (575 MB
-// to halve a 36 MP photo), while Transform needs no temporary memory and
-// produces the same pixels to within one level of rounding (resize_test.go).
+// resize downscales src by scale. Sources with a known pixel layout go through
+// the box filter in downscale.go, which is an order of magnitude cheaper than
+// the kernel path and needs no colour conversion; every other image type keeps
+// the kernel path. Both paths downscale only: a scale of 1 or more returns src
+// itself, so callers never pay for an upscale nobody asked for.
 func resize(src image.Image, scale float64) image.Image {
 	if scale >= 1 {
 		return src
@@ -263,6 +263,22 @@ func resize(src image.Image, scale float64) image.Image {
 	b := src.Bounds()
 	w := max(1, int(float64(b.Dx())*scale))
 	h := max(1, int(float64(b.Dy())*scale))
+	if box, ok := boxDownscale(src, w, h); ok {
+		return box
+	}
+	return resizeKernel(src, w, h)
+}
+
+// resizeKernel downscales src to w x h with a bilinear kernel widened to the
+// scale factor (so every source pixel contributes). It uses Kernel.Transform,
+// not Kernel.Scale: Scale allocates a dstWidth x srcHeight float64 buffer
+// (575 MB to halve a 36 MP photo), while Transform needs no temporary memory
+// and produces the same pixels to within one level of rounding (resize_test.go).
+// It stays for the image types the box filter does not know (paletted,
+// 16-bit and generic images) and as the reference the box path is measured
+// against.
+func resizeKernel(src image.Image, w, h int) image.Image {
+	b := src.Bounds()
 	dst := image.NewRGBA(image.Rect(0, 0, w, h))
 	sx := float64(w) / float64(b.Dx())
 	sy := float64(h) / float64(b.Dy())
@@ -284,10 +300,13 @@ func savePreview(img image.Image, path string) error {
 	return saveImage(thumbnail(img, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight), "webp", path, config.ThumbnailQuality)
 }
 
-// webpEffort trades WebP encode time for file size (0..9). Preset 3 is the
-// fastest one that enables the full lossy search; the default, 0, produces
-// previews roughly a third larger for no visible gain.
-const webpEffort = 3
+// webpEffort trades WebP encode time for preview size (0..9). Measured on a
+// 12 MP photo source, the 640x360 preview costs about 27 ms at effort 0, 50 ms
+// at effort 1, and 108 ms at effort 3 for a size difference of 0.4% between
+// the last two; flat graphics (icons, screenshots) come out 20-35% smaller at
+// effort 3, but a preview is a few kilobytes either way. Effort 1 keeps the
+// encoder's full search enabled, which is where the useful compression is.
+const webpEffort = 1
 
 func encodeImage(w io.Writer, img image.Image, format string, quality int) error {
 	switch format {

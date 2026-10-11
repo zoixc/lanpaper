@@ -30,7 +30,9 @@ link, which is handy for digital frames, smart TVs, kiosks and other displays.
 - **Image processing:** thumbnails, optional compression and scaling, and a
   lossless mode that keeps the original bytes. Memory stays bounded (about
   50 MB peak for a 24-megapixel photo) and is returned to the system after
-  each upload.
+  each upload. Both downscales are box averages over raw pixel rows, so a
+  24-megapixel photo costs a few hundred milliseconds of CPU instead of
+  several seconds.
 - **Per-link access levels:** `public`, `local` (LAN only), `token` (secret
   URL) and `auth` (admin only). Media is stored outside the static web root.
 - **Admin panel** (installable PWA) with gallery-style previews, search,
