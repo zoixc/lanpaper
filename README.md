@@ -296,7 +296,9 @@ already set in the environment take precedence over it.
   is, after the same full decode (validation) and with the same thumbnail. On a
   12 MP PNG that is about 1.3 s of CPU instead of 3.2 s. The stored file keeps
   whatever the upload carried, as in lossless mode. A scale below 100 is a real
-  transformation, so those uploads are re-encoded as before.
+  transformation, so those uploads are re-encoded, with the fast encoder
+  setting: about 10% larger files instead of a slower encode and a 92 MB spike
+  in heap use (measured on a 12 MP 16-bit source).
 - **Other settings.** The server decodes, scales by `COMPRESSION_SCALE` and
   re-encodes. BMP/TIFF become JPEG, and a re-encoded GIF keeps only its first
   frame. MP4/WebM are stored as they are.
@@ -309,8 +311,12 @@ already set in the environment take precedence over it.
     for images above about 16.7 MP.
 - **Unsupported and limits.** Animated WebP is not supported; static WebP is.
   Images are limited to 16,384 px per side, 36 M pixels per image and 48 M
-  decoded pixels in flight. Large or malformed media may be rejected even
-  below `MAX_UPLOAD_MB`.
+  decoded pixels in flight. The images decode in two layouts depending on the
+  file: 8-bit sources take 4 bytes per pixel, 16-bit ones 8, so a second cap
+  keeps the decodes running at once within 288 MB — the largest allowed image
+  still fits on its own, and an upload that would not is answered with the same
+  429 "retry shortly" the pixel budget uses. Large or malformed media may be
+  rejected even below `MAX_UPLOAD_MB`.
 
 ### Remote URLs
 

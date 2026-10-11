@@ -7,7 +7,27 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
-- **PNG uploads no longer spend two seconds re-encoding identical pixels.**
+- **Encoders that cannot change quality now cost less CPU and less memory.**
+  Three measured changes, all of them trading a little disk space for a lower
+  peak:
+  - The stored WebP is encoded at effort 0: on a 12 MP photo, 833 ms of CPU
+    instead of 1119 ms (26% less) for 1.5% more bytes. The admin thumbnail keeps
+    its own setting, which was already tuned for a 640x360 image.
+  - A PNG that is being scaled is encoded with `BestSpeed`: on a 12 MP source
+    the default level takes the same time on a 16-bit one (1.83 s vs 1.74 s) or
+    20% more on an 8-bit one, and grows the heap by about 92 MB while it runs,
+    for 8-10% smaller files. Unscaled PNG uploads keep their bytes and never
+    reach this encoder.
+  - The shared decode budget now also caps the memory the decoded images will
+    actually occupy, not just their pixel count. `image.Decode` allocates four
+    bytes per pixel for the usual 8-bit sources but eight for 16-bit ones (a
+    12 MP 16-bit PNG is 101 MB of `image.RGBA64`), so the pixel budget alone let
+    two 20.9 MP 16-bit PNGs decode together: measured peak RSS grew by 336 MB.
+    The byte cap keeps such combinations within 288 MB — the largest image the
+    app accepts (36 MP) still fits on its own — and the refused upload gets the
+    existing 429 "image processing busy, retry shortly"; preview regeneration
+    waits for a free slot, exactly as it already did for the pixel budget.
+- **PNG uploads no longer spend two seconds re-encoding identical pixels.**- **PNG uploads no longer spend two seconds re-encoding identical pixels.**
   With `COMPRESSION_SCALE=100` (the default) and a quality below 100, a PNG used
   to go through the full compression pass: decode, scale by 100% and re-encode
   the same pixels with the stdlib encoder. PNG is lossless, so the result
