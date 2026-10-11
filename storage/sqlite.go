@@ -192,26 +192,12 @@ func getSQL(ctx context.Context, query sqlQuerier, id string) (*Wallpaper, bool,
 }
 
 func listSQL(ctx context.Context, query sqlQuerier) ([]*Wallpaper, error) {
-	rows, err := query.QueryContext(ctx, `SELECT `+wallpaperColumns+` FROM wallpapers ORDER BY is_pinned DESC,pinned_at DESC,created_at DESC,link_name`)
+	list, err := listBase(ctx, query, ` ORDER BY is_pinned DESC,pinned_at DESC,created_at DESC,link_name`)
 	if err != nil {
 		return nil, err
 	}
-	var list []*Wallpaper
-	for rows.Next() {
-		wallpaper, err := scanWallpaper(rows)
-		if err != nil {
-			rows.Close()
-			return nil, err
-		}
-		list = append(list, wallpaper)
-	}
-	if err := rows.Close(); err != nil {
+	if err := attachRelations(ctx, query, list); err != nil {
 		return nil, err
-	}
-	for _, wallpaper := range list {
-		if err := loadRelations(ctx, query, wallpaper); err != nil {
-			return nil, err
-		}
 	}
 	return list, nil
 }
@@ -397,74 +383,89 @@ var _ WallpaperStore = (*SQLiteWallpaperStore)(nil)
 // per-record loadRelations path costs three round trips per link and is only
 // used for single lookups.
 func (s *SQLiteWallpaperStore) loadAll(ctx context.Context) (map[string]*Wallpaper, error) {
-	list, err := listBase(ctx, s.db)
+	list, err := listBase(ctx, s.db, "")
 	if err != nil {
+		return nil, err
+	}
+	if err := attachRelations(ctx, s.db, list); err != nil {
 		return nil, err
 	}
 	byName := make(map[string]*Wallpaper, len(list))
 	for _, wp := range list {
 		byName[wp.LinkName] = wp
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT link_name,version,ext,size_bytes,mtime,saved_at FROM history ORDER BY link_name, version DESC`)
+	return byName, nil
+}
+
+// attachRelations fills History, Items and Rotate for every record in list with
+// three set-based queries, whatever the list length. Rows are matched to records
+// by link name; rows for names not in list are ignored.
+func attachRelations(ctx context.Context, query sqlQuerier, list []*Wallpaper) error {
+	if len(list) == 0 {
+		return nil
+	}
+	byName := make(map[string]*Wallpaper, len(list))
+	for _, wp := range list {
+		byName[wp.LinkName] = wp
+	}
+	rows, err := query.QueryContext(ctx, `SELECT link_name,version,ext,size_bytes,mtime,saved_at FROM history ORDER BY link_name, version DESC`)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for rows.Next() {
 		var name string
 		var entry HistoryEntry
 		if err := rows.Scan(&name, &entry.Version, &entry.Ext, &entry.SizeBytes, &entry.ModTime, &entry.SavedAt); err != nil {
 			rows.Close()
-			return nil, err
+			return err
 		}
 		if wp := byName[name]; wp != nil {
 			wp.History = append(wp.History, entry)
 		}
 	}
 	if err := rows.Close(); err != nil {
-		return nil, err
+		return err
 	}
-	rows, err = s.db.QueryContext(ctx, `SELECT link_name,item_id,ext,size_bytes,added_at,mod_time FROM playlist_items ORDER BY link_name, item_id`)
+	rows, err = query.QueryContext(ctx, `SELECT link_name,item_id,ext,size_bytes,added_at,mod_time FROM playlist_items ORDER BY link_name, item_id`)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for rows.Next() {
 		var name string
 		var item PlaylistItem
 		if err := rows.Scan(&name, &item.ID, &item.Ext, &item.SizeBytes, &item.AddedAt, &item.ModTime); err != nil {
 			rows.Close()
-			return nil, err
+			return err
 		}
 		if wp := byName[name]; wp != nil {
 			wp.Items = append(wp.Items, item)
 		}
 	}
 	if err := rows.Close(); err != nil {
-		return nil, err
+		return err
 	}
-	rows, err = s.db.QueryContext(ctx, `SELECT link_name,enabled,interval_seconds,ordering FROM rotations`)
+	rows, err = query.QueryContext(ctx, `SELECT link_name,enabled,interval_seconds,ordering FROM rotations`)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for rows.Next() {
 		var name string
 		var rotation RotateConfig
 		if err := rows.Scan(&name, &rotation.Enabled, &rotation.Interval, &rotation.Order); err != nil {
 			rows.Close()
-			return nil, err
+			return err
 		}
 		if wp := byName[name]; wp != nil {
 			wp.Rotate = &rotation
 		}
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	return byName, nil
+	return rows.Close()
 }
 
-// listBase reads the wallpaper rows without their history, items or rotation.
-func listBase(ctx context.Context, query sqlQuerier) ([]*Wallpaper, error) {
-	rows, err := query.QueryContext(ctx, `SELECT `+wallpaperColumns+` FROM wallpapers`)
+// listBase reads the wallpaper rows, without history, items or rotation, in the
+// order given by orderBy (an " ORDER BY ..." suffix, or empty).
+func listBase(ctx context.Context, query sqlQuerier, orderBy string) ([]*Wallpaper, error) {
+	rows, err := query.QueryContext(ctx, `SELECT `+wallpaperColumns+` FROM wallpapers`+orderBy)
 	if err != nil {
 		return nil, err
 	}
