@@ -99,6 +99,13 @@ Notable changes to Lanpaper. Docker images are published as
   startup log and in the build. Public probes should not learn which release to
   look up for known flaws.
 
+### Fixed
+
+- The admin footer showed `v—` instead of the release. It read the version
+  from `/health`, which deliberately does not report it. It now reads it from
+  `/api/compression-config` for the signed-in administrator. The footer stays
+  hidden when no version is available, and a local `dev` build shows `dev`.
+
 ### Dependencies
 
 - `golang.org/x/image` v0.46.0 → v0.47.0.
