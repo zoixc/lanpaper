@@ -264,6 +264,9 @@ func (s *UploadService) Upload(w http.ResponseWriter, r *http.Request) {
 
 	video := isVideo(ext)
 	lossless := !video && canUseLosslessMode()
+	// A PNG at scale 100 keeps its bytes: re-encoding it would only rewrite
+	// identical pixels (see storeUploadedBytes).
+	storeBytes := !video && storeUploadedBytes(ext, lossless)
 	saveExt := storedExt(ext, lossless)
 	// Staging happens in the directory the file will end up in, so publishing is
 	// always a rename within one directory (no cross-device surprise).
@@ -305,7 +308,7 @@ func (s *UploadService) Upload(w http.ResponseWriter, r *http.Request) {
 		if clientGone(r) {
 			return
 		}
-		if !lossless {
+		if !storeBytes {
 			img = scaleImage(img, config.Current.Compression.Scale)
 		}
 		// Playlist items get no thumbnail: the panel shows one preview per link,
@@ -323,7 +326,7 @@ func (s *UploadService) Upload(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		if lossless {
+		if storeBytes {
 			if _, err := source.Seek(0, io.SeekStart); err != nil {
 				writeUploadError(w, err)
 				return

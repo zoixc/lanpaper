@@ -257,6 +257,40 @@ func TestAppWebPUploadPreservesOriginalAndCompressedMode(t *testing.T) {
 	}
 }
 
+// A PNG whose pixels the settings cannot change is stored as uploaded: the
+// compression pass would only re-encode identical data, for about two seconds of
+// CPU on a 12 MP image. Scaling still re-encodes, as it always did.
+func TestAppPNGStoredAsUploadedInCompressedMode(t *testing.T) {
+	a := setupApp(t)
+	config.Current.Compression = config.CompressionConfig{Quality: 85, Scale: 100}
+	a.createLink("shot")
+	original := makePNG(t, color.RGBA{R: 10, G: 200, B: 30, A: 255})
+	a.upload(http.StatusOK, "shot", original, "")
+	status, h, body := a.request("GET", "/shot", nil, false, nil)
+	if status != http.StatusOK || h.Get("Content-Type") != "image/png" || !bytes.Equal(body, original) {
+		t.Fatalf("PNG bytes not preserved in compressed mode: HTTP %d %v (%d vs %d bytes)",
+			status, h, len(body), len(original))
+	}
+	if s, _, preview := a.request("GET", "/api/preview/shot", nil, true, nil); s != http.StatusOK || len(preview) < 16 {
+		t.Fatalf("preview missing for a stored-as-uploaded PNG: HTTP %d, %d bytes", s, len(preview))
+	}
+
+	// A scale below 100 is a real transformation and must still run.
+	config.Current.Compression.Scale = 50
+	a.upload(http.StatusOK, "shot", original, "")
+	_, _, scaled := a.request("GET", "/shot", nil, false, nil)
+	if bytes.Equal(scaled, original) {
+		t.Fatal("scaling was skipped: the stored PNG is still the uploaded file")
+	}
+	cfg, err := png.DecodeConfig(bytes.NewReader(scaled))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Width != 4 || cfg.Height != 4 {
+		t.Fatalf("scaled PNG is %dx%d, want 4x4", cfg.Width, cfg.Height)
+	}
+}
+
 func TestAppUploadAccessRenameAndDelete(t *testing.T) {
 	a := setupApp(t)
 	red := makePNG(t, color.RGBA{R: 255, A: 255})

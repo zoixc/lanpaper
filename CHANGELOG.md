@@ -7,6 +7,22 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **PNG uploads no longer spend two seconds re-encoding identical pixels.**
+  With `COMPRESSION_SCALE=100` (the default) and a quality below 100, a PNG used
+  to go through the full compression pass: decode, scale by 100% and re-encode
+  the same pixels with the stdlib encoder. PNG is lossless, so the result
+  differs from the upload only in how the same data is packed, and the Encoder
+  is measurably slower than the encoder that produced most PNGs in the first
+  place — on a 12 MP PNG the pass costs about 2 s of CPU and, on a file already
+  written with a fast encoder, comes out about 8% *smaller*, while PNGs written
+  at the default level come out the same size or larger. Those uploads are now
+  stored as they are, after the same full decode that rejects malformed files
+  and with the same admin thumbnail, which takes the whole upload from 3.2 s of
+  CPU to 1.3 s. Scaling below 100 still re-encodes, and GIF keeps its documented
+  single-frame re-encode because the palette quantiser is what flattens it.
+  Like lossless mode, keeping the bytes keeps any ancillary chunks the upload
+  carried (JPEG and WebP are still re-encoded, which keeps dropping their EXIF).
+
 - **Downscaling is an order of magnitude cheaper, so uploads no longer spike
   the CPU.** Fitting the admin preview and scaling a stored image used to run a
   bilinear kernel widened to the scale factor, which calls `At()` — and a

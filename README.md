@@ -291,6 +291,12 @@ already set in the environment take precedence over it.
   `COMPRESSION_SCALE=100`, images are fully decoded to validate them, and then
   their original bytes are stored unchanged. This keeps the format (including
   BMP/TIFF) and GIF animation.
+- **PNG at `COMPRESSION_SCALE=100`.** PNG stores pixels without loss, so the
+  compression pass could only repack identical data: the upload is stored as it
+  is, after the same full decode (validation) and with the same thumbnail. On a
+  12 MP PNG that is about 1.3 s of CPU instead of 3.2 s. The stored file keeps
+  whatever the upload carried, as in lossless mode. A scale below 100 is a real
+  transformation, so those uploads are re-encoded as before.
 - **Other settings.** The server decodes, scales by `COMPRESSION_SCALE` and
   re-encodes. BMP/TIFF become JPEG, and a re-encoded GIF keeps only its first
   frame. MP4/WebM are stored as they are.
