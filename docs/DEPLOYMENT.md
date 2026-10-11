@@ -20,12 +20,11 @@ things the application cannot do alone: **TLS in front of it, backups of
 | Lanpaper terminates TLS | Single host, no proxy available, internal CA | Set `TLS_CERT_FILE` + `TLS_KEY_FILE` (both or neither — a partial configuration refuses to start) |
 | Plain HTTP | LAN only, or a proxy that already enforces auth | Keep the default and never expose the port to the internet |
 
-Only one process should write to a given `data/` directory. Replicas can *read*
-the same directory (rotation is stateless, and metadata is renamed atomically,
-so a reader never sees a half-written file), but two writers would overwrite
-each other's changes: each process keeps its own in-memory copy of the library
-and writes it back, so the last commit wins and the other update is lost. Scale
-by putting a cache in front, not by running several writers.
+Only one process may use a given `data/` directory. The server takes an
+exclusive lock on `data/.lanpaper.lock` at start-up and refuses to start while
+another server, a `migrate-sqlite` write or a `recovery repair --apply` holds
+it, so two processes can never write the same database. Read-only replicas on a
+shared directory are not supported. Scale by putting a cache in front.
 
 ## 2. Configuration checklist
 

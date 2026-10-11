@@ -3,6 +3,7 @@
 package middleware
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -19,8 +20,8 @@ import (
 	"time"
 
 	"lanpaper/config"
-	"lanpaper/internal/atomicfile"
 	appmetrics "lanpaper/internal/metrics"
+	"lanpaper/storage"
 )
 
 // Admin sessions. A browser that signs in through the login form gets a random
@@ -28,9 +29,10 @@ import (
 // be used by installed PWAs: their standalone window has no password prompt.
 // Scripts keep using Basic auth.
 //
-// Only SHA-256 digests of the tokens are stored, in memory and in
-// data/sessions.json. The file holds digests and expiry times, so reading it
-// does not reveal a usable token. Sessions survive a restart.
+// Only SHA-256 digests of the tokens are stored, in memory and in the
+// `sessions` table of data/wallpapers.db. The table holds digests and expiry
+// times, so reading it does not reveal a usable token. Sessions survive a
+// restart. Sessions from the earlier data/sessions.json file are imported once.
 const (
 	sessionCookieName = "lanpaper_session"
 	sessionTTL        = 14 * 24 * time.Hour
@@ -38,8 +40,16 @@ const (
 	maxLoginBody      = 4 << 10
 )
 
-// sessionsPath is a variable so tests can point it at a temporary directory.
-var sessionsPath = filepath.Join("data", "sessions.json")
+// sessionDBPath and legacySessionsPath are variables so tests can point them at
+// a temporary directory. sessionDB is opened by LoadSessions and used for every
+// later write; it shares the wallpaper database file and therefore its single
+// transactional area and its owner-only permissions.
+var (
+	sessionDBPath       = filepath.Join("data", "wallpapers.db")
+	legacySessionsPath  = filepath.Join("data", "sessions.json")
+	sessionDB           *storage.SQLiteWallpaperStore
+	errSessionDBMissing = errors.New("session store is not open; LoadSessions must run first")
+)
 
 // SessionStore owns browser-session state. The package-level default remains a
 // compatibility adapter for handlers not yet constructed through App.
@@ -83,9 +93,10 @@ type sessionRecord struct {
 	Credential string
 }
 
-// persistedSession is one entry of data/sessions.json. ID and CreatedAt were
-// added after the original digest/expiry format; zero values are migrated on
-// load without exposing the bearer token or collecting device information.
+// persistedSession is one session row, either from the `sessions` table or from
+// the legacy data/sessions.json file. ID and CreatedAt were added after the
+// original digest/expiry format; zero values are migrated on load without
+// exposing the bearer token or collecting device information.
 type persistedSession struct {
 	ID         string `json:"id,omitempty"`
 	Digest     string `json:"digest"` // hex SHA-256 of the token
@@ -110,21 +121,17 @@ func validSessionID(id string) bool {
 // LoadSessions restores sessions saved by an earlier run. Expired and malformed
 // entries are dropped. A missing file means no sessions yet.
 func LoadSessions() error {
-	data, err := os.ReadFile(sessionsPath)
-	if os.IsNotExist(err) {
-		return nil
-	}
+	entries, imported, err := readPersistedSessions(context.Background())
 	if err != nil {
 		return err
-	}
-	var entries []persistedSession
-	if err := json.Unmarshal(data, &entries); err != nil {
-		return fmt.Errorf("%s: %w", sessionsPath, err)
 	}
 	now := time.Now()
 	next := make(map[[sha256.Size]byte]sessionRecord)
 	ids := make(map[string]bool)
-	changed := false
+	// The first run on the SQLite store writes the table and the import marker
+	// even when there was nothing to import, so the legacy file is never read
+	// again.
+	changed := !imported
 	credential := credentialFingerprint()
 	for _, e := range entries {
 		if e.Credential != "" && e.Credential != credential {
@@ -182,41 +189,101 @@ func LoadSessions() error {
 	return nil
 }
 
+// readPersistedSessions opens the session store and returns the saved rows. On
+// the first run it imports data/sessions.json instead, if that file exists.
+// imported reports whether the import has already happened.
+func readPersistedSessions(ctx context.Context) (entries []persistedSession, imported bool, err error) {
+	if sessionDB != nil {
+		sessionDB.Close()
+		sessionDB = nil
+	}
+	db, err := storage.OpenSQLiteWallpaperStore(ctx, sessionDBPath)
+	if err != nil {
+		return nil, false, fmt.Errorf("open session store: %w", err)
+	}
+	imported, err = db.SessionsImported(ctx)
+	if err != nil {
+		db.Close()
+		return nil, false, err
+	}
+	if !imported {
+		legacy, err := readLegacySessions()
+		if err != nil {
+			db.Close()
+			return nil, false, err
+		}
+		entries = legacy
+	} else {
+		rows, err := db.LoadSessions(ctx)
+		if err != nil {
+			db.Close()
+			return nil, false, fmt.Errorf("load sessions: %w", err)
+		}
+		for _, r := range rows {
+			entries = append(entries, persistedSession{
+				ID: r.ID, Digest: r.Digest, CreatedAt: r.CreatedAt, Expires: r.Expires, Credential: r.Credential,
+			})
+		}
+	}
+	sessionDB = db
+	return entries, imported, nil
+}
+
+// readLegacySessions parses the pre-SQLite data/sessions.json file. A missing
+// file means there is nothing to import.
+func readLegacySessions() ([]persistedSession, error) {
+	data, err := os.ReadFile(legacySessionsPath)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var entries []persistedSession
+	if err := json.Unmarshal(data, &entries); err != nil {
+		return nil, fmt.Errorf("%s: %w", legacySessionsPath, err)
+	}
+	log.Printf("Imported sessions from %s into the SQLite store; the file is kept as a backup and no longer read.", legacySessionsPath)
+	return entries, nil
+}
+
+// CloseSessions releases the session store after shutdown or in tests. Later
+// session writes fail until LoadSessions opens the store again.
+func CloseSessions() error {
+	if sessionDB == nil {
+		return nil
+	}
+	err := sessionDB.Close()
+	sessionDB = nil
+	return err
+}
+
 // persistSessions is replaceable in tests so disk failures can be injected
 // deterministically. Production always points it at persistLocked. The caller
 // holds sessionStore.Lock.
 var persistSessions = persistLocked
 
-// persistLocked writes the live sessions to disk atomically. The caller holds
-// sessionStore.Lock.
+// persistLocked replaces the `sessions` table with the live sessions in one
+// transaction. The caller holds sessionStore.Lock.
 func persistLocked(now time.Time) error {
-	entries := make([]persistedSession, 0, len(sessionStore.expiry))
+	if sessionDB == nil {
+		return errSessionDBMissing
+	}
+	rows := make([]storage.SessionRow, 0, len(sessionStore.expiry))
 	for digest, record := range sessionStore.expiry {
 		if now.Before(record.Expires) {
-			entries = append(entries, persistedSession{
-				ID: record.ID, Digest: hex.EncodeToString(digest[:]), Credential: record.Credential,
+			rows = append(rows, storage.SessionRow{
+				Digest: hex.EncodeToString(digest[:]), ID: record.ID, Credential: record.Credential,
 				CreatedAt: record.CreatedAt.Unix(), Expires: record.Expires.Unix(),
 			})
 		}
 	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Digest < entries[j].Digest })
-	body, err := json.Marshal(entries)
-	if err != nil {
+	sort.Slice(rows, func(i, j int) bool { return rows[i].Digest < rows[j].Digest })
+	if err := sessionDB.ReplaceSessions(context.Background(), rows); err != nil {
+		appmetrics.PersistenceFailure()
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(sessionsPath), config.DataDirPerm); err != nil {
-		return err
-	}
-	err = atomicfile.Write(atomicfile.OSFS{}, sessionsPath, ".sessions-*.json", body, 0o600)
-	if atomicfile.IsCommitted(err) {
-		appmetrics.PersistenceFailure()
-		log.Printf("Warning: sessions were renamed but directory durability could not be confirmed: %v", err)
-		return nil
-	}
-	if err != nil {
-		appmetrics.PersistenceFailure()
-	}
-	return err
+	return nil
 }
 
 // issueSession creates a session, saves it, and returns its token. If the save

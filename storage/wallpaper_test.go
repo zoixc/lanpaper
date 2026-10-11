@@ -3,7 +3,7 @@
 package storage
 
 import (
-	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -35,8 +35,7 @@ func testStorageDir(t *testing.T) {
 }
 
 func TestStoreCommitsAtomicallyAndReturnsCopies(t *testing.T) {
-	testStorageDir(t)
-	s := &Store{legacyJSON: true}
+	s := newTestLoadedStore(t)
 	if err := s.Create(&Wallpaper{ID: "a", LinkName: "a", Category: "other", AccessLevel: config.AccessToken, AccessToken: "secret"}); err != nil {
 		t.Fatal(err)
 	}
@@ -47,28 +46,22 @@ func TestStoreCommitsAtomicallyAndReturnsCopies(t *testing.T) {
 	if fresh, _ := s.Get("a"); fresh.Category != "other" || fresh.AccessToken != "secret" {
 		t.Fatalf("mutable pointer escaped Store: %+v", fresh)
 	}
-	original, err := os.ReadFile(dataFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Rename(dataFile, dataFile+".orig"); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Mkdir(dataFile, 0755); err != nil {
-		t.Fatal(err)
-	}
+
+	restore := SetCommitFailure(errors.New("injected commit failure"))
 	if _, err := s.Update("a", func(w *Wallpaper) error { w.Category = "work"; return nil }); err == nil {
-		t.Fatal("Store.Update returned success despite failed disk commit")
+		t.Fatal("Store.Update returned success despite failed commit")
 	}
 	if err := s.Create(&Wallpaper{ID: "b", LinkName: "b"}); err == nil {
-		t.Fatal("Store.Create returned success despite failed disk commit")
+		t.Fatal("Store.Create returned success despite failed commit")
 	}
 	if _, err := s.DeleteEntry("a"); err == nil {
-		t.Fatal("Store.DeleteEntry returned success despite failed disk commit")
+		t.Fatal("Store.DeleteEntry returned success despite failed commit")
 	}
 	if _, err := s.Rename("a", "c"); err == nil {
-		t.Fatal("Store.Rename returned success despite failed disk commit")
+		t.Fatal("Store.Rename returned success despite failed commit")
 	}
+	restore()
+
 	if _, exists := s.Get("b"); exists {
 		t.Fatal("failed create appeared in memory")
 	}
@@ -78,21 +71,19 @@ func TestStoreCommitsAtomicallyAndReturnsCopies(t *testing.T) {
 	if fresh, exists := s.Get("a"); !exists || fresh.Category != "other" || fresh.AccessToken != "secret" {
 		t.Fatalf("failed transaction changed memory: %+v", fresh)
 	}
-	if err := os.Remove(dataFile); err != nil {
+
+	// A fresh process must see the same state as memory: nothing from the
+	// failed transactions reached the database.
+	reloaded := &Store{}
+	if err := reloaded.Load(); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Rename(dataFile+".orig", dataFile); err != nil {
-		t.Fatal(err)
-	}
-	if persisted, err := os.ReadFile(dataFile); err != nil || !bytes.Equal(persisted, original) {
-		t.Fatalf("failed transaction modified disk: %v", err)
-	}
-	loaded := &Store{legacyJSON: true}
-	if err := loaded.Load(); err != nil {
-		t.Fatal(err)
-	}
-	if wp, ok := loaded.Get("a"); !ok || wp.Category != "other" {
+	defer reloaded.Close()
+	if wp, ok := reloaded.Get("a"); !ok || wp.Category != "other" || wp.AccessToken != "secret" {
 		t.Fatalf("reloaded state incorrect: %+v", wp)
+	}
+	if _, ok := reloaded.Get("b"); ok {
+		t.Fatal("failed create was persisted")
 	}
 }
 
@@ -101,7 +92,7 @@ func TestStoreCommitsAtomicallyAndReturnsCopies(t *testing.T) {
 // the store behind its back.
 func TestStoreSnapshotsDoNotShareSlices(t *testing.T) {
 	testStorageDir(t)
-	s := &Store{legacyJSON: true}
+	s := newTestLoadedStore(t)
 	created := &Wallpaper{
 		ID: "p", LinkName: "p", Category: "other", AccessLevel: config.AccessPublic,
 		Items:   []PlaylistItem{{ID: 1, Ext: "jpg"}, {ID: 2, Ext: "png"}},
@@ -134,12 +125,9 @@ func TestStoreSnapshotsDoNotShareSlices(t *testing.T) {
 	}
 }
 
+// Legacy JSON is validated before import. A refused file must not leave a
+// database behind, and it must not be rewritten.
 func TestStoreLoadRefusesCorruptAndUnsafeData(t *testing.T) {
-	testStorageDir(t)
-	s := &Store{legacyJSON: true}
-	if err := s.Create(&Wallpaper{LinkName: "keep", Category: "other"}); err != nil {
-		t.Fatal(err)
-	}
 	for _, tc := range []struct{ name, body string }{
 		{"malformed", `{broken`},
 		{"null root", `null`},
@@ -148,14 +136,16 @@ func TestStoreLoadRefusesCorruptAndUnsafeData(t *testing.T) {
 		{"unsupported media type", `{"keep":{"hasImage":true,"mimeType":"html"}}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			testStorageDir(t)
 			if err := os.WriteFile(dataFile, []byte(tc.body), 0600); err != nil {
 				t.Fatal(err)
 			}
+			s := &Store{}
 			if err := s.Load(); err == nil {
 				t.Fatal("Load silently dropped or replaced malformed metadata")
 			}
-			if _, ok := s.Get("keep"); !ok {
-				t.Fatal("failed Load replaced existing state")
+			if fileExists(databaseFile) {
+				t.Fatal("refused import still created a database")
 			}
 			if unchanged, _ := os.ReadFile(dataFile); string(unchanged) != tc.body {
 				t.Fatal("invalid metadata was rewritten")
@@ -164,13 +154,16 @@ func TestStoreLoadRefusesCorruptAndUnsafeData(t *testing.T) {
 	}
 	// A legacy record may have untrusted ID/paths; the validated map key is
 	// the only authority for filenames and URLs, and unknown access fails shut.
+	testStorageDir(t)
 	body := `{"valid":{"id":"../../secret","linkName":"../bad","hasImage":true,"mimeType":"png","accessLevel":"unknown"}}`
 	if err := os.WriteFile(dataFile, []byte(body), 0600); err != nil {
 		t.Fatal(err)
 	}
+	s := &Store{}
 	if err := s.Load(); err != nil {
 		t.Fatal(err)
 	}
+	defer s.Close()
 	if wp, ok := s.Get("valid"); !ok || wp.ID != "valid" || wp.LinkName != "valid" ||
 		wp.ImagePath != MediaPath("valid", "png") || wp.AccessLevel != config.AccessAuth {
 		t.Fatalf("unsafe persisted field escaped validation: %+v", wp)
@@ -179,7 +172,7 @@ func TestStoreLoadRefusesCorruptAndUnsafeData(t *testing.T) {
 
 func TestConcurrentUpdatesAndSnapshots(t *testing.T) {
 	testStorageDir(t)
-	s := &Store{legacyJSON: true}
+	s := newTestLoadedStore(t)
 	if err := s.Create(&Wallpaper{LinkName: "counter", Category: "other"}); err != nil {
 		t.Fatal(err)
 	}
@@ -201,10 +194,11 @@ func TestConcurrentUpdatesAndSnapshots(t *testing.T) {
 	if wp, _ := s.Get("counter"); wp.SizeBytes != 200 {
 		t.Fatalf("lost updates or snapshot escaped cache: %d", wp.SizeBytes)
 	}
-	loaded := &Store{legacyJSON: true}
+	loaded := &Store{}
 	if err := loaded.Load(); err != nil {
 		t.Fatal(err)
 	}
+	defer loaded.Close()
 	if wp, _ := loaded.Get("counter"); wp.SizeBytes != 200 {
 		t.Fatalf("lost persisted updates: %d", wp.SizeBytes)
 	}
@@ -213,7 +207,7 @@ func TestConcurrentUpdatesAndSnapshots(t *testing.T) {
 func TestLegacyMigrationNeverFollowsFileSymlink(t *testing.T) {
 	testStorageDir(t)
 	oldGlobal := Global
-	Global = &Store{legacyJSON: true}
+	Global = newTestLoadedStore(t)
 	t.Cleanup(func() { Global = oldGlobal })
 	outside := filepath.Join(t.TempDir(), "private.png")
 	if err := os.WriteFile(outside, []byte("secret"), 0600); err != nil {
@@ -241,7 +235,7 @@ func TestLegacyMigrationNeverFollowsFileSymlink(t *testing.T) {
 func TestPruneKeepsLinksAndTheirAccessControls(t *testing.T) {
 	testStorageDir(t)
 	oldGlobal := Global
-	Global = &Store{legacyJSON: true}
+	Global = newTestLoadedStore(t)
 	t.Cleanup(func() { Global = oldGlobal })
 	for index, name := range []string{"old", "new"} {
 		path := MediaPath(name, "png")

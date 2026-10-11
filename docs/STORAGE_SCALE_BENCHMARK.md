@@ -17,16 +17,17 @@ durable mutation rewrites the complete dataset (about 132 ms and 48 MB allocated
 and a list allocates about 15 MB. Concurrent traffic, slower persistent volumes
 and richer history/playlist records increase those costs.
 
-Operational policy:
+Operational policy (updated for 0.17.0):
 
-- **0–10k records:** supported JSON-store range.
-- **10k–50k records:** transitional range; monitor API p95 latency, process RSS,
-  metadata-file size and storage fsync latency.
-- Begin the SQLite migration before **10k records**, or earlier when metadata
-  mutations exceed **250 ms p95**, `wallpapers.json` exceeds **25 MB**, or peak
-  memory is constrained below roughly four times the metadata file size.
-- **Above 50k records:** not supported by the JSON backend for production; use
-  the SQLite backend introduced by the following roadmap work.
+- **SQLite is the only backend.** A single change costs about 1–2 ms at 3,000
+  records, and the cost stays flat as the library grows (see the last section).
+- **Memory is the limit, not the write path.** The whole library is held in
+  memory for reads, so plan for roughly 1.7 KB per link plus the media cache.
+- **Above about 50k records,** measure API p95 and RSS before relying on the
+  deployment; this has not been benchmarked.
+
+The JSON figures above are historical. They explain why the SQLite backend was
+introduced and are not a current operating guide.
 
 These are baseline microbenchmarks, not a throughput promise. Each result uses
 three iterations and an empty-media metadata shape. `BenchmarkStoreScale`

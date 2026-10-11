@@ -3,6 +3,8 @@
 package middleware
 
 import (
+	"bytes"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -12,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"lanpaper/storage"
 )
 
 // useSessionDir runs the test in a fresh directory with an empty session store,
@@ -23,6 +27,15 @@ func useSessionDir(t *testing.T) {
 		t.Fatal(err)
 	}
 	resetSessionStore()
+	db, err := storage.OpenSQLiteWallpaperStore(context.Background(), sessionDBPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessionDB = db
+	t.Cleanup(func() {
+		db.Close()
+		sessionDB = nil
+	})
 	t.Cleanup(resetSessionStore)
 }
 
@@ -97,37 +110,42 @@ func TestExpiredSessionIsRefused(t *testing.T) {
 	}
 }
 
-// The file and the store hold digests, never the token itself.
-func TestSessionFileHoldsDigestsOnly(t *testing.T) {
+// The table and the database file hold digests, never the token itself.
+func TestSessionTableHoldsDigestsOnly(t *testing.T) {
 	useSessionDir(t)
 	token, err := issueSession(time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
-	body, err := os.ReadFile(sessionsPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(body), token) {
-		t.Fatal("raw token written to sessions.json")
+	entries := readSessionRows(t)
+	if len(entries) != 1 {
+		t.Fatalf("session rows = %d, want 1", len(entries))
 	}
 	want := hex.EncodeToString(func() []byte { d := tokenDigest(token); return d[:] }())
-	if !strings.Contains(string(body), want) {
-		t.Fatal("digest missing from sessions.json")
-	}
-	var entries []persistedSession
-	if err := json.Unmarshal(body, &entries); err != nil || len(entries) != 1 {
-		t.Fatalf("session metadata: entries=%d err=%v", len(entries), err)
+	if entries[0].Digest != want {
+		t.Fatalf("stored digest %q, want %q", entries[0].Digest, want)
 	}
 	if entries[0].ID == "" || entries[0].CreatedAt <= 0 || entries[0].Expires <= entries[0].CreatedAt {
 		t.Fatalf("incomplete session metadata: %+v", entries[0])
 	}
-	info, err := os.Stat(sessionsPath)
+	for _, name := range []string{sessionDBPath, sessionDBPath + "-wal"} {
+		body, err := os.ReadFile(name)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if bytes.Contains(body, []byte(token)) {
+			t.Fatalf("raw token found in %s", name)
+		}
+	}
+	info, err := os.Stat(sessionDBPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if info.Mode().Perm() != 0o600 {
-		t.Fatalf("sessions.json mode %v, want 0600", info.Mode().Perm())
+		t.Fatalf("%s mode %v, want 0600", sessionDBPath, info.Mode().Perm())
 	}
 }
 
@@ -159,7 +177,7 @@ func TestSessionListMarksOnlyCurrentWithoutSensitiveMetadata(t *testing.T) {
 	}
 }
 
-func TestLegacySessionFileIsMigrated(t *testing.T) {
+func TestLegacySessionFileIsImportedOnce(t *testing.T) {
 	useSessionDir(t)
 	token := "legacy-session-token"
 	digest := tokenDigest(token)
@@ -171,25 +189,26 @@ func TestLegacySessionFileIsMigrated(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(sessionsPath, legacy, 0o600); err != nil {
+	if err := os.WriteFile(legacySessionsPath, legacy, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := LoadSessions(); err != nil {
 		t.Fatal(err)
 	}
 	if !HasAdminSession(requestWithToken(token)) {
-		t.Fatal("legacy session did not survive metadata migration")
+		t.Fatal("legacy session was not imported")
 	}
-	body, err := os.ReadFile(sessionsPath)
-	if err != nil {
+	migrated := readSessionRows(t)
+	if len(migrated) != 1 || !validSessionID(migrated[0].ID) || migrated[0].CreatedAt <= 0 {
+		t.Fatalf("imported rows: %+v", migrated)
+	}
+	// The file stays as a backup, but a later logout must not be undone by it.
+	if err := revokeSession(requestWithToken(token)); err != nil {
 		t.Fatal(err)
 	}
-	var migrated []persistedSession
-	if err := json.Unmarshal(body, &migrated); err != nil || len(migrated) != 1 {
-		t.Fatalf("migrated file: entries=%d err=%v", len(migrated), err)
-	}
-	if !validSessionID(migrated[0].ID) || migrated[0].CreatedAt <= 0 {
-		t.Fatalf("legacy metadata was not normalized: %+v", migrated[0])
+	simulateRestart(t)
+	if HasAdminSession(requestWithToken(token)) {
+		t.Fatal("revoked session came back from sessions.json after import")
 	}
 }
 
@@ -306,16 +325,11 @@ func TestRevokeAllSessionsRollsBackOnPersistenceFailure(t *testing.T) {
 
 func TestExpiredSessionsAreNotRestored(t *testing.T) {
 	useSessionDir(t)
-	stale, err := json.Marshal([]persistedSession{{
+	writeSessionRows(t, []persistedSession{{
 		Digest:  hex.EncodeToString(func() []byte { d := tokenDigest("old"); return d[:] }()),
+		ID:      "stale-id",
 		Expires: time.Now().Add(-time.Hour).Unix(),
 	}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(sessionsPath, stale, 0o600); err != nil {
-		t.Fatal(err)
-	}
 	simulateRestart(t)
 	if n := len(sessionStore.expiry); n != 0 {
 		t.Fatalf("%d expired session(s) restored", n)
@@ -324,7 +338,7 @@ func TestExpiredSessionsAreNotRestored(t *testing.T) {
 
 func TestMalformedSessionsFileIsReported(t *testing.T) {
 	useSessionDir(t)
-	if err := os.WriteFile(sessionsPath, []byte("{not json"), 0o600); err != nil {
+	if err := os.WriteFile(legacySessionsPath, []byte("{not json"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := LoadSessions(); err == nil {
@@ -336,14 +350,50 @@ func TestMalformedSessionsFileIsReported(t *testing.T) {
 // cookie that would disappear on the next restart.
 func TestLoginFailsWhenSessionCannotBeSaved(t *testing.T) {
 	useSessionDir(t)
-	if err := os.Chmod("data", 0o500); err != nil {
+	if err := sessionDB.Close(); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.Chmod("data", 0o700) })
 	if _, err := issueSession(time.Now()); err == nil {
 		t.Fatal("session issued although it could not be saved")
 	}
 	if n := len(sessionStore.expiry); n != 0 {
 		t.Fatalf("%d unsaved session(s) kept in memory", n)
+	}
+}
+
+// readSessionRows returns the rows of the `sessions` table as the server sees
+// them after a restart.
+func readSessionRows(t *testing.T) []persistedSession {
+	t.Helper()
+	db, err := storage.OpenSQLiteWallpaperStore(context.Background(), sessionDBPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	rows, err := db.LoadSessions(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := make([]persistedSession, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, persistedSession{ID: r.ID, Digest: r.Digest, CreatedAt: r.CreatedAt, Expires: r.Expires, Credential: r.Credential})
+	}
+	return out
+}
+
+// writeSessionRows replaces the `sessions` table, as an earlier run would have.
+func writeSessionRows(t *testing.T, entries []persistedSession) {
+	t.Helper()
+	db, err := storage.OpenSQLiteWallpaperStore(context.Background(), sessionDBPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	rows := make([]storage.SessionRow, 0, len(entries))
+	for _, e := range entries {
+		rows = append(rows, storage.SessionRow{Digest: e.Digest, ID: e.ID, CreatedAt: e.CreatedAt, Expires: e.Expires, Credential: e.Credential})
+	}
+	if err := db.ReplaceSessions(context.Background(), rows); err != nil {
+		t.Fatal(err)
 	}
 }

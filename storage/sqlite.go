@@ -46,6 +46,12 @@ CREATE TABLE IF NOT EXISTS rotations (
 ) STRICT;
 CREATE INDEX IF NOT EXISTS wallpapers_created_idx ON wallpapers(created_at DESC, link_name);
 CREATE INDEX IF NOT EXISTS wallpapers_access_idx ON wallpapers(access_level, created_at DESC);
+CREATE TABLE IF NOT EXISTS sessions (
+  digest TEXT PRIMARY KEY CHECK(length(digest) = 64),
+  id TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL DEFAULT 0,
+  expires INTEGER NOT NULL, credential TEXT NOT NULL DEFAULT ''
+) STRICT;
+CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT;
 `
 
 // SQLiteWallpaperStore implements WallpaperStore with normalized metadata.
@@ -59,6 +65,13 @@ func OpenSQLiteWallpaperStore(ctx context.Context, path string) (*SQLiteWallpape
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, err
 	}
+	// The database holds access tokens and session digests, so it is created
+	// owner-only, as the JSON metadata file was before the SQLite switch.
+	if f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o600); err != nil {
+		return nil, err
+	} else if err := f.Close(); err != nil {
+		return nil, err
+	}
 	dsn := "file:" + filepath.ToSlash(path) + "?_txlock=immediate&_pragma=busy_timeout(5000)"
 	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
@@ -70,7 +83,22 @@ func OpenSQLiteWallpaperStore(ctx context.Context, path string) (*SQLiteWallpape
 		db.Close()
 		return nil, fmt.Errorf("initialize sqlite: %w", err)
 	}
+	if err := restrictSQLiteFiles(path); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return store, nil
+}
+
+// restrictSQLiteFiles makes the WAL and shared-memory files owner-only. SQLite
+// creates them with the process umask rather than the database file's mode.
+func restrictSQLiteFiles(path string) error {
+	for _, suffix := range []string{"-wal", "-shm"} {
+		if err := os.Chmod(path+suffix, 0o600); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *SQLiteWallpaperStore) Close() error { return s.db.Close() }

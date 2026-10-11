@@ -20,7 +20,9 @@ Back up the **entire `data/` tree as one unit**, including:
 
 - JSON or SQLite metadata and SQLite sidecar files;
 - `media/`, `previews/`, `history/` and `items/`;
-- `sessions.json`, migration checkpoints, repair journals and quarantine data.
+- the `sessions` table in the database, migration checkpoints, repair journals
+  and quarantine data. The one-time import source `sessions.json` may still be
+  present on upgraded installations.
 
 Also preserve outside the data backup, in a secret manager:
 

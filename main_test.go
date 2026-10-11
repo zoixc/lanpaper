@@ -25,6 +25,7 @@ import (
 
 	"lanpaper/config"
 	"lanpaper/handlers"
+	"lanpaper/middleware"
 	"lanpaper/storage"
 )
 
@@ -59,6 +60,10 @@ func setupApp(t *testing.T) *testApp {
 		Rate:        config.RateConfig{PublicPerMin: 10000, UploadPerMin: 10000, Burst: 100},
 	}
 	storage.Global = loadedTestStore(t)
+	if err := middleware.LoadSessions(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = middleware.CloseSessions() })
 	handlers.InitUploadSemaphore(config.Current.MaxConcurrentUploads)
 	for _, dir := range []string{"data/media", "data/previews", "external/images", "static/css", "static/js", "static/images", "static/i18n"} {
 		if err := os.MkdirAll(dir, 0755); err != nil {

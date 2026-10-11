@@ -3,17 +3,45 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
-## [Unreleased]
+## [0.17.0] – 2026-10-11
+
+**Upgrade notes — read before deploying**
+
+- **The first start imports `data/wallpapers.json` automatically.** When there is
+  no `data/wallpapers.db`, the server checks the JSON checksum, writes a durable
+  backup named `data/wallpapers.json.pre-sqlite-<UTC time>.bak`, and imports the
+  records. The original JSON file stays on disk and is never written again.
+- **Rollback is manual and uses the backup.** Lanpaper 0.17.0 does not write JSON
+  back. To return to an earlier release, stop the server, restore the backup as
+  `data/wallpapers.json`, and remove `data/wallpapers.db` and its `-wal` and
+  `-shm` files. Changes made after the upgrade are lost unless you copy them
+  first. See `docs/SQLITE_MIGRATION.md` and `docs/DISASTER_RECOVERY.md`.
+- **Only one process may use a data directory.** A second server, or a
+  `migrate-sqlite` or `recovery repair --apply` run, now fails at once with a
+  clear message while the first one holds `data/.lanpaper.lock`. Before, two
+  processes could write the same database.
+- **Sign-in sessions moved into the database.** They are stored in the
+  `sessions` table of `data/wallpapers.db`, in the same transactional store as
+  the metadata. On the first start, `data/sessions.json` is imported once and
+  the users stay signed in. The file is kept as a backup and is no longer read
+  after that, so a later sign-out cannot be undone by it. You may delete it
+  after you have checked the upgrade.
 
 ### Security
+
+- **Database files are owner-only.** `wallpapers.db`, and the `-wal` and `-shm`
+  files SQLite creates beside it, are mode 0600. The SQLite switch had created
+  the database with the umask default (0644), and it held access tokens and
+  session digests. This is fixed; check the mode if you copied the data
+  directory with other permissions.
 
 - **Concurrent password checks are bounded.** Every Argon2id evaluation
   allocates 64 MiB, and nothing limited how many ran at once: ten concurrent
   wrong Basic-auth requests reached 668 MB of RSS and a hundred ended in an
-  out-of-memory kill. At most two evaluations now run at a time. A request that
+  out-of-memory kill. At most one evaluation runs at a time. A request that
   cannot get a slot within five seconds receives `503` with `Retry-After`, and
   does not count as a failed login. The hash parameters did not change. With the
-  same hundred attempts, the peak is now about 146 MB.
+  same hundred attempts, the peak is now about 83 MB (measured on 0.17.0).
 
 ### Changed
 
@@ -24,8 +52,22 @@ Notable changes to Lanpaper. Docker images are published as
   from memory, and a failed write is never published to readers. On the first
   start, an existing `wallpapers.json` is imported automatically after a
   checksum-verified backup. The original file is kept and never written again.
-  `recovery audit` and `recovery repair` work on the database when it exists.
-  Sessions remain in `data/sessions.json`.
+  `recovery audit` only reads. `recovery repair` imports a JSON-only installation
+  first and then repairs the database, keeping a copy of the database in
+  quarantine.
+- **One Argon2id evaluation at a time.** The limit is now one concurrent
+  evaluation (`argonConcurrency = 1`), down from two. The hash parameters did not
+  change. Requests that cannot get a slot within five seconds still receive
+  `503` with `Retry-After`. Several simultaneous sign-ins are now served one
+  after another, so they take longer. The limit is one constant in
+  `middleware/argon_limit.go`.
+- **Sessions are stored in SQLite.** Only SHA-256 digests are saved, as before,
+  in the `sessions` table. Each change replaces the table in one transaction,
+  so a sign-out and a restart can no longer disagree.
+- **The JSON write path is removed.** The test-only `legacyJSON` switch, the
+  JSON writer and its benchmark are gone. Tests run the real SQLite store. The
+  JSON benchmarks in `docs/STORAGE_SCALE_BENCHMARK.md` are kept as historical
+  numbers.
 - **Successful Basic-auth verifications are cached for five minutes.** Scripts
   that send the same credentials on every request no longer pay one Argon2
   evaluation (tens to over a hundred milliseconds of CPU, depending on load) per
@@ -37,8 +79,8 @@ Notable changes to Lanpaper. Docker images are published as
   password check left the process at about 79 MB instead of 12 MB, and the
   memory was not returned for minutes. The pages are now released at most once
   every 30 seconds, so a lone sign-in gives them back and an attacker cannot
-  force more frequent releases. The burst peak (100 wrong passwords, about
-  148 MB) is unchanged.
+  force more frequent releases. The burst peak (100 wrong passwords) was about
+  148 MB with two slots and is about 83 MB with one slot.
 - **SQLite WAL size is bounded:** `journal_size_limit` is 64 MiB, so a large
   import does not leave a permanently large write-ahead log on disk.
 - **Admin page:** the versioned HTML is cached per file, keyed by its
@@ -46,6 +88,10 @@ Notable changes to Lanpaper. Docker images are published as
 - **Metadata maintenance** (prune and history budget) reads a shared snapshot
   instead of deep-copying every record after each upload.
 - **Example deployment** sets `GOMEMLIMIT=768MiB` below the 1 GiB container limit.
+
+- **`/health` does not report the version,** as before. The version is in the
+  startup log and in the build. Public probes should not learn which release to
+  look up for known flaws.
 
 ### Dependencies
 

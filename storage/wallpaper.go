@@ -4,7 +4,6 @@ package storage
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -19,8 +18,6 @@ import (
 	"sync/atomic"
 
 	"lanpaper/config"
-	"lanpaper/internal/atomicfile"
-	appmetrics "lanpaper/internal/metrics"
 	"lanpaper/utils"
 )
 
@@ -76,18 +73,19 @@ type Store struct {
 	wallpapers map[string]*Wallpaper
 	sortedSnap []*Wallpaper
 	generation uint64
-	// db is the durable SQLite backend. It is nil only for stores that were
-	// never loaded (tests and in-memory use); those fall back to the JSON file.
+	// db is the durable SQLite backend. It is nil until Load succeeds, and a
+	// store without it refuses every write, so metadata can never be
+	// silently kept somewhere that is not the database.
 	db *SQLiteWallpaperStore
-	// legacyJSON lets an unloaded store persist to wallpapers.json. Only test
-	// stores set it. A production store that was never loaded refuses to
-	// write, so it can never silently fork metadata into the legacy file.
-	legacyJSON bool
 }
 
 // commitFailure, when set, makes every commit fail with the stored error. It is
 // the fault seam for tests that check rollback after a metadata write error.
 var commitFailure atomic.Pointer[error]
+
+// commitHook, when set, replaces the database write. Tests use it to slow a
+// commit down or count commits without touching disk.
+var commitHook func(next map[string]*Wallpaper) error
 
 // SetCommitFailure makes all metadata commits fail with err until the returned
 // function is called. Tests use it to check that failed writes are rolled back.
@@ -140,10 +138,6 @@ func (s *Store) Set(id string, wp *Wallpaper) {
 	s.wallpapers[id] = &clone
 	s.sortedSnap = nil
 }
-
-// writeFile persists a full wallpaper map. It is a variable so tests can slow
-// it down and check that readers are not blocked by a write in progress.
-var writeFile = atomicWrite
 
 // commit persists next BEFORE publishing it to readers. No handler may report
 // success or change access levels in memory if saving fails. The caller must
@@ -385,26 +379,6 @@ func cloneWallpaper(wp *Wallpaper) *Wallpaper {
 	clone.Items = slices.Clone(wp.Items)
 	clone.History = slices.Clone(wp.History)
 	return &clone
-}
-
-// atomicWrite marshals data to a temp file, flushes it to stable storage and
-// renames it atomically, so neither a crash nor a power loss mid-write can
-// leave a truncated or empty JSON file behind.
-func atomicWrite(path string, data map[string]*Wallpaper) error {
-	body, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal: %w", err)
-	}
-	err = atomicfile.Write(atomicfile.OSFS{}, path, ".wallpapers-*.json", body)
-	if atomicfile.IsCommitted(err) {
-		appmetrics.PersistenceFailure()
-		log.Printf("Warning: wallpaper metadata was renamed but directory durability could not be confirmed: %v", err)
-		return nil
-	}
-	if err != nil {
-		appmetrics.PersistenceFailure()
-	}
-	return err
 }
 
 // MediaPath returns the canonical on-disk path for a link's media file.
@@ -682,20 +656,19 @@ func sanitizeMediaLists(wp *Wallpaper) {
 	}
 }
 
-// persist makes next durable. With a database it writes only the records that
-// changed since the last commit; without one it rewrites the legacy JSON file.
-// The caller holds writeMu.
+// persist makes next durable. It writes only the records that changed since
+// the last commit, in one transaction. The caller holds writeMu.
 func (s *Store) persist(next map[string]*Wallpaper) error {
 	if injected := commitFailure.Load(); injected != nil && *injected != nil {
 		return *injected
 	}
-	if s.db != nil {
-		return s.db.syncRecords(context.Background(), s.wallpapers, next)
+	if commitHook != nil {
+		return commitHook(next)
 	}
-	if s.legacyJSON {
-		return writeFile(dataFile, next)
+	if s.db == nil {
+		return ErrStoreNotLoaded
 	}
-	return ErrStoreNotLoaded
+	return s.db.syncRecords(context.Background(), s.wallpapers, next)
 }
 
 // Load opens the SQLite metadata database and loads every record into memory.
@@ -729,7 +702,6 @@ func (s *Store) Load() error {
 		s.db.Close()
 	}
 	s.db = db
-	s.legacyJSON = false
 	s.Lock()
 	s.generation++
 	for _, wp := range m {

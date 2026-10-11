@@ -20,8 +20,10 @@ import (
 // allocates argonMemory (64 MiB). Without a bound, N concurrent wrong
 // credentials cost N x 64 MiB and an unauthenticated client can exhaust the
 // memory of the process (measured: 10 requests -> 668 MB RSS, 100 -> OOM kill).
-// Two slots keep the peak near 128 MiB. The hash parameters do not change.
-const argonConcurrency = 2
+// One slot keeps the peak near 64 MiB plus the process baseline. The hash
+// parameters do not change. A second slot doubles the peak, and the operator
+// may raise the limit only with that trade-off in mind.
+const argonConcurrency = 1
 
 // argonQueueWait is how long a request waits for a free slot before it is
 // refused with 503. Legitimate sign-ins under moderate load wait a fraction of

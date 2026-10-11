@@ -7,6 +7,9 @@ automatically: it verifies the checksum, makes a durable backup named
 keeps the original JSON file. An interrupted import is resumed on the next start
 from its checkpoint.
 
+Upgrading to 0.17.0 also moves sign-in sessions into the same database. The
+first start imports `data/sessions.json` once and keeps the file as a backup.
+
 This page describes the manual `migrate-sqlite` command, which is still useful
 for dry runs, for checking an installation before upgrading, and for staging a
 database somewhere other than the default location. The command is explicit and
@@ -14,7 +17,9 @@ offline and never deletes `wallpapers.json`.
 
 ## Before migrating
 
-1. Stop the Lanpaper server so metadata cannot change during migration.
+1. Stop the Lanpaper server so metadata cannot change during migration. The
+   command takes `data/.lanpaper.lock` for every run except `--dry-run`, and
+   it refuses to write while a server is running.
 2. Back up the entire `data/` directory, including media, history and playlist
    files. The migration only changes metadata storage.
 3. Run a validation pass:

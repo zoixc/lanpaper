@@ -18,6 +18,13 @@ func importLegacyMetadata(ctx context.Context) error {
 	return importLegacyMetadataAt(ctx, databaseFile, dataFile)
 }
 
+// ImportLegacyMetadata runs the startup import for the working directory root.
+// Recovery tools call it before repairing, so a repair always works on the
+// database and never on wallpapers.json.
+func ImportLegacyMetadata(root string) error {
+	return importLegacyMetadataAt(context.Background(), filepath.Join(root, databaseFile), filepath.Join(root, dataFile))
+}
+
 func importLegacyMetadataAt(ctx context.Context, dbPath, jsonPath string) error {
 	checkpoint := dbPath + ".migration.json"
 	dbExists := fileExists(dbPath)

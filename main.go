@@ -86,6 +86,13 @@ func main() {
 	if err := os.MkdirAll(config.Current.ExternalImageDir, 0755); err != nil {
 		log.Printf("Warning: external gallery unavailable: %v", err)
 	}
+	// Only one process may own the data directory: two servers writing the same
+	// database would race. The lock is released when the process exits.
+	unlockData, err := storage.LockDataDir("data")
+	if err != nil {
+		log.Fatalf("Cannot start: %v", err)
+	}
+	defer unlockData()
 	if err := storage.Global.Load(); err != nil {
 		log.Fatalf("Cannot load wallpapers (refusing to overwrite metadata): %v", err)
 	}
@@ -166,6 +173,9 @@ func main() {
 		}
 	}
 	// Close after the HTTP server has drained, so no request can still write.
+	if err := middleware.CloseSessions(); err != nil {
+		log.Printf("Warning: closing session store: %v", err)
+	}
 	if err := storage.Global.Close(); err != nil {
 		log.Printf("Warning: closing metadata database: %v", err)
 	}

@@ -24,23 +24,23 @@ func scaleWallpapers(size int) map[string]*Wallpaper {
 	return wallpapers
 }
 
-func benchmarkJSONCommit(_ string, data map[string]*Wallpaper) error {
+// benchmarkSerializeCommit does the same work as the old JSON writer's encoding
+// step and discards the bytes, so the mutation benchmarks keep their shape
+// without disk I/O.
+func benchmarkSerializeCommit(data map[string]*Wallpaper) error {
 	return json.NewEncoder(io.Discard).Encode(data)
 }
 
-// BenchmarkStoreScale measures selectors and the complete map-copy + JSON
-// serialization mutation path. Filesystem durability is intentionally excluded
-// here because runner disks obscure the scaling curve; BenchmarkAtomicWriteScale
-// below measures the end-to-end durable write separately.
+// BenchmarkStoreScale measures selectors and the in-memory mutation path with
+// the commit replaced by serialization only. Durable SQLite commits are
+// measured by BenchmarkDatabaseScale in database_bench_test.go.
 func BenchmarkStoreScale(b *testing.B) {
-	originalWrite := writeFile
-	writeFile = benchmarkJSONCommit
-	b.Cleanup(func() { writeFile = originalWrite })
+	withCommitHookBench(b, benchmarkSerializeCommit)
 
 	for _, size := range scaleSizes {
 		seed := scaleWallpapers(size)
 		b.Run(fmt.Sprintf("records=%d/list", size), func(b *testing.B) {
-			store := &Store{legacyJSON: true, wallpapers: maps.Clone(seed)}
+			store := &Store{wallpapers: maps.Clone(seed)}
 			b.ReportAllocs()
 			for b.Loop() {
 				_ = store.GetAll()
@@ -48,7 +48,7 @@ func BenchmarkStoreScale(b *testing.B) {
 		})
 		for _, operation := range []string{"create", "update", "rename", "delete"} {
 			b.Run(fmt.Sprintf("records=%d/%s", size, operation), func(b *testing.B) {
-				store := &Store{legacyJSON: true}
+				store := &Store{wallpapers: make(map[string]*Wallpaper)}
 				b.ReportAllocs()
 				for b.Loop() {
 					b.StopTimer()
@@ -74,17 +74,8 @@ func BenchmarkStoreScale(b *testing.B) {
 	}
 }
 
-func BenchmarkAtomicWriteScale(b *testing.B) {
-	for _, size := range scaleSizes {
-		data := scaleWallpapers(size)
-		b.Run(fmt.Sprintf("records=%d", size), func(b *testing.B) {
-			root := b.TempDir()
-			b.ReportAllocs()
-			for b.Loop() {
-				if err := atomicWrite(root+"/wallpapers.json", data); err != nil {
-					b.Fatal(err)
-				}
-			}
-		})
-	}
+func withCommitHookBench(b *testing.B, hook func(map[string]*Wallpaper) error) {
+	saved := commitHook
+	commitHook = hook
+	b.Cleanup(func() { commitHook = saved })
 }

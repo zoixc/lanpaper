@@ -372,7 +372,8 @@ Two properties worth knowing before sizing a host:
 
 - **Authentication uses sign-in sessions.** The browser signs in once through
   the form and keeps an HttpOnly cookie for 14 days. Sessions are stored as
-  SHA-256 digests in `data/sessions.json` (mode 0600), so they survive a restart.
+  SHA-256 digests in the `sessions` table of `data/wallpapers.db` (owner-only
+  file), so they survive a restart.
   Settings → Account → Sign out ends the current session at once; “Sign out on
   all devices” durably revokes every browser session. Scripts can still send
   the admin password as HTTP Basic Auth on each API request. Either way, TLS in front
@@ -391,6 +392,11 @@ still has `data/wallpapers.json` is imported automatically on first start; the
 original file and a verified backup are kept. The manual staged command, with
 dry runs, backups, resumable batches and rollback, is described in the
 [migration runbook](docs/SQLITE_MIGRATION.md).
+
+A running server holds `data/.lanpaper.lock`. A second server, `migrate-sqlite`
+(outside dry runs) or `recovery repair --apply` on the same `data/` directory
+refuses to start until the first one stops.
+
 ## Storage scale
 
 Metadata is kept in memory for reads and written to SQLite one changed link at a

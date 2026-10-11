@@ -53,7 +53,9 @@ cookie (`SameSite=Lax`, 14 days, `Secure` over HTTPS). HTTP Basic Auth protects
 Requests carrying browser Fetch Metadata never fall back from an expired or
 revoked session to origin-wide cached Basic credentials.
 
-- Sessions are stored as SHA-256 digests in `data/sessions.json` (mode 0600)
+- Sessions are stored as SHA-256 digests in the `sessions` table of
+  `data/wallpapers.db` (the database is mode 0600, and so are its WAL and
+  shared-memory files)
   and expire after 14 days. The account settings can durably revoke the current
   session or every browser session. If the updated file cannot be saved, the
   operation fails without partially revoking sessions and can be retried.
@@ -204,9 +206,10 @@ reverse-proxy access logs.
    bugs. Keep Lanpaper, the base image and browsers updated. Add scanning or
    sandboxing if people you don't trust can upload.
 4. **Back up `data/` and protect its permissions.** `data/wallpapers.db` and
-   the legacy `data/wallpapers.json` contain link tokens. The metadata store is
-   meant for one server process that owns its data directory, not for several
-   replicas.
+   the legacy `data/wallpapers.json` contain link tokens, and the database holds
+   session digests. The metadata store is meant for one server process that owns
+   its data directory: the server takes `data/.lanpaper.lock` and refuses to
+   start while another process holds it, so replicas cannot share the directory.
 5. **Set limits for your deployment.** The rate limiters and the login lockout
    live in memory and reset on restart. They are not a distributed DoS
    defence. `MAX_UPLOAD_MB` can go up to 512 MiB, and decoding needs more RAM

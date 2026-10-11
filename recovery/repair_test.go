@@ -87,3 +87,53 @@ func TestRepairExclusiveLock(t *testing.T) {
 		t.Fatal("repair ignored exclusive lock")
 	}
 }
+
+// An installation that still has only wallpapers.json is repaired in the
+// database. The JSON file is imported, never rewritten.
+func TestRepairOfLegacyInstallLeavesJSONUntouched(t *testing.T) {
+	root := repairFixture(t)
+	jsonPath := filepath.Join(root, "data/wallpapers.json")
+	before, err := os.ReadFile(jsonPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := PlanRepair(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ApplyRepair(plan); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.ReadFile(jsonPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(before) != string(after) {
+		t.Fatal("repair rewrote wallpapers.json")
+	}
+	if !storage.MetadataDatabaseExists(root) {
+		t.Fatal("repair did not leave a database behind")
+	}
+	backups, _ := filepath.Glob(filepath.Join(root, "data/quarantine/*/data/wallpapers.db.before-repair"))
+	if len(backups) != 1 {
+		t.Fatalf("database backup before repair: %v", backups)
+	}
+}
+
+// A running server holds the data directory lock, so repair refuses to touch
+// the metadata while it runs.
+func TestRepairRefusesWhileServerHoldsDataDir(t *testing.T) {
+	root := repairFixture(t)
+	unlock, err := storage.LockDataDir(filepath.Join(root, "data"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	plan, err := PlanRepair(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ApplyRepair(plan); err == nil {
+		t.Fatal("repair ran while the data directory was locked by a server")
+	}
+}
