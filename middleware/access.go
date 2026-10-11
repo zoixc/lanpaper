@@ -52,6 +52,9 @@ func AuthorizeLinkAccess(w http.ResponseWriter, r *http.Request, wp *storage.Wal
 		case authLocked:
 			writeTooManyRequests(w, retry, "Too many failed login attempts")
 			return false
+		case authBusy:
+			writeAuthBusy(w)
+			return false
 		}
 		http.Error(w, "Forbidden: valid access token required", http.StatusForbidden)
 		return false
@@ -69,6 +72,9 @@ func AuthorizeLinkAccess(w http.ResponseWriter, r *http.Request, wp *storage.Wal
 			return true
 		case authLocked:
 			writeTooManyRequests(w, retry, "Too many failed login attempts")
+			return false
+		case authBusy:
+			writeAuthBusy(w)
 			return false
 		}
 		// Do not challenge: a browser's Basic-auth cache is origin-wide and has

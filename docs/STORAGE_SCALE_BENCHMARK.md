@@ -1,5 +1,10 @@
 # JSON storage scale benchmark — GitHub hosted runner
 
+> **Note:** the raw results below were measured on the former full-file JSON
+> backend. SQLite is now the default. Its per-change cost is in the last section.
+> The thresholds in the interpretation section describe the JSON backend and
+> stay valid for the memory held in RAM, which SQLite does not reduce.
+
 Generated on 2026-10-10 with Go stable on `ubuntu-latest`; three iterations per case.
 
 ## Interpretation and supported range
@@ -57,3 +62,25 @@ BenchmarkAtomicWriteScale/records=50000-4       	       3	 131687423 ns/op	47687
 PASS
 ok  	lanpaper/storage	1.301s
 ```
+
+
+## Single change: SQLite against the former JSON rewrite
+
+Measured on the same machine with `BenchmarkSingleUpdate` (`storage/database_bench_test.go`):
+one `Store.Update` that toggles the access level of one link, with the library
+pre-filled to the stated size. Three iterations, one CPU at 2.6 GHz.
+
+| Records | SQLite (`syncRecords`), three runs | JSON full rewrite, three runs |
+|---:|---:|---:|
+| 100 | 1.1 ms, 1.2 ms | 1.8 ms, 2.1 ms |
+| 1,000 | 1.1 ms, 1.5 ms | 8.0 ms, 8.1 ms |
+| 3,000 | 2.0 ms, 3.5 ms | 11.9 ms, 21.2 ms |
+
+Each row is 30 iterations of the benchmark, run on the sandbox machine, which is
+noisy: the same configuration varied by up to about 2x between runs. Read the
+ratio, not the absolute values.
+
+SQLite cost grows much more slowly because only the changed rows are written.
+The residual growth comes from in-memory bookkeeping and the fsync of the WAL.
+The JSON figures above are the legacy backend, kept only for stores that were
+never loaded.

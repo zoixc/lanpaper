@@ -158,8 +158,8 @@ reverse-proxy access logs.
 - `Referrer-Policy: no-referrer` stops browsers from leaking them in the
   Referer header.
 - Rotate a leaked token; the old one stops working immediately.
-- Browser exports never contain tokens. `data/wallpapers.json` does, so
-  protect it.
+- Browser exports never contain tokens. `data/wallpapers.db` (and its `-wal`
+  and `-shm` files) and the legacy `data/wallpapers.json` do, so protect them.
 
 ## Implemented controls
 
@@ -203,9 +203,10 @@ reverse-proxy access logs.
 3. **Treat uploaded media as untrusted.** Decoders and media players can have
    bugs. Keep Lanpaper, the base image and browsers updated. Add scanning or
    sandboxing if people you don't trust can upload.
-4. **Back up `data/` and protect its permissions.** `data/wallpapers.json`
-   contains link tokens. The JSON store is meant for one server process that
-   owns its data directory, not for several replicas.
+4. **Back up `data/` and protect its permissions.** `data/wallpapers.db` and
+   the legacy `data/wallpapers.json` contain link tokens. The metadata store is
+   meant for one server process that owns its data directory, not for several
+   replicas.
 5. **Set limits for your deployment.** The rate limiters and the login lockout
    live in memory and reset on restart. They are not a distributed DoS
    defence. `MAX_UPLOAD_MB` can go up to 512 MiB, and decoding needs more RAM

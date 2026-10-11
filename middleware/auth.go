@@ -31,6 +31,9 @@ const (
 	authOK
 	authInvalid
 	authLocked
+	// authBusy: the request was valid to evaluate but no Argon2 slot freed up
+	// in time. It is a capacity refusal and never counts as a failure.
+	authBusy
 )
 
 // AuthRealm is the Basic-auth realm of every password prompt in the app: the
@@ -68,11 +71,28 @@ func verifyAdminPassword(user, pass, key string) (authResult, time.Duration) {
 	if locked, retry := budgetExhausted("authfail", key, authMaxFailures, authFailWindow); locked {
 		return authLocked, retry
 	}
+	now := time.Now()
+	cacheKey, cacheable := verifiedCredentials.digest(credentialFingerprint(), user, pass)
+	if cacheable && verifiedCredentials.hit(cacheKey, now) {
+		return authOK, 0
+	}
+	if !acquireArgonSlot() {
+		return authBusy, argonRetryAfter
+	}
+	// A slot is released on every path, including a panic that the recovery
+	// middleware catches: a leaked slot would shrink capacity for good.
+	defer releaseArgonSlot()
+	// A request queued before the lockout was reached must not be hashed now.
+	if locked, retry := budgetExhausted("authfail", key, authMaxFailures, authFailWindow); locked {
+		return authLocked, retry
+	}
 	// Evaluate both comparisons so the response time does not reveal
 	// whether the username alone was correct.
-	userOK := secureCompare(user, config.Current.AdminUser)
-	passOK := configuredPasswordOK(pass)
+	userOK, passOK := compareAdminCredentials(user, pass)
 	if userOK && passOK {
+		if cacheable {
+			verifiedCredentials.remember(cacheKey, time.Now())
+		}
 		return authOK, 0
 	}
 	if n := recordEvent("authfail", key, authFailWindow); n >= authMaxFailures {
@@ -100,6 +120,8 @@ func MaybeBasicAuth(next http.HandlerFunc) http.HandlerFunc {
 			next(w, r)
 		case authLocked:
 			writeTooManyRequests(w, retry, "Too many failed login attempts")
+		case authBusy:
+			writeAuthBusy(w)
 		default:
 			// A browser uses the session flow and must never be prompted into
 			// caching origin-wide Basic credentials. Script clients still receive

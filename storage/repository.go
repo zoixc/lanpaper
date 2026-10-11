@@ -30,16 +30,16 @@ type WallpaperTransaction interface {
 	List() []*Wallpaper
 }
 
-// JSONWallpaperStore adapts the existing durable JSON Store without changing
-// its on-disk format. Direct mutations retain their established behavior;
-// Transact performs one full-file durable commit.
-type JSONWallpaperStore struct{ Store *Store }
+// StoreAdapter exposes the application Store through WallpaperStore. Every
+// change goes through the Store's commit path, so it is durable in SQLite and
+// visible to the in-memory readers. Transact performs one durable commit.
+type StoreAdapter struct{ Store *Store }
 
-func NewJSONWallpaperStore(store *Store) *JSONWallpaperStore {
+func NewStoreAdapter(store *Store) *StoreAdapter {
 	if store == nil {
 		store = Global
 	}
-	return &JSONWallpaperStore{Store: store}
+	return &StoreAdapter{Store: store}
 }
 
 func contextError(ctx context.Context) error {
@@ -51,7 +51,7 @@ func contextError(ctx context.Context) error {
 	}
 }
 
-func (s *JSONWallpaperStore) Get(ctx context.Context, id string) (*Wallpaper, bool, error) {
+func (s *StoreAdapter) Get(ctx context.Context, id string) (*Wallpaper, bool, error) {
 	if err := contextError(ctx); err != nil {
 		return nil, false, err
 	}
@@ -59,35 +59,35 @@ func (s *JSONWallpaperStore) Get(ctx context.Context, id string) (*Wallpaper, bo
 	return wallpaper, exists, nil
 }
 
-func (s *JSONWallpaperStore) List(ctx context.Context) ([]*Wallpaper, error) {
+func (s *StoreAdapter) List(ctx context.Context) ([]*Wallpaper, error) {
 	if err := contextError(ctx); err != nil {
 		return nil, err
 	}
 	return s.Store.GetAll(), nil
 }
 
-func (s *JSONWallpaperStore) Create(ctx context.Context, wallpaper *Wallpaper) error {
+func (s *StoreAdapter) Create(ctx context.Context, wallpaper *Wallpaper) error {
 	if err := contextError(ctx); err != nil {
 		return err
 	}
 	return s.Store.Create(wallpaper)
 }
 
-func (s *JSONWallpaperStore) Update(ctx context.Context, id string, edit func(*Wallpaper) error) (*Wallpaper, error) {
+func (s *StoreAdapter) Update(ctx context.Context, id string, edit func(*Wallpaper) error) (*Wallpaper, error) {
 	if err := contextError(ctx); err != nil {
 		return nil, err
 	}
 	return s.Store.Update(id, edit)
 }
 
-func (s *JSONWallpaperStore) Rename(ctx context.Context, oldName, newName string) (*Wallpaper, error) {
+func (s *StoreAdapter) Rename(ctx context.Context, oldName, newName string) (*Wallpaper, error) {
 	if err := contextError(ctx); err != nil {
 		return nil, err
 	}
 	return s.Store.Rename(oldName, newName)
 }
 
-func (s *JSONWallpaperStore) Delete(ctx context.Context, id string) (*Wallpaper, error) {
+func (s *StoreAdapter) Delete(ctx context.Context, id string) (*Wallpaper, error) {
 	if err := contextError(ctx); err != nil {
 		return nil, err
 	}
@@ -180,7 +180,7 @@ func (tx *jsonTransaction) List() []*Wallpaper {
 	return list
 }
 
-func (s *JSONWallpaperStore) Transact(ctx context.Context, apply func(WallpaperTransaction) error) error {
+func (s *StoreAdapter) Transact(ctx context.Context, apply func(WallpaperTransaction) error) error {
 	if err := contextError(ctx); err != nil {
 		return err
 	}
@@ -198,4 +198,4 @@ func (s *JSONWallpaperStore) Transact(ctx context.Context, apply func(WallpaperT
 	return s.Store.commit(maps.Clone(tx.wallpapers))
 }
 
-var _ WallpaperStore = (*JSONWallpaperStore)(nil)
+var _ WallpaperStore = (*StoreAdapter)(nil)

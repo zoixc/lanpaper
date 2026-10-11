@@ -454,6 +454,9 @@ func handleSessionLogin(w http.ResponseWriter, r *http.Request) {
 		writeTooManyRequests(w, retry, "Too many failed login attempts")
 		return
 	case authOK:
+	case authBusy:
+		writeAuthBusy(w)
+		return
 	default:
 		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 		return

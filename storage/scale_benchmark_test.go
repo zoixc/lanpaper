@@ -40,7 +40,7 @@ func BenchmarkStoreScale(b *testing.B) {
 	for _, size := range scaleSizes {
 		seed := scaleWallpapers(size)
 		b.Run(fmt.Sprintf("records=%d/list", size), func(b *testing.B) {
-			store := &Store{wallpapers: maps.Clone(seed)}
+			store := &Store{legacyJSON: true, wallpapers: maps.Clone(seed)}
 			b.ReportAllocs()
 			for b.Loop() {
 				_ = store.GetAll()
@@ -48,7 +48,7 @@ func BenchmarkStoreScale(b *testing.B) {
 		})
 		for _, operation := range []string{"create", "update", "rename", "delete"} {
 			b.Run(fmt.Sprintf("records=%d/%s", size, operation), func(b *testing.B) {
-				store := &Store{}
+				store := &Store{legacyJSON: true}
 				b.ReportAllocs()
 				for b.Loop() {
 					b.StopTimer()

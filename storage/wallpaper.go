@@ -3,6 +3,7 @@
 package storage
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"lanpaper/config"
 	"lanpaper/internal/atomicfile"
@@ -74,9 +76,36 @@ type Store struct {
 	wallpapers map[string]*Wallpaper
 	sortedSnap []*Wallpaper
 	generation uint64
+	// db is the durable SQLite backend. It is nil only for stores that were
+	// never loaded (tests and in-memory use); those fall back to the JSON file.
+	db *SQLiteWallpaperStore
+	// legacyJSON lets an unloaded store persist to wallpapers.json. Only test
+	// stores set it. A production store that was never loaded refuses to
+	// write, so it can never silently fork metadata into the legacy file.
+	legacyJSON bool
 }
 
+// commitFailure, when set, makes every commit fail with the stored error. It is
+// the fault seam for tests that check rollback after a metadata write error.
+var commitFailure atomic.Pointer[error]
+
+// SetCommitFailure makes all metadata commits fail with err until the returned
+// function is called. Tests use it to check that failed writes are rolled back.
+func SetCommitFailure(err error) (restore func()) {
+	commitFailure.Store(&err)
+	return func() { commitFailure.Store(nil) }
+}
+
+// ErrStoreNotLoaded is returned when a change is committed before Load opened
+// the metadata database.
+var ErrStoreNotLoaded = errors.New("metadata store is not loaded")
+
+// dataFile is the legacy JSON metadata file. It is read once, to import an
+// existing installation, and never written by the running server again.
 const dataFile = "data/wallpapers.json"
+
+// databaseFile holds the live metadata since the SQLite backend was introduced.
+const databaseFile = "data/wallpapers.db"
 
 // Global is the application-wide wallpaper store.
 var Global = &Store{wallpapers: make(map[string]*Wallpaper)}
@@ -121,7 +150,7 @@ var writeFile = atomicWrite
 // hold writeMu and must not hold the RWMutex, so readers keep running during
 // the write.
 func (s *Store) commit(next map[string]*Wallpaper) error {
-	if err := writeFile(dataFile, next); err != nil {
+	if err := s.persist(next); err != nil {
 		return err
 	}
 	s.Lock()
@@ -653,41 +682,54 @@ func sanitizeMediaLists(wp *Wallpaper) {
 	}
 }
 
-// Load reads wallpapers from disk. A missing file is treated as first run.
+// persist makes next durable. With a database it writes only the records that
+// changed since the last commit; without one it rewrites the legacy JSON file.
+// The caller holds writeMu.
+func (s *Store) persist(next map[string]*Wallpaper) error {
+	if injected := commitFailure.Load(); injected != nil && *injected != nil {
+		return *injected
+	}
+	if s.db != nil {
+		return s.db.syncRecords(context.Background(), s.wallpapers, next)
+	}
+	if s.legacyJSON {
+		return writeFile(dataFile, next)
+	}
+	return ErrStoreNotLoaded
+}
+
+// Load opens the SQLite metadata database and loads every record into memory.
+// The first start after the upgrade imports an existing wallpapers.json with a
+// verified backup. A missing database and missing JSON mean a fresh install.
 func (s *Store) Load() error {
-	data, err := os.ReadFile(dataFile)
+	ctx := context.Background()
+	if err := importLegacyMetadata(ctx); err != nil {
+		return err
+	}
+	db, err := OpenSQLiteWallpaperStore(ctx, databaseFile)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
 		return err
 	}
-	m := make(map[string]*Wallpaper)
-	if err := json.Unmarshal(data, &m); err != nil {
+	m, err := db.loadAll(ctx)
+	if err != nil {
+		db.Close()
+		return fmt.Errorf("load %s: %w", databaseFile, err)
+	}
+	archived, err := prepareRecords(m, databaseFile)
+	if err != nil {
+		db.Close()
 		return err
-	}
-	if m == nil {
-		return fmt.Errorf("invalid wallpaper object in %s", dataFile)
-	}
-	var archived int64
-	for key, wp := range m {
-		if wp == nil || !utils.IsValidLinkName(key) || (wp.HasImage && !validStoredMediaExt(wp.MIMEType)) {
-			// Silently dropping a bad entry would permanently erase it on the
-			// next save. Stop startup so an operator can repair the file.
-			return fmt.Errorf("invalid wallpaper entry for key %q in %s", key, dataFile)
-		}
-		// Never build file paths from untrusted persisted ID/LinkName fields.
-		// The validated map key is the canonical identifier.
-		wp.ID, wp.LinkName = key, key
-		sanitizeMediaLists(wp)
-		archived += HistoryBytes(wp.History)
-		derivePaths(wp)
 	}
 	// The archive budget is checked from a counter, so it has to start from the
 	// value already on disk.
 	historyBytesTotal.Store(archived)
 	s.writeMu.Lock()
 	defer s.writeMu.Unlock()
+	if s.db != nil {
+		s.db.Close()
+	}
+	s.db = db
+	s.legacyJSON = false
 	s.Lock()
 	s.generation++
 	for _, wp := range m {
@@ -697,6 +739,38 @@ func (s *Store) Load() error {
 	s.sortedSnap = nil
 	s.Unlock()
 	return nil
+}
+
+// Close releases the database. The server calls it on shutdown, after the last
+// request has finished.
+func (s *Store) Close() error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	if s.db == nil {
+		return nil
+	}
+	err := s.db.Close()
+	s.db = nil
+	return err
+}
+
+// prepareRecords validates loaded records and derives their runtime fields. It
+// returns the archive size in bytes. Invalid entries stop startup: silently
+// dropping one would erase it permanently on the next save.
+func prepareRecords(m map[string]*Wallpaper, source string) (int64, error) {
+	var archived int64
+	for key, wp := range m {
+		if wp == nil || !utils.IsValidLinkName(key) || (wp.HasImage && !validStoredMediaExt(wp.MIMEType)) {
+			return 0, fmt.Errorf("invalid wallpaper entry for key %q in %s", key, source)
+		}
+		// Never build file paths from untrusted persisted ID/LinkName fields.
+		// The validated map key is the canonical identifier.
+		wp.ID, wp.LinkName = key, key
+		sanitizeMediaLists(wp)
+		archived += HistoryBytes(wp.History)
+		derivePaths(wp)
+	}
+	return archived, nil
 }
 
 // SchedulePrune coalesces concurrent requests into at most one pending pass.
@@ -745,7 +819,9 @@ func PruneOldImages(max int) {
 		return
 	}
 	var candidates []*Wallpaper
-	for _, wp := range Global.GetAll() {
+	// Read-only pass: the shared snapshot is enough, and it avoids deep-copying
+	// every record (Items and History included) after each upload.
+	for _, wp := range Global.Snapshot() {
 		if wp.HasImage && !wp.IsPinned {
 			candidates = append(candidates, wp)
 		}

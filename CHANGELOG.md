@@ -5,6 +5,56 @@ Notable changes to Lanpaper. Docker images are published as
 
 ## [Unreleased]
 
+### Security
+
+- **Concurrent password checks are bounded.** Every Argon2id evaluation
+  allocates 64 MiB, and nothing limited how many ran at once: ten concurrent
+  wrong Basic-auth requests reached 668 MB of RSS and a hundred ended in an
+  out-of-memory kill. At most two evaluations now run at a time. A request that
+  cannot get a slot within five seconds receives `503` with `Retry-After`, and
+  does not count as a failed login. The hash parameters did not change. With the
+  same hundred attempts, the peak is now about 146 MB.
+
+### Changed
+
+- **Metadata is stored in SQLite (`data/wallpapers.db`).** Every change is one
+  transaction that writes only the changed link and its history, playlist and
+  rotation rows, instead of rewriting the whole JSON file. One change in a
+  3,000-link library takes about 2 ms (12–21 ms before, depending on the run). Reads still come
+  from memory, and a failed write is never published to readers. On the first
+  start, an existing `wallpapers.json` is imported automatically after a
+  checksum-verified backup. The original file is kept and never written again.
+  `recovery audit` and `recovery repair` work on the database when it exists.
+  Sessions remain in `data/sessions.json`.
+- **Successful Basic-auth verifications are cached for five minutes.** Scripts
+  that send the same credentials on every request no longer pay one Argon2
+  evaluation (tens to over a hundred milliseconds of CPU, depending on load) per
+  request. A session costs under 1 ms. Only a keyed digest is
+  stored, failures are never cached, and a password change invalidates the cache.
+- **Idle memory:** the dummy hash used for timing is computed on first use, not
+  at start-up. Idle RSS fell from about 75 MB to about 10 MB.
+- **Memory after a sign-in is returned to the OS.** A single successful
+  password check left the process at about 79 MB instead of 12 MB, and the
+  memory was not returned for minutes. The pages are now released at most once
+  every 30 seconds, so a lone sign-in gives them back and an attacker cannot
+  force more frequent releases. The burst peak (100 wrong passwords, about
+  148 MB) is unchanged.
+- **SQLite WAL size is bounded:** `journal_size_limit` is 64 MiB, so a large
+  import does not leave a permanently large write-ahead log on disk.
+- **Admin page:** the versioned HTML is cached per file, keyed by its
+  modification time and size.
+- **Metadata maintenance** (prune and history budget) reads a shared snapshot
+  instead of deep-copying every record after each upload.
+- **Example deployment** sets `GOMEMLIMIT=768MiB` below the 1 GiB container limit.
+
+### Dependencies
+
+- `golang.org/x/image` v0.46.0 → v0.47.0.
+- `github.com/ncruces/go-sqlite3` v0.34.0 → v0.35.6. This pulls in
+  `go-sqlite3-wasm/v6` (it was `/v2`). The driver is used only by the optional
+  `migrate-sqlite` command.
+- `actions/setup-node` v7.0.0 → v7.1.0 in CI and release workflows.
+
 ## [0.16.0] – 2026-10-10
 
 ### Fixed

@@ -23,8 +23,9 @@ things the application cannot do alone: **TLS in front of it, backups of
 Only one process should write to a given `data/` directory. Replicas can *read*
 the same directory (rotation is stateless, and metadata is renamed atomically,
 so a reader never sees a half-written file), but two writers would overwrite
-each other's `wallpapers.json` — the last rename wins and the other update is
-lost. Scale by putting a cache in front, not by running several writers.
+each other's changes: each process keeps its own in-memory copy of the library
+and writes it back, so the last commit wins and the other update is lost. Scale
+by putting a cache in front, not by running several writers.
 
 ## 2. Configuration checklist
 
@@ -69,6 +70,7 @@ docker run -d --name lanpaper \
   -p 127.0.0.1:8080:8080 \
   -v /srv/lanpaper/data:/app/data \
   -e ADMIN_USER -e ADMIN_PASSWORD_HASH -e TRUSTED_PROXY=172.17.0.1 \
+  -e GOMEMLIMIT=768MiB \
   --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m,mode=1777 \
   --cap-drop ALL --security-opt no-new-privileges:true \
   --pids-limit 128 --memory 1g --cpus 2 \
@@ -187,12 +189,13 @@ without credentials.
   `POST /api/regenerate-previews` (whole library, two previews at a time,
   rate limited like uploads).
   Serving media is `sendfile`: cheap, and range requests cost one syscall path.
-- **Writes**: every metadata mutation rewrites `data/wallpapers.json`
-  atomically (temp file → `fsync` → `rename` → directory `fsync`). Writers are
-  queued, but readers keep serving while the file is written. That is
-  O(links) per mutation and the reason the file stays human-readable; it is
-  fine into the tens of thousands of links, but do not script thousands of
-  mutations per second against one instance.
+- **Writes**: every metadata mutation is one SQLite transaction in
+  `data/wallpapers.db` that writes only the changed link and its history,
+  playlist and rotation rows (WAL mode, `synchronous=FULL`). Writers are
+  queued, but readers keep serving from memory while the write is in progress.
+  The cost of one change no longer grows with the library; the whole library is
+  still held in memory for reads. Do not script thousands of mutations per
+  second against one instance.
 
 ## Storage audit
 

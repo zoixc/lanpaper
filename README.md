@@ -94,6 +94,7 @@ docker run -d --name lanpaper -p 127.0.0.1:8080:8080 \
   --cap-drop ALL --security-opt no-new-privileges:true \
   --pids-limit 128 --memory 1g --cpus 2 --stop-timeout 35 \
   -e ADMIN_USER=admin -e ADMIN_PASSWORD_HASH="$ADMIN_PASSWORD_HASH" \
+  -e GOMEMLIMIT=768MiB \
   -v "$(pwd)/data:/app/data" ptabi/lanpaper:latest
 ```
 
@@ -382,23 +383,25 @@ Two properties worth knowing before sizing a host:
   growing the process without limit. A 36 M pixel upload peaks at about 174 MB
   of memory with the pure Go WebP encoder.
 
-## SQLite migration
+## Metadata storage
 
-The explicit JSON-to-SQLite staging command supports dry-run, verified backups,
-resumable batches and rollback without deleting `wallpapers.json`. Stop the
-server before running it and follow the [migration runbook](docs/SQLITE_MIGRATION.md).
-
+Link metadata lives in `data/wallpapers.db` (SQLite, WAL mode). Each change is
+one transaction that writes only the changed link. An existing installation that
+still has `data/wallpapers.json` is imported automatically on first start; the
+original file and a verified backup are kept. The manual staged command, with
+dry runs, backups, resumable batches and rollback, is described in the
+[migration runbook](docs/SQLITE_MIGRATION.md).
 ## Storage scale
 
-The JSON metadata backend is supported through **10,000 links**. Installations
-approaching that size should plan the SQLite migration, especially when metadata
-mutations exceed 250 ms p95 or `wallpapers.json` exceeds 25 MB. The 10k–50k
-range is transitional; production use above 50k is unsupported on JSON. See the
-[raw benchmark results and methodology](docs/STORAGE_SCALE_BENCHMARK.md).
-
+Metadata is kept in memory for reads and written to SQLite one changed link at a
+time. A single change in a 3,000-link library takes about 2 ms against about
+12–21 ms with the former full-file JSON rewrite (timings vary between runs). The full library is still held in
+memory, so memory use grows with the number of links. Raw results and methodology
+are in [docs/STORAGE_SCALE_BENCHMARK.md](docs/STORAGE_SCALE_BENCHMARK.md).
 ## Backups and upgrades
 
-Back up the whole persistent `data/` directory: `wallpapers.json`, `media/`,
+Back up the whole persistent `data/` directory: `wallpapers.db` (with its `-wal`
+and `-shm` files, or from a stopped server), `media/`,
 `previews/` and, if you use them, `history/` (archived versions) and `items/`
 (playlist files). Skipping the last two loses only the extra copies: the live
 media of every link stays in `media/`.
@@ -415,7 +418,7 @@ The browser's **link-list export** is not a media backup:
 **Upgrading from 0.11.x:**
 
 - Existing data keeps working: `history/` and `items/` are created on demand
-  and every new field in `wallpapers.json` is optional, so a link that uses
+  and every new metadata field is optional, so a link that uses
   neither feature is stored exactly as before.
 - Version history is on by default (`HISTORY_LIMIT=3`, 512 MB budget). Set
   `HISTORY_LIMIT=0` if you want the previous replace-only behaviour and no

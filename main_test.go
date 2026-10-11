@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"image"
 	"image/color"
 	"image/png"
@@ -18,7 +19,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/SeriousBug/webp-go-pure/std"
@@ -58,7 +58,7 @@ func setupApp(t *testing.T) *testApp {
 		Compression: config.CompressionConfig{Quality: 100, Scale: 100},
 		Rate:        config.RateConfig{PublicPerMin: 10000, UploadPerMin: 10000, Burst: 100},
 	}
-	storage.Global = &storage.Store{}
+	storage.Global = loadedTestStore(t)
 	handlers.InitUploadSemaphore(config.Current.MaxConcurrentUploads)
 	for _, dir := range []string{"data/media", "data/previews", "external/images", "static/css", "static/js", "static/images", "static/i18n"} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -420,27 +420,7 @@ func TestAppCompressesTextResponsesOnly(t *testing.T) {
 // record must be restored before the 500 response is sent.
 func blockMetadata(t *testing.T) func() {
 	t.Helper()
-	path := filepath.Join("data", "wallpapers.json")
-	backup := path + ".bak"
-	if err := os.Rename(path, backup); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Mkdir(path, 0700); err != nil {
-		t.Fatal(err)
-	}
-	var once sync.Once
-	restore := func() {
-		once.Do(func() {
-			if err := os.Remove(path); err != nil {
-				t.Error(err)
-			}
-			if err := os.Rename(backup, path); err != nil {
-				t.Error(err)
-			}
-		})
-	}
-	t.Cleanup(restore)
-	return restore
+	return storage.SetCommitFailure(errors.New("injected metadata failure"))
 }
 
 func TestAppRollsBackOnMetadataFailures(t *testing.T) {

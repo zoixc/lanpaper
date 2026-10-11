@@ -8,7 +8,7 @@ import (
 )
 
 // Context is the context in which an SQL function executes.
-// An SQLite [Context] is in no way related to a Go [context.Context].
+// It is in no way related to a Go [context.Context].
 //
 // https://sqlite.org/c3ref/context.html
 type Context struct {
@@ -217,6 +217,6 @@ func (ctx Context) ResultSubtype(t uint) {
 //
 // https://sqlite.org/c3ref/vtab_nochange.html
 func (ctx Context) VTabNoChange() bool {
-	b := int32(ctx.c.wrp.Xsqlite3_vtab_nochange(int32(ctx.handle)))
+	b := ctx.c.wrp.Xsqlite3_vtab_nochange(int32(ctx.handle))
 	return b != 0
 }

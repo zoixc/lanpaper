@@ -5,6 +5,7 @@ package sqlite3_wasm
 import (
 	"bytes"
 	"math"
+	"math/bits"
 	"strconv"
 	"time"
 	"unsafe"
@@ -25,8 +26,7 @@ func (m *Module) _exp(x float64) float64 { return math.Exp(x) }
 
 func (m *Module) _fmod(x, y float64) float64 { return math.Mod(x, y) }
 func (m *Module) _localtime_r(timer, buf int32) int32 {
-	const size = 32 / 8
-	t := load64((*m.memory)[uint32(timer):])
+	t := load64((*m.memory), uint32(timer))
 	m._storetime_r((*m.memory)[uint32(buf):], time.Unix(int64(t), 0))
 	return buf
 }
@@ -35,7 +35,7 @@ func (m *Module) _log(x float64) float64   { return math.Log(x) }
 func (m *Module) _log10(x float64) float64 { return math.Log10(x) }
 
 func (m *Module) _log2(x float64) float64 { return math.Log2(x) }
-func (m *Module) _memchr(s, c, n int32) int32 {
+func (m *Module) _memchr(s int32, c int32, n int32) int32 {
 	b := (*m.memory)[uint32(s):]
 	if uint(len(b)) > uint(uint32(n)) {
 		b = b[:uint32(n)]
@@ -47,17 +47,20 @@ func (m *Module) _memchr(s, c, n int32) int32 {
 }
 
 func (m *Module) _memcmp(s1, s2, n int32) int32 {
+	if s1 == s2 {
+		return 0
+	}
 	e1, e2 := s1+n, s2+n
 	b1 := (*m.memory)[uint32(s1):uint32(e1)]
 	b2 := (*m.memory)[uint32(s2):uint32(e2)]
 	return int32(bytes.Compare(b1, b2))
 }
-
 func (m *Module) _pow(x, y float64) float64 { return math.Pow(x, y) }
 
 func (m *Module) _sin(x float64) float64  { return math.Sin(x) }
 func (m *Module) _sinh(x float64) float64 { return math.Sinh(x) }
-func (m *Module) _strchr(s, c int32) int32 {
+
+func (m *Module) _strchr(s int32, c int32) int32 {
 	s = m._strchrnul(s, c)
 	if (*m.memory)[uint32(s)] == byte(c) {
 		return s
@@ -65,7 +68,7 @@ func (m *Module) _strchr(s, c int32) int32 {
 	return 0
 }
 
-func (m *Module) _strchrnul(s, c int32) int32 {
+func (m *Module) _strchrnul(s int32, c int32) int32 {
 	b := (*m.memory)[uint32(s):]
 	b = b[:bytes.IndexByte(b, 0)]
 	sz := len(b)
@@ -78,28 +81,26 @@ func (m *Module) _strchrnul(s, c int32) int32 {
 }
 
 func (m *Module) _strcmp(s1, s2 int32) int32 {
+	if s1 == s2 {
+		return 0
+	}
 	b1 := (*m.memory)[uint32(s1):]
 	b2 := (*m.memory)[uint32(s2):]
 	sz := min(len(b1), len(b2))
-	if i := bytes.IndexByte(b1[:sz], 0); i >= 0 {
+	if i := bytes.IndexByte(b2[:sz], 0); i >= 0 {
 		sz = i + 1
 	}
 	return int32(bytes.Compare(b1[:sz], b2[:sz]))
 }
 
-func (m *Module) _strcpy(d, s int32) int32 {
-	b := (*m.memory)[uint32(s):]
-	b = b[:bytes.IndexByte(b, 0)+1]
-	copy((*m.memory)[uint32(d):], b)
-	return d
-}
 func (m *Module) _strcspn(s, reject int32) int32 {
 	b := (*m.memory)[uint32(s):]
 	r := (*m.memory)[uint32(reject):]
 	r = r[:bytes.IndexByte(r, 0)+1]
 
-	for i, b := range b {
-		if bytes.IndexByte(r, b) >= 0 {
+	set := m._makeByteSet(r)
+	for i, c := range b {
+		if set[c/bits.UintSize]&(1<<(c%bits.UintSize)) != 0 {
 			return int32(i)
 		}
 	}
@@ -110,15 +111,18 @@ func (m *Module) _strlen(s int32) int32 {
 }
 
 func (m *Module) _strncmp(s1, s2, n int32) int32 {
+	if s1 == s2 {
+		return 0
+	}
 	b1 := (*m.memory)[uint32(s1):]
 	b2 := (*m.memory)[uint32(s2):]
 	sz := int(min(uint(len(b1)), uint(len(b2)), uint(uint32(n))))
-	if i := bytes.IndexByte(b1[:sz], 0); i >= 0 {
+	if i := bytes.IndexByte(b2[:sz], 0); i >= 0 {
 		sz = i + 1
 	}
 	return int32(bytes.Compare(b1[:sz], b2[:sz]))
 }
-func (m *Module) _strrchr(s, c int32) int32 {
+func (m *Module) _strrchr(s int32, c int32) int32 {
 	b := (*m.memory)[uint32(s):]
 	b = b[:bytes.IndexByte(b, 0)+1]
 	if i := bytes.LastIndexByte(b, byte(c)); i >= 0 {
@@ -132,14 +136,14 @@ func (m *Module) _strspn(s, accept int32) int32 {
 	a := (*m.memory)[uint32(accept):]
 	a = a[:bytes.IndexByte(a, 0)]
 
-	for i, b := range b {
-		if bytes.IndexByte(a, b) < 0 {
+	set := m._makeByteSet(a)
+	for i, c := range b {
+		if set[c/bits.UintSize]&(1<<(c%bits.UintSize)) == 0 {
 			return int32(i)
 		}
 	}
 	return int32(len(b))
 }
-
 func (m *Module) _strstr(haystack, needle int32) int32 {
 	h := (*m.memory)[uint32(haystack):]
 	n := (*m.memory)[uint32(needle):]
@@ -152,17 +156,50 @@ func (m *Module) _strstr(haystack, needle int32) int32 {
 	return haystack + int32(i)
 }
 func (m *Module) _strtol(s, endptr int32, base int32) int32 {
+	return int32(m._strtoll_helper(s, endptr, base, 32))
+}
+
+func (m *Module) _tan(x float64) float64  { return math.Tan(x) }
+func (m *Module) _tanh(x float64) float64 { return math.Tanh(x) }
+func (m *Module) _storetime_r(buf []byte, t time.Time) {
+	const size uint32 = 32 / 8
+	var isdst uint32
+	if t.IsDST() {
+		isdst = 1
+	}
+	_, zone := t.Zone()
+
+	store32(buf, 0*size, uint32(t.Second()))
+	store32(buf, 1*size, uint32(t.Minute()))
+	store32(buf, 2*size, uint32(t.Hour()))
+	store32(buf, 3*size, uint32(t.Day()))
+	store32(buf, 4*size, uint32(t.Month()-time.January))
+	store32(buf, 5*size, uint32(t.Year()-1900))
+	store32(buf, 6*size, uint32(t.Weekday()-time.Sunday))
+	store32(buf, 7*size, uint32(t.YearDay()-1))
+	store32(buf, 8*size, isdst)
+	store32(buf, 9*size, uint32(zone))
+	store32(buf, 10*size, 0)
+}
+
+func (m *Module) _makeByteSet(chars []byte) (set [256 / bits.UintSize]uint) {
+	for _, c := range chars {
+		set[c/bits.UintSize] |= 1 << (c % bits.UintSize)
+	}
+	return set
+}
+func (m *Module) _strtoll_helper(s, endptr int32, base int32, bitSize int) int64 {
 	m0 := (*m.memory)[uint32(s):]
 	m1 := bytes.TrimLeft(m0, " \t\n\v\f\r")
 	m2 := bytes.TrimLeft(m1, "+-0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	spaces := len(m0) - len(m1)
+	prefix := len(m0) - len(m1)
 	digits := len(m1) - len(m2)
 
 	var val int64
 	for ; digits > 0; digits-- {
 		var err error
 		str := unsafe.String(&m1[0], digits)
-		val, err = strconv.ParseInt(str, int(base), 32)
+		val, err = strconv.ParseInt(str, int(base), bitSize)
 		if e, ok := err.(*strconv.NumError); !ok || e.Err == strconv.ErrRange {
 			break
 		}
@@ -170,28 +207,9 @@ func (m *Module) _strtol(s, endptr int32, base int32) int32 {
 
 	if endptr != 0 {
 		if digits > 0 {
-			s += int32(spaces + digits)
+			s += int32(prefix + digits)
 		}
-		store32((*m.memory)[uint32(endptr):], uint32(s))
+		store32((*m.memory), uint32(endptr), uint32(s))
 	}
-	return int32(val)
-}
-func (m *Module) _tan(x float64) float64  { return math.Tan(x) }
-func (m *Module) _tanh(x float64) float64 { return math.Tanh(x) }
-func (m *Module) _storetime_r(buf []byte, t time.Time) {
-	const size = 32 / 8
-	var isdst uint32
-	if t.IsDST() {
-		isdst = 1
-	}
-
-	store32(buf[0*size:], uint32(t.Second()))
-	store32(buf[1*size:], uint32(t.Minute()))
-	store32(buf[2*size:], uint32(t.Hour()))
-	store32(buf[3*size:], uint32(t.Day()))
-	store32(buf[4*size:], uint32(t.Month()-time.January))
-	store32(buf[5*size:], uint32(t.Year()-1900))
-	store32(buf[6*size:], uint32(t.Weekday()-time.Sunday))
-	store32(buf[7*size:], uint32(t.YearDay()-1))
-	store32(buf[8*size:], isdst)
+	return val
 }

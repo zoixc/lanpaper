@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	_ "github.com/ncruces/go-sqlite3/driver"
@@ -65,7 +66,7 @@ func OpenSQLiteWallpaperStore(ctx context.Context, path string) (*SQLiteWallpape
 	}
 	db.SetMaxOpenConns(1)
 	store := &SQLiteWallpaperStore{db: db, path: path}
-	if _, err = db.ExecContext(ctx, "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;"+sqliteSchema); err != nil {
+	if _, err = db.ExecContext(ctx, "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA journal_size_limit=67108864;"+sqliteSchema); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("initialize sqlite: %w", err)
 	}
@@ -363,3 +364,133 @@ func (s *SQLiteWallpaperStore) Backup(ctx context.Context, destination string) e
 }
 
 var _ WallpaperStore = (*SQLiteWallpaperStore)(nil)
+
+// loadAll reads every record with a fixed number of set-based queries. The
+// per-record loadRelations path costs three round trips per link and is only
+// used for single lookups.
+func (s *SQLiteWallpaperStore) loadAll(ctx context.Context) (map[string]*Wallpaper, error) {
+	list, err := listBase(ctx, s.db)
+	if err != nil {
+		return nil, err
+	}
+	byName := make(map[string]*Wallpaper, len(list))
+	for _, wp := range list {
+		byName[wp.LinkName] = wp
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT link_name,version,ext,size_bytes,mtime,saved_at FROM history ORDER BY link_name, version DESC`)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var name string
+		var entry HistoryEntry
+		if err := rows.Scan(&name, &entry.Version, &entry.Ext, &entry.SizeBytes, &entry.ModTime, &entry.SavedAt); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if wp := byName[name]; wp != nil {
+			wp.History = append(wp.History, entry)
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	rows, err = s.db.QueryContext(ctx, `SELECT link_name,item_id,ext,size_bytes,added_at,mod_time FROM playlist_items ORDER BY link_name, item_id`)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var name string
+		var item PlaylistItem
+		if err := rows.Scan(&name, &item.ID, &item.Ext, &item.SizeBytes, &item.AddedAt, &item.ModTime); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if wp := byName[name]; wp != nil {
+			wp.Items = append(wp.Items, item)
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	rows, err = s.db.QueryContext(ctx, `SELECT link_name,enabled,interval_seconds,ordering FROM rotations`)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var name string
+		var rotation RotateConfig
+		if err := rows.Scan(&name, &rotation.Enabled, &rotation.Interval, &rotation.Order); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if wp := byName[name]; wp != nil {
+			wp.Rotate = &rotation
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	return byName, nil
+}
+
+// listBase reads the wallpaper rows without their history, items or rotation.
+func listBase(ctx context.Context, query sqlQuerier) ([]*Wallpaper, error) {
+	rows, err := query.QueryContext(ctx, `SELECT `+wallpaperColumns+` FROM wallpapers`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*Wallpaper
+	for rows.Next() {
+		wp, err := scanWallpaper(rows)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, wp)
+	}
+	return list, rows.Err()
+}
+
+// syncRecords makes the database equal to next, writing only the records that
+// differ from prev and deleting the ones that disappeared. All of it happens in
+// one transaction, so a crash leaves either the old or the new state, and the
+// cost of a single change no longer grows with the size of the library.
+func (s *SQLiteWallpaperStore) syncRecords(ctx context.Context, prev, next map[string]*Wallpaper) error {
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for id := range prev {
+		if _, ok := next[id]; ok {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM wallpapers WHERE link_name=?`, id); err != nil {
+			return err
+		}
+	}
+	for id, wp := range next {
+		if old, ok := prev[id]; ok && sameRecord(old, wp) {
+			continue
+		}
+		if err := writeSQL(ctx, tx, wp); err != nil {
+			return err
+		}
+	}
+	if err := contextError(ctx); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// sameRecord reports whether two records hold the same persisted state. The
+// runtime Version counter is not persisted, so it is ignored.
+func sameRecord(a, b *Wallpaper) bool {
+	if a == b {
+		return true
+	}
+	x, y := *a, *b
+	x.Version, y.Version = 0, 0
+	return reflect.DeepEqual(x, y)
+}

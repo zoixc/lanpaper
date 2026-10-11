@@ -20,7 +20,7 @@ func withFakeWriter(t *testing.T, fn func(path string, data map[string]*Wallpape
 }
 
 func newTestStore(names ...string) *Store {
-	s := &Store{wallpapers: make(map[string]*Wallpaper)}
+	s := &Store{legacyJSON: true, wallpapers: make(map[string]*Wallpaper)}
 	for _, n := range names {
 		s.wallpapers[n] = &Wallpaper{ID: n, LinkName: n}
 	}
