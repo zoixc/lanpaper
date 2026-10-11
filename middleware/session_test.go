@@ -406,3 +406,44 @@ func writeSessionRows(t *testing.T, entries []persistedSession) {
 		t.Fatal(err)
 	}
 }
+
+// Expired sessions leave memory and the table on the periodic prune. A prune
+// with nothing expired must not write anything.
+func TestPruneRemovesExpiredSessionsOnly(t *testing.T) {
+	useSessionDir(t)
+	live, err := issueSession(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	expired, err := issueSession(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessionStore.Lock()
+	for d, r := range sessionStore.expiry {
+		if d == tokenDigest(expired) {
+			r.Expires = time.Now().Add(-time.Minute)
+			sessionStore.expiry[d] = r
+		}
+	}
+	sessionStore.Unlock()
+	if err := pruneExpiredSessions(time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if rows := readSessionRows(t); len(rows) != 1 || rows[0].Digest != hex.EncodeToString(func() []byte { d := tokenDigest(live); return d[:] }()) {
+		t.Fatalf("table after prune: %+v", rows)
+	}
+	if HasAdminSession(requestWithToken(expired)) {
+		t.Fatal("expired session still accepted")
+	}
+
+	writes := 0
+	persistSessions = func(time.Time) error { writes++; return nil }
+	t.Cleanup(func() { persistSessions = persistLocked })
+	if err := pruneExpiredSessions(time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if writes != 0 {
+		t.Fatalf("prune with nothing expired wrote %d time(s)", writes)
+	}
+}

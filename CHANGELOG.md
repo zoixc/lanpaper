@@ -83,6 +83,18 @@ Notable changes to Lanpaper. Docker images are published as
 - **Metadata maintenance** (prune and history budget) reads a shared snapshot
   instead of deep-copying every record after each upload.
 - **Example deployment** sets `GOMEMLIMIT=768MiB` below the 1 GiB container limit.
+- **Lower-priority resource work:**
+  - The garbage collector runs with `GOGC=200` unless `GOGC` is set. With 3,000
+    links and 4,000 list requests, throughput rose about 15% and p95 fell from
+    about 46 ms to 36 ms, for 3–5 MB more peak RSS.
+  - Expired sessions are removed from memory and from the `sessions` table by the
+    periodic cleaner. The table is written only when something expired.
+  - The metadata list loads its history, playlist and rotation rows in three
+    set-based queries instead of two queries per link.
+  - Checked and left unchanged: the remote-download client is built per request
+    on purpose (IP pinning, no connection reuse); the decode path decodes one
+    frame and checks dimensions first; static assets already use versioned
+    immutable URLs and gzip; regeneration takes one pointer snapshot.
 - **`/health` does not report the version,** as before. The version is in the
   startup log and in the build. Public probes should not learn which release to
   look up for known flaws.

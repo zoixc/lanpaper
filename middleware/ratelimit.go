@@ -88,6 +88,9 @@ func StartCleaner() {
 	defer ticker.Stop()
 	for now := range ticker.C {
 		cleanExpiredCounts(now)
+		if err := pruneExpiredSessions(now); err != nil {
+			log.Printf("Warning: pruning expired sessions: %v", err)
+		}
 	}
 }
 func resetRateCounts() {

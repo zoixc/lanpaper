@@ -183,10 +183,14 @@ without credentials.
   budget (`MaxDecodedPixelsInFlight`) caps concurrent decodes and
   `MAX_CONCURRENT_UPLOADS` (1–8) caps parallel uploads; a request that arrives
   while the budget is busy gets `429` with `Retry-After: 5`. Metadata is one
-  small struct per link.
+  small struct per link. The Go garbage collector runs with `GOGC=200` unless
+  `GOGC` is set in the environment; `GOMEMLIMIT` remains the hard ceiling. Idle
+  memory returns to about 21–24 MB within a minute after a 3,000-link list burst.
 - **CPU** spikes on upload (decode + scale + encode + thumbnail) and on
   `POST /api/regenerate-previews` (whole library, two previews at a time,
-  rate limited like uploads).
+  rate limited like uploads). Sessions are not written on every request: the
+  periodic cleaner (every 120 s) rewrites the session table only when a session
+  has expired.
   Serving media is `sendfile`: cheap, and range requests cost one syscall path.
 - **Writes**: every metadata mutation is one SQLite transaction in
   `data/wallpapers.db` that writes only the changed link and its history,

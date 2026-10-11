@@ -317,6 +317,25 @@ func issueSession(now time.Time) (string, error) {
 	return token, nil
 }
 
+// pruneExpiredSessions drops sessions past their expiry. It runs from the
+// periodic cleaner and writes the table only when something expired, so an
+// idle server does no session I/O.
+func pruneExpiredSessions(now time.Time) error {
+	sessionStore.Lock()
+	defer sessionStore.Unlock()
+	removed := 0
+	for digest, record := range sessionStore.expiry {
+		if !now.Before(record.Expires) {
+			delete(sessionStore.expiry, digest)
+			removed++
+		}
+	}
+	if removed == 0 {
+		return nil
+	}
+	return persistSessions(now)
+}
+
 // sessionValid reports whether the request carries a live session cookie.
 func sessionValid(r *http.Request, now time.Time) bool {
 	c, err := r.Cookie(sessionCookieName)
