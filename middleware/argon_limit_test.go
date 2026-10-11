@@ -174,3 +174,45 @@ func TestDummyHashIsComputedOnceOnDemand(t *testing.T) {
 		t.Fatal("dummy hash is empty or unstable")
 	}
 }
+
+// Repeated evaluations must share one pending release, so an attacker cannot
+// make the process return memory more often than argonMemoryReleaseDelay.
+func TestMemoryReleaseIsCoalescedAndRearms(t *testing.T) {
+	saved := argonMemoryReleaseDelay
+	argonMemoryReleaseDelay = 10 * time.Millisecond
+	t.Cleanup(func() { argonMemoryReleaseDelay = saved })
+	// An earlier test may have left a release pending with the long delay.
+	releaseMu.Lock()
+	releasePending = false
+	releaseMu.Unlock()
+
+	scheduleMemoryRelease()
+	scheduleMemoryRelease()
+	scheduleMemoryRelease()
+	releaseMu.Lock()
+	pending := releasePending
+	releaseMu.Unlock()
+	if !pending {
+		t.Fatal("release was not scheduled")
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		releaseMu.Lock()
+		pending = releasePending
+		releaseMu.Unlock()
+		if !pending {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("scheduled release never ran")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	scheduleMemoryRelease()
+	releaseMu.Lock()
+	rearmed := releasePending
+	releaseMu.Unlock()
+	if !rearmed {
+		t.Fatal("a later evaluation must be able to schedule another release")
+	}
+}

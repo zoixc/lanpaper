@@ -254,3 +254,21 @@ func TestRepairMetadataDatabaseBacksUpAndReplaces(t *testing.T) {
 		t.Fatal("unexpected record count after repair")
 	}
 }
+
+// The WAL is truncated back to this size after a checkpoint, so one large
+// import cannot leave a permanently large file on disk.
+func TestDatabaseLimitsWALSize(t *testing.T) {
+	t.Chdir(t.TempDir())
+	db, err := OpenSQLiteWallpaperStore(context.Background(), filepath.Join(t.TempDir(), "limit.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var limit int64
+	if err := db.db.QueryRow("PRAGMA journal_size_limit").Scan(&limit); err != nil {
+		t.Fatal(err)
+	}
+	if limit != 64<<20 {
+		t.Fatalf("journal_size_limit = %d, want %d", limit, int64(64<<20))
+	}
+}

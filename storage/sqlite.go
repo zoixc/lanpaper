@@ -66,7 +66,7 @@ func OpenSQLiteWallpaperStore(ctx context.Context, path string) (*SQLiteWallpape
 	}
 	db.SetMaxOpenConns(1)
 	store := &SQLiteWallpaperStore{db: db, path: path}
-	if _, err = db.ExecContext(ctx, "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;"+sqliteSchema); err != nil {
+	if _, err = db.ExecContext(ctx, "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA journal_size_limit=67108864;"+sqliteSchema); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("initialize sqlite: %w", err)
 	}

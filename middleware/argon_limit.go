@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"net/http"
 	"runtime"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -51,14 +52,45 @@ func acquireArgonSlot() bool {
 
 func releaseArgonSlot() { <-argonSlots }
 
-// compareAdminCredentials evaluates both checks. Each Argon2 evaluation leaves
-// a 64 MiB buffer behind. A blocking collection right after it lets the next
-// evaluation reuse that memory. Without it, a burst allocates fresh pages
-// before the collector runs, and the peak grows well past two buffers (341 MB
-// measured for 100 attempts). debug.FreeOSMemory was tried as well: it also
-// returns the pages to the OS, so every later evaluation pays to fault them in
-// again, and each attempt took 350-420 ms against about 150 ms.
+// argonMemoryReleaseDelay bounds how often pages go back to the OS. Every
+// Argon2 evaluation leaves a 64 MiB buffer behind. A blocking collection right
+// after it lets the next evaluation reuse that memory, which keeps bursts from
+// growing the peak (341 MB measured for 100 attempts without it).
+//
+// The collection alone does not return the pages to the OS. A single successful
+// sign-in therefore kept the process at about 79 MB instead of 12 MB, and it
+// stayed there for minutes. Returning them after each evaluation costs about
+// 350-420 ms per attempt under load, so the release runs at most once per this
+// delay: a lone sign-in gives the memory back, and an attacker cannot make the
+// process release it more often than that.
+var argonMemoryReleaseDelay = 30 * time.Second
+
+var (
+	releaseMu      sync.Mutex
+	releasePending bool
+)
+
+// scheduleMemoryRelease arranges one debug.FreeOSMemory after the delay. While a
+// release is pending, further calls add nothing.
+func scheduleMemoryRelease() {
+	releaseMu.Lock()
+	defer releaseMu.Unlock()
+	if releasePending {
+		return
+	}
+	releasePending = true
+	time.AfterFunc(argonMemoryReleaseDelay, func() {
+		releaseMu.Lock()
+		releasePending = false
+		releaseMu.Unlock()
+		debug.FreeOSMemory()
+	})
+}
+
+// compareAdminCredentials evaluates both checks and then schedules the release
+// of the buffers they used. See argonMemoryReleaseDelay.
 func compareAdminCredentials(user, pass string) (userOK, passOK bool) {
+	defer scheduleMemoryRelease()
 	defer runtime.GC()
 	userOK = secureCompare(user, config.Current.AdminUser)
 	passOK = configuredPasswordOK(pass)

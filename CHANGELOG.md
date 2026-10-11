@@ -33,6 +33,14 @@ Notable changes to Lanpaper. Docker images are published as
   stored, failures are never cached, and a password change invalidates the cache.
 - **Idle memory:** the dummy hash used for timing is computed on first use, not
   at start-up. Idle RSS fell from about 75 MB to about 10 MB.
+- **Memory after a sign-in is returned to the OS.** A single successful
+  password check left the process at about 79 MB instead of 12 MB, and the
+  memory was not returned for minutes. The pages are now released at most once
+  every 30 seconds, so a lone sign-in gives them back and an attacker cannot
+  force more frequent releases. The burst peak (100 wrong passwords, about
+  148 MB) is unchanged.
+- **SQLite WAL size is bounded:** `journal_size_limit` is 64 MiB, so a large
+  import does not leave a permanently large write-ahead log on disk.
 - **Admin page:** the versioned HTML is cached per file, keyed by its
   modification time and size.
 - **Metadata maintenance** (prune and history budget) reads a shared snapshot
