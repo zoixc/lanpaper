@@ -31,7 +31,7 @@ type App struct {
 }
 
 func NewApp() *App {
-	return &App{Config: config.Current, Sessions: middleware.DefaultSessionStore(), Limiters: middleware.DefaultRateStore(), Logger: slog.Default(), Services: AppServices{Wallpapers: storage.NewJSONWallpaperStore(storage.Global), Upload: handlers.NewUploadService(storage.Global), Library: handlers.NewLibraryService(storage.Global)}}
+	return &App{Config: config.Current, Sessions: middleware.DefaultSessionStore(), Limiters: middleware.DefaultRateStore(), Logger: slog.Default(), Services: AppServices{Wallpapers: storage.NewStoreAdapter(storage.Global), Upload: handlers.NewUploadService(storage.Global), Library: handlers.NewLibraryService(storage.Global)}}
 }
 
 func (a *App) Handler() http.Handler {

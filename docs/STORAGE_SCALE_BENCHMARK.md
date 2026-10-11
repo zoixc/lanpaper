@@ -1,10 +1,15 @@
-# JSON storage scale benchmark — GitHub hosted runner
+# Storage scale benchmark — GitHub hosted runner (historical)
+
+> **Note:** the raw results and the interpretation below were measured on the
+> former full-file JSON backend, which was removed in 0.17.0. SQLite is the only
+> backend now; its per-change cost is in the last section. The memory figures
+> still apply, because the whole library is still held in RAM.
 
 Generated on 2026-10-10 with Go stable on `ubuntu-latest`; three iterations per case.
 
 ## Interpretation and supported range
 
-The JSON store remains comfortably supported through **10,000 links** on
+The JSON store was comfortably supported through **10,000 links** on
 hardware comparable to the hosted runner: durable full-file persistence was
 about 27 ms and list construction about 1.8 ms, although list responses allocate
 roughly 3 MB. At 50,000 records the same operations remain functional, but each
@@ -12,22 +17,24 @@ durable mutation rewrites the complete dataset (about 132 ms and 48 MB allocated
 and a list allocates about 15 MB. Concurrent traffic, slower persistent volumes
 and richer history/playlist records increase those costs.
 
-Operational policy:
+Operational policy (updated for 0.17.0):
 
-- **0–10k records:** supported JSON-store range.
-- **10k–50k records:** transitional range; monitor API p95 latency, process RSS,
-  metadata-file size and storage fsync latency.
-- Begin the SQLite migration before **10k records**, or earlier when metadata
-  mutations exceed **250 ms p95**, `wallpapers.json` exceeds **25 MB**, or peak
-  memory is constrained below roughly four times the metadata file size.
-- **Above 50k records:** not supported by the JSON backend for production; use
-  the SQLite backend introduced by the following roadmap work.
+- **SQLite is the only backend.** A single change costs about 1–2 ms at 3,000
+  records, and the cost stays flat as the library grows (see the last section).
+- **Memory is the limit, not the write path.** The whole library is held in
+  memory for reads, so plan for roughly 1.7 KB per link plus the media cache.
+- **Above about 50k records,** measure API p95 and RSS before relying on the
+  deployment; this has not been benchmarked.
+
+The JSON figures above are historical. They explain why the SQLite backend was
+introduced and are not a current operating guide.
 
 These are baseline microbenchmarks, not a throughput promise. Each result uses
 three iterations and an empty-media metadata shape. `BenchmarkStoreScale`
-measures map copy plus JSON serialization without disk variability;
-`BenchmarkAtomicWriteScale` includes temporary-file write, fsync, rename and
-directory fsync.
+measures map copy plus JSON serialization without disk variability (the JSON
+encoding is kept only as the benchmark's work). `BenchmarkAtomicWriteScale`
+measured temporary-file write, fsync, rename and directory fsync; it was removed
+with the JSON writer in 0.17.0.
 
 ## Raw results
 
@@ -57,3 +64,25 @@ BenchmarkAtomicWriteScale/records=50000-4       	       3	 131687423 ns/op	47687
 PASS
 ok  	lanpaper/storage	1.301s
 ```
+
+
+## Single change: SQLite against the former JSON rewrite (historical comparison)
+
+Measured on the same machine with `BenchmarkSingleUpdate` (`storage/database_bench_test.go`):
+one `Store.Update` that toggles the access level of one link, with the library
+pre-filled to the stated size. Three iterations, one CPU at 2.6 GHz.
+
+| Records | SQLite (`syncRecords`), three runs | JSON full rewrite, three runs |
+|---:|---:|---:|
+| 100 | 1.1 ms, 1.2 ms | 1.8 ms, 2.1 ms |
+| 1,000 | 1.1 ms, 1.5 ms | 8.0 ms, 8.1 ms |
+| 3,000 | 2.0 ms, 3.5 ms | 11.9 ms, 21.2 ms |
+
+Each row is 30 iterations of the benchmark, run on the sandbox machine, which is
+noisy: the same configuration varied by up to about 2x between runs. Read the
+ratio, not the absolute values.
+
+SQLite cost grows much more slowly because only the changed rows are written.
+The residual growth comes from in-memory bookkeeping and the fsync of the WAL.
+The JSON figures above are the legacy backend, kept only for stores that were
+never loaded.

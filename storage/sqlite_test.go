@@ -4,6 +4,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -85,5 +86,55 @@ func TestSQLiteForeignKeysAndWAL(t *testing.T) {
 	var journal string
 	if err := store.db.QueryRowContext(ctx, `PRAGMA journal_mode`).Scan(&journal); err != nil || journal != "wal" {
 		t.Fatalf("journal_mode=%q err=%v", journal, err)
+	}
+}
+
+// List and the full load return the same records with their history, items and
+// rotation, in list order, for a library large enough that a per-record query
+// would show up.
+func TestSQLiteListMatchesLoadAllAcrossRecords(t *testing.T) {
+	ctx := context.Background()
+	db, err := OpenSQLiteWallpaperStore(ctx, filepath.Join(t.TempDir(), "data", "wallpapers.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	const n = 120
+	for i := 0; i < n; i++ {
+		name := fmt.Sprintf("w%03d", i)
+		wp := &Wallpaper{ID: name, LinkName: name, Category: "other", AccessLevel: "public", CreatedAt: int64(i)}
+		if i%3 == 0 {
+			wp.History = []HistoryEntry{{Version: 1, Ext: "png", SizeBytes: 1}, {Version: 2, Ext: "jpg", SizeBytes: 2}}
+		}
+		if i%4 == 0 {
+			wp.Items = []PlaylistItem{{ID: 1, Ext: "png", SizeBytes: 3}}
+			wp.Rotate = &RotateConfig{Enabled: true, Interval: 30, Order: "sequential"}
+		}
+		if err := db.Create(ctx, wp); err != nil {
+			t.Fatal(err)
+		}
+	}
+	list, err := db.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	all, err := db.loadAll(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != n || len(all) != n {
+		t.Fatalf("list=%d loadAll=%d, want %d", len(list), len(all), n)
+	}
+	for i, wp := range list {
+		if i > 0 && list[i-1].CreatedAt < wp.CreatedAt {
+			t.Fatalf("list not in order at %d", i)
+		}
+		want := all[wp.LinkName]
+		if want == nil || len(wp.History) != len(want.History) || len(wp.Items) != len(want.Items) || (wp.Rotate == nil) != (want.Rotate == nil) {
+			t.Fatalf("%s: list and loadAll disagree", wp.LinkName)
+		}
+	}
+	if w := all["w000"]; len(w.History) != 2 || w.History[0].Version != 2 || len(w.Items) != 1 || w.Rotate == nil {
+		t.Fatalf("relations not loaded: %+v", w)
 	}
 }

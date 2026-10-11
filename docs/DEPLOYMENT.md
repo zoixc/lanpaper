@@ -20,11 +20,11 @@ things the application cannot do alone: **TLS in front of it, backups of
 | Lanpaper terminates TLS | Single host, no proxy available, internal CA | Set `TLS_CERT_FILE` + `TLS_KEY_FILE` (both or neither — a partial configuration refuses to start) |
 | Plain HTTP | LAN only, or a proxy that already enforces auth | Keep the default and never expose the port to the internet |
 
-Only one process should write to a given `data/` directory. Replicas can *read*
-the same directory (rotation is stateless, and metadata is renamed atomically,
-so a reader never sees a half-written file), but two writers would overwrite
-each other's `wallpapers.json` — the last rename wins and the other update is
-lost. Scale by putting a cache in front, not by running several writers.
+Only one process may use a given `data/` directory. The server takes an
+exclusive lock on `data/.lanpaper.lock` at start-up and refuses to start while
+another server, a `migrate-sqlite` write or a `recovery repair --apply` holds
+it, so two processes can never write the same database. Read-only replicas on a
+shared directory are not supported. Scale by putting a cache in front.
 
 ## 2. Configuration checklist
 
@@ -69,6 +69,7 @@ docker run -d --name lanpaper \
   -p 127.0.0.1:8080:8080 \
   -v /srv/lanpaper/data:/app/data \
   -e ADMIN_USER -e ADMIN_PASSWORD_HASH -e TRUSTED_PROXY=172.17.0.1 \
+  -e GOMEMLIMIT=768MiB \
   --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m,mode=1777 \
   --cap-drop ALL --security-opt no-new-privileges:true \
   --pids-limit 128 --memory 1g --cpus 2 \
@@ -182,17 +183,22 @@ without credentials.
   budget (`MaxDecodedPixelsInFlight`) caps concurrent decodes and
   `MAX_CONCURRENT_UPLOADS` (1–8) caps parallel uploads; a request that arrives
   while the budget is busy gets `429` with `Retry-After: 5`. Metadata is one
-  small struct per link.
+  small struct per link. The Go garbage collector runs with `GOGC=200` unless
+  `GOGC` is set in the environment; `GOMEMLIMIT` remains the hard ceiling. Idle
+  memory returns to about 21–24 MB within a minute after a 3,000-link list burst.
 - **CPU** spikes on upload (decode + scale + encode + thumbnail) and on
   `POST /api/regenerate-previews` (whole library, two previews at a time,
-  rate limited like uploads).
+  rate limited like uploads). Sessions are not written on every request: the
+  periodic cleaner (every 120 s) rewrites the session table only when a session
+  has expired.
   Serving media is `sendfile`: cheap, and range requests cost one syscall path.
-- **Writes**: every metadata mutation rewrites `data/wallpapers.json`
-  atomically (temp file → `fsync` → `rename` → directory `fsync`). Writers are
-  queued, but readers keep serving while the file is written. That is
-  O(links) per mutation and the reason the file stays human-readable; it is
-  fine into the tens of thousands of links, but do not script thousands of
-  mutations per second against one instance.
+- **Writes**: every metadata mutation is one SQLite transaction in
+  `data/wallpapers.db` that writes only the changed link and its history,
+  playlist and rotation rows (WAL mode, `synchronous=FULL`). Writers are
+  queued, but readers keep serving from memory while the write is in progress.
+  The cost of one change no longer grows with the library; the whole library is
+  still held in memory for reads. Do not script thousands of mutations per
+  second against one instance.
 
 ## Storage audit
 

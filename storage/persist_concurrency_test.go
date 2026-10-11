@@ -10,15 +10,29 @@ import (
 	"time"
 )
 
-// withFakeWriter replaces the disk writer for one test. The fake records the
-// last map it was asked to persist and never touches the filesystem.
-func withFakeWriter(t *testing.T, fn func(path string, data map[string]*Wallpaper) error) {
+// withCommitHook installs hook in place of the database write for one test.
+func withCommitHook(t *testing.T, hook func(next map[string]*Wallpaper) error) {
 	t.Helper()
-	saved := writeFile
-	writeFile = fn
-	t.Cleanup(func() { writeFile = saved })
+	saved := commitHook
+	commitHook = hook
+	t.Cleanup(func() { commitHook = saved })
 }
 
+// newTestLoadedStore returns a store loaded from a fresh SQLite database in a
+// temporary working directory. It takes the same Load path as production.
+func newTestLoadedStore(t *testing.T) *Store {
+	t.Helper()
+	testStorageDir(t)
+	s, err := NewLoadedStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	return s
+}
+
+// newTestStore returns an unloaded store with the given records. Its commits go
+// to the commit hook, which tests install with withCommitHook.
 func newTestStore(names ...string) *Store {
 	s := &Store{wallpapers: make(map[string]*Wallpaper)}
 	for _, n := range names {
@@ -33,7 +47,7 @@ func TestReadersNotBlockedByPendingWrite(t *testing.T) {
 	s := newTestStore("alpha")
 	entered := make(chan struct{})
 	release := make(chan struct{})
-	withFakeWriter(t, func(string, map[string]*Wallpaper) error {
+	withCommitHook(t, func(map[string]*Wallpaper) error {
 		close(entered)
 		<-release
 		return nil
@@ -70,7 +84,7 @@ func TestConcurrentCreatesAreNotLost(t *testing.T) {
 	s := newTestStore()
 	var mu sync.Mutex
 	var persisted int
-	withFakeWriter(t, func(_ string, data map[string]*Wallpaper) error {
+	withCommitHook(t, func(data map[string]*Wallpaper) error {
 		mu.Lock()
 		persisted = len(data)
 		mu.Unlock()
@@ -103,7 +117,7 @@ func TestConcurrentCreatesAreNotLost(t *testing.T) {
 // A failed write must leave memory exactly as it was.
 func TestFailedWriteDoesNotPublish(t *testing.T) {
 	s := newTestStore("keep")
-	withFakeWriter(t, func(string, map[string]*Wallpaper) error {
+	withCommitHook(t, func(map[string]*Wallpaper) error {
 		return errors.New("disk full")
 	})
 

@@ -34,9 +34,10 @@ Open ideas, roughly in priority order. For shipped changes see
 
 - Paginate the admin UI and the gallery for very large libraries. The API
   already supports pagination.
-- Put storage behind an interface (e.g. SQLite) for large libraries or
-  several instances. Rotation is already stateless, so several readers of the
-  same `data/` directory agree without coordination.
+- Read-only replicas. Metadata is in SQLite now and the server locks the data
+  directory, so a second instance cannot share it. A replica would need its own
+  copy of the database, or a read-only mode that refuses writes and skips the
+  lock. Rotation is already stateless.
 - Optional disk quota for `data/media/`, in addition to `MAX_IMAGES` and
   `HISTORY_MAX_MB`.
 - Admin-only metrics endpoint: upload queue, rate-limit hits, decode errors,
@@ -46,8 +47,6 @@ Open ideas, roughly in priority order. For shipped changes see
 
 ## Security
 
-- Hashed admin credentials (bcrypt/argon2) and optional session cookies
-  instead of Basic Auth on every request.
 - Per-key scoping and revocation for `PUBLISH_KEYS`: today every key may publish
   to every link, and rotating one means restarting the process.
 - Optional CONNECT-only mode for outbound HTTP proxies, with proxy

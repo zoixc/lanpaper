@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"path/filepath"
 
 	"lanpaper/storage"
 )
@@ -29,6 +30,16 @@ func runSQLiteMigration(args []string, stdout, stderr io.Writer) int {
 	options := storage.SQLiteMigrationOptions{
 		Source: *source, Destination: *destination, Checkpoint: *checkpoint,
 		Backup: *backup, BatchSize: *batchSize, DryRun: *dryRun, Resume: *resume,
+	}
+	// Writes need the data directory to themselves: a running server would
+	// change metadata under the migration. Dry runs only read and need no lock.
+	if !*dryRun {
+		unlock, err := storage.LockDataDir(filepath.Dir(*destination))
+		if err != nil {
+			fmt.Fprintf(stderr, "migrate-sqlite: %v\n", err)
+			return 1
+		}
+		defer unlock()
 	}
 	if *rollback {
 		if *dryRun || *resume {

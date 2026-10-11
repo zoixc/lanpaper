@@ -34,6 +34,7 @@ type Conn struct {
 	update     func(AuthorizerActionCode, string, string, int64)
 	commit     func() bool
 	rollback   func()
+	preupdate  func(PreUpdateData)
 
 	busy1st time.Time
 	busylst time.Time
@@ -119,8 +120,8 @@ func (c *Conn) openDB(filename string, flags OpenFlag) (ptr_t, error) {
 	c.wrp.Xsqlite3_progress_handler_go(int32(handle), 1000)
 	if flags|OPEN_URI != 0 && strings.HasPrefix(filename, "file:") {
 		var pragmas strings.Builder
-		if _, after, ok := strings.Cut(filename, "?"); ok {
-			query, _ := url.ParseQuery(after)
+		if u, err := url.Parse(filename); err == nil {
+			query := u.Query()
 			for _, p := range query["_pragma"] {
 				pragmas.WriteString(`PRAGMA `)
 				pragmas.WriteString(p)
@@ -143,7 +144,7 @@ func (c *Conn) openDB(filename string, flags OpenFlag) (ptr_t, error) {
 func (c *Conn) closeDB(handle ptr_t) {
 	rc := res_t(c.wrp.Xsqlite3_close_v2(int32(handle)))
 	if err := c.errorFor(handle, rc); err != nil {
-		panic(err)
+		panic(err) // MISUSE
 	}
 }
 
@@ -259,7 +260,7 @@ func (c *Conn) Filename(schema string) *vfs.Filename {
 // ReadOnly determines if a database is read-only.
 //
 // https://sqlite.org/c3ref/db_readonly.html
-func (c *Conn) ReadOnly(schema string) (ro bool, ok bool) {
+func (c *Conn) ReadOnly(schema string) (ro, ok bool) {
 	var ptr ptr_t
 	if schema != "" {
 		defer c.arena.Mark()()
@@ -347,7 +348,7 @@ func (c *Conn) SetInterrupt(ctx context.Context) (old context.Context) {
 	return old
 }
 
-func (e *env) Xgo_progress_handler(_ int32) (interrupt int32) {
+func (e env) Xgo_progress_handler(_ int32) (interrupt int32) {
 	if c, ok := e.DB.(*Conn); ok {
 		if c.gosched++; c.gosched%16 == 0 {
 			runtime.Gosched()
@@ -368,7 +369,7 @@ func (c *Conn) BusyTimeout(timeout time.Duration) error {
 	return c.error(rc)
 }
 
-func (e *env) Xgo_busy_timeout(count, tmout int32) (retry int32) {
+func (e env) Xgo_busy_timeout(count, tmout int32) (retry int32) {
 	// https://fractaledmind.github.io/2024/04/15/sqlite-on-rails-the-how-and-why-of-optimal-performance/
 	if c, ok := e.DB.(*Conn); ok && c.interrupt.Err() == nil {
 		switch {
@@ -403,7 +404,7 @@ func (c *Conn) BusyHandler(cb func(ctx context.Context, count int) (retry bool))
 	return nil
 }
 
-func (e *env) Xgo_busy_handler(pDB, count int32) (retry int32) {
+func (e env) Xgo_busy_handler(pDB, count int32) (retry int32) {
 	if c, ok := e.DB.(*Conn); ok && c.handle == ptr_t(pDB) && c.busy != nil {
 		if interrupt := c.interrupt; interrupt.Err() == nil &&
 			c.busy(interrupt, int(count)) {
@@ -417,9 +418,9 @@ func (e *env) Xgo_busy_handler(pDB, count int32) (retry int32) {
 //
 // https://sqlite.org/c3ref/db_status.html
 func (c *Conn) Status(op DBStatus, reset bool) (current, highwater int64, err error) {
-	defer c.arena.Mark()()
-	hiPtr := c.arena.New(8)
-	curPtr := c.arena.New(8)
+	defer c.wrp.StackMark()()
+	hiPtr := c.wrp.StackAlloc(8)
+	curPtr := c.wrp.StackAlloc(8)
 
 	var i int32
 	if reset {
@@ -506,7 +507,7 @@ func (c *Conn) errorFor(handle ptr_t, rc res_t, sql ...string) error {
 		}
 
 		if len(sql) != 0 {
-			if i := int32(c.wrp.Xsqlite3_error_offset(int32(handle))); i != -1 {
+			if i := c.wrp.Xsqlite3_error_offset(int32(handle)); i != -1 {
 				query = sql[0][i:]
 			}
 		}

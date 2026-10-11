@@ -3,7 +3,6 @@
 package recovery
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -35,16 +34,13 @@ func safeName(name string) bool {
 
 func Audit(root string) (Report, error) {
 	report := Report{Root: root, Issues: []Issue{}}
-	metaPath := filepath.Join(root, "data", "wallpapers.json")
-	body, err := os.ReadFile(metaPath)
-	if os.IsNotExist(err) {
-		body = []byte("{}")
-	} else if err != nil {
-		return report, err
+	metaLabel := "data/wallpapers.json"
+	if storage.MetadataDatabaseExists(root) {
+		metaLabel = "data/wallpapers.db"
 	}
-	var records map[string]*storage.Wallpaper
-	if err := json.Unmarshal(body, &records); err != nil {
-		return report, fmt.Errorf("parse %s: %w", metaPath, err)
+	records, err := storage.ReadMetadataRecords(root)
+	if err != nil {
+		return report, fmt.Errorf("read metadata under %s: %w", root, err)
 	}
 	expected := map[string]bool{}
 	addMissing := func(path, code, link string, size int64) {
@@ -70,7 +66,7 @@ func Audit(root string) (Report, error) {
 	}
 	for key, wp := range records {
 		if wp == nil {
-			report.Issues = append(report.Issues, Issue{"invalid-record", "data/wallpapers.json", key, "null wallpaper record", false})
+			report.Issues = append(report.Issues, Issue{"invalid-record", metaLabel, key, "null wallpaper record", false})
 			continue
 		}
 		name := wp.LinkName
@@ -78,12 +74,12 @@ func Audit(root string) (Report, error) {
 			name = key
 		}
 		if !safeName(name) {
-			report.Issues = append(report.Issues, Issue{"invalid-record", "data/wallpapers.json", name, "unsafe link name", false})
+			report.Issues = append(report.Issues, Issue{"invalid-record", metaLabel, name, "unsafe link name", false})
 			continue
 		}
 		if wp.HasImage {
 			if !config.AllowedMediaExts["."+wp.MIMEType] {
-				report.Issues = append(report.Issues, Issue{"invalid-record", "data/wallpapers.json", name, "unsafe or unsupported media extension", false})
+				report.Issues = append(report.Issues, Issue{"invalid-record", metaLabel, name, "unsafe or unsupported media extension", false})
 				continue
 			}
 			addMissing(filepath.Join(root, "data", "media", name+"."+wp.MIMEType), "missing-media", name, wp.SizeBytes)
@@ -93,14 +89,14 @@ func Audit(root string) (Report, error) {
 		}
 		for _, h := range wp.History {
 			if h.Version == 0 || !config.AllowedMediaExts["."+h.Ext] {
-				report.Issues = append(report.Issues, Issue{"invalid-record", "data/wallpapers.json", name, "invalid history reference", false})
+				report.Issues = append(report.Issues, Issue{"invalid-record", metaLabel, name, "invalid history reference", false})
 				continue
 			}
 			addMissing(filepath.Join(root, "data", "history", name, fmt.Sprintf("%d.%s", h.Version, h.Ext)), "missing-history", name, h.SizeBytes)
 		}
 		for _, it := range wp.Items {
 			if it.ID <= 0 || !config.AllowedMediaExts["."+it.Ext] {
-				report.Issues = append(report.Issues, Issue{"invalid-record", "data/wallpapers.json", name, "invalid playlist reference", false})
+				report.Issues = append(report.Issues, Issue{"invalid-record", metaLabel, name, "invalid playlist reference", false})
 				continue
 			}
 			addMissing(filepath.Join(root, "data", "items", name, fmt.Sprintf("%d.%s", it.ID, it.Ext)), "missing-item", name, it.SizeBytes)

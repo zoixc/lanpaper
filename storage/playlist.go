@@ -92,7 +92,7 @@ func WithoutItem(current []PlaylistItem, id int) ([]PlaylistItem, PlaylistItem, 
 
 // NormalizeRotate clamps rotation settings to the supported ranges. A record
 // that never used rotation keeps its zero value, so enabling the feature does
-// not grow wallpapers.json for every existing link.
+// not change the stored record of every existing link.
 func NormalizeRotate(rc RotateConfig, hasItems bool) RotateConfig {
 	if !rc.Enabled && rc.Interval == 0 && rc.Order == "" && !hasItems {
 		return RotateConfig{}

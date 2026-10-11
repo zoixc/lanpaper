@@ -2374,16 +2374,16 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
         });
     }
 
-    /* Служебные данные: версию показываем из /health (как раньше), настройки
-       сжатия — из /api/compression-config. Оба запроса необязательные: если
-       они не ответили, панель работает дальше без них. */
-    async function loadAppVersion() {
-        try {
-            const res = await fetch('/health', { credentials: 'same-origin' });
-            if (!res.ok) return;
-            const data = await res.json();
-            if (data.version) $('#appVersion').textContent = 'v' + data.version;
-        } catch (_) { /* версия не критична */ }
+    /* Служебные данные панели: версия сервера и настройки сжатия приходят из
+       /api/compression-config (только для вошедшего администратора; /health
+       версию намеренно не отдаёт). Запрос необязательный: если он не ответил,
+       футер просто не показывает версию, а загрузка работает без сжатия. */
+    function showAppVersion(version) {
+        const el = $('#appVersion');
+        if (!el || typeof version !== 'string' || !/^[0-9A-Za-z][0-9A-Za-z.+_-]{0,31}$/.test(version)) return;
+        /* Релизы несут номер (0.17.0 → v0.17.0); локальная сборка — "dev" без префикса. */
+        el.textContent = /^\d/.test(version) ? 'v' + version : version;
+        el.hidden = false;
     }
 
     async function loadCompressionConfig() {
@@ -2391,6 +2391,7 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
             const res = await fetch('/api/compression-config', { credentials: 'same-origin' });
             if (!res.ok) return;
             const cfg = await res.json();
+            showAppVersion(cfg && cfg.version);
             if (typeof ImageCompressor === 'undefined' || !cfg) return;
             if (!Number.isFinite(cfg.quality) || !Number.isFinite(cfg.scale)) return;
             /* Размеры оставляем серверу: он применяет COMPRESSION_SCALE на
@@ -2517,7 +2518,6 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
         initDragDrop();
         initShortcuts();
         initPWA();
-        loadAppVersion();
         loadCompressionConfig();
 
         /* Кнопки шапки */

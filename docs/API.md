@@ -13,8 +13,11 @@ Examples use `curl` and assume `ADMIN_PASS` is set in the shell.
   `204` with the cookie. `DELETE /api/session` signs out the current browser;
   authenticated `GET /api/sessions` lists non-secret lifecycle metadata and
   `DELETE /api/sessions` signs out every browser session. Sessions are kept in
-  `data/sessions.json`, so they survive a restart. Wrong passwords return `401` and share the Basic Auth
-  lockout (`429`).
+  the `sessions` table of `data/wallpapers.db`, so they survive a restart. Wrong passwords return `401` and share the Basic Auth
+  lockout (`429`). At most one password check runs at a time (it allocates
+  64 MiB); a request that waits more than five seconds for a free slot gets
+  `503` with `Retry-After`. A `503` is a capacity refusal and does not count as
+  a failed login.
   - **Publish keys.** `PUBLISH_KEYS` (environment only, comma-separated, 16+
     characters, at most 32) authorizes *publishing* without the admin login:
     `POST /api/upload` and `POST /api/link`. Send the key as

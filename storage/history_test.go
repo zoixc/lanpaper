@@ -18,9 +18,24 @@ func useGlobalStore(t *testing.T) {
 	t.Helper()
 	testStorageDir(t)
 	savedStore, savedBytes := Global, historyBytesTotal.Load()
+	Global = newTestLoadedStore(t)
+	ResetHistoryCounters()
+	t.Cleanup(func() {
+		Global = savedStore
+		historyBytesTotal.Store(savedBytes)
+	})
+}
+
+// useLegacyImportStore starts with no database, so the next Load imports the
+// JSON file in the working directory, as on an upgraded installation.
+func useLegacyImportStore(t *testing.T) {
+	t.Helper()
+	testStorageDir(t)
+	savedStore, savedBytes := Global, historyBytesTotal.Load()
 	Global = &Store{}
 	ResetHistoryCounters()
 	t.Cleanup(func() {
+		_ = Global.Close()
 		Global = savedStore
 		historyBytesTotal.Store(savedBytes)
 	})
@@ -321,7 +336,7 @@ func TestMoveLinkExtraDirsIsReversible(t *testing.T) {
 }
 
 func TestLoadSanitizesHistoryAndPlaylist(t *testing.T) {
-	useGlobalStore(t)
+	useLegacyImportStore(t)
 	body := `{
 	  "good": {"id":"good","linkName":"good","category":"other","hasImage":true,"mimeType":"png","currentVersion":4,
 	           "history":[{"version":3,"ext":"png","sizeBytes":10},{"version":3,"ext":"jpg","sizeBytes":99},

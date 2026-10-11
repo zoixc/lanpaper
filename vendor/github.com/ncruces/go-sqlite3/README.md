@@ -1,7 +1,6 @@
 # Go bindings to SQLite using wasm2go
 
 [![Go Reference](https://pkg.go.dev/badge/image)](https://pkg.go.dev/github.com/ncruces/go-sqlite3)
-[![Go Report](https://goreportcard.com/badge/github.com/ncruces/go-sqlite3)](https://goreportcard.com/report/github.com/ncruces/go-sqlite3)
 [![Go Coverage](https://github.com/ncruces/go-sqlite3/wiki/coverage.svg)](https://github.com/ncruces/go-sqlite3/wiki/Test-coverage-report)
 
 Go module `github.com/ncruces/go-sqlite3` is a `cgo`-free [SQLite](https://sqlite.org/) wrapper.\
@@ -10,7 +9,7 @@ as well as direct access to most of the [C SQLite API](https://sqlite.org/cintro
 
 It wraps a [Wasm](https://webassembly.org/) build of SQLite,
 and uses [wasm2go](https://github.com/ncruces/wasm2go) to translate it to Go.\
-Go and [`x/sys`](https://pkg.go.dev/golang.org/x/sys) are the _only_ direct dependencies.
+Go and [`x/sys`](https://pkg.go.dev/golang.org/x/sys) are the _only_ required dependencies.
 
 ### Getting started
 
@@ -55,8 +54,6 @@ db.QueryRow(`SELECT sqlite_version()`).Scan(&version)
 - [JSON support](https://sqlite.org/json1.html)
   ([example](https://pkg.go.dev/github.com/ncruces/go-sqlite3/driver#example-package-Json))
 - [math functions](https://sqlite.org/lang_mathfunc.html)
-- [full-text search](https://sqlite.org/fts5.html)
-- [geospatial search](https://sqlite.org/geopoly.html)
 - [Unicode support](https://pkg.go.dev/github.com/ncruces/go-sqlite3/ext/unicode)
 - [statistics functions](https://pkg.go.dev/github.com/ncruces/go-sqlite3/ext/stats)
 - [encryption at rest](vfs/adiantum/README.md)
@@ -89,7 +86,8 @@ Every commit is tested on:
 * illumos: amd64
 * Solaris: amd64
 
-Certain operating system and CPU combinations have some limitations. See the [support matrix](https://github.com/ncruces/go-sqlite3/wiki/Support-matrix) for a complete overview.
+Certain operating system and CPU combinations have some limitations.
+See the [support matrix](https://github.com/ncruces/go-sqlite3/wiki/Support-matrix) for a complete overview.
 
 The Go VFS is tested by running SQLite's
 [mptest](https://github.com/sqlite/sqlite/blob/master/mptest/mptest.c).
@@ -119,12 +117,5 @@ Also, post there if you used this driver for something interesting
 ([_"Show and tell"_](https://github.com/ncruces/go-sqlite3/discussions/categories/show-and-tell)),
 have an [idea](https://github.com/ncruces/go-sqlite3/discussions/categories/ideas)…
 
-The [Issue](https://github.com/ncruces/go-sqlite3/issues) tracker is for bugs,
+The [Issues](https://github.com/ncruces/go-sqlite3/issues) tracker is for bugs,
 and features we're working on, planning to work on, or asking for help with.
-
-### Alternatives
-
-- [`modernc.org/sqlite`](https://pkg.go.dev/modernc.org/sqlite)
-- [`crawshaw.io/sqlite`](https://pkg.go.dev/crawshaw.io/sqlite)
-- [`github.com/mattn/go-sqlite3`](https://pkg.go.dev/github.com/mattn/go-sqlite3)
-- [`github.com/zombiezen/go-sqlite`](https://pkg.go.dev/github.com/zombiezen/go-sqlite)

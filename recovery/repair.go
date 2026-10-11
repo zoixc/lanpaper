@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"lanpaper/internal/atomicfile"
 	"lanpaper/storage"
 )
 
@@ -56,6 +55,13 @@ func ApplyRepair(plan RepairPlan) (err error) {
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		return err
 	}
+	// The directory lock keeps a running server out; the lock file keeps two
+	// repairs apart and is removed when this repair finishes.
+	unlockData, err := storage.LockDataDir(dataDir)
+	if err != nil {
+		return err
+	}
+	defer unlockData()
 	lockPath := filepath.Join(dataDir, ".repair.lock")
 	lock, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
@@ -65,6 +71,13 @@ func ApplyRepair(plan RepairPlan) (err error) {
 		return err
 	}
 	defer func() { _ = lock.Close(); _ = os.Remove(lockPath) }()
+	// Installations that still have only wallpapers.json are imported first, so
+	// the repair runs on the database alone. The import keeps the JSON file.
+	if !storage.MetadataDatabaseExists(plan.Root) {
+		if err := storage.ImportLegacyMetadata(plan.Root); err != nil {
+			return fmt.Errorf("import legacy metadata before repair: %w", err)
+		}
+	}
 	stamp := time.Now().UTC().Format("20060102T150405.000000000Z")
 	qdir := filepath.Join(dataDir, "quarantine", stamp)
 	journalPath := filepath.Join(dataDir, "repair-"+stamp+".jsonl")
@@ -133,26 +146,12 @@ func ApplyRepair(plan RepairPlan) (err error) {
 		}
 	}
 	if metaChanged {
-		metadataOp := Operation{"commit-metadata", "data/wallpapers.json", "durable atomic replacement"}
+		metadataOp := Operation{"commit-metadata", "data/wallpapers.db", "durable transactional replacement"}
 		if err := record(metadataOp, "started", nil); err != nil {
 			return err
 		}
-		metaPath := filepath.Join(dataDir, "wallpapers.json")
-		body, err := json.MarshalIndent(records, "", "  ")
-		if err != nil {
-			return err
-		}
-		backup := filepath.Join(qdir, "data", "wallpapers.json.before-repair")
-		if err := os.MkdirAll(filepath.Dir(backup), 0o700); err != nil {
-			return err
-		}
-		if original, readErr := os.ReadFile(metaPath); readErr == nil {
-			if err := atomicfile.Write(atomicfile.OSFS{}, backup, ".metadata-backup-*", original, 0o600); err != nil && !atomicfile.IsCommitted(err) {
-				_ = record(metadataOp, "failed", err)
-				return err
-			}
-		}
-		if err := atomicfile.Write(atomicfile.OSFS{}, metaPath, ".repair-metadata-*", body, 0o600); err != nil && !atomicfile.IsCommitted(err) {
+		backup := filepath.Join(qdir, "data", "wallpapers.db.before-repair")
+		if err := storage.RepairMetadataDatabase(plan.Root, records, backup); err != nil {
 			_ = record(metadataOp, "failed", err)
 			return err
 		}
@@ -164,16 +163,7 @@ func ApplyRepair(plan RepairPlan) (err error) {
 }
 
 func readRecords(root string) (map[string]*storage.Wallpaper, error) {
-	body, err := os.ReadFile(filepath.Join(root, "data", "wallpapers.json"))
-	if os.IsNotExist(err) {
-		return map[string]*storage.Wallpaper{}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	var records map[string]*storage.Wallpaper
-	err = json.Unmarshal(body, &records)
-	return records, err
+	return storage.ReadMetadataRecords(root)
 }
 func updateRecord(records map[string]*storage.Wallpaper, path string, size int64, remove bool) bool {
 	parts := strings.Split(filepath.ToSlash(path), "/")

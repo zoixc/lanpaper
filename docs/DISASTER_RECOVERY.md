@@ -20,7 +20,9 @@ Back up the **entire `data/` tree as one unit**, including:
 
 - JSON or SQLite metadata and SQLite sidecar files;
 - `media/`, `previews/`, `history/` and `items/`;
-- `sessions.json`, migration checkpoints, repair journals and quarantine data.
+- the `sessions` table in the database, migration checkpoints, repair journals
+  and quarantine data. The one-time import source `sessions.json` may still be
+  present on upgraded installations.
 
 Also preserve outside the data backup, in a secret manager:
 
@@ -29,7 +31,8 @@ Also preserve outside the data backup, in a secret manager:
 - non-secret configuration and reverse-proxy configuration.
 
 A panel link-list export is not a backup: it contains neither media nor all
-operational state. Do not back up only `wallpapers.json` or only a SQLite file.
+operational state. Do not back up only the database file: copy `wallpapers.db`
+together with its `-wal` and `-shm` sidecars, or use a stopped backup.
 
 ## Create and verify a backup
 

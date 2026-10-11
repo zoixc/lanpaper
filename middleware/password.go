@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"lanpaper/config"
 
@@ -24,12 +25,22 @@ const (
 	argonKeyLen  = 32
 )
 
-var dummyPasswordHash string
+// dummyPasswordHash is computed on first use, not at package init: it costs
+// argonMemory (64 MiB) of heap, and only the plaintext-migration mode needs it.
+// A process that uses a configured hash never allocates it.
+var (
+	dummyOnce         sync.Once
+	dummyPasswordHash string
+)
 
-func init() {
-	// Fixed salt is intentional for the dummy: it protects timing when no real
-	// hash is configured and authenticates nobody.
-	dummyPasswordHash = encodePasswordHash("invalid-password", []byte("lanpaper-dummy!!"))
+// dummyHash returns a fixed Argon2id hash used to keep timing equal when no
+// real hash is configured. Its fixed salt is intentional: it authenticates
+// nobody.
+func dummyHash() string {
+	dummyOnce.Do(func() {
+		dummyPasswordHash = encodePasswordHash("invalid-password", []byte("lanpaper-dummy!!"))
+	})
+	return dummyPasswordHash
 }
 
 func GeneratePasswordHash(password string) (string, error) {
@@ -99,7 +110,7 @@ func configuredPasswordOK(password string) bool {
 	}
 	// Plaintext migration mode still performs a full Argon2id calculation, so
 	// timing does not disclose which credential storage mode is configured.
-	_ = verifyPasswordHash(password, dummyPasswordHash)
+	_ = verifyPasswordHash(password, dummyHash())
 	return secureCompare(password, config.Current.AdminPass)
 }
 

@@ -91,23 +91,21 @@ func runWallpaperStoreConformance(t *testing.T, factory wallpaperStoreFactory) {
 	}
 }
 
-func TestJSONWallpaperStoreConformance(t *testing.T) {
+func TestStoreAdapterConformance(t *testing.T) {
 	t.Chdir(t.TempDir())
 	if err := os.MkdirAll("data", 0o755); err != nil {
 		t.Fatal(err)
 	}
 	runWallpaperStoreConformance(t, func(t *testing.T) WallpaperStore {
-		return NewJSONWallpaperStore(&Store{})
+		return NewStoreAdapter(newTestLoadedStore(t))
 	})
 }
 
-func TestJSONWallpaperStoreTransactionCommitsOnce(t *testing.T) {
-	store := &Store{}
-	repository := NewJSONWallpaperStore(store)
-	original := writeFile
+func TestStoreAdapterTransactionCommitsOnce(t *testing.T) {
+	store := newTestLoadedStore(t)
+	repository := NewStoreAdapter(store)
 	commits := 0
-	writeFile = func(_ string, _ map[string]*Wallpaper) error { commits++; return nil }
-	t.Cleanup(func() { writeFile = original })
+	withCommitHook(t, func(map[string]*Wallpaper) error { commits++; return nil })
 	if err := repository.Transact(context.Background(), func(tx WallpaperTransaction) error {
 		if err := tx.Create(&Wallpaper{ID: "a", LinkName: "a"}); err != nil {
 			return err

@@ -20,7 +20,9 @@ feature.
   3. Never read `config.Current` from a background goroutine; pass the value in.
   4. Validate before doing work, and authorise before resolving a selector.
 - **Backwards compatibility is a requirement.** An existing `data/` directory,
-  an existing `wallpapers.json` and every existing URL keep working. New
+  an existing `wallpapers.json` (imported into SQLite on first start) and every
+  existing URL keep working. Do not add new writes to the JSON file: the
+  database is the only writer. New
   persisted fields are `omitempty` (and pointers, if a struct — `encoding/json`
   never omits an empty struct), and a new default must not change what an
   upgraded installation does on disk.
