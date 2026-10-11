@@ -1,15 +1,15 @@
-# JSON storage scale benchmark — GitHub hosted runner
+# Storage scale benchmark — GitHub hosted runner (historical)
 
-> **Note:** the raw results below were measured on the former full-file JSON
-> backend. SQLite is now the default. Its per-change cost is in the last section.
-> The thresholds in the interpretation section describe the JSON backend and
-> stay valid for the memory held in RAM, which SQLite does not reduce.
+> **Note:** the raw results and the interpretation below were measured on the
+> former full-file JSON backend, which was removed in 0.17.0. SQLite is the only
+> backend now; its per-change cost is in the last section. The memory figures
+> still apply, because the whole library is still held in RAM.
 
 Generated on 2026-10-10 with Go stable on `ubuntu-latest`; three iterations per case.
 
 ## Interpretation and supported range
 
-The JSON store remains comfortably supported through **10,000 links** on
+The JSON store was comfortably supported through **10,000 links** on
 hardware comparable to the hosted runner: durable full-file persistence was
 about 27 ms and list construction about 1.8 ms, although list responses allocate
 roughly 3 MB. At 50,000 records the same operations remain functional, but each
@@ -31,9 +31,10 @@ introduced and are not a current operating guide.
 
 These are baseline microbenchmarks, not a throughput promise. Each result uses
 three iterations and an empty-media metadata shape. `BenchmarkStoreScale`
-measures map copy plus JSON serialization without disk variability;
-`BenchmarkAtomicWriteScale` includes temporary-file write, fsync, rename and
-directory fsync.
+measures map copy plus JSON serialization without disk variability (the JSON
+encoding is kept only as the benchmark's work). `BenchmarkAtomicWriteScale`
+measured temporary-file write, fsync, rename and directory fsync; it was removed
+with the JSON writer in 0.17.0.
 
 ## Raw results
 
@@ -65,7 +66,7 @@ ok  	lanpaper/storage	1.301s
 ```
 
 
-## Single change: SQLite against the former JSON rewrite
+## Single change: SQLite against the former JSON rewrite (historical comparison)
 
 Measured on the same machine with `BenchmarkSingleUpdate` (`storage/database_bench_test.go`):
 one `Store.Update` that toggles the access level of one link, with the library

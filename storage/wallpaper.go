@@ -52,7 +52,7 @@ type Wallpaper struct {
 	Items []PlaylistItem `json:"items,omitempty"`
 	// Rotate switches between the live file and Items over time. It is a
 	// pointer because encoding/json never omits an empty struct: a link that
-	// does not use rotation must not gain a "rotate" key in wallpapers.json.
+	// does not use rotation must not gain a "rotate" key in the stored record.
 	Rotate *RotateConfig `json:"rotate,omitempty"`
 
 	// Not persisted; derived from MIMEType on Load.
@@ -61,7 +61,8 @@ type Wallpaper struct {
 	Version     uint64 `json:"-"` // runtime generation for pruning stale snapshots
 }
 
-// Store is a thread-safe in-memory store backed by a JSON file.
+// Store is a thread-safe in-memory view of the metadata, backed by SQLite.
+// Reads come from memory; every change is committed to the database first.
 // sortedSnap caches the sorted slice and is invalidated on any mutation.
 type Store struct {
 	sync.RWMutex

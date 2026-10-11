@@ -344,6 +344,15 @@ func TestMalformedSessionsFileIsReported(t *testing.T) {
 	if err := LoadSessions(); err == nil {
 		t.Fatal("damaged sessions file was accepted silently")
 	}
+	// The damaged file costs the old sessions, not the ability to sign in.
+	token, err := issueSession(time.Now())
+	if err != nil {
+		t.Fatalf("sign-in failed after a damaged sessions file: %v", err)
+	}
+	simulateRestart(t)
+	if !HasAdminSession(requestWithToken(token)) {
+		t.Fatal("session issued after the damaged import did not survive a restart")
+	}
 }
 
 // A session that cannot be saved is not issued, so the user never gets a

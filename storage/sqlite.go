@@ -66,7 +66,7 @@ func OpenSQLiteWallpaperStore(ctx context.Context, path string) (*SQLiteWallpape
 		return nil, err
 	}
 	// The database holds access tokens and session digests, so it is created
-	// owner-only, as the JSON metadata file was before the SQLite switch.
+	// owner-only, as the legacy JSON metadata file always was.
 	if f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o600); err != nil {
 		return nil, err
 	} else if err := f.Close(); err != nil {

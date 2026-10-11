@@ -94,7 +94,7 @@ func (s *StoreAdapter) Delete(ctx context.Context, id string) (*Wallpaper, error
 	return s.Store.DeleteEntry(id)
 }
 
-type jsonTransaction struct {
+type memoryTransaction struct {
 	wallpapers map[string]*Wallpaper
 	generation uint64
 }
@@ -107,7 +107,7 @@ func cloneMap(source map[string]*Wallpaper) map[string]*Wallpaper {
 	return cloned
 }
 
-func (tx *jsonTransaction) Get(id string) (*Wallpaper, bool) {
+func (tx *memoryTransaction) Get(id string) (*Wallpaper, bool) {
 	wallpaper, exists := tx.wallpapers[id]
 	if !exists || wallpaper == nil {
 		return nil, false
@@ -115,7 +115,7 @@ func (tx *jsonTransaction) Get(id string) (*Wallpaper, bool) {
 	return cloneWallpaper(wallpaper), true
 }
 
-func (tx *jsonTransaction) Create(wallpaper *Wallpaper) error {
+func (tx *memoryTransaction) Create(wallpaper *Wallpaper) error {
 	if _, exists := tx.wallpapers[wallpaper.LinkName]; exists {
 		return ErrExists
 	}
@@ -125,7 +125,7 @@ func (tx *jsonTransaction) Create(wallpaper *Wallpaper) error {
 	return nil
 }
 
-func (tx *jsonTransaction) Update(id string, edit func(*Wallpaper) error) (*Wallpaper, error) {
+func (tx *memoryTransaction) Update(id string, edit func(*Wallpaper) error) (*Wallpaper, error) {
 	wallpaper, exists := tx.wallpapers[id]
 	if !exists || wallpaper == nil {
 		return nil, ErrNotFound
@@ -139,7 +139,7 @@ func (tx *jsonTransaction) Update(id string, edit func(*Wallpaper) error) (*Wall
 	return cloneWallpaper(clone), nil
 }
 
-func (tx *jsonTransaction) Rename(oldName, newName string) (*Wallpaper, error) {
+func (tx *memoryTransaction) Rename(oldName, newName string) (*Wallpaper, error) {
 	wallpaper, exists := tx.wallpapers[oldName]
 	if !exists || wallpaper == nil {
 		return nil, ErrNotFound
@@ -162,7 +162,7 @@ func (tx *jsonTransaction) Rename(oldName, newName string) (*Wallpaper, error) {
 	return cloneWallpaper(clone), nil
 }
 
-func (tx *jsonTransaction) Delete(id string) (*Wallpaper, error) {
+func (tx *memoryTransaction) Delete(id string) (*Wallpaper, error) {
 	wallpaper, exists := tx.wallpapers[id]
 	if !exists || wallpaper == nil {
 		return nil, ErrNotFound
@@ -171,7 +171,7 @@ func (tx *jsonTransaction) Delete(id string) (*Wallpaper, error) {
 	return cloneWallpaper(wallpaper), nil
 }
 
-func (tx *jsonTransaction) List() []*Wallpaper {
+func (tx *memoryTransaction) List() []*Wallpaper {
 	list := make([]*Wallpaper, 0, len(tx.wallpapers))
 	for _, wallpaper := range tx.wallpapers {
 		list = append(list, cloneWallpaper(wallpaper))
@@ -187,7 +187,7 @@ func (s *StoreAdapter) Transact(ctx context.Context, apply func(WallpaperTransac
 	s.Store.writeMu.Lock()
 	defer s.Store.writeMu.Unlock()
 	s.Store.RLock()
-	tx := &jsonTransaction{wallpapers: cloneMap(s.Store.wallpapers), generation: s.Store.generation + 1}
+	tx := &memoryTransaction{wallpapers: cloneMap(s.Store.wallpapers), generation: s.Store.generation + 1}
 	s.Store.RUnlock()
 	if err := apply(tx); err != nil {
 		return err

@@ -11,11 +11,11 @@ Notable changes to Lanpaper. Docker images are published as
   no `data/wallpapers.db`, the server checks the JSON checksum, writes a durable
   backup named `data/wallpapers.json.pre-sqlite-<UTC time>.bak`, and imports the
   records. The original JSON file stays on disk and is never written again.
-- **Rollback is manual and uses the backup.** Lanpaper 0.17.0 does not write JSON
-  back. To return to an earlier release, stop the server, restore the backup as
-  `data/wallpapers.json`, and remove `data/wallpapers.db` and its `-wal` and
-  `-shm` files. Changes made after the upgrade are lost unless you copy them
-  first. See `docs/SQLITE_MIGRATION.md` and `docs/DISASTER_RECOVERY.md`.
+- **Rollback is manual.** Lanpaper 0.17.0 no longer writes `wallpapers.json`, so
+  changes made after the upgrade exist only in `data/wallpapers.db`. Returning to
+  an earlier release means restoring the pre-upgrade JSON file, which loses those
+  changes unless you export them first. See `docs/SQLITE_MIGRATION.md` and
+  `docs/DISASTER_RECOVERY.md`.
 - **Only one process may use a data directory.** A second server, or a
   `migrate-sqlite` or `recovery repair --apply` run, now fails at once with a
   clear message while the first one holds `data/.lanpaper.lock`. Before, two
@@ -34,7 +34,6 @@ Notable changes to Lanpaper. Docker images are published as
   the database with the umask default (0644), and it held access tokens and
   session digests. This is fixed; check the mode if you copied the data
   directory with other permissions.
-
 - **Concurrent password checks are bounded.** Every Argon2id evaluation
   allocates 64 MiB, and nothing limited how many ran at once: ten concurrent
   wrong Basic-auth requests reached 668 MB of RSS and a hundred ended in an
@@ -42,25 +41,21 @@ Notable changes to Lanpaper. Docker images are published as
   cannot get a slot within five seconds receives `503` with `Retry-After`, and
   does not count as a failed login. The hash parameters did not change. With the
   same hundred attempts, the peak is now about 83 MB (measured on 0.17.0).
+  Several simultaneous sign-ins are served one after another, so they take
+  longer. The limit is one constant in `middleware/argon_limit.go`.
 
 ### Changed
 
 - **Metadata is stored in SQLite (`data/wallpapers.db`).** Every change is one
   transaction that writes only the changed link and its history, playlist and
   rotation rows, instead of rewriting the whole JSON file. One change in a
-  3,000-link library takes about 2 ms (12–21 ms before, depending on the run). Reads still come
-  from memory, and a failed write is never published to readers. On the first
+  3,000-link library takes about 2 ms (12–21 ms before, depending on the run).
+  Reads still come from memory, and a failed write is never published to readers. On the first
   start, an existing `wallpapers.json` is imported automatically after a
   checksum-verified backup. The original file is kept and never written again.
   `recovery audit` only reads. `recovery repair` imports a JSON-only installation
   first and then repairs the database, keeping a copy of the database in
   quarantine.
-- **One Argon2id evaluation at a time.** The limit is now one concurrent
-  evaluation (`argonConcurrency = 1`), down from two. The hash parameters did not
-  change. Requests that cannot get a slot within five seconds still receive
-  `503` with `Retry-After`. Several simultaneous sign-ins are now served one
-  after another, so they take longer. The limit is one constant in
-  `middleware/argon_limit.go`.
 - **Sessions are stored in SQLite.** Only SHA-256 digests are saved, as before,
   in the `sessions` table. Each change replaces the table in one transaction,
   so a sign-out and a restart can no longer disagree.
@@ -71,8 +66,8 @@ Notable changes to Lanpaper. Docker images are published as
 - **Successful Basic-auth verifications are cached for five minutes.** Scripts
   that send the same credentials on every request no longer pay one Argon2
   evaluation (tens to over a hundred milliseconds of CPU, depending on load) per
-  request. A session costs under 1 ms. Only a keyed digest is
-  stored, failures are never cached, and a password change invalidates the cache.
+  request. A session costs under 1 ms. Only a keyed digest is stored, failures
+  are never cached, and a password change invalidates the cache.
 - **Idle memory:** the dummy hash used for timing is computed on first use, not
   at start-up. Idle RSS fell from about 75 MB to about 10 MB.
 - **Memory after a sign-in is returned to the OS.** A single successful
@@ -88,7 +83,6 @@ Notable changes to Lanpaper. Docker images are published as
 - **Metadata maintenance** (prune and history budget) reads a shared snapshot
   instead of deep-copying every record after each upload.
 - **Example deployment** sets `GOMEMLIMIT=768MiB` below the 1 GiB container limit.
-
 - **`/health` does not report the version,** as before. The version is in the
   startup log and in the build. Public probes should not learn which release to
   look up for known flaws.

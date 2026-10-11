@@ -192,6 +192,10 @@ func LoadSessions() error {
 // readPersistedSessions opens the session store and returns the saved rows. On
 // the first run it imports data/sessions.json instead, if that file exists.
 // imported reports whether the import has already happened.
+//
+// The store stays open even when the import fails. A damaged legacy file then
+// costs the sessions in it, not the ability to sign in: the next save writes
+// the import marker and the file is never read again.
 func readPersistedSessions(ctx context.Context) (entries []persistedSession, imported bool, err error) {
 	if sessionDB != nil {
 		sessionDB.Close()
@@ -201,32 +205,25 @@ func readPersistedSessions(ctx context.Context) (entries []persistedSession, imp
 	if err != nil {
 		return nil, false, fmt.Errorf("open session store: %w", err)
 	}
+	sessionDB = db
 	imported, err = db.SessionsImported(ctx)
 	if err != nil {
-		db.Close()
 		return nil, false, err
 	}
 	if !imported {
-		legacy, err := readLegacySessions()
-		if err != nil {
-			db.Close()
-			return nil, false, err
-		}
-		entries = legacy
-	} else {
-		rows, err := db.LoadSessions(ctx)
-		if err != nil {
-			db.Close()
-			return nil, false, fmt.Errorf("load sessions: %w", err)
-		}
-		for _, r := range rows {
-			entries = append(entries, persistedSession{
-				ID: r.ID, Digest: r.Digest, CreatedAt: r.CreatedAt, Expires: r.Expires, Credential: r.Credential,
-			})
-		}
+		entries, err = readLegacySessions()
+		return entries, false, err
 	}
-	sessionDB = db
-	return entries, imported, nil
+	rows, err := db.LoadSessions(ctx)
+	if err != nil {
+		return nil, true, fmt.Errorf("load sessions: %w", err)
+	}
+	for _, r := range rows {
+		entries = append(entries, persistedSession{
+			ID: r.ID, Digest: r.Digest, CreatedAt: r.CreatedAt, Expires: r.Expires, Credential: r.Credential,
+		})
+	}
+	return entries, true, nil
 }
 
 // readLegacySessions parses the pre-SQLite data/sessions.json file. A missing

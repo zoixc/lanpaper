@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 )
 
-// LockFileName is created inside the data directory while a Lanpaper process
+// lockFileName is created inside the data directory while a Lanpaper process
 // or a repair operation owns it.
-const LockFileName = ".lanpaper.lock"
+const lockFileName = ".lanpaper.lock"
 
 // LockDataDir takes an exclusive, non-blocking lock on the data directory. Two
 // processes writing the same SQLite database and session table would race, so
@@ -20,7 +20,7 @@ func LockDataDir(dir string) (func(), error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err
 	}
-	f, err := os.OpenFile(filepath.Join(dir, LockFileName), os.O_RDWR|os.O_CREATE, 0o600)
+	f, err := os.OpenFile(filepath.Join(dir, lockFileName), os.O_RDWR|os.O_CREATE, 0o600)
 	if err != nil {
 		return nil, err
 	}
