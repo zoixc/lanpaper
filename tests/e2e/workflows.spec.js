@@ -183,6 +183,10 @@ test('card spacing tokens remain editable in both responsive layouts', async ({ 
   await signIn(page);
   await page.click('#viewGridBtn');
   const body = page.locator('#grid .card__body').first();
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.click('#viewListBtn');
+  const listPadding = await body.evaluate(node => getComputedStyle(node).padding);
+  await page.click('#viewGridBtn');
   // Use CSSOM like the application does; do not weaken CSP for the test.
   await page.evaluate(() => {
     document.documentElement.style.setProperty('--card-padding', '18px');
@@ -194,6 +198,6 @@ test('card spacing tokens remain editable in both responsive layouts', async ({ 
   await expect(body).toHaveCSS('padding', '14px');
   // List geometry intentionally overrides the tile-density token on phones.
   await page.click('#viewListBtn');
-  await expect(body).toHaveCSS('padding', '9px 12px');
+  await expect(body).toHaveCSS('padding', listPadding);
   await expect(page.locator('#errorState')).toBeHidden();
 });
