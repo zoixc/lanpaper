@@ -5,6 +5,17 @@ Notable changes to Lanpaper. Docker images are published as
 
 ## [Unreleased]
 
+### Fixed
+
+- Libraries larger than 12 links now render icons and load subsequent chunks
+  without an undefined `CHUNK` exception. Rendering uses the shared state limit.
+- The offline banner lives inside the sticky header instead of covering its
+  controls. Dark-theme secondary text and select arrows have stronger contrast;
+  neutral hover fills and focus rings are consistent. Conflicting mobile search
+  rules were consolidated, preserving the full-width search and scrolling filters.
+- CI checks production CSS contrast in all six palettes and both themes, including
+  nested surfaces. The old design-check entry point delegates to the same checker.
+
 ### Changed
 
 - **The sign-in card says "Lanpaper" once, in a readable size.** `logo.svg` is
@@ -33,7 +44,7 @@ Notable changes to Lanpaper. Docker images are published as
     app accepts (36 MP) still fits on its own — and the refused upload gets the
     existing 429 "image processing busy, retry shortly"; preview regeneration
     waits for a free slot, exactly as it already did for the pixel budget.
-- **PNG uploads no longer spend two seconds re-encoding identical pixels.**- **PNG uploads no longer spend two seconds re-encoding identical pixels.**
+- **PNG uploads no longer spend two seconds re-encoding identical pixels.**
   With `COMPRESSION_SCALE=100` (the default) and a quality below 100, a PNG used
   to go through the full compression pass: decode, scale by 100% and re-encode
   the same pixels with the stdlib encoder. PNG is lossless, so the result

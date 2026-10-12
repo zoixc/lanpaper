@@ -15,7 +15,7 @@ import { accessMeta, entryMeta as formatEntryMeta, entryTitle as formatEntryTitl
 import { createUploadFeature } from './upload-feature.js';
 import { createOverlayController } from './overlay-controller.js';
 import { observeConnectivity } from './operation-state.js';
-import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as linkMatchesQuery,
+import { RENDER_CHUNK, createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as linkMatchesQuery,
     countFilteredLinks, resetIncrementalRender, selectVisibleLinks } from './state.js';
 
 (function () {
@@ -824,7 +824,7 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
         const left = Math.max(0, list.length - state.shown);
         box.classList.toggle('is-hidden', state.loading || left === 0);
         if (!left) return;
-        $('#loadMoreBtn').textContent = t('loading_more', { count: Math.min(CHUNK, left) });
+        $('#loadMoreBtn').textContent = t('loading_more', { count: Math.min(RENDER_CHUNK, left) });
         box.querySelector('[data-left]').textContent = t('shown_of', { shown: state.shown, total: list.length });
     }
 
@@ -869,7 +869,7 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
     function showMore() {
         const list = visibleLinks();
         const before = state.shown;
-        state.shown = Math.min(list.length, state.shown + CHUNK);
+        state.shown = Math.min(list.length, state.shown + RENDER_CHUNK);
         const grid = $('#grid');
         const frag = document.createDocumentFragment();
         list.slice(before, state.shown).forEach(link => frag.append(cardFor(link)));

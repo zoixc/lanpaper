@@ -126,3 +126,52 @@ test('logout expires every open tab without a Basic-auth fallback', async ({ pag
   await other.reload();
   await expect(other.locator('#loginForm')).toBeVisible();
 });
+
+for (const count of [13, 25]) {
+  test(`library renders ${count} links in chunks with populated icons`, async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    const links = Array.from({ length: count }, (_, i) => ({
+      linkName: `pagination-${String(i).padStart(2, '0')}`,
+      accessLevel: 'public', hasImage: false, modTime: i,
+    }));
+    // Only the data is mocked; HTML, JS, translations and auth use the server.
+    await page.route('**/api/wallpapers?*', route => route.fulfill({ json: links }));
+    await signIn(page);
+    const cards = page.locator('#grid .card');
+    await expect(cards).toHaveCount(12);
+    await expect(page.locator('#errorState')).toBeHidden();
+    await expect(page.locator('#loadMoreBtn')).toBeVisible();
+    await expect(page.locator('#grid svg[data-icon]:empty')).toHaveCount(0);
+    for (let shown = 12; shown < count; shown += 12) {
+      await page.click('#loadMoreBtn');
+      await expect(cards).toHaveCount(Math.min(shown + 12, count));
+      await expect(page.locator('#grid svg[data-icon]:empty')).toHaveCount(0);
+    }
+    await expect(page.locator('#loadMore')).toBeHidden();
+    await page.click('#viewListBtn');
+    // Switching views preserves the already revealed portion.
+    await expect(cards).toHaveCount(count);
+    await expect(page.locator('#grid svg[data-icon]:empty')).toHaveCount(0);
+    await expect(page.locator('#errorState')).toBeHidden();
+    expect(errors).toEqual([]);
+  });
+}
+
+test('offline notice stays below header controls and clears on reconnect', async ({ page, context }) => {
+  await signIn(page);
+  await context.setOffline(true);
+  try {
+    const banner = page.locator('#networkBanner');
+    await expect(banner).toBeVisible();
+    const tools = await page.locator('.appbar__row--tools').boundingBox();
+    const notice = await banner.boundingBox();
+    expect(notice.y).toBeGreaterThanOrEqual(tools.y + tools.height);
+    await expect(page.locator('#settingsBtn')).toBeVisible();
+    await page.click('#settingsBtn');
+    await expect(page.locator('#settingsSheet')).toBeVisible();
+  } finally {
+    await context.setOffline(false);
+  }
+  await expect(page.locator('#networkBanner')).toBeHidden();
+});

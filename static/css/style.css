@@ -110,7 +110,7 @@ ul, ol { list-style: none; }
 
 
 /* ============================================================
-   3. ПАЛИТРА ПО УМОЛЧАНИЮ — светлая, «Индиго»
+   3. ПАЛИТРА ПО УМОЛЧАНИЮ — светлая, монохромная
    Нейтральные поверхности: почти серые, с самым слабым
    подтоном. Так фотографии на плитках не спорят с фоном.
    ============================================================ */
@@ -121,7 +121,7 @@ ul, ol { list-style: none; }
     --surface:       #FFF;
     --surface-2:     #F1F3F7;
     --surface-3:     #E7EAF1;
-    --surface-hover: #F7F8FB;
+    --surface-hover: #EFF1F6;
     --glass:         rgba(255, 255, 255, 0.78);
     --overlay:       rgba(22, 24, 30, 0.42);
 
@@ -249,13 +249,13 @@ html[data-theme="dark"] {
     --surface:       #1B1E24;
     --surface-2:     #22262E;
     --surface-3:     #2A2F38;
-    --surface-hover: #1F232A;
+    --surface-hover: #242830;
     --glass:         rgba(23, 26, 32, 0.76);
     --overlay:       rgba(6, 7, 9, 0.62);
 
     --text:          #E9EAEC;
     --text-2:        #A4A7AC;
-    --text-3:        #898C91;
+    --text-3:        #8D9095;
     --text-on-accent:#12141A;
 
     --border:        #2A2F37;
@@ -577,7 +577,7 @@ html[data-palette="ocean"][data-theme="dark"] {
                 transform var(--dur-fast) var(--ease);
 }
 .icon-btn svg { width: 17px; height: 17px; }
-.icon-btn:hover { background: var(--surface-2); color: var(--text); }
+.icon-btn:hover { background: var(--surface-hover); color: var(--text); }
 .icon-btn:active { transform: scale(0.94); }
 .icon-btn[aria-pressed="true"] {
     background: var(--accent-soft);
@@ -835,7 +835,7 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
 }
 .chip[aria-pressed="true"] .chip__count { color: inherit; opacity: 0.7; }
 .chip--ghost { background: transparent; border-color: transparent; }
-.chip--ghost:hover { background: var(--surface-2); }
+.chip--ghost:hover { background: var(--surface-hover); }
 .chip-row {
     display: flex;
     align-items: center;
@@ -871,7 +871,7 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
 .field:hover { border-color: var(--border-2); }
 .field:focus-within {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.16);
+    box-shadow: var(--shadow-focus);
 }
 .field__icon { flex: none; width: 15px; height: 15px; color: var(--text-3); }
 .field input {
@@ -907,7 +907,7 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
     transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
 .input::placeholder { color: var(--text-3); }
-.input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.16); }
+.input:focus { outline: none; border-color: var(--accent); box-shadow: var(--shadow-focus); }
 .input[aria-invalid="true"] { border-color: var(--danger); }
 
 .field-label {
@@ -931,7 +931,7 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
     border: 1px solid var(--border);
     border-radius: var(--r-full);
     background: var(--surface);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%236B6E73' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5l3 3 3-3'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%2362656A' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5l3 3 3-3'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 10px center;
     background-size: 12px;
@@ -940,7 +940,10 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
     font-weight: var(--fw-semibold);
     cursor: pointer;
 }
-.select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.16); }
+html[data-theme="dark"] .select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%2393969B' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5l3 3 3-3'/%3E%3C/svg%3E");
+}
+.select:focus { outline: none; border-color: var(--accent); box-shadow: var(--shadow-focus); }
 .select--block { width: 100%; }
 /* Компактный вариант — для строки списка, где нужен переключатель доступа,
    но не нужна высота формы: он не должен растягивать строку. */
@@ -1088,7 +1091,7 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
     transition: background var(--dur-fast) var(--ease);
 }
 .menu__item svg { flex: none; width: 15px; height: 15px; color: var(--text-3); }
-.menu__item:hover { background: var(--surface-2); }
+.menu__item:hover { background: var(--surface-hover); }
 .menu__item:hover svg { color: var(--text-2); }
 .menu__item[aria-checked="true"] { color: var(--accent-text); }
 .menu__item[aria-checked="true"] svg { color: var(--accent-text); }
@@ -1724,7 +1727,7 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
 }
 .toast__action:hover { background: var(--accent-soft-2); }
 .toast__close { flex: none; width: 26px; height: 26px; border-radius: 50%; color: var(--text-3); display: grid; place-items: center; }
-.toast__close:hover { background: var(--surface-2); color: var(--text); }
+.toast__close:hover { background: var(--surface-hover); color: var(--text); }
 .toast__close svg { width: 13px; height: 13px; }
 
 /* Экран перетаскивания файлов */
@@ -2205,10 +2208,8 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
     .appbar__row { min-height: 52px; gap: var(--s-2); }
     .appbar__row--tools { padding-bottom: 8px; }
     /* Имя приложения остаётся: без него шапка — набор значков, и непонятно,
-       что это за панель. Счётчик при этом убираем — он дублирует число в
-       заголовке «Ссылки», а место в строке дорогое. */
+       что это за панель. */
     .brand__name { font-size: 0.875rem; }
-    .brand__badge { display: none; }
     /* «Новая ссылка» уезжает в плавающую кнопку: основное действие
        на телефоне должно быть под большим пальцем, а не в шапке */
     .appbar__actions .btn--primary { display: none; }
@@ -2219,11 +2220,10 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
     .page-head__title { font-size: var(--t-xl); }
     .page-head { margin-bottom: var(--s-3); }
 
-    /* Поиск и фильтры стоят в одной строке: поиск занимает фиксированную
-       долю, чипы прокручиваются. Так липкая шапка на телефоне не съедает
-       треть экрана — вместо трёх полос остаётся две. */
-    .search { flex: 0 1 168px; min-width: 116px; max-width: none; }
-    .tools { flex: 1 1 auto; min-width: 0; }
+    /* Поиск на всю ширину сохраняет читаемый placeholder. Фильтры ниже
+       прокручиваются внутри своего ряда, не растягивая страницу. */
+    .search { flex: 1 1 100%; max-width: none; min-width: 0; }
+    .tools { flex: 1 1 100%; min-width: 0; }
     .tools .chip-row { flex: 1; }
 
     .grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--s-3); }
@@ -2239,7 +2239,6 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
 @media (max-width: 560px) {
     .appbar__row { gap: 6px; }
     .appbar__actions { gap: 6px; }
-    .search { flex: 0 1 144px; }
     .grid { grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 10px; }
     .grid.grid--list { gap: var(--s-2); }
     .grid--list .card__frame { width: 92px; }
@@ -2315,15 +2314,6 @@ svg.is-pulse { animation: icon-pop 320ms var(--ease-out); }
     .card__meta > span:nth-last-child(2) { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 }
 
-/* Телефон: поиск на всю ширину, фильтры — строкой ниже. Раньше поиск был
-   144 px, и плейсхолдер «Search by name or file» обрезался. Фильтры по-прежнему
-   прокручиваются, высота шапки та же: поиск и чипы и так занимали две строки. */
-@media (max-width: 720px) {
-    .appbar__row--tools { flex-wrap: wrap; }
-    .search { flex: 1 1 100%; max-width: none; min-width: 0; }
-    .tools { flex: 1 1 100%; min-width: 0; }
-}
-
 /* Скрытие элементов массовых действий и режима выбора */
 body.is-selecting .grid .card__open { display: none; }
 
@@ -2393,20 +2383,18 @@ body.is-selecting .grid .card__open { display: none; }
     border-radius: var(--r-md);
     cursor: pointer;
 }
+.login-card__submit:hover:not(:disabled) { background: var(--accent-hover); }
 .login-card__submit:disabled { opacity: 0.6; cursor: progress; }
 
 /* Connection state is explicit; admin/API responses remain network-only. */
 .network-banner {
-    position: sticky;
-    top: 0;
-    z-index: 45;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 10px;
     padding: 8px 16px;
     color: var(--text);
-    background: var(--surface, #fff);
+    background: var(--surface);
     border-bottom: 1px solid var(--border);
 }
 .network-banner > svg { width: 18px; height: 18px; flex: 0 0 auto; }
