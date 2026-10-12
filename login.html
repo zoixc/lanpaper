@@ -10,8 +10,13 @@
 </head>
 <body class="login-page">
   <main class="login-card">
-    <img class="login-card__logo" src="/static/logo.svg" alt="" width="56" height="56">
-    <h1 class="login-card__title">Lanpaper</h1>
+    <!-- The logo is the full wordmark, so it already says "Lanpaper": a
+         separate heading with the same word only repeated it, and the small
+         icon-sized box made the wordmark unreadable. It stays wrapped in an
+         h1 so the page keeps a level-one heading. -->
+    <h1 class="login-card__brand">
+      <img class="login-card__logo" src="/static/logo.svg" alt="Lanpaper" width="220" height="55">
+    </h1>
     <form id="loginForm" class="login-card__form" novalidate>
       <label class="login-card__field">
         <span data-i18n="username">Username</span>

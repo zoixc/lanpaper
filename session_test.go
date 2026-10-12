@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -67,6 +69,36 @@ func (a *testApp) get(path string, cookie *http.Cookie) (int, http.Header, strin
 
 // Without a session the admin URL shows the sign-in form. It must not show the
 // admin panel, and must not trigger the browser's native password prompt.
+// The sign-in card carries the product name once. The logo is the full
+// wordmark (static/logo.svg draws the icon and the word "Lanpaper"), so a
+// heading with the same word next to it only repeated the name — and inside an
+// icon-sized box the wordmark was too small to read. The size lives in the
+// attributes and in one CSS rule, so a future change that shrinks it back is
+// caught here.
+func TestLoginCardShowsTheWordmarkOnce(t *testing.T) {
+	a := setupApp(t)
+	status, _, body := a.get("/admin", nil)
+	if status != http.StatusOK {
+		t.Fatalf("status %d", status)
+	}
+	if !strings.Contains(body, `class="login-card__logo"`) || !strings.Contains(body, `alt="Lanpaper"`) {
+		t.Fatal("sign-in card has no wordmark logo")
+	}
+	if !strings.Contains(body, `width="220" height="55"`) {
+		t.Fatal("wordmark is not rendered at the readable size (the 4:1 ratio at 220px)")
+	}
+	if strings.Contains(body, "login-card__title") || strings.Contains(body, ">Lanpaper</h1>") {
+		t.Fatal("sign-in card repeats the product name next to the wordmark")
+	}
+	css, err := os.ReadFile(filepath.Join("static", "css", "style.css"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(css), "width: min(100%, 220px)") {
+		t.Fatal("the wordmark size rule is gone: the logo would fall back to its attributes only")
+	}
+}
+
 func TestAdminShowsLoginFormWithoutSession(t *testing.T) {
 	a := setupApp(t)
 	status, h, body := a.get("/admin", nil)

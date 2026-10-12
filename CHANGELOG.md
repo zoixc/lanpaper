@@ -7,6 +7,12 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **The sign-in card says "Lanpaper" once, in a readable size.** `logo.svg` is
+  the full wordmark — the icon plus the word — but the card drew it inside a
+  56x56 box meant for the icon alone, so the word came out a few pixels tall
+  while a separate heading repeated the name next to it. The wordmark is now the
+  heading of the card, at its own 4:1 ratio: 220x55 on a 360px card, and it
+  keeps the level-one heading and the accessible name (`alt="Lanpaper"`).
 - **Encoders that cannot change quality now cost less CPU and less memory.**
   Three measured changes, all of them trading a little disk space for a lower
   peak:
