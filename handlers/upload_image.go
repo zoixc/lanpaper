@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/color"
 	"image/draw"
 	"image/gif"
 	"image/jpeg"
@@ -20,6 +21,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"strings"
+	"sync"
 
 	"github.com/SeriousBug/webp-go-pure/std"
 	_ "golang.org/x/image/bmp"
@@ -53,7 +55,16 @@ var (
 )
 
 // Enforce one shared memory budget for uploads and preview jobs.
-func reserveDecodedPixels(pixels int64) (func(), error) {
+//
+// Two caps are needed because a pixel count does not say how much memory a
+// decode asks for: image.Decode allocates four bytes per pixel for the usual
+// 8-bit models but eight for the 16-bit ones (a 12 MP 16-bit PNG is a 101 MB
+// *image.RGBA64, measured). The pixel cap keeps the historical concurrency for
+// 8-bit sources unchanged; the byte cap refuses only the combinations whose
+// images cannot fit in memory together — two 24 MP 16-bit PNGs are 404 MB,
+// while the largest image the app accepts at all (36 MP) is 288 MB and still
+// fits on its own, exactly as before.
+func reserveDecodedPixels(pixels, decodedBytes int64) (func(), error) {
 	if pixels <= 0 || pixels > config.MaxDecodedPixelsInFlight {
 		return nil, errImageBudgetBusy
 	}
@@ -62,12 +73,61 @@ func reserveDecodedPixels(pixels int64) (func(), error) {
 	if err != nil {
 		return nil, errImageBudgetBusy
 	}
+	releaseBytes, err := reserveDecodedBytes(decodedBytes)
+	if err != nil {
+		release()
+		return nil, errImageBudgetBusy
+	}
 	return func() {
+		releaseBytes()
 		release()
 		if pool.Snapshot().MemoryUsed == 0 && pixels >= freeOSMemoryMinPixels {
 			go debug.FreeOSMemory()
 		}
 	}, nil
+}
+
+// decodedMemoryUsed is the memory the images being decoded right now will
+// occupy. It is a second cap next to the pixel budget, not a replacement: the
+// pixel budget has always been the concurrency limit, and this one only stops
+// deep formats from adding up.
+var decodedMemoryUsed struct {
+	mu   sync.Mutex
+	used int64
+}
+
+// maxDecodedBytesInFlight fits the largest image the app accepts (36 MP) at the
+// deepest layout image.Decode produces for it: 36 M x 8 bytes = 288 MB.
+const maxDecodedBytesInFlight = 288 << 20
+
+func reserveDecodedBytes(bytes int64) (func(), error) {
+	if bytes <= 0 || bytes > maxDecodedBytesInFlight {
+		return nil, errImageBudgetBusy
+	}
+	decodedMemoryUsed.mu.Lock()
+	defer decodedMemoryUsed.mu.Unlock()
+	if decodedMemoryUsed.used+bytes > maxDecodedBytesInFlight {
+		return nil, errImageBudgetBusy
+	}
+	decodedMemoryUsed.used += bytes
+	return func() {
+		decodedMemoryUsed.mu.Lock()
+		decodedMemoryUsed.used -= bytes
+		decodedMemoryUsed.mu.Unlock()
+	}, nil
+}
+
+// decodedBytesPerPixel is the heap a decoded image occupies per pixel, which
+// image.Decode decides from the colour model in the header: the 16-bit models
+// become image.RGBA64/NRGBA64/Gray16 at eight bytes per pixel, everything else
+// stays at the four the pixel budget has always assumed (Gray and paletted
+// images use less, which this deliberately does not exploit).
+func decodedBytesPerPixel(model color.Model) int64 {
+	switch model {
+	case color.RGBA64Model, color.NRGBA64Model, color.Gray16Model:
+		return 8
+	}
+	return 4
 }
 
 // freeOSMemoryMinPixels is the decode size (~4 MP) from which returning
@@ -87,6 +147,27 @@ func storedExt(ext string, lossless bool) string {
 		return "jpg"
 	}
 	return ext
+}
+
+// storeUploadedBytes reports whether the uploaded file is stored as it is: the
+// explicit lossless mode, or a PNG at COMPRESSION_SCALE=100. PNG is a lossless
+// format, so the compression pass could only re-encode identical pixels —
+// measured on a 12 MP PNG, the upload costs 3.2 s of CPU that way and 1.3 s
+// when the bytes are kept — while a file that is already well compressed comes
+// out the same size or larger. The image is still fully decoded to validate it
+// and the preview is still rebuilt from it, and a scale below 100 does change
+// the picture, so the pass still runs then.
+//
+// GIF is lossless too, but the compressed mode is documented to flatten it to a
+// single frame, so it keeps going through the encoder. JPEG and WebP keep being
+// re-encoded at the configured quality, which is also what drops their EXIF
+// metadata (location data included) that a public link should not serve. Like
+// lossless mode, keeping the bytes keeps whatever the file carries.
+func storeUploadedBytes(ext string, lossless bool) bool {
+	if lossless {
+		return true
+	}
+	return ext == "png" && config.Current.Compression.Scale == 100
 }
 
 func canUseLosslessMode() bool {
@@ -193,33 +274,32 @@ func isMP4VideoFtyp(head []byte) bool {
 // checkImageDimensions runs before any full image decode, including lossless
 // uploads and thumbnail regeneration. A width/height cap alone still allows
 // a 16k x 16k image to allocate >1 GB per decoded copy.
-func checkImageDimensions(r io.ReadSeeker, ext string) (int64, error) {
+func checkImageDimensions(r io.ReadSeeker, ext string) (pixels, decodedBytes int64, err error) {
 	var cfg image.Config
-	var err error
 	if ext == "webp" {
 		cfg, err = xwebp.DecodeConfig(r)
 	} else {
 		cfg, _, err = image.DecodeConfig(r)
 	}
 	if err != nil {
-		return 0, fmt.Errorf("could not read image config: %w", err)
+		return 0, 0, fmt.Errorf("could not read image config: %w", err)
 	}
-	pixels := int64(cfg.Width) * int64(cfg.Height)
+	pixels = int64(cfg.Width) * int64(cfg.Height)
 	if cfg.Width < 1 || cfg.Height < 1 || cfg.Width > config.MaxImageDimension ||
 		cfg.Height > config.MaxImageDimension || pixels > config.MaxImagePixels {
-		return 0, fmt.Errorf("image %dx%d exceeds limits", cfg.Width, cfg.Height)
+		return 0, 0, fmt.Errorf("image %dx%d exceeds limits", cfg.Width, cfg.Height)
 	}
-	return pixels, nil
+	return pixels, pixels * decodedBytesPerPixel(cfg.ColorModel), nil
 }
 
 // The returned release function must be called after all resizing/encoding
 // is finished, even on failure. Reserve BEFORE allocating a decoded image.
 func decodeImage(r io.ReadSeeker, ext string) (image.Image, func(), error) {
-	pixels, err := checkImageDimensions(r, ext)
+	pixels, decodedBytes, err := checkImageDimensions(r, ext)
 	if err != nil {
 		return nil, nil, err
 	}
-	release, err := reserveDecodedPixels(pixels)
+	release, err := reserveDecodedPixels(pixels, decodedBytes)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -251,11 +331,11 @@ func scaleImage(src image.Image, scalePercent int) image.Image {
 	return resize(src, float64(scalePercent)/100)
 }
 
-// resize downscales src by scale with a bilinear kernel widened to the scale
-// factor (so every source pixel contributes). It uses Kernel.Transform, not
-// Kernel.Scale: Scale allocates a dstWidth x srcHeight float64 buffer (575 MB
-// to halve a 36 MP photo), while Transform needs no temporary memory and
-// produces the same pixels to within one level of rounding (resize_test.go).
+// resize downscales src by scale. Sources with a known pixel layout go through
+// the box filter in downscale.go, which is an order of magnitude cheaper than
+// the kernel path and needs no colour conversion; every other image type keeps
+// the kernel path. Both paths downscale only: a scale of 1 or more returns src
+// itself, so callers never pay for an upscale nobody asked for.
 func resize(src image.Image, scale float64) image.Image {
 	if scale >= 1 {
 		return src
@@ -263,6 +343,22 @@ func resize(src image.Image, scale float64) image.Image {
 	b := src.Bounds()
 	w := max(1, int(float64(b.Dx())*scale))
 	h := max(1, int(float64(b.Dy())*scale))
+	if box, ok := boxDownscale(src, w, h); ok {
+		return box
+	}
+	return resizeKernel(src, w, h)
+}
+
+// resizeKernel downscales src to w x h with a bilinear kernel widened to the
+// scale factor (so every source pixel contributes). It uses Kernel.Transform,
+// not Kernel.Scale: Scale allocates a dstWidth x srcHeight float64 buffer
+// (575 MB to halve a 36 MP photo), while Transform needs no temporary memory
+// and produces the same pixels to within one level of rounding (resize_test.go).
+// It stays for the image types the box filter does not know (paletted,
+// 16-bit and generic images) and as the reference the box path is measured
+// against.
+func resizeKernel(src image.Image, w, h int) image.Image {
+	b := src.Bounds()
 	dst := image.NewRGBA(image.Rect(0, 0, w, h))
 	sx := float64(w) / float64(b.Dx())
 	sy := float64(h) / float64(b.Dy())
@@ -279,26 +375,48 @@ func saveImage(img image.Image, format, path string, quality int) error {
 	})
 }
 
-// savePreview writes the WebP thumbnail shown in the admin panel.
+// savePreview writes the WebP thumbnail shown in the admin panel, at the
+// preview effort rather than the stored-image one.
 func savePreview(img image.Image, path string) error {
-	return saveImage(thumbnail(img, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight), "webp", path, config.ThumbnailQuality)
+	small := thumbnail(img, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight)
+	return writeFileAtomic(path, func(out *os.File) error {
+		return encodeImageWithWebpEffort(out, small, "webp", config.ThumbnailQuality, webpEffort)
+	})
 }
 
-// webpEffort trades WebP encode time for file size (0..9). Preset 3 is the
-// fastest one that enables the full lossy search; the default, 0, produces
-// previews roughly a third larger for no visible gain.
-const webpEffort = 3
+// webpEffort trades WebP encode time for preview size (0..9). Measured on a
+// 12 MP photo source, the 640x360 preview costs about 27 ms at effort 0, 50 ms
+// at effort 1, and 108 ms at effort 3 for a size difference of 0.4% between
+// the last two; flat graphics (icons, screenshots) come out 20-35% smaller at
+// effort 3, but a preview is a few kilobytes either way. Effort 1 keeps the
+// encoder's full search enabled, which is where the useful compression is.
+const webpEffort = 1
+
+// webpStoreEffort is the effort for the stored image, which is orders of
+// magnitude larger than a preview: measured on a 12 MP photo, effort 0 takes
+// 833 ms instead of 1119 ms (26% less) for 2% more bytes.
+const webpStoreEffort = 0
 
 func encodeImage(w io.Writer, img image.Image, format string, quality int) error {
+	return encodeImageWithWebpEffort(w, img, format, quality, webpStoreEffort)
+}
+
+func encodeImageWithWebpEffort(w io.Writer, img image.Image, format string, quality, effort int) error {
 	switch format {
 	case "jpg", "jpeg":
 		return jpeg.Encode(w, img, &jpeg.Options{Quality: quality})
 	case "png":
-		return png.Encode(w, img)
+		// BestSpeed, not the default level: measured on a 12 MP source, the
+		// default level takes the same time (1.83 s vs 1.74 s on a 16-bit
+		// source) or 20% more on an 8-bit one, and grows the heap by about
+		// 92 MB while it runs, for 8-10% smaller files. An upload that is not
+		// scaled keeps its bytes and never reaches this encoder
+		// (storeUploadedBytes).
+		return (&png.Encoder{CompressionLevel: png.BestSpeed}).Encode(w, img)
 	case "gif":
 		return gif.Encode(w, img, &gif.Options{NumColors: config.GIFColors})
 	case "webp":
-		return webp.Encode(w, img, &webp.Options{Quality: quality, Effort: webpEffort})
+		return webp.Encode(w, img, &webp.Options{Quality: quality, Effort: effort})
 	default:
 		return fmt.Errorf("unsupported output format %q", format)
 	}

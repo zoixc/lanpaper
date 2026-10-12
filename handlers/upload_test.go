@@ -26,7 +26,7 @@ import (
 )
 
 func TestDecodedImageBudgetIsShared(t *testing.T) {
-	release, err := reserveDecodedPixels(config.MaxImagePixels)
+	release, err := reserveDecodedPixels(config.MaxImagePixels, config.MaxImagePixels*4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,19 +35,80 @@ func TestDecodedImageBudgetIsShared(t *testing.T) {
 			release()
 		}
 	}()
-	if _, err := reserveDecodedPixels(config.MaxImagePixels); !errors.Is(err, errImageBudgetBusy) {
+	if _, err := reserveDecodedPixels(config.MaxImagePixels, config.MaxImagePixels*4); !errors.Is(err, errImageBudgetBusy) {
 		t.Fatalf("concurrent large image unexpectedly accepted: %v", err)
 	}
-	if _, err := reserveDecodedPixels(0); !errors.Is(err, errImageBudgetBusy) {
+	if _, err := reserveDecodedPixels(0, 0); !errors.Is(err, errImageBudgetBusy) {
 		t.Fatalf("invalid reservation accepted: %v", err)
 	}
 	release()
 	release = nil
-	second, err := reserveDecodedPixels(config.MaxImagePixels)
+	second, err := reserveDecodedPixels(config.MaxImagePixels, config.MaxImagePixels*4)
 	if err != nil {
 		t.Fatalf("memory budget not released: %v", err)
 	}
 	second()
+}
+
+// A pixel budget cannot see the difference between four and eight bytes per
+// pixel, so the byte cap is what stops two deep-format decodes (a 16-bit PNG is
+// 101 MB of image.RGBA64 at 12 MP) from being accepted together. The largest
+// image the app accepts at all (36 MP, 288 MB at eight bytes per pixel) still
+// fits on its own.
+func TestDecodedBytesBudgetBoundsDeepFormats(t *testing.T) {
+	const (
+		limitImage = 36_000_000
+		twelveMP   = 12_700_000
+		twentyFour = 24_000_000
+	)
+	deepest, err := reserveDecodedPixels(limitImage, limitImage*8)
+	if err != nil {
+		t.Fatalf("a single 36 MP 16-bit image (288 MB) must be accepted: %v", err)
+	}
+	if _, err := reserveDecodedPixels(twelveMP, twelveMP*4); !errors.Is(err, errImageBudgetBusy) {
+		t.Fatalf("an 8-bit image was accepted next to a 36 MP 16-bit one (339 MB)")
+	}
+	deepest()
+
+	first, err := reserveDecodedPixels(twentyFour, twentyFour*8)
+	if err != nil {
+		t.Fatalf("a single 24 MP 16-bit image must be accepted: %v", err)
+	}
+	if _, err := reserveDecodedPixels(twentyFour, twentyFour*8); !errors.Is(err, errImageBudgetBusy) {
+		t.Fatalf("two 24 MP 16-bit images (404 MB) accepted together")
+	}
+	// Two 24 MP 8-bit images are 192 MB and must still both fit, exactly as
+	// before the byte cap existed.
+	first()
+	first, err = reserveDecodedPixels(twentyFour, twentyFour*4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer first()
+	second, err := reserveDecodedPixels(twentyFour, twentyFour*4)
+	if err != nil {
+		t.Fatalf("two 24 MP 8-bit images no longer fit: %v", err)
+	}
+	second()
+}
+
+func TestDecodedBytesPerPixelMatchesDecodedLayout(t *testing.T) {
+	cases := []struct {
+		model color.Model
+		want  int64
+	}{
+		{color.RGBA64Model, 8},
+		{color.NRGBA64Model, 8},
+		{color.Gray16Model, 8},
+		{color.RGBAModel, 4},
+		{color.YCbCrModel, 4},
+		{color.GrayModel, 4},
+	}
+	for _, tc := range cases {
+		if got := decodedBytesPerPixel(tc.model); got != tc.want {
+			t.Errorf("decodedBytesPerPixel(%v) = %d, want %d", tc.model, got, tc.want)
+		}
+	}
 }
 
 func TestWebPDecodesWithoutCDecoderAndRejectsOversizedDimensions(t *testing.T) {

@@ -3,6 +3,80 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
+## [Unreleased]
+
+### Changed
+
+- **Encoders that cannot change quality now cost less CPU and less memory.**
+  Three measured changes, all of them trading a little disk space for a lower
+  peak:
+  - The stored WebP is encoded at effort 0: on a 12 MP photo, 833 ms of CPU
+    instead of 1119 ms (26% less) for 1.5% more bytes. The admin thumbnail keeps
+    its own setting, which was already tuned for a 640x360 image.
+  - A PNG that is being scaled is encoded with `BestSpeed`: on a 12 MP source
+    the default level takes the same time on a 16-bit one (1.83 s vs 1.74 s) or
+    20% more on an 8-bit one, and grows the heap by about 92 MB while it runs,
+    for 8-10% smaller files. Unscaled PNG uploads keep their bytes and never
+    reach this encoder.
+  - The shared decode budget now also caps the memory the decoded images will
+    actually occupy, not just their pixel count. `image.Decode` allocates four
+    bytes per pixel for the usual 8-bit sources but eight for 16-bit ones (a
+    12 MP 16-bit PNG is 101 MB of `image.RGBA64`), so the pixel budget alone let
+    two 20.9 MP 16-bit PNGs decode together: measured peak RSS grew by 336 MB.
+    The byte cap keeps such combinations within 288 MB — the largest image the
+    app accepts (36 MP) still fits on its own — and the refused upload gets the
+    existing 429 "image processing busy, retry shortly"; preview regeneration
+    waits for a free slot, exactly as it already did for the pixel budget.
+- **PNG uploads no longer spend two seconds re-encoding identical pixels.**- **PNG uploads no longer spend two seconds re-encoding identical pixels.**
+  With `COMPRESSION_SCALE=100` (the default) and a quality below 100, a PNG used
+  to go through the full compression pass: decode, scale by 100% and re-encode
+  the same pixels with the stdlib encoder. PNG is lossless, so the result
+  differs from the upload only in how the same data is packed, and the Encoder
+  is measurably slower than the encoder that produced most PNGs in the first
+  place — on a 12 MP PNG the pass costs about 2 s of CPU and, on a file already
+  written with a fast encoder, comes out about 8% *smaller*, while PNGs written
+  at the default level come out the same size or larger. Those uploads are now
+  stored as they are, after the same full decode that rejects malformed files
+  and with the same admin thumbnail, which takes the whole upload from 3.2 s of
+  CPU to 1.3 s. Scaling below 100 still re-encodes, and GIF keeps its documented
+  single-frame re-encode because the palette quantiser is what flattens it.
+  Like lossless mode, keeping the bytes keeps any ancillary chunks the upload
+  carried (JPEG and WebP are still re-encoded, which keeps dropping their EXIF).
+
+- **Downscaling is an order of magnitude cheaper, so uploads no longer spike
+  the CPU.** Fitting the admin preview and scaling a stored image used to run a
+  bilinear kernel widened to the scale factor, which calls `At()` — and a
+  colour conversion — for every source sample; the kernel support grows as the
+  scale shrinks, so a big downscale cost tens of interface calls per
+  destination pixel. Measured on a 12 MP photo, the 640x360 preview took about
+  470 ms of CPU and halving a 24 MP photo about 1.1 s, several times the JPEG
+  decode (176 ms) or the WebP encode next to them. Both now go through a box
+  average computed on raw pixel rows (JPEG-encoded sources are reduced plane by
+  plane in YCbCr, with no RGB round-trip at all), which touches every source
+  pixel exactly once: the same preview costs about 18 ms instead of 470 ms, and
+  the 24 MP halving about 73 ms instead of 1.1 s. The whole non-lossless upload
+  path therefore drops by roughly 40% of its CPU. The two filters do not
+  produce identical pixels — on real photos they differ by a mean of 1.5 levels
+  of 255, which the JPEG encoder's rounding then absorbs — and the box average
+  is the more faithful of the two, because every source pixel contributes with
+  equal weight. Paletted, 16-bit and generic images keep the kernel path, and
+  `handlers/downscale_bench_test.go` keeps both measured. End to end (release
+  build, 2.6 GHz x86-64), uploading a 12 MP JPEG 4130x3070 and 3.2 MB costs the
+  server 0.61 s of CPU instead of 1.10 s: the request is single-threaded, so the
+  CPU peak it produces is halved.
+- **Preview WebP encoding uses effort 1 instead of 3.** On the preview the two
+  presets produce the same bytes (34,830 vs 34,866 for a 12 MP photo), while
+  effort 3 takes twice as long: about 105 ms instead of 50 ms per preview.
+  Effort 3 only paid off on flat graphics, and those previews were a few
+  kilobytes to begin with. A box-filtered thumbnail does keep more detail than
+  the wider kernel blur did, so a preview is now roughly 20% larger in bytes
+  (about 6 KB on a 640x360 photo) — the encoder's effort setting does not
+  change that.
+- **A stored JPEG is re-encoded from the YCbCr planes** of the downscaled
+  image, so the encoder's own fast path reads them directly. The stored file is
+  about 0.2% smaller and measurably no worse than the previous RGBA round-trip.
+
+
 ## [0.17.0] – 2026-10-11
 
 **Upgrade notes — read before deploying**
