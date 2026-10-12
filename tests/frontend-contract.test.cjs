@@ -208,21 +208,32 @@ test('the theme switch and the gear move the way 0.12.1 moved them', () => {
       `the ${glyph} is not one of the stacked theme icons`);
   }
   const css = read('static/css/style.css');
-  const themeIcon = css.match(/#themeBtn \.theme-icon \{([\s\S]*?)\n\}/);
-  assert.ok(themeIcon, 'the stacked theme icons lost their rules');
-  assert.match(themeIcon[1], /position: absolute/, 'the theme icons are not stacked');
-  assert.match(themeIcon[1], /transition: opacity 0\.2s ease, transform 0\.25s ease/,
-    `the cross-fade no longer matches 0.12.1: ${themeIcon[1]}`);
-  assert.match(css, /#themeBtn \.theme-icon \{ transform: scale\(0\.5\) rotate\(-90deg\); \}/,
-    'the inactive theme glyph no longer shrinks and turns like it did in 0.12.1');
-  assert.match(css, /html\[data-theme="light"\] #themeBtn \.theme-icon\[data-icon="sun"\]/,
-    'the light theme no longer shows the sun');
-  assert.match(css, /html\[data-theme="dark"\]  #themeBtn \.theme-icon\[data-icon="moon"\]/,
-    'the dark theme no longer shows the moon');
-  assert.match(css, /#settingsBtn svg \{ transition: transform 0\.25s ease; \}/,
-    'the gear lost the 0.25s turn of 0.12.1');
-  assert.match(css, /body\.settings-open #settingsBtn svg \{ transform: rotate\(90deg\); \}/,
-    'the gear no longer turns while the settings panel is open');
+  // Test declarations, not line breaks, indentation or selector-list layout.
+  // These contracts concern ordinary flat rules, not the whole CSS grammar.
+  function declarations(selector, source = css) {
+    const result = {};
+    const clean = source.replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const [, selectors, body] of clean.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!selectors.split(',').some(s => s.trim().replace(/\s+/g, ' ') === selector)) continue;
+      for (const decl of body.split(';')) {
+        const colon = decl.indexOf(':');
+        if (colon !== -1) result[decl.slice(0, colon).trim()] = decl.slice(colon + 1).replace(/\s+/g, ' ').trim();
+      }
+    }
+    return result;
+  }
+  const themeIcon = declarations('#themeBtn .theme-icon');
+  assert.deepEqual(declarations('#themeBtn .theme-icon', css.replace(/\s+/g, ' ')), themeIcon);
+  assert.equal(themeIcon.position, 'absolute', 'the theme icons are not stacked');
+  assert.equal(themeIcon.transition, 'opacity 0.2s ease, transform 0.25s ease');
+  assert.equal(themeIcon.transform, 'scale(0.5) rotate(-90deg)');
+  for (const [theme, icon] of [['light', 'sun'], ['dark', 'moon']]) {
+    const active = declarations(`html[data-theme="${theme}"] #themeBtn .theme-icon[data-icon="${icon}"]`);
+    assert.equal(active.opacity, '1');
+    assert.equal(active.transform, 'scale(1) rotate(0deg)');
+  }
+  assert.equal(declarations('#settingsBtn svg').transition, 'transform 0.25s ease');
+  assert.equal(declarations('body.settings-open #settingsBtn svg').transform, 'rotate(90deg)');
   assert.match(scriptSource, /classList\.toggle\('settings-open'/,
     'nothing sets the settings-open state the gear turns on');
   assert.match(css, /prefers-reduced-motion/, 'the "less motion" switch disappeared');
@@ -272,7 +283,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v13/,
+  assert.match(code, /lanpaper-static-v14/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 

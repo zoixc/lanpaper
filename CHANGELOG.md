@@ -18,6 +18,12 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Changed
 
+- **Production CSS is easier to edit without changing the design.** Consistent
+  formatting, a section map, spacing/component-padding tokens and documented
+  layer tokens preserve the existing values and cascade. Animation contracts
+  tolerate whitespace changes. Development-only formatting and structural/token
+  checks run in CI; `docs/STYLE_GUIDE.md` documents safe edits and cache updates.
+
 - **The sign-in card says "Lanpaper" once, in a readable size.** `logo.svg` is
   the full wordmark — the icon plus the word — but the card drew it inside a
   56x56 box meant for the icon alone, so the word came out a few pixels tall

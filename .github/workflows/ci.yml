@@ -97,6 +97,11 @@ jobs:
       - name: Syntax check
         run: for f in static/js/*.js static/sw.js; do node --input-type=module --check < "$f"; done
 
+      - name: CSS formatting and structural checks
+        run: |
+          npm ci --prefix tools --ignore-scripts
+          npm run check --prefix tools
+
       - name: Production palette contrast
         run: node tools/check-contrast.mjs
 

@@ -30,7 +30,7 @@ test('production checker covers mono and five colour palettes in both themes', t
 });
 
 test('checker rejects the original dark nested-surface contrast regression', t => {
-  const result = audit(t, css.replace('--text-3:        #8D9095;', '--text-3:        #898C91;'));
+  const result = audit(t, css.replace(/--text-3:\s*#8d9095;/i, '--text-3: #898C91;'));
   assert.equal(result.status, 1, result.stdout + result.stderr);
   assert.match(result.stdout, /mono\/dark: мета на вложенной поверхности/);
 });

@@ -1,0 +1,13 @@
+{
+  "name": "lanpaper-css-tools",
+  "private": true,
+  "scripts": {
+    "check": "prettier --check ../static/css/style.css && node check-css.mjs && node --test css.test.mjs",
+    "format": "prettier --write ../static/css/style.css"
+  },
+  "devDependencies": {
+    "postcss": "8.5.29",
+    "postcss-value-parser": "4.2.0",
+    "prettier": "3.9.10"
+  }
+}

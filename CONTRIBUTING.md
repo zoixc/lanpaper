@@ -54,9 +54,10 @@ at startup, and versioned URLs are served with immutable caching.
 
 `static/css/style.css` is the production source of truth. `design/v2/` is a
 historical prototype, not a second stylesheet to keep editing in parallel.
-Start with the `:root` tokens, then the dark-theme and palette overrides. Keep
-layout changes separate from colour changes; many component paddings are still
-literal pixel values rather than spacing tokens. Preserve reduced-motion rules,
+Start with the `:root` tokens, then the dark-theme and palette overrides. Common
+spacing and component paddings have dedicated tokens; optical adjustments and
+control geometry intentionally keep literal values. See [the CSS editing guide](docs/STYLE_GUIDE.md)
+for the token map and responsive exceptions. Preserve reduced-motion rules,
 focus indicators, mobile scrolling, and the login wordmark's aspect ratio.
 
 Run `node tools/check-contrast.mjs --table` to inspect the production token pairs
@@ -69,9 +70,22 @@ contrast overrides and arbitrary CSS selectors need browser testing. The 1.1:1
 decorative-border threshold is a design guard, not WCAG control conformance.
 
 Run the Node tests above and the browser suite in `tests/e2e` before merging.
-Exact animation and wordmark contracts also live in
+Animation-value and wordmark contracts also live in
 `tests/frontend-contract.test.cjs` and `session_test.go`; changing their design
 intentionally requires reviewing those tests, not just deleting assertions.
+Animation checks tolerate formatting changes.
+
+Development-only CSS tooling is pinned in `tools/package-lock.json`:
+
+```sh
+npm ci --prefix tools --ignore-scripts
+npm run format --prefix tools  # formats only static/css/style.css
+npm run check --prefix tools   # formatting, structural/token guards, tool tests
+```
+
+CI runs the same checks. Do not auto-sort properties or merge media queries:
+source order and fallback declarations are intentional. No CSS build step is
+needed to run or deploy the application.
 
 Conventions worth following: table-driven tests next to the code they cover, an
 end-to-end test in `features_test.go` for anything reachable through the router,

@@ -175,3 +175,25 @@ test('offline notice stays below header controls and clears on reconnect', async
   }
   await expect(page.locator('#networkBanner')).toBeHidden();
 });
+
+test('card spacing tokens remain editable in both responsive layouts', async ({ page }) => {
+  await page.route('**/api/wallpapers?*', route => route.fulfill({ json: [
+    { linkName: 'css-token-check', accessLevel: 'public', hasImage: false },
+  ] }));
+  await signIn(page);
+  await page.click('#viewGridBtn');
+  const body = page.locator('#grid .card__body').first();
+  // Use CSSOM like the application does; do not weaken CSP for the test.
+  await page.evaluate(() => {
+    document.documentElement.style.setProperty('--card-padding', '18px');
+    document.documentElement.style.setProperty('--card-padding-phone', '14px');
+  });
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await expect(body).toHaveCSS('padding', '18px');
+  await page.setViewportSize({ width: 390, height: 800 });
+  await expect(body).toHaveCSS('padding', '14px');
+  // List geometry intentionally overrides the tile-density token on phones.
+  await page.click('#viewListBtn');
+  await expect(body).toHaveCSS('padding', '9px 12px');
+  await expect(page.locator('#errorState')).toBeHidden();
+});
