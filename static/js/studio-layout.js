@@ -40,26 +40,35 @@ export function initializeStudio(t) {
     const mobile = matchMedia('(max-width: 760px)');
     let collapsed = false;
     try { collapsed = localStorage.getItem('lp-studio-nav-collapsed') === 'true'; } catch (_) {}
+    /* На телефоне рельса — не колонка, а горизонтальная полоса, и в ней лежат
+       и фильтры, и единственный экземпляр кнопок: .sidebar-collapsed снимает
+       её целиком (display: none), так что «свернуть» здесь значит спрятать
+       органы управления, не оставив им другого места. Свёрнутое состояние
+       поэтому учитывается только там, где рельса — боковая колонка, а
+       переключатель на телефоне не предлагается вовсе. */
+    const collapsible = () => !mobile.matches;
+    const folded = () => collapsible() && collapsed;
     function labels() {
-        const text = t(collapsed ? 'expand_navigation' : 'collapse_navigation');
+        const text = t(folded() ? 'expand_navigation' : 'collapse_navigation');
         toggle.setAttribute('aria-label', text);
         toggle.title = text;
     }
     function placeActions() {
         const focused = document.activeElement;
-        mobileActions.hidden = collapsed || !mobile.matches;
-        if (collapsed) actionRow.append(create, theme, settings);
+        if (folded()) actionRow.append(create, theme, settings);
         else if (mobile.matches) mobileActions.append(theme, settings, create);
         else { rail.insertBefore(create, label); utilities.append(theme, settings); }
+        mobileActions.hidden = !mobile.matches;
         if ([create, theme, settings].includes(focused)) focused.focus({ preventScroll: true });
     }
     function apply() {
-        document.documentElement.classList.toggle('sidebar-collapsed', collapsed);
-        toggle.setAttribute('aria-expanded', String(!collapsed));
+        document.documentElement.classList.toggle('sidebar-collapsed', folded());
+        toggle.hidden = !collapsible();
+        toggle.setAttribute('aria-expanded', String(!folded()));
         labels();
         placeActions();
     }
-    mobile.addEventListener('change', placeActions);
+    mobile.addEventListener('change', apply);
     toggle.addEventListener('click', () => {
         collapsed = !collapsed;
         apply();

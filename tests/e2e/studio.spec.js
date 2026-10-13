@@ -52,7 +52,21 @@ test('palette name exists on first mount, stays centered, and updates without mo
 
 test('navigation collapse retains controls, translations and preference across reloads', async ({ page }) => {
   await signIn(page);
-  if (await page.evaluate(() => innerWidth <= 760)) await expect(page.locator('.catalog-label')).toBeHidden();
+  if (await page.evaluate(() => innerWidth <= 760)) {
+    // A phone keeps its rail: the filters and the only copy of the action
+    // buttons live in it, so there is nothing to collapse and no control
+    // offered for it — not even a preference saved on a wider window.
+    await expect(page.locator('.catalog-label')).toBeHidden();
+    await expect(page.locator('#studioNavToggle')).toBeHidden();
+    await expect(page.locator('#studioNavigation')).toBeVisible();
+    await expect(page.locator('#studioNavigation .chip-row')).toBeVisible();
+    await page.evaluate(() => localStorage.setItem('lp-studio-nav-collapsed', 'true'));
+    await page.reload();
+    await expect(page.locator('#studioNavigation')).toBeVisible();
+    for (const id of ['newLinkBtn', 'themeBtn', 'settingsBtn']) await expect(page.locator(`#${id}`)).toBeVisible();
+    await expect(page.locator('#appVersion')).toHaveText('v' + fs.readFileSync(path.join(__dirname, '../../VERSION'), 'utf8').trim());
+    return;
+  }
   await page.click('#studioNavToggle');
   await expect(page.locator('#studioNavigation')).toBeHidden();
   for (const id of ['newLinkBtn', 'themeBtn', 'settingsBtn']) await expect(page.locator(`#${id}`)).toBeVisible();

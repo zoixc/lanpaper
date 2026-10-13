@@ -283,7 +283,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v20/,
+  assert.match(code, /lanpaper-static-v21/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 
@@ -515,4 +515,37 @@ test('every colour outside a media overlay comes from a theme token', () => {
   }
   assert.deepEqual(offenders, [],
     'a hardcoded colour cannot follow the theme — add a token instead');
+});
+
+test('a phone keeps its rail open: the filters and the action buttons live in it', () => {
+  // .studio.sidebar-collapsed .catalog-rail is display: none — collapsing
+  // removes the whole band, not only its width. On a phone the band carries
+  // the filters, the new-link button and the only copy of the theme and
+  // settings buttons, so folding it would leave nowhere to reach them.
+  // The saved preference is therefore honoured only where the rail is a
+  // sidebar, and the toggle is not offered where it cannot be used.
+  const studio = read('static/css/studio.css');
+  assert.match(studio, /\.studio\.sidebar-collapsed \.catalog-rail \{\s*display: none;/,
+    'collapsing no longer removes the whole rail, so the rule below is stale');
+
+  const layout = read('static/js/studio-layout.js');
+  const apply = layout.match(/function apply\(\) \{([\s\S]*?)\n    \}/);
+  assert.ok(apply, 'apply() disappeared');
+  assert.match(apply[1], /classList\.toggle\('sidebar-collapsed', folded\(\)\)/,
+    'the rail is collapsed from its saved state without asking whether it can collapse');
+  assert.match(apply[1], /toggle\.hidden = !collapsible\(\)/,
+    'a phone is still offered a control that can only hide its filters and buttons');
+  assert.match(layout, /const collapsible = \(\) => !mobile\.matches;/,
+    'the phone breakpoint no longer decides whether the rail can collapse');
+  assert.match(layout, /mobile\.addEventListener\('change', apply\)/,
+    'a rotation between phone and desktop no longer re-applies the collapsed state');
+
+  // Before the first paint the class comes from prepaint.js, so a phone would
+  // flash an empty band until studio-layout.js put it back.
+  const prepaint = read('static/js/prepaint.js');
+  const saved = prepaint.match(
+    /if \(localStorage\.getItem\('lp-studio-nav-collapsed'\) === 'true'[\s\S]{0,160}?\{\s*root\.classList\.add\('sidebar-collapsed'\);/);
+  assert.ok(saved, 'the saved collapse state is no longer applied before the first paint');
+  assert.match(saved[0], /matchMedia\('\(max-width: 760px\)'\)\.matches/,
+    'prepaint.js collapses the rail on a phone, where nothing can expand it back');
 });

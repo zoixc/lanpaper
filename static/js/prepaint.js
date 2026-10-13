@@ -70,7 +70,13 @@
             root.dataset.palette = palette;
             if (root.dataset.layout === 'studio') {
                 root.classList.add('studio', 'radical');
-                if (localStorage.getItem('lp-studio-nav-collapsed') === 'true') {
+                /* Рельсу на телефоне не сворачивают: в ней лежат фильтры и
+                   кнопки, а .sidebar-collapsed снимает её целиком. Класс
+                   ставим только там, где сворачивание возможно, — иначе
+                   полоса мигнёт пустотой до того, как studio-layout.js
+                   вернёт её на место. */
+                if (localStorage.getItem('lp-studio-nav-collapsed') === 'true' &&
+                    !matchMedia('(max-width: 760px)').matches) {
                     root.classList.add('sidebar-collapsed');
                 }
             } else if (root.dataset.layout) {

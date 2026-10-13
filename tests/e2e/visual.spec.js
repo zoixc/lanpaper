@@ -48,7 +48,14 @@ async function signIn(page) {
   await page.fill('input[name=username]', USER);
   await page.fill('input[name=password]', PASS);
   await page.click('#loginSubmit');
-  await expect(page.locator('#studioNavToggle')).toBeVisible();
+  // A phone keeps its rail open — it carries the filters and the only copy
+  // of the action buttons — so it is offered no collapse control at all.
+  if (await page.evaluate(() => innerWidth > 760)) {
+    await expect(page.locator('#studioNavToggle')).toBeVisible();
+  } else {
+    await expect(page.locator('#studioNavToggle')).toBeHidden();
+    await expect(page.locator('#studioNavigation')).toBeVisible();
+  }
 }
 
 // Best effort: a link that already exists (a rerun against a server that

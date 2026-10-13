@@ -75,6 +75,15 @@ Notable changes to Lanpaper. Docker images are published as
   and select buttons painted on top of a frame, whose backing is dark in both
   themes by design. Anything else that picks a colour of its own is the shade
   that does not follow the switch, so it has to read a token instead.
+- **A phone no longer folds its navigation away.** Collapsing sets
+  `.sidebar-collapsed`, and that rule removes the rail entirely
+  (`display: none`) — not only its width. On a phone the rail is not a sidebar
+  but a horizontal band, and it carries the filters, the new-link button and
+  the only copy of the theme and settings buttons, so folding it left nothing
+  to reach them with. The saved preference is now honoured only where the rail
+  is a sidebar, and the toggle is not offered where it cannot be used;
+  `prepaint.js` keeps the band up before the first paint, so a rotation or a
+  reload cannot flash an empty strip. On a desktop nothing changed.
 
 ## [0.19.1] – 2026-10-13
 
