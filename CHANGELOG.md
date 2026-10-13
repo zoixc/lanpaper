@@ -115,6 +115,27 @@ Notable changes to Lanpaper. Docker images are published as
   `prepaint.js` keeps the band up before the first paint, so a rotation or a
   reload cannot flash an empty strip. On a desktop nothing changed.
 
+- **The header no longer reshuffles when the navigation rail opens.** Opening
+  the rail takes the width of a column away from the header, and the row was
+  allowed to wrap, so the controls could drop to a second line; the compact
+  new-link button — one node that moves between the rail and the header, and a
+  move in the DOM cannot be animated — vanished at once, and the search jumped
+  into the space it left. The button now lives in a slot that is always in the
+  header, so it is the slot that opens and closes (width `0` ↔ `32px`, together
+  with the gap it carries and its own opacity), and the rest of the row travels
+  with it; the button goes back to the rail only after the slot has closed, and
+  it keeps its compact form on the way out, so the full caption cannot flash
+  inside a narrowing slot. The row stays on one line: when the space runs out
+  the search gives way down to a floor of `132px`, and then the title is cut
+  short with an ellipsis.
+- **Accent details follow the palette.** In the monochrome palette the accent
+  *is* the text colour, so a detail painted with `var(--text)` looked right
+  there and wrong everywhere else: the focus ring, the underline of a pressed
+  chip, the dot and the fill of the active collection and the underline of the
+  focused name field stayed neutral grey on every colour palette. They are
+  painted with `var(--accent)` now — the same colour in monochrome, and the
+  colour the user picked everywhere else.
+
 ## [0.19.1] – 2026-10-13
 
 ### Fixed

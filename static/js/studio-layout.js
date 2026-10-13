@@ -33,8 +33,15 @@ export function initializeStudio(t) {
     toggle.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m14 6-6 6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     row.prepend(toggle);
     const actionRow = $('.appbar__actions');
+    /* Коробка для уменьшенной «Новая ссылка»: она лежит в шапке всегда, и
+       потому её появление можно анимировать (ширина 0 ↔ 32px). Саму кнопку
+       анимировать нельзя — она одна на обеих сторонах и переезжает по DOM. */
+    const createSlot = document.createElement('span');
+    createSlot.className = 'appbar__create';
+    actionRow.prepend(createSlot);
     const mobile = matchMedia('(max-width: 760px)');
     let collapsed = false;
+    let returnCreate = 0;
     try { collapsed = localStorage.getItem('lp-studio-nav-collapsed') === 'true'; } catch (_) {}
     /* На телефоне рельса — не колонка, а горизонтальная полоса, и в ней лежат
        и фильтры, и единственный экземпляр кнопок: .sidebar-collapsed снимает
@@ -54,16 +61,42 @@ export function initializeStudio(t) {
        которая теперь не сворачивается. Раньше тема и настройки жили в низу
        рельсы и при каждом сворачивании перелетали в шапку: один и тот же
        узел переезжал, дублировать его нельзя (id один, фокус один). */
+    /* Длительность берётся из CSS, чтобы число жило в одном месте. */
+    function slideDuration() {
+        const raw = getComputedStyle(document.documentElement)
+            .getPropertyValue('--dur-slow')
+            .trim();
+        const value = parseFloat(raw) || 0;
+        return raw.indexOf('ms') > -1 ? value : value * 1000;
+    }
     function placeActions() {
         const focused = document.activeElement;
+        clearTimeout(returnCreate);
         if (mobile.matches) {
+            createSlot.classList.remove('appbar__create--leaving');
             mobileActions.append(theme, settings, create);
         } else {
             actionRow.append(theme, settings);
             /* «Новая ссылка» живёт в рельсе, а свёрнутая рельса снимается
-               целиком — кнопка переезжает в шапку и возвращается обратно. */
-            if (folded()) actionRow.prepend(create);
-            else rail.insertBefore(create, label);
+               целиком — кнопка переезжает в шапку и возвращается обратно.
+               Обратно она уезжает не сразу, а когда коробка схлопнулась:
+               иначе кнопка исчезает рывком, а поиск прыгает на её место.
+               Пока коробка схлопывается, на кнопке держится компактный вид,
+               чтобы в узкой коробке не мелькнула полная подпись. */
+            if (folded()) {
+                createSlot.classList.remove('appbar__create--leaving');
+                createSlot.append(create);
+            } else if (createSlot.contains(create)) {
+                createSlot.classList.add('appbar__create--leaving');
+                returnCreate = setTimeout(function () {
+                    const keepFocus = document.activeElement === create;
+                    rail.insertBefore(create, label);
+                    createSlot.classList.remove('appbar__create--leaving');
+                    if (keepFocus) create.focus({ preventScroll: true });
+                }, slideDuration());
+            } else {
+                rail.insertBefore(create, label);
+            }
         }
         mobileActions.hidden = !mobile.matches;
         if ([create, theme, settings].includes(focused)) focused.focus({ preventScroll: true });

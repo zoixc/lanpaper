@@ -283,7 +283,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v24/,
+  assert.match(code, /lanpaper-static-v25/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 
@@ -617,4 +617,90 @@ test('the library canvas is textured for both themes', () => {
   assert.match(studio,
     /@media \(prefers-contrast: more\), \(forced-colors: active\) \{\s*\.studio \.content \{\s*background-image: none;/,
     'the texture is no longer dropped when the reader asks for more contrast');
+});
+
+test('accent details take the palette colour, not the text colour', () => {
+  // В монохромной палитре акцент совпадает с цветом текста и ошибку не видно:
+  // на цветных палитрах нажатый фильтр, его точка, рамка фокуса и
+  // подчёркивание поля оставались нейтрально-серыми, хотя красить их — ровно
+  // та работа, для которой палитра и выбирается.
+  const studio = read('static/css/studio.css');
+  const details = [
+    [/\)?\s*:focus-visible \{\s*outline: 2px solid var\(--accent\)/, 'the focus ring is not painted with the palette'],
+    [/\.chip\[aria-pressed="true"\] \{[\s\S]*?box-shadow: inset 0 -2px var\(--accent\)/, 'the pressed chip keeps a neutral underline'],
+    [
+      /\.catalog-rail \.chip\[aria-pressed="true"\] \{\s*background: var\(--accent\)/,
+      'the active collection is filled with the text colour instead of the palette'
+    ],
+    [
+      /\.studio \.catalog-rail \.chip\[aria-pressed="true"\]::before \{[\s\S]*?background: var\(--accent\)/,
+      'the dot of the active collection is not painted with the palette'
+    ],
+    [
+      /\.studio \.studio-name-field:focus-within \{[\s\S]*?box-shadow: inset 0 -2px 0 var\(--accent\)/,
+      'the focused name field keeps a neutral underline'
+    ]
+  ];
+  for (const [re, message] of details) assert.match(studio, re, message);
+  assert.ok(
+    !/outline: 2px solid var\(--text\)/.test(studio),
+    'a focus ring is back to the text colour: it ignores the palette'
+  );
+});
+
+test('the appbar row stays on one line when the rail opens', () => {
+  // Раскрытая рельса отъедает у шапки ширину колонки, и с переносом кнопки
+  // прыгали бы на вторую строку. Теперь место уступает поиск (но не до нуля),
+  // а за ним — заголовок, который обрезается многоточием.
+  const studio = read('static/css/studio.css');
+  const row = studio.match(/\.studio \.appbar__row--top \{([\s\S]*?)\n\}/);
+  assert.ok(row, 'the appbar row rule disappeared');
+  assert.match(row[1], /flex-wrap: nowrap/, 'the row wraps on desktop again: the buttons drop to a second line');
+  const rows = matches(studio, /\.studio \.appbar__row--top \{([\s\S]*?)\n\s*\}/g);
+  assert.equal(
+    rows.filter((body) => /flex-wrap: wrap/.test(body)).length,
+    1,
+    'only the phone row may wrap — there the search takes a line of its own'
+  );
+  assert.match(studio, /\.studio \.search \{[\s\S]*?min-width: \d+px;/, 'the search has no floor: it shrinks into a slot');
+  assert.match(studio, /\.studio \.appbar \.page-head \{\s*flex: 0 1 auto;/, 'the title cannot give way, so the row overflows');
+  assert.match(
+    studio,
+    /\.studio \.appbar \.page-head__title \{[\s\S]*?text-overflow: ellipsis;/,
+    'a long title is not cut short with an ellipsis'
+  );
+});
+
+test('the compact new-link button collapses instead of vanishing', () => {
+  // Кнопка одна на обеих сторонах и переезжает по DOM, а переезд не
+  // анимируется: она исчезала рывком, и поиск прыгал на её место. Теперь
+  // кнопка лежит в коробке, которая всегда в шапке, и анимируется ширина
+  // коробки — вместе с ней разъезжаются остальные элементы строки.
+  const studio = read('static/css/studio.css');
+  const closed = studio.match(/\.studio \.appbar__create \{([\s\S]*?)\n\}/);
+  const open = studio.match(/\.studio\.sidebar-collapsed \.appbar__create \{([\s\S]*?)\n\}/);
+  assert.ok(closed && open, 'the create slot is gone: the button disappears at once again');
+  assert.match(closed[1], /width: 0;/, 'the slot does not collapse');
+  assert.match(open[1], /width: 32px;/, 'the slot does not open to the width of the button');
+  assert.match(closed[1], /transition:[\s\S]*width var\(--dur-slow\)/, 'the slot changes width without a transition');
+  assert.match(closed[1], /visibility 0s var\(--dur-slow\)/, 'an empty slot stays focusable until the movement ends');
+  assert.match(
+    closed[1],
+    /margin-right: calc\(var\(--studio-actions-gap\) \* -1\)/,
+    'an empty slot leaves the gap between the controls behind, and the row jumps by it'
+  );
+  assert.match(open[1], /margin-right: 0;/, 'the open slot cancels the gap it needs when it is closed');
+  const layout = read('static/js/studio-layout.js');
+  assert.match(layout, /className = 'appbar__create'/, 'the panel no longer builds the create slot');
+  assert.match(layout, /createSlot\.append\(create\)/, 'the button is not put into the slot');
+  assert.match(
+    layout,
+    /appbar__create--leaving/,
+    'while the slot collapses the button keeps the compact form, or the full caption flashes inside it'
+  );
+  assert.match(
+    layout,
+    /setTimeout\([\s\S]*?rail\.insertBefore\(create, label\)/,
+    'the button returns to the rail before the slot has collapsed, so it vanishes at once'
+  );
 });
