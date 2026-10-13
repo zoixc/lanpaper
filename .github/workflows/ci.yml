@@ -124,7 +124,7 @@ jobs:
           node-version: lts/*
 
       - name: Build the server
-        run: go build -o "$RUNNER_TEMP/lanpaper" .
+        run: go build -trimpath -ldflags="-X main.Version=$(cat VERSION)" -o "$RUNNER_TEMP/lanpaper" .
 
       - name: Install browser tests
         working-directory: tests/e2e

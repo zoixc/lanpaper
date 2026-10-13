@@ -32,3 +32,9 @@ test('release binary version comes from VERSION in the build shell', () => {
   assert.match(release, /version="\$\(cat VERSION\)"[\s\S]*?-X main\.Version=\$\{version\}/);
   assert.doesNotMatch(release, /main\.Version=\$\{VERSION\}/);
 });
+
+test('browser-test server embeds VERSION rather than the dev default', () => {
+  const build = ci.match(/- name: Build the server\n\s+run: ([^\n]+)/);
+  assert.ok(build, 'the browser-test server build must be explicit');
+  assert.match(build[1], /-ldflags="-X main\.Version=\$\(cat VERSION\)"/);
+});
