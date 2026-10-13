@@ -635,6 +635,9 @@
     --studio-popover-shadow: 0 12px 32px -16px rgb(0 0 0 / 24%);
     --studio-canvas-dot: rgb(0 0 0 / 3%);
     --studio-sheet-shadow: -16px 0 48px -32px rgb(0 0 0 / 28%);
+    /* Высота верхней строки: её делят шапка и блок марки в рельсе (см. ниже),
+       поэтому знак, название и заголовок стоят на одной центральной линии. */
+    --studio-head-height: 66px;
 }
 .studio[data-theme="dark"] {
     --studio-control-shadow: 0 1px 2px rgb(0 0 0 / 18%);
@@ -668,6 +671,21 @@
 .studio .catalog-rail .brand {
     margin: 0 7px 26px;
     gap: 9px;
+}
+/* Одна верхняя линия на двоих. Блок марки занимает ту же высоту, что строка
+   шапки, и начинается от самого верха рельсы: знак, название и заголовок
+   «Ссылки» оказываются на одной центральной линии (66/2 = 33px), а верх
+   кнопки «Новая ссылка» — на одной линии с верхом сетки, потому что отступ
+   марки снизу (26px) равен отступу сетки сверху. Ниже 761px рельса — не
+   колонка, а полоса над шапкой, и её отступы заданы отдельно. */
+@media (min-width: 761px) {
+    .studio .catalog-rail {
+        padding-top: 0;
+    }
+    .studio .catalog-rail .brand {
+        height: var(--studio-head-height);
+        flex: none;
+    }
 }
 .studio .catalog-rail .brand__mark {
     width: 25px;
@@ -729,20 +747,6 @@
 .studio .catalog-rail .chip-row__sep {
     margin: 9px 10px;
 }
-.studio-utilities {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-top: auto;
-    padding: 30px 7px 0;
-}
-.studio-utilities .icon-btn {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
-    min-height: 32px;
-}
 .studio .appbar {
     top: 0;
     border: 0;
@@ -752,7 +756,7 @@
     padding: 0 26px;
 }
 .studio .appbar__row--top {
-    min-height: 66px;
+    min-height: var(--studio-head-height);
     gap: 18px;
 }
 .studio .appbar .page-head {
@@ -818,7 +822,9 @@
     box-shadow: none;
 }
 .studio .content {
-    padding: 2px 26px 42px;
+    /* 26px сверху — ровно отступ марки снизу: верх кнопки «Новая ссылка»
+       в рельсе и верх первой карточки в сетке оказываются на одной линии. */
+    padding: 26px 26px 42px;
 }
 /* Regular contact sheet: no hero panel, no headline occupying a third of the screen. */
 .studio .grid:not(.grid--list) .card:first-child {
@@ -927,9 +933,12 @@
     .studio .appbar__inner {
         padding-inline: 16px;
     }
+    :root.studio {
+        --studio-head-height: 56px;
+    }
     .studio .appbar__row--top {
         padding: 9px 0 14px;
-        min-height: 56px;
+        min-height: var(--studio-head-height);
         gap: 10px;
     }
     .studio .appbar .page-head {
@@ -1581,9 +1590,6 @@
     .studio .catalog-rail .tools {
         grid-row: 2;
     }
-    .studio .studio-utilities {
-        display: none;
-    }
     .studio .studio-mobile-actions {
         grid-column: 2;
         grid-row: 1;
@@ -1785,7 +1791,8 @@
     display: flex;
     align-items: center;
     gap: 18px;
-    min-height: 66px;
+    /* Та же высота, что у строки шапки: каркас повторяет настоящий вид. */
+    min-height: var(--studio-head-height);
 }
 .boot__line--title {
     width: 96px;
@@ -1876,7 +1883,7 @@
     .boot__bar {
         flex-wrap: wrap;
         gap: 10px;
-        min-height: 56px;
+        min-height: var(--studio-head-height);
         padding: 9px 0 14px;
     }
     .boot__line--search {

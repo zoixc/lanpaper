@@ -71,10 +71,24 @@ Notable changes to Lanpaper. Docker images are published as
   heavier one (55% where a menu takes 24%) — and a literal cannot follow the
   switch, so the sheet was the only piece of chrome whose shadow stayed the
   same in both themes. The light value is unchanged.
+- The theme and settings buttons no longer change place when the rail is
+  folded. They used to sit at the bottom of the rail and fly into the appbar
+  every time it collapsed — one node cannot be in two places (one id, one
+  focus) and a duplicate would break both, so their only home is the appbar,
+  or the action row in the rail band on a phone. «Новая ссылка» still moves
+  into the appbar when the rail is folded: its home is the rail, and a folded
+  rail is removed entirely.
 - A contract test fails on a colour literal anywhere except the badges, play
   and select buttons painted on top of a frame, whose backing is dark in both
   themes by design. Anything else that picks a colour of its own is the shade
   that does not follow the switch, so it has to read a token instead.
+- **The rail and the appbar share one top line.** The brand block is now
+  exactly as tall as the appbar row (`--studio-head-height`, 66px, 56px on a
+  phone), so the mark, the name and the «Ссылки» title sit on the same centre
+  line instead of three different ones. The brand's bottom margin and the
+  grid's top padding are the same 26px, which puts the top edge of «Новая
+  ссылка» level with the top edge of the first card. The boot skeleton reads
+  the same token, so it keeps standing in for the header it copies.
 - **A phone no longer folds its navigation away.** Collapsing sets
   `.sidebar-collapsed`, and that rule removes the rail entirely
   (`display: none`) — not only its width. On a phone the rail is not a sidebar

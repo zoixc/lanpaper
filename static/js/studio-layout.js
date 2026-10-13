@@ -20,10 +20,6 @@ export function initializeStudio(t) {
     const row = $('.appbar__row--top');
     row.prepend($('.page-head'), $('.search'));
     $('.appbar__row--tools').remove();
-    const utilities = document.createElement('div');
-    utilities.className = 'studio-utilities';
-    utilities.append(theme, settings);
-    rail.append(utilities);
     const mobileActions = document.createElement('div');
     mobileActions.className = 'studio-mobile-actions';
     mobileActions.setAttribute('role', 'group');
@@ -53,11 +49,22 @@ export function initializeStudio(t) {
         toggle.setAttribute('aria-label', text);
         toggle.title = text;
     }
+    /* У кнопок один дом: на широком экране это шапка справа — и при свёрнутой,
+       и при раскрытой рельсе, — а на телефоне своя строка в полосе рельсы,
+       которая теперь не сворачивается. Раньше тема и настройки жили в низу
+       рельсы и при каждом сворачивании перелетали в шапку: один и тот же
+       узел переезжал, дублировать его нельзя (id один, фокус один). */
     function placeActions() {
         const focused = document.activeElement;
-        if (folded()) actionRow.append(create, theme, settings);
-        else if (mobile.matches) mobileActions.append(theme, settings, create);
-        else { rail.insertBefore(create, label); utilities.append(theme, settings); }
+        if (mobile.matches) {
+            mobileActions.append(theme, settings, create);
+        } else {
+            actionRow.append(theme, settings);
+            /* «Новая ссылка» живёт в рельсе, а свёрнутая рельса снимается
+               целиком — кнопка переезжает в шапку и возвращается обратно. */
+            if (folded()) actionRow.prepend(create);
+            else rail.insertBefore(create, label);
+        }
         mobileActions.hidden = !mobile.matches;
         if ([create, theme, settings].includes(focused)) focused.focus({ preventScroll: true });
     }

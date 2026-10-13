@@ -283,7 +283,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v21/,
+  assert.match(code, /lanpaper-static-v22/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 
@@ -548,4 +548,38 @@ test('a phone keeps its rail open: the filters and the action buttons live in it
   assert.ok(saved, 'the saved collapse state is no longer applied before the first paint');
   assert.match(saved[0], /matchMedia\('\(max-width: 760px\)'\)\.matches/,
     'prepaint.js collapses the rail on a phone, where nothing can expand it back');
+});
+
+test('the theme and settings buttons have one home', () => {
+  // Они переезжали: раскрытая рельса держала их внизу, свёрнутая — в шапке.
+  // Узел один (id один, фокус один), а дубль ломает и то и другое, значит
+  // дом у кнопок один: шапка на широком экране, строка действий в полосе
+  // рельсы на телефоне.
+  const layout = read('static/js/studio-layout.js');
+  const studio = read('static/css/studio.css');
+  assert.ok(!/studio-utilities/.test(layout + studio),
+    'the rail-bottom utilities are back: the buttons jump between the rail and the appbar again');
+  const place = layout.match(/function placeActions\(\) \{([\s\S]*?)\n    \}/);
+  assert.ok(place, 'placeActions() disappeared');
+  assert.match(place[1], /actionRow\.append\(theme, settings\)/,
+    'the theme and settings buttons no longer live in the appbar');
+  assert.ok(!/utilities\.append/.test(layout), 'something still moves the buttons into the rail');
+});
+
+test('the rail head and the appbar share one top line', () => {
+  // Блок марки по высоте равен строке шапки, поэтому знак, название и
+  // заголовок «Ссылки» стоят на одной центральной линии. А верх «Новой
+  // ссылки» совпадёт с верхом сетки, только если отступ сетки сверху равен
+  // отступу марки снизу: до марки отступов нет ни сверху, ни сбоку.
+  const studio = read('static/css/studio.css');
+  assert.match(studio, /--studio-head-height: 66px/, 'the head height token disappeared');
+  assert.match(studio, /\.studio \.appbar__row--top \{\s*min-height: var\(--studio-head-height\)/,
+    'the appbar row no longer takes its height from the shared token');
+  assert.match(studio, /\.studio \.catalog-rail \.brand \{\s*height: var\(--studio-head-height\)/,
+    'the brand block is no longer as tall as the appbar row, so the name and the title drift apart');
+  const brand = studio.match(/\.studio \.catalog-rail \.brand \{\s*margin: 0 7px (\d+)px;/);
+  const content = studio.match(/\.studio \.content \{[^}]*padding: (\d+)px/);
+  assert.ok(brand && content, 'the brand margin or the content padding is gone');
+  assert.equal(content[1], brand[1],
+    'the grid no longer starts level with the new-link button');
 });
