@@ -166,7 +166,6 @@ ol {
 :root {
     /* Фон и поверхности */
     --bg: #f5f6f9;
-    --bg-2: #edeff4;
     --surface: #fff;
     --surface-2: #f1f3f7;
     --surface-3: #e7eaf1;
@@ -197,8 +196,6 @@ ol {
     /* Статусы: монохром — различаются значком и текстом, не цветом */
     --success: #3e4147;
     --success-soft: rgba(27, 28, 30, 0.07);
-    --warning: #3e4147;
-    --warning-soft: rgba(27, 28, 30, 0.07);
     --danger: #b04a45;
     --danger-soft: rgba(176, 74, 69, 0.1);
     --info: #3e4147;
@@ -206,7 +203,6 @@ ol {
 
     /* Матование превью: поля вокруг вписанного кадра */
     --matte: #eceef2;
-    --matte-line: rgba(27, 28, 30, 0.06);
     --checker-a: #f4f5f7;
     --checker-b: #e7e9ed;
     --shade: rgba(16, 17, 20, 0.62); /* подписи на кадре */
@@ -215,7 +211,6 @@ ol {
        мягкий разлёт с отрицательным spread держит тень под элементом, а не
        вокруг него. Свечения и цветных градиентов нет ни у одной. */
     --shadow-xs: 0 1px 1px rgba(20, 22, 32, 0.03);
-    --shadow-sm: 0 1px 2px rgba(20, 22, 32, 0.04);
     --shadow-md: 0 2px 5px rgba(20, 22, 32, 0.04), 0 8px 18px -14px rgba(20, 22, 32, 0.12);
     --shadow-lg: 0 4px 10px rgba(20, 22, 32, 0.05), 0 18px 36px -26px rgba(20, 22, 32, 0.18);
     /* Плитка. На светлом фоне сама поверхность белее фона, поэтому хватает
@@ -267,7 +262,6 @@ ol {
     --t-lg: 1rem; /* 16 — акцентные подписи */
     --t-xl: 1.25rem; /* 20 — заголовок страницы (телефон) */
     --t-2xl: 1.5rem; /* 24 — заголовок страницы (десктоп) */
-    --t-3xl: 1.875rem; /* 30 — заголовок пустоты */
 
     --fw-normal: 400;
     --fw-medium: 500;
@@ -285,7 +279,6 @@ ol {
     --dur-slow: 260ms;
 
     /* Слои */
-    --z-sticky: 20;
     --z-appbar: 30;
     --z-fab: 35;
     --z-dropdown: 60;
@@ -318,7 +311,6 @@ html[data-theme="dark"] {
     color-scheme: dark;
 
     --bg: #14161b;
-    --bg-2: #0f1114;
     --surface: #1b1e24;
     --surface-2: #22262e;
     --surface-3: #2a2f38;
@@ -345,21 +337,17 @@ html[data-theme="dark"] {
 
     --success: #b9bcc2;
     --success-soft: rgba(233, 234, 236, 0.08);
-    --warning: #b9bcc2;
-    --warning-soft: rgba(233, 234, 236, 0.08);
     --danger: #e79a96;
     --danger-soft: rgba(231, 154, 150, 0.14);
     --info: #b9bcc2;
     --info-soft: rgba(233, 234, 236, 0.08);
 
     --matte: #23262c;
-    --matte-line: rgba(255, 255, 255, 0.05);
     --checker-a: #22262e;
     --checker-b: #2a2f38;
     --shade: rgba(8, 9, 11, 0.66);
 
     --shadow-xs: 0 1px 1px rgba(0, 0, 0, 0.25);
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28);
     --shadow-md: 0 2px 5px rgba(0, 0, 0, 0.28), 0 8px 18px -14px rgba(0, 0, 0, 0.45);
     --shadow-lg: 0 4px 10px rgba(0, 0, 0, 0.32), 0 18px 36px -26px rgba(0, 0, 0, 0.55);
     /* В темноте форму задают фон и границы, тень лишь усиливает глубину.
@@ -383,7 +371,6 @@ html[data-theme="dark"] {
 /* --- Индиго — спокойный синий --- */
 html[data-palette="indigo"] {
     --bg: #f5f6f9;
-    --bg-2: #edeff4;
     --surface-2: #f1f3f7;
     --surface-3: #e7eaf1;
     --matte: #eceef2;
@@ -397,7 +384,6 @@ html[data-palette="indigo"] {
 }
 html[data-palette="indigo"][data-theme="dark"] {
     --bg: #14161b;
-    --bg-2: #0f1114;
     --surface: #1b1e24;
     --surface-2: #22262e;
     --surface-3: #2a2f38;
@@ -414,7 +400,6 @@ html[data-palette="indigo"][data-theme="dark"] {
 /* --- Шалфей — приглушённая зелень --- */
 html[data-palette="sage"] {
     --bg: #f4f7f5;
-    --bg-2: #ebf1ed;
     --surface-2: #f0f4f1;
     --surface-3: #e5ebe7;
     --border: #e0e7e2;
@@ -431,7 +416,6 @@ html[data-palette="sage"] {
 }
 html[data-palette="sage"][data-theme="dark"] {
     --bg: #131715;
-    --bg-2: #0e1211;
     --surface: #1a1f1d;
     --surface-2: #212725;
     --surface-3: #29302d;
@@ -451,7 +435,6 @@ html[data-palette="sage"][data-theme="dark"] {
 /* --- Глина — тёплая, «бумага и терракота» --- */
 html[data-palette="clay"] {
     --bg: #f8f5f3;
-    --bg-2: #f1eae6;
     --surface-2: #f4efeb;
     --surface-3: #eae2dc;
     --border: #e7dfd9;
@@ -468,7 +451,6 @@ html[data-palette="clay"] {
 }
 html[data-palette="clay"][data-theme="dark"] {
     --bg: #171512;
-    --bg-2: #111010;
     --surface: #1e1b17;
     --surface-2: #26221d;
     --surface-3: #2f2a24;
@@ -488,7 +470,6 @@ html[data-palette="clay"][data-theme="dark"] {
 /* --- Графит — почти монохром, для тех, кто не любит цвет --- */
 html[data-palette="graphite"] {
     --bg: #f5f5f6;
-    --bg-2: #ededef;
     --surface-2: #f1f1f3;
     --surface-3: #e6e7e9;
     --border: #e3e3e6;
@@ -505,7 +486,6 @@ html[data-palette="graphite"] {
 }
 html[data-palette="graphite"][data-theme="dark"] {
     --bg: #151617;
-    --bg-2: #101112;
     --surface: #1c1d1f;
     --surface-2: #242628;
     --surface-3: #2d2f32;
@@ -525,7 +505,6 @@ html[data-palette="graphite"][data-theme="dark"] {
 /* --- Океан — холодный бирюзовый --- */
 html[data-palette="ocean"] {
     --bg: #f3f6f7;
-    --bg-2: #e9f0f2;
     --surface-2: #eff4f5;
     --surface-3: #e3ecee;
     --border: #dfe8ea;
@@ -542,7 +521,6 @@ html[data-palette="ocean"] {
 }
 html[data-palette="ocean"][data-theme="dark"] {
     --bg: #131618;
-    --bg-2: #0e1113;
     --surface: #1a1e20;
     --surface-2: #212628;
     --surface-3: #293033;

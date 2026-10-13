@@ -89,4 +89,31 @@
             if (saved.lang || legacyLang) root.lang = saved.lang || legacyLang;
         } catch (e) { /* приватный режим: остаются значения по умолчанию */ }
     })();
+
+    (function () {
+        /* Второй поднабор гарнитуры. Интерфейс — Manrope, но в разметке
+           предзагружен только латинский поднабор: он нужен при любом языке,
+           потому что имена ссылок всегда латиницей. Если интерфейс русский,
+           кириллический поднабор надо запросить тоже, и тоже до отрисовки:
+           иначе бренд, заголовок и названия карточек сначала рисуются
+           подменой и перещёлкиваются на каждой загрузке. Язык определяем так
+           же, как langFromPrefs() в app.js: сохранённый выбор, затем язык
+           браузера. Кириллица из шести языков панели нужна только русскому. */
+        var stored = '';
+        try {
+            stored = localStorage.getItem('lang')
+                || (JSON.parse(localStorage.getItem('lp-ui') || '{}')).lang || '';
+        } catch (e) { stored = ''; }
+        var lang = String(stored || navigator.language || '').slice(0, 2).toLowerCase();
+        if (lang !== 'ru') return;
+        var link = document.createElement('link');
+        link.rel = 'preload';
+        link.as = 'font';
+        link.type = 'font/woff2';
+        /* Шрифты загружаются в CORS-режиме: без crossorigin предзагрузка не
+           совпадёт с настоящим запросом, и файл придёт дважды. */
+        link.crossOrigin = 'anonymous';
+        link.href = '/static/fonts/manrope-cyrillic-wght-normal.woff2';
+        document.head.appendChild(link);
+    })();
 })();

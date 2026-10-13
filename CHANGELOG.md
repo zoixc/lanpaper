@@ -15,7 +15,42 @@ Notable changes to Lanpaper. Docker images are published as
   panel from the first paint until `app.js` reports it built. `prepaint.js`
   arms it, and it releases itself on a timeout or on a panel script that failed
   to load, so a broken script can never leave the panel permanently blank.
-  Precache generation moves to `lanpaper-static-v18`.
+- A Russian panel no longer swaps its typeface after the first paint. The
+  markup preloads the Latin subset of Manrope, which covers link names in every
+  language but not the labels of a Russian interface, so the brand, the page
+  title and the card names were drawn with a fallback and then re-drawn.
+  `prepaint.js` now preloads the Cyrillic subset for the language the panel will
+  actually use — resolved the way `langFromPrefs()` does it: the saved choice,
+  then the browser language.
+- The installed app opens in the colour the panel paints. `manifest.json` still
+  carried a pre-Studio background (`#f5f6f9`) for `background_color` and
+  `theme_color`; both now use the Studio light background (`#fafafa`), which is
+  also the only safe choice for the splash screen, because the icon is dark and
+  opaque.
+
+### Changed
+
+- **UI work can be reviewed by eye before it merges.** `tests/e2e/visual.spec.js`
+  shoots the states ROADMAP.md asks for — desktop, tablet and phone, both
+  themes, a full and an empty library, the link panel and the settings sheet —
+  into `tests/e2e/screenshots/` (gitignored), and CI uploads them as the
+  `visual-review` artifact on every run, including failed ones. It seeds the
+  saved theme and language, so shots do not depend on the runner's locale or
+  colour scheme, and filters the grid to links it created itself, so shots do
+  not depend on what other specs left on the shared server. Nothing is asserted
+  about pixels: the gate is a person looking at the picture, which is exactly
+  what 0.13.0 was missing.
+- The video stage in the link panel takes its colour from a `--stage` token
+  instead of a literal `#000`, so the letterbox around a fitted video is one
+  declared value rather than a colour no palette could reach.
+- Removed tokens nothing referenced any more: `--bg-2` (declared per palette and
+  per theme), `--warning` and `--warning-soft` (a state the monochrome palettes
+  deliberately do not have), `--matte-line`, `--shadow-sm`, `--t-3xl` and
+  `--z-sticky`. The structural check already fails on a `var()` reference to an
+  undeclared token, so a future use of a removed name cannot pass silently.
+- `design/README.md` now says that the app has looked like Studio since 0.19.0
+  and that `v2/` and the earlier mockups are history, and points at the
+  screenshot gate instead of a manual browser pass.
 
 ## [0.19.1] – 2026-10-13
 

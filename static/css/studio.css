@@ -17,7 +17,6 @@
 }
 :root[data-palette="mono"] {
     --bg: #f4f4f4;
-    --bg-2: #ededed;
     --surface: #ffffff;
     --surface-2: #f0f0f0;
     --surface-3: #e7e7e7;
@@ -37,7 +36,6 @@
 }
 :root[data-palette="mono"][data-theme="dark"] {
     --bg: #171717;
-    --bg-2: #121212;
     --surface: #222222;
     --surface-2: #282828;
     --surface-3: #323232;
@@ -298,6 +296,10 @@
     --rail-width: 232px;
     --r-full: 8px;
     --maxw: 1800px;
+    /* Подложка под вписанным видео: поля вокруг кадра. Почти чёрная в обеих
+       темах — иначе поля спорят с яркостью самого кадра. Объявлена здесь, а
+       не в палитрах: у всех палитр она одна, и var() не останется без значения. */
+    --stage: #0d0d0e;
 }
 .radical .shell {
     padding-top: 0;
@@ -1654,7 +1656,7 @@
     width: 100%;
     height: 100%;
     object-fit: contain;
-    background: #000;
+    background: var(--stage);
 }
 .video-preview .field-hint {
     padding: 16px;

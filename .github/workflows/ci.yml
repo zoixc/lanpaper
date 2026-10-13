@@ -147,6 +147,17 @@ jobs:
           fi
           exit "$status"
 
+      - name: Upload visual review screenshots
+        # Скриншоты нужны и при падении: их задача — показать, что именно
+        # поехало, а не только что что-то поехало. Это и есть гейт из
+        # ROADMAP.md: решение принимает человек, глядя на картинку.
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: visual-review
+          path: tests/e2e/screenshots
+          if-no-files-found: warn
+
   docker:
     needs: [ test, frontend, e2e ]
     runs-on: ubuntu-latest

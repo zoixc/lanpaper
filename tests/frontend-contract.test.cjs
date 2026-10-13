@@ -283,7 +283,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v18/,
+  assert.match(code, /lanpaper-static-v19/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 
@@ -330,6 +330,43 @@ test('the boot screen covers the unassembled panel and is always released', () =
     'nothing turns the boot screen on once it is armed');
   assert.match(boot, /:root\[data-boot="done"\] \.boot[\s\S]*?opacity: 0;/,
     'the boot screen no longer fades out when it is released');
+});
+
+test('the panel preloads the typeface subset its language needs', () => {
+  // Интерфейс — Manrope, а в разметке предзагружен только латинский поднабор:
+  // его хватает на имена ссылок при любом языке. Если интерфейс русский,
+  // кириллический поднабор тоже нужен до первой отрисовки, иначе бренд,
+  // заголовок и названия карточек рисуются подменой и перещёлкиваются.
+  // prepaint.js знает сохранённый язык и добавляет предзагрузку сам.
+  const prepaint = read('static/js/prepaint.js');
+  assert.match(adminHtml, /rel="preload"[^>]*manrope-latin-wght-normal\.woff2/,
+    'the latin subset is no longer preloaded in the markup');
+  assert.match(prepaint, /manrope-cyrillic-wght-normal\.woff2/,
+    'prepaint.js no longer preloads the subset a Russian panel needs');
+  assert.match(prepaint, /navigator\.language/,
+    'the preload no longer falls back to the browser language, as langFromPrefs() does');
+  // Шрифты загружаются в CORS-режиме: без crossorigin предзагрузка не
+  // совпадёт с настоящим запросом, и файл придёт дважды.
+  assert.match(prepaint, /crossOrigin = 'anonymous'/, 'the font preload lost crossorigin');
+  assert.match(prepaint, /link\.as = 'font'/, 'the font preload is no longer announced as a font');
+  for (const subset of ['latin', 'cyrillic']) {
+    assert.ok(exists(`/static/fonts/manrope-${subset}-wght-normal.woff2`),
+      `the ${subset} subset is gone from static/fonts`);
+  }
+});
+
+test('the manifest colours agree with the background the panel paints', () => {
+  // Android рисует экран запуска цветом background_color и кладёт на него
+  // иконку. Иконка — тёмная и непрозрачная, поэтому фон обязан оставаться
+  // светлым и совпадать с реальным --bg Studio, иначе установленное
+  // приложение открывается чужим цветом (а в тёмной теме — светлой вспышкой).
+  const manifest = JSON.parse(read('static/manifest.json'));
+  const studio = read('static/css/studio.css');
+  for (const key of ['background_color', 'theme_color']) {
+    assert.equal(manifest[key], '#fafafa', `${key} is no longer the Studio light background`);
+  }
+  assert.match(studio, /--bg:\s*#fafafa/,
+    'the Studio background moved; the manifest has to move with it');
 });
 
 test('copying reports the truth, and the upload toast stays until the upload ends', () => {
