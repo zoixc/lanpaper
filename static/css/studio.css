@@ -304,6 +304,9 @@
 .radical .shell {
     padding-top: 0;
     padding-left: var(--rail-width);
+    /* Содержимое расправляется тем же движением, что и рельса: иначе
+       карточки прыгают на новое место, когда анимация заканчивается. */
+    transition: padding-left var(--dur-slow) var(--ease);
 }
 .catalog-rail {
     position: fixed;
@@ -667,6 +670,9 @@
     padding: 25px 16px 18px;
     background: var(--bg);
     border: 0;
+    transition:
+        transform var(--dur-slow) var(--ease),
+        visibility 0s;
 }
 .studio .catalog-rail .brand {
     margin: 0 7px 26px;
@@ -1207,8 +1213,16 @@
 :root.studio.sidebar-collapsed {
     --rail-width: 0px;
 }
+/* Рельса уезжает за левый край, а не исчезает: display: none не оставляет
+   перехода, и сворачивание щёлкало. Видимость снимается в конце движения
+   (visibility с задержкой), чтобы свёрнутая рельса не ловила фокус и не
+   читалась скринридером, а при раскрытии возвращалась сразу. */
 .studio.sidebar-collapsed .catalog-rail {
-    display: none;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition:
+        transform var(--dur-slow) var(--ease),
+        visibility 0s var(--dur-slow);
 }
 .studio .studio-nav-toggle {
     flex: none;

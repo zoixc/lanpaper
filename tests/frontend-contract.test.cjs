@@ -283,7 +283,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v22/,
+  assert.match(code, /lanpaper-static-v23/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 
@@ -525,7 +525,10 @@ test('a phone keeps its rail open: the filters and the action buttons live in it
   // The saved preference is therefore honoured only where the rail is a
   // sidebar, and the toggle is not offered where it cannot be used.
   const studio = read('static/css/studio.css');
-  assert.match(studio, /\.studio\.sidebar-collapsed \.catalog-rail \{\s*display: none;/,
+  // Свёрнутая рельса уезжает за край и снимается с visibility — её фильтры
+  // и кнопки всё равно перестают существовать, поэтому на телефоне она
+  // не сворачивается (см. collapsible()/folded() ниже).
+  assert.match(studio, /\.studio\.sidebar-collapsed \.catalog-rail \{\s*transform: translateX\(-100%\);\s*visibility: hidden;/,
     'collapsing no longer removes the whole rail, so the rule below is stale');
 
   const layout = read('static/js/studio-layout.js');
@@ -582,4 +585,21 @@ test('the rail head and the appbar share one top line', () => {
   assert.ok(brand && content, 'the brand margin or the content padding is gone');
   assert.equal(content[1], brand[1],
     'the grid no longer starts level with the new-link button');
+});
+
+test('folding the rail animates instead of snapping', () => {
+  const studio = read('static/css/studio.css');
+  assert.ok(!/\.sidebar-collapsed \.catalog-rail \{\s*display: none/.test(studio),
+    'the rail is removed with display: none again: no transition can run');
+  const collapsed = studio.match(/\.studio\.sidebar-collapsed \.catalog-rail \{([\s\S]*?)\n\}/);
+  assert.ok(collapsed, 'the collapsed rail rule disappeared');
+  assert.match(collapsed[1], /transform: translateX\(-100%\)/, 'the rail no longer slides out of view');
+  assert.match(collapsed[1], /transition:[\s\S]*transform var\(--dur-slow\)/, 'the rail slides without a transition');
+  assert.match(collapsed[1], /visibility 0s var\(--dur-slow\)/,
+    'a folded rail stays focusable — and readable for a screen reader — until the movement ends');
+  assert.match(studio, /\.radical \.shell \{[^}]*transition: padding-left/,
+    'the content still jumps to its new width when the movement has already finished');
+  // Движение уважает системную настройку: общий блок гасит переходы целиком.
+  assert.match(read('static/css/style.css'), /prefers-reduced-motion/,
+    'the "less motion" switch disappeared, so the slide cannot be turned off');
 });

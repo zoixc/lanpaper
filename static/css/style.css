@@ -1691,8 +1691,11 @@ html[data-theme="dark"] .select {
 .card__media--contain {
     object-fit: contain;
 }
+/* 1.5% было незаметно: на карточке в 400px это два пикселя на сторону.
+   Кадр обрезает движение (overflow: hidden), поэтому кадр не растёт —
+   приближается только фотография внутри него. */
 .card:hover .card__media {
-    transform: scale(1.015);
+    transform: scale(1.04);
 }
 .card:hover .card__media--contain {
     transform: none;
