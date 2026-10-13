@@ -95,7 +95,7 @@
     box-shadow: none;
 }
 .search .field:focus-within {
-    box-shadow: var(--shadow-focus);
+    background: var(--surface-3);
 }
 .chip-row {
     gap: 5px;
@@ -1471,18 +1471,19 @@
     }
 }
 /* Create/rename uses the same template. Remove BOTH the input outline and its
-   parent's focus halo. A bottom rule and changed fill still indicate focus. */
+   parent's focus halo: the field shows focus with its fill, not with a frame —
+   a rule under the field drew a border around a borderless control. */
 .studio .studio-name-field,
 .studio .studio-name-field:hover {
     border: 0;
     background: var(--surface-2);
     box-shadow: none;
     border-radius: 8px 8px 0 0;
+    transition: background var(--dur-fast) var(--ease);
 }
 .studio .studio-name-field:focus-within {
     border: 0;
     background: var(--surface-hover);
-    box-shadow: inset 0 -2px 0 var(--accent);
 }
 .studio .studio-name-field input,
 .studio .studio-name-field input:focus,

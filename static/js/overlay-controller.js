@@ -87,14 +87,28 @@ export function createOverlayController(options) {
         return true;
     }
 
-    /* A virtual keyboard changes the visual viewport without a window resize.
-       Keep the focused control visible instead of moving or resizing the sheet. */
+    /* A virtual keyboard changes the visual viewport without a window resize:
+       the layout keeps its height, so a centred dialog stays put and ends up
+       under the keyboard, together with the field it was opened for. Publish
+       how much of the screen the keyboard has taken (--keyboard-inset, see
+       .dialog in style.css, which lifts by half of it) and keep the focused
+       control visible instead of moving or resizing the overlay. */
     if (options.visualViewport) {
-        options.visualViewport.addEventListener('resize', () => {
+        const viewport = options.visualViewport;
+        const measure = () => {
+            const root = doc.documentElement;
+            if (root) {
+                const taken = root.clientHeight - viewport.height - (viewport.offsetTop || 0);
+                if (Number.isFinite(taken)) {
+                    root.style.setProperty('--keyboard-inset', Math.round(Math.max(0, taken)) + 'px');
+                }
+            }
             if (current() && doc.activeElement && current().node.contains(doc.activeElement)) {
                 doc.activeElement.scrollIntoView({ block: 'nearest', inline: 'nearest' });
             }
-        });
+        };
+        viewport.addEventListener('resize', measure);
+        viewport.addEventListener('scroll', measure);
     }
 
     return Object.freeze({ open, close, closeAll, current, keydown, depth: () => stack.length });

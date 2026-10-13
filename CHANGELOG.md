@@ -136,6 +136,29 @@ Notable changes to Lanpaper. Docker images are published as
   painted with `var(--accent)` now — the same colour in monochrome, and the
   colour the user picked everywhere else.
 
+- **The washes follow the palette.** The search field, the view-toggle group,
+  the count next to the title and the active filter are all painted with
+  `--surface-hover`, and that token existed in the base `:root` only, with the
+  indigo value: every palette that redefines `--surface-2` — sage, clay,
+  graphite and ocean — kept the blue-grey wash, in both themes. A palette now
+  declares the whole ramp it repaints, and a test fails when one of the five
+  washes is left behind.
+- **A text field no longer draws a frame on focus.** The caret already shows
+  where the typing goes, and a ring turned the search row into a separate
+  object on a flat panel: focus is a fill one step deeper now (`--surface-3`,
+  `--surface-2` for a bare input, `--surface-hover` for the create/rename
+  field) together with the icon gesture the field already had. Buttons, chips,
+  switches and selects keep their focus ring — it marks a control you are
+  about to press, not a line you are typing.
+- **The create dialog no longer hides under the phone keyboard.** Below 520px
+  `.dialog` became a full-width bottom sheet, so the keyboard covered it
+  together with the field it was opened for. It is centred again on every
+  screen — and no longer full width, since it is not glued to the bottom edge
+  any more — and it lifts by half of the keyboard height, which the overlay
+  controller publishes as `--keyboard-inset`: a virtual keyboard changes the
+  visual viewport, not the layout, so a centred dialog would otherwise stay
+  put and sink.
+
 ## [0.19.1] – 2026-10-13
 
 ### Fixed

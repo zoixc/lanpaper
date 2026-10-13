@@ -283,7 +283,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v25/,
+  assert.match(code, /lanpaper-static-v26/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 
@@ -472,8 +472,8 @@ test('an autofilled field keeps the panel colours, not the browser ones', () => 
   assert.ok(panel, 'panel fields have no autofill rule');
   assert.match(panel[1], /-webkit-text-fill-color:\s*var\(--text\)/, 'autofilled text keeps the browser colour');
   assert.match(panel[1], /box-shadow:\s*inset 0 0 0 1000px var\(--surface\)/, 'autofill background is not repainted');
-  assert.match(style, /\.input:-webkit-autofill:focus\s*\{[^}]*var\(--shadow-focus\)/,
-    'an autofilled field loses its focus ring');
+  assert.match(style, /\.input:-webkit-autofill:focus\s*\{[^}]*inset 0 0 0 1000px var\(--surface-2\)/,
+    'a focused autofilled field loses the fill that marks focus');
 
   const login = style.match(/\.login-card__field input:-webkit-autofill\s*\{([^}]*)\}/);
   assert.ok(login, 'the sign-in fields have no autofill rule');
@@ -637,8 +637,8 @@ test('accent details take the palette colour, not the text colour', () => {
       'the dot of the active collection is not painted with the palette'
     ],
     [
-      /\.studio \.studio-name-field:focus-within \{[\s\S]*?box-shadow: inset 0 -2px 0 var\(--accent\)/,
-      'the focused name field keeps a neutral underline'
+      /\.studio \.catalog-rail \.chip\[aria-pressed="true"\] \{[\s\S]*?color: var\(--accent\)/,
+      'the active collection is labelled with the text colour instead of the palette'
     ]
   ];
   for (const [re, message] of details) assert.match(studio, re, message);
@@ -703,4 +703,83 @@ test('the compact new-link button collapses instead of vanishing', () => {
     /setTimeout\([\s\S]*?rail\.insertBefore\(create, label\)/,
     'the button returns to the rail before the slot has collapsed, so it vanishes at once'
   );
+});
+
+test('every palette carries its own surface ramp', () => {
+  // Подложки — поле поиска, группа вида, счётчик возле «Ссылки», нажатый
+  // фильтр — красятся --surface-hover. Токен жил только в :root со значением
+  // индиго, и палитры, переопределявшие --surface-2, продолжали брать его
+  // оттуда: на шалфее, глине, графите и океане подложки оставались
+  // голубоватыми, хотя в монохроме и индиго были своими.
+  const style = read('static/css/style.css');
+  const studio = read('static/css/studio.css');
+  const values = (body) =>
+    Object.fromEntries([...body.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
+  const block = (source, re, what) => {
+    const found = source.match(re);
+    assert.ok(found, `${what} disappeared`);
+    return values(found[1]);
+  };
+  const base = block(style, /^:root \{([\s\S]*?)^\}/m, 'the light base tokens');
+  const dark = block(style, /^html\[data-theme="dark"\] \{([\s\S]*?)^\}/m, 'the dark base tokens');
+  const palettes = [...style.matchAll(/^html\[data-palette="(\w+)"\](?:\[data-theme="(\w+)"\])? \{([\s\S]*?)^\}/gm)];
+  assert.equal(palettes.length, 10, 'a palette block appeared or disappeared: check the list');
+  for (const [, palette, theme, body] of palettes) {
+    const own = values(body);
+    const root = theme === 'dark' ? dark : base;
+    assert.ok(own['--surface-hover'], `${palette} ${theme}: no --surface-hover, so the indigo wash stays`);
+    if (own['--surface-2'] && own['--surface-2'] !== root['--surface-2']) {
+      assert.notEqual(own['--surface-hover'], root['--surface-hover'],
+        `${palette} ${theme} paints --surface-2 in its own colour but keeps the base hover`);
+    }
+  }
+  const mono = block(studio, /^:root\[data-palette="mono"\] \{([\s\S]*?)^\}/m, 'the mono tokens');
+  assert.notEqual(mono['--surface-hover'], base['--surface-hover'], 'mono keeps the indigo hover');
+});
+
+test('a text field marks focus with its fill, not with a frame', () => {
+  // Рамка превращала строку поиска в отдельный объект на панели. Фокус
+  // обозначен заливкой на шаг глубже, курсором и жестом значка: поле и так
+  // показывает, куда попадает набор.
+  const style = read('static/css/style.css');
+  const studio = read('static/css/studio.css');
+  const framed = /box-shadow:\s*var\(--shadow-focus\)|outline: 2px solid/;
+  const rule = (source, re, what) => {
+    const found = source.match(re);
+    assert.ok(found, `${what} disappeared`);
+    return found[1];
+  };
+  const field = rule(style, /\.field:focus-within\s*\{([\s\S]*?)\n\}/, 'the field focus rule');
+  assert.ok(!framed.test(field), 'the field is framed on focus again');
+  assert.match(field, /background:\s*var\(--surface-3\)/, 'a focused field no longer changes: give it a fill');
+  const input = rule(style, /\.input:focus\s*\{([\s\S]*?)\n\}/, 'the bare input focus rule');
+  assert.ok(!framed.test(input), 'the bare input is framed on focus again');
+  assert.match(input, /background:\s*var\(--surface-2\)/, 'a focused input no longer changes');
+  const search = rule(studio, /\.search \.field:focus-within\s*\{([\s\S]*?)\n\}/, 'the search focus rule');
+  assert.ok(!framed.test(search), 'the search field is framed on focus again');
+  const name = rule(studio, /\.studio \.studio-name-field:focus-within\s*\{([\s\S]*?)\n\}/, 'the name field focus rule');
+  assert.ok(!/box-shadow:\s*inset 0 -2px/.test(name), 'the name field draws a rule under itself on focus');
+  assert.match(name, /background:\s*var\(--surface-hover\)/, 'a focused name field no longer changes');
+});
+
+test('the create dialog stays centred on a phone', () => {
+  // На телефоне диалог создания ссылки становился шторкой снизу во всю
+  // ширину, и экранная клавиатура накрывала его вместе с полем, ради
+  // которого он открыт. Теперь он centred на любом экране — значит, и не во
+  // всю ширину: к нижней грани он больше не приклеен, — и приподнимается над
+  // клавиатурой, которая меняет визуальный вьюпорт, но не раскладку.
+  const style = read('static/css/style.css');
+  assert.ok(!/max-width: 520px\)\s*\{[\s\S]*?\.dialog \{/.test(style),
+    'the dialog is a bottom sheet on a phone again');
+  const dialog = style.match(/\.dialog \{([\s\S]*?)\n\}/);
+  assert.ok(dialog, 'the dialog rule disappeared');
+  assert.match(dialog[1], /transform: translate\(-50%, -50%\)/, 'the dialog is no longer centred');
+  assert.match(dialog[1], /width: min\(420px, calc\(100vw - 32px\)\)/,
+    'the dialog is full width again, though it is no longer glued to the bottom edge');
+  assert.match(dialog[1], /translate: 0 calc\(var\(--keyboard-inset\) \* -0\.5\)/,
+    'the dialog does not lift over the keyboard, so a phone covers it');
+  assert.match(style, /--keyboard-inset: 0px;/, 'the keyboard inset token disappeared');
+  const overlay = read('static/js/overlay-controller.js');
+  assert.match(overlay, /setProperty\('--keyboard-inset'/,
+    'nothing measures the keyboard, so the dialog stays under it');
 });

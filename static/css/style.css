@@ -299,6 +299,10 @@ ol {
     --card-gap: 3px;
     --row-padding: var(--s-2-5) var(--s-3);
     --sheet-body-padding: var(--s-4);
+    /* Сколько экрана снизу заняла экранная клавиатура. Клавиатура меняет
+       визуальный вьюпорт, а не раскладку, поэтому ноль до первого измерения
+       и на всех устройствах без неё. */
+    --keyboard-inset: 0px;
     --menu-item-padding: var(--s-2) var(--s-2-5);
     --version-row-padding: 9px var(--s-2-5);
     --picker-item-padding: var(--s-2) var(--s-2-5);
@@ -363,6 +367,11 @@ html[data-theme="dark"] {
    границы и статусы остаются общими, поэтому контраст не
    зависит от выбора пользователя.
    Переключатель: <html data-palette="sage">.
+   Палитра обязана определить весь набор подложек целиком —
+   --surface-2, --surface-hover, --surface-3: подложки поля поиска,
+   группы вида, счётчика и нажатого фильтра красятся
+   --surface-hover, и пока токен жил только в :root, на шалфее,
+   глине, графите и океане они оставались голубоватыми.
    ============================================================ */
 
 /* --- Монохром (по умолчанию, значения в :root) — акцент = текст: без цвета ---
@@ -372,6 +381,7 @@ html[data-theme="dark"] {
 html[data-palette="indigo"] {
     --bg: #f5f6f9;
     --surface-2: #f1f3f7;
+    --surface-hover: #eff1f6;
     --surface-3: #e7eaf1;
     --matte: #eceef2;
     --accent: #5a66b5;
@@ -386,6 +396,7 @@ html[data-palette="indigo"][data-theme="dark"] {
     --bg: #14161b;
     --surface: #1b1e24;
     --surface-2: #22262e;
+    --surface-hover: #242830;
     --surface-3: #2a2f38;
     --matte: #23262c;
     --accent: #9aa4e8;
@@ -401,6 +412,7 @@ html[data-palette="indigo"][data-theme="dark"] {
 html[data-palette="sage"] {
     --bg: #f4f7f5;
     --surface-2: #f0f4f1;
+    --surface-hover: #eef2ef;
     --surface-3: #e5ebe7;
     --border: #e0e7e2;
     --border-2: #cfd9d3;
@@ -418,6 +430,7 @@ html[data-palette="sage"][data-theme="dark"] {
     --bg: #131715;
     --surface: #1a1f1d;
     --surface-2: #212725;
+    --surface-hover: #232927;
     --surface-3: #29302d;
     --border: #29302d;
     --border-2: #39423e;
@@ -436,6 +449,7 @@ html[data-palette="sage"][data-theme="dark"] {
 html[data-palette="clay"] {
     --bg: #f8f5f3;
     --surface-2: #f4efeb;
+    --surface-hover: #f2ede9;
     --surface-3: #eae2dc;
     --border: #e7dfd9;
     --border-2: #d8ccc4;
@@ -453,6 +467,7 @@ html[data-palette="clay"][data-theme="dark"] {
     --bg: #171512;
     --surface: #1e1b17;
     --surface-2: #26221d;
+    --surface-hover: #28241f;
     --surface-3: #2f2a24;
     --border: #2e2923;
     --border-2: #3f382f;
@@ -471,6 +486,7 @@ html[data-palette="clay"][data-theme="dark"] {
 html[data-palette="graphite"] {
     --bg: #f5f5f6;
     --surface-2: #f1f1f3;
+    --surface-hover: #efeff1;
     --surface-3: #e6e7e9;
     --border: #e3e3e6;
     --border-2: #d2d3d7;
@@ -488,6 +504,7 @@ html[data-palette="graphite"][data-theme="dark"] {
     --bg: #151617;
     --surface: #1c1d1f;
     --surface-2: #242628;
+    --surface-hover: #26282a;
     --surface-3: #2d2f32;
     --border: #2c2e31;
     --border-2: #3c3f43;
@@ -506,6 +523,7 @@ html[data-palette="graphite"][data-theme="dark"] {
 html[data-palette="ocean"] {
     --bg: #f3f6f7;
     --surface-2: #eff4f5;
+    --surface-hover: #edf2f3;
     --surface-3: #e3ecee;
     --border: #dfe8ea;
     --border-2: #cdd9dc;
@@ -523,6 +541,7 @@ html[data-palette="ocean"][data-theme="dark"] {
     --bg: #131618;
     --surface: #1a1e20;
     --surface-2: #212628;
+    --surface-hover: #23282a;
     --surface-3: #293033;
     --border: #293032;
     --border-2: #384144;
@@ -1231,14 +1250,16 @@ svg.is-pulse {
     background: var(--surface);
     transition:
         border-color var(--dur-fast) var(--ease),
-        box-shadow var(--dur-fast) var(--ease);
+        background var(--dur-fast) var(--ease);
 }
 .field:hover {
     border-color: var(--border-2);
 }
+/* Фокус текстового поля обозначен заливкой, а не рамкой: поле и без того
+   показывает, куда попадает набор, — курсором и жестом значка, — а ободок
+   вокруг превращал строку поиска в отдельный объект на панели. */
 .field:focus-within {
-    border-color: var(--accent);
-    box-shadow: var(--shadow-focus);
+    background: var(--surface-3);
 }
 .field__icon {
     flex: none;
@@ -1294,7 +1315,7 @@ svg.is-pulse {
     font-size: var(--t-sm);
     transition:
         border-color var(--dur-fast) var(--ease),
-        box-shadow var(--dur-fast) var(--ease);
+        background var(--dur-fast) var(--ease);
 }
 .input::placeholder {
     color: var(--text-3);
@@ -1310,17 +1331,14 @@ svg.is-pulse {
     caret-color: var(--text);
     box-shadow: inset 0 0 0 1000px var(--surface);
 }
-/* У .input рамка фокуса живёт на самом поле, поэтому она возвращается
-   вместе с заливкой: иначе автозаполненное поле теряет фокусный круг. */
+/* У .input фокус обозначен заливкой на самом поле, а не ободком, поэтому
+   автозаполненное поле возвращает только свою заливку. */
 .input:-webkit-autofill:focus {
-    box-shadow:
-        inset 0 0 0 1000px var(--surface),
-        var(--shadow-focus);
+    box-shadow: inset 0 0 0 1000px var(--surface-2);
 }
 .input:focus {
     outline: none;
-    border-color: var(--accent);
-    box-shadow: var(--shadow-focus);
+    background: var(--surface-2);
 }
 .input[aria-invalid="true"] {
     border-color: var(--danger);
@@ -2188,6 +2206,12 @@ html[data-theme="dark"] .select {
     border: 1px solid var(--border);
     box-shadow: var(--shadow-lg);
     animation: dialog-in var(--dur-slow) var(--ease-out);
+    /* Клавиатура подъезжает поверх раскладки: диалог приподнимается на
+       половину её высоты, иначе центр экрана — и поле, ради которого диалог
+       открыт, — оказываются под клавиатурой. Смещение живёт в отдельном
+       свойстве translate, поэтому не спорит ни с центрированием, ни с
+       анимацией появления: те правят transform. */
+    translate: 0 calc(var(--keyboard-inset) * -0.5);
 }
 
 @keyframes dialog-in {
@@ -2217,22 +2241,6 @@ html[data-theme="dark"] .select {
 }
 .dialog__foot .btn {
     flex: 1;
-}
-
-@media (max-width: 520px) {
-    /* На телефоне диалог становится шторкой снизу: до верхних кнопок
-       не дотянуться одной рукой, а нижняя шторка закрывается жестом. */
-    .dialog {
-        top: auto;
-        bottom: 0;
-        left: 0;
-        transform: none;
-        width: 100%;
-        max-width: none;
-        border-radius: var(--r-xl) var(--r-xl) 0 0;
-        padding-bottom: calc(20px + env(safe-area-inset-bottom));
-        animation: sheet-up var(--dur-slow) var(--ease-out);
-    }
 }
 
 /* ============================================================
