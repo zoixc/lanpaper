@@ -1,0 +1,1864 @@
+/* SPDX-License-Identifier: MIT
+ * Studio presentation layer. Admin only; style.css owns shared primitives,
+ * media fit, grid geometry, accessibility and the separate sign-in page.
+ */
+
+/* DESIGN — monochrome foundation */
+:root {
+    --maxw: 1424px;
+    --r-full: 7px;
+    --r-lg: 10px;
+    --r-xl: 14px;
+    --card-padding: 16px 12px 19px;
+    --card-padding-phone: 12px 5px 14px;
+    --card-gap: 7px;
+    --shadow-card: 0 2px 3px rgba(0, 0, 0, 0.025);
+    --shadow-card-hover: 0 6px 16px -10px rgba(0, 0, 0, 0.18);
+}
+:root[data-palette="mono"] {
+    --bg: #f4f4f4;
+    --bg-2: #ededed;
+    --surface: #ffffff;
+    --surface-2: #f0f0f0;
+    --surface-3: #e7e7e7;
+    --surface-hover: #eaeaea;
+    --text: #202020;
+    --text-2: #535353;
+    --text-3: #656565;
+    --accent: #202020;
+    --accent-rgb: 32, 32, 32;
+    --accent-text: #202020;
+    --accent-hover: #383838;
+    --accent-active: #000000;
+    --border: #dedede;
+    --border-2: #c5c5c5;
+    --border-strong: #a0a0a0;
+    --matte: #ececec;
+}
+:root[data-palette="mono"][data-theme="dark"] {
+    --bg: #171717;
+    --bg-2: #121212;
+    --surface: #222222;
+    --surface-2: #282828;
+    --surface-3: #323232;
+    --surface-hover: #303030;
+    --text: #eeeeee;
+    --text-2: #b4b4b4;
+    --text-3: #a0a0a0;
+    --text-on-accent: #171717;
+    --accent: #eeeeee;
+    --accent-rgb: 238, 238, 238;
+    --accent-text: #eeeeee;
+    --accent-hover: #ffffff;
+    --accent-active: #d5d5d5;
+    --border: #393939;
+    --border-2: #555555;
+    --border-strong: #747474;
+    --matte: #292929;
+    --shadow-card: 0 2px 3px rgba(0, 0, 0, 0.12);
+    --shadow-card-hover: 0 6px 16px -10px rgba(0, 0, 0, 0.5);
+}
+/* Identity lives in type, proportion and a few black rules — not decoration. */
+.brand__name {
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -0.045em;
+}
+.brand__mark {
+    width: 31px;
+    height: 31px;
+    border-radius: 7px;
+    box-shadow: none;
+}
+.appbar {
+    box-shadow: none;
+}
+.appbar__row--top {
+    min-height: 76px;
+    padding-top: 0;
+}
+.appbar__row--tools {
+    padding-bottom: 17px;
+    gap: 15px;
+}
+.appbar__actions {
+    gap: 12px;
+}
+.appbar__actions .btn--primary {
+    padding-inline: 18px;
+    margin-left: 8px;
+    font-weight: 500;
+}
+.search {
+    max-width: 320px;
+}
+.search .field {
+    border-radius: 6px;
+    box-shadow: none;
+}
+.search .field:focus-within {
+    box-shadow: var(--shadow-focus);
+}
+.chip-row {
+    gap: 5px;
+}
+.chip {
+    border-color: transparent;
+    background: transparent;
+    border-radius: 0;
+    padding-inline: 10px;
+    font-weight: 500;
+}
+.chip:not(.chip--ghost):hover {
+    background: var(--surface-hover);
+}
+.chip[aria-pressed="true"] {
+    color: var(--text);
+    background: transparent;
+    border-color: transparent;
+    box-shadow: inset 0 -2px var(--text);
+}
+.chip__count {
+    color: var(--text-3);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    margin-left: 3px;
+}
+.chip--ghost {
+    color: var(--text-2);
+    font-weight: 400;
+    font-size: 11px;
+}
+.chip-row__sep {
+    opacity: 0.65;
+    margin-inline: 6px;
+}
+.content {
+    padding-top: 42px;
+}
+.page-head {
+    align-items: baseline;
+    gap: 17px;
+    padding-bottom: 23px;
+    margin-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+}
+.page-head__title {
+    font-family: var(--font-ui);
+    font-size: clamp(34px, 3.8vw, 49px);
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.045em;
+}
+.page-head__count {
+    align-self: center;
+    font-size: 12px;
+    font-weight: 400;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--text-3);
+}
+.page-head__count::before {
+    content: "";
+    display: inline-block;
+    width: 4px;
+    height: 4px;
+    background: var(--text);
+    border-radius: 50%;
+    vertical-align: middle;
+    margin-right: 12px;
+}
+.grid:not(.grid--list) {
+    grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+    gap: 28px;
+}
+/* Print-like matte, not a floating dashboard tile. List view stays a list. */
+.grid:not(.grid--list) .card {
+    padding: 8px 8px 0;
+    border-radius: 5px;
+}
+.grid:not(.grid--list) .card__frame {
+    border: 0;
+    border-radius: 2px;
+    aspect-ratio: 1.6;
+}
+.grid:not(.grid--list) .card__body {
+    min-height: 90px;
+}
+.card__name {
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+}
+.card__meta {
+    font-size: 11px;
+    color: var(--text-3);
+}
+.card__menu-btn {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 5px;
+}
+.card__menu-btn:hover,
+.card__menu-btn:focus-visible {
+    background: var(--surface-hover);
+    border-color: var(--border);
+}
+.card__badges {
+    padding: 8px;
+}
+.on-media {
+    border-radius: 3px;
+    background: rgba(20, 20, 20, 0.84);
+    font-size: 10px;
+}
+.card.is-pinned .card__frame::after {
+    width: 2px;
+}
+.grid--list {
+    gap: 10px;
+}
+.grid--list .card {
+    border-radius: 5px;
+}
+.sheet__title,
+.dialog__title {
+    font-family: var(--font-ui);
+    font-weight: 600;
+    letter-spacing: -0.025em;
+}
+.foot {
+    border-top-color: var(--border);
+    background: transparent;
+}
+@media (max-width: 1080px) {
+    .appbar__row--tools {
+        gap: 10px;
+    }
+    .grid:not(.grid--list) {
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        gap: 20px;
+    }
+}
+@media (max-width: 720px) {
+    .appbar__row--top {
+        min-height: 62px;
+    }
+    .appbar__actions {
+        gap: 5px;
+    }
+    .brand__name {
+        font-size: 17px;
+    }
+    .search {
+        max-width: none;
+    }
+    .content {
+        padding-top: 27px;
+    }
+    .page-head {
+        padding-bottom: 18px;
+        margin-bottom: 20px;
+    }
+    .appbar__row--tools {
+        padding-bottom: 10px;
+    }
+}
+@media (max-width: 560px) {
+    .grid:not(.grid--list) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+    .grid:not(.grid--list) .card {
+        padding: 5px 5px 0;
+    }
+    .grid:not(.grid--list) .card__body {
+        min-height: 77px;
+    }
+    .card__name {
+        font-size: 12px;
+    }
+    .card__meta {
+        font-size: 10px;
+    }
+    .card__badges {
+        padding: 5px;
+    }
+}
+@media (max-width: 340px) {
+    .grid:not(.grid--list) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* RADICAL — catalog layout */
+:root {
+    --rail-width: 232px;
+    --r-full: 8px;
+    --maxw: 1800px;
+}
+.radical .shell {
+    padding-top: 0;
+    padding-left: var(--rail-width);
+}
+.catalog-rail {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: var(--rail-width);
+    padding: 34px 23px 22px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    overflow-y: auto;
+    z-index: 40;
+}
+.catalog-rail .brand {
+    margin-bottom: 48px;
+    gap: 11px;
+}
+.catalog-rail .brand__mark {
+    width: 33px;
+    height: 33px;
+    border-radius: 8px;
+}
+.catalog-rail .brand__name {
+    font-size: 23px;
+    letter-spacing: -1px;
+}
+.catalog-rail #newLinkBtn {
+    width: 100%;
+    min-height: 44px;
+    border-radius: 7px;
+    font-weight: 500;
+    margin-bottom: 36px;
+    justify-content: flex-start;
+    padding-left: 14px;
+}
+.catalog-label {
+    font-size: 9px;
+    letter-spacing: 0.17em;
+    color: var(--text-3);
+    margin: 0 10px 17px;
+}
+.catalog-rail .tools {
+    display: block;
+    width: 100%;
+    flex: none;
+}
+.catalog-rail .chip-row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    overflow: visible;
+    width: 100%;
+}
+.catalog-rail .chip {
+    width: 100%;
+    justify-content: flex-start;
+    border-radius: 6px;
+    min-height: 40px;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.35;
+    height: auto;
+    white-space: normal;
+    text-align: left;
+}
+.catalog-rail .chip__count {
+    margin-left: auto;
+    padding-left: 12px;
+    font-size: 11px;
+}
+.catalog-rail .chip[aria-pressed="true"] {
+    background: var(--text);
+    color: var(--surface);
+    box-shadow: none;
+}
+.catalog-rail .chip[aria-pressed="true"] .chip__count {
+    color: inherit;
+    opacity: 0.75;
+}
+.catalog-rail .chip--ghost {
+    font-size: 11px;
+    color: var(--text-2);
+    font-weight: 400;
+}
+.catalog-rail .chip-row__sep {
+    width: calc(100% - 24px);
+    height: 1px;
+    margin: 12px;
+    background: var(--border);
+}
+.radical .appbar {
+    top: 0;
+    background: var(--bg);
+    z-index: 30;
+}
+.radical .appbar__inner {
+    padding: 0 44px;
+}
+.radical .appbar__row--top {
+    min-height: 85px;
+}
+.radical .search {
+    max-width: 420px;
+    flex: 1 1 220px;
+}
+.radical .search .field {
+    background: transparent;
+    border-color: transparent;
+    padding-left: 0;
+}
+.radical .search .field:focus-within {
+    background: var(--surface);
+    border-color: var(--border-2);
+    padding-left: 12px;
+}
+.radical .appbar__actions {
+    gap: 13px;
+}
+.radical .content {
+    padding: 36px 44px 65px;
+}
+.radical .page-head {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    align-items: flex-start;
+    gap: 22px;
+}
+.radical .page-head__title {
+    font-size: clamp(62px, 7.4vw, 108px);
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.07em;
+}
+.radical .page-head__count {
+    align-self: flex-start;
+    margin-top: 16px;
+    font-size: 17px;
+    font-variant-numeric: tabular-nums;
+}
+.radical .page-head__count::before {
+    display: none;
+}
+.radical .grid:not(.grid--list) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 30px 22px;
+    counter-reset: catalog-card;
+}
+.radical .grid:not(.grid--list) .card {
+    counter-increment: catalog-card;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+    overflow: visible;
+}
+.radical .grid:not(.grid--list) .card:first-child {
+    grid-column: span 2;
+}
+.radical .grid:not(.grid--list) .card__frame {
+    aspect-ratio: 4/3;
+    border-radius: 8px;
+}
+.radical .grid:not(.grid--list) .card:first-child .card__frame {
+    aspect-ratio: 2.73;
+}
+.radical .grid:not(.grid--list) .card__body {
+    padding: 14px 0 8px;
+    min-height: 76px;
+    gap: 6px;
+}
+.radical .grid:not(.grid--list) .card__head::before {
+    content: counter(catalog-card, decimal-leading-zero);
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--text-3);
+    margin-right: 7px;
+    align-self: center;
+}
+.radical .card__name {
+    font-size: 14px;
+    font-weight: 500;
+}
+.radical .card__meta {
+    font-size: 10px;
+    letter-spacing: 0.015em;
+}
+.radical .card:hover {
+    transform: none;
+}
+.radical .card:hover .card__name {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+.radical .grid:not(.grid--list) .card.is-selected {
+    outline: 2px solid var(--accent);
+    outline-offset: 6px;
+}
+.radical .grid:not(.grid--list) .card:focus-within {
+    outline: 2px solid var(--border-strong);
+    outline-offset: 6px;
+}
+.radical .card__menu-btn {
+    min-width: 30px;
+}
+.radical .foot {
+    margin: 0 44px;
+    padding-inline: 0;
+}
+.radical .fab {
+    display: none;
+}
+@media (min-width: 1600px) {
+    .radical .content {
+        padding-inline: 64px;
+    }
+    .radical .appbar__inner {
+        padding-inline: 64px;
+    }
+}
+@media (max-width: 1100px) {
+    :root {
+        --rail-width: 200px;
+    }
+    .catalog-rail {
+        padding-inline: 16px;
+    }
+    .radical .appbar__inner {
+        padding-inline: 28px;
+    }
+    .radical .content {
+        padding-inline: 28px;
+    }
+    .radical .grid:not(.grid--list) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .radical .grid:not(.grid--list) .card:first-child {
+        grid-column: auto;
+    }
+    .radical .grid:not(.grid--list) .card:first-child .card__frame {
+        aspect-ratio: 4/3;
+    }
+}
+@media (max-width: 760px) {
+    .radical .shell {
+        padding: 0;
+    }
+    .catalog-rail {
+        position: relative;
+        inset: auto;
+        width: 100%;
+        padding: 20px 18px 14px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 16px;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+        overflow: visible;
+    }
+    .catalog-rail .brand {
+        margin: 0;
+    }
+    .catalog-rail .brand__name {
+        display: block;
+        font-size: 21px;
+    }
+    .catalog-rail #newLinkBtn {
+        margin: 0;
+        width: auto;
+        min-height: 38px;
+        padding-inline: 12px;
+    }
+    .catalog-rail .tools {
+        grid-column: 1/-1;
+        min-width: 0;
+    }
+    .catalog-rail .chip-row {
+        flex-direction: row;
+        overflow-x: auto;
+        padding-bottom: 2px;
+        gap: 4px;
+    }
+    .catalog-rail .chip {
+        flex: 0 0 auto;
+        width: auto;
+        white-space: nowrap;
+        min-height: 36px;
+        padding: 8px 10px;
+    }
+    .catalog-rail .chip-row__sep {
+        width: 1px;
+        height: 20px;
+        margin: 8px;
+    }
+    .radical .appbar {
+        top: 0;
+    }
+    .radical .appbar__inner {
+        padding: 0 18px;
+    }
+    .radical .appbar__row--top {
+        min-height: 64px;
+        flex-wrap: wrap;
+        gap: 4px;
+        padding-block: 8px;
+    }
+    .radical .search {
+        min-width: 140px;
+        flex: 1 1 160px;
+    }
+    .radical .appbar__spacer {
+        display: none;
+    }
+    .radical .appbar__actions {
+        gap: 3px;
+        margin-left: auto;
+    }
+    .radical .content {
+        padding: 27px 18px 44px;
+    }
+    .radical .page-head__title {
+        font-size: 60px;
+    }
+    .radical .grid:not(.grid--list) {
+        gap: 22px 14px;
+    }
+    .radical .card__name {
+        font-size: 12px;
+    }
+    .radical .foot {
+        margin-inline: 18px;
+    }
+}
+@media (max-width: 360px) {
+    .radical .grid:not(.grid--list) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* STUDIO — controls and responsive finish */
+@font-face {
+    font-family: "Manrope Studio";
+    font-style: normal;
+    font-weight: 200 800;
+    font-display: swap;
+    src: url("/static/fonts/manrope-latin-wght-normal.woff2") format("woff2");
+    unicode-range:
+        U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+        U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+    font-family: "Manrope Studio";
+    font-style: normal;
+    font-weight: 200 800;
+    font-display: swap;
+    src: url("/static/fonts/manrope-cyrillic-wght-normal.woff2") format("woff2");
+    unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+:root.studio {
+    --font-ui: "Manrope Studio", "Golos Text", sans-serif;
+    --font-display: var(--font-ui);
+    --rail-width: 184px;
+    --r-full: 8px;
+    --r-lg: 12px;
+    --r-xl: 16px;
+}
+.studio[data-palette="mono"] {
+    --bg: #fafafa;
+    --surface: #fff;
+    --border: #e8e8e8;
+    --surface-hover: #ededed;
+    --text-3: #696969;
+}
+.studio[data-palette="mono"][data-theme="dark"] {
+    --bg: #171717;
+    --surface: #222;
+    --border: #303030;
+    --surface-hover: #303030;
+    --text-3: #a0a0a0;
+}
+.studio .shell {
+    padding-top: 0;
+}
+.studio .catalog-rail {
+    top: 0;
+    padding: 25px 16px 18px;
+    background: var(--bg);
+    border: 0;
+}
+.studio .catalog-rail .brand {
+    margin: 0 7px 26px;
+    gap: 9px;
+}
+.studio .catalog-rail .brand__mark {
+    width: 25px;
+    height: 25px;
+    border-radius: 7px;
+}
+.studio .catalog-rail .brand__mark img {
+    width: 25px;
+    height: 25px;
+}
+.studio .catalog-rail .brand__name {
+    font-family: var(--font-ui);
+    font-size: 18px;
+    font-weight: 750;
+    letter-spacing: -0.8px;
+}
+.studio .catalog-rail #newLinkBtn {
+    min-height: 36px;
+    height: 36px;
+    margin-bottom: 29px;
+    font-size: 11px;
+    padding-inline: 12px;
+    border-radius: 8px;
+}
+.studio .catalog-label {
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    margin: 0 10px 11px;
+}
+.studio .catalog-rail .chip-row {
+    gap: 3px;
+}
+.studio .catalog-rail .chip {
+    min-height: 34px;
+    padding: 8px 10px;
+    font-size: 11px;
+    font-weight: 550;
+}
+.studio .catalog-rail .chip[aria-pressed="true"] {
+    background: var(--surface-hover);
+    color: var(--text);
+}
+.studio .catalog-rail .chip[aria-pressed="true"]::before {
+    content: "";
+    width: 4px;
+    height: 4px;
+    background: var(--text);
+    border-radius: 50%;
+    flex: none;
+}
+.studio .catalog-rail .chip__count {
+    font-size: 10px;
+    font-weight: 400;
+}
+.studio .catalog-rail .chip--ghost {
+    font-size: 10px;
+    font-weight: 450;
+}
+.studio .catalog-rail .chip-row__sep {
+    margin: 9px 10px;
+}
+.studio-utilities {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: auto;
+    padding: 30px 7px 0;
+}
+.studio-utilities .icon-btn {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+}
+.studio .appbar {
+    top: 0;
+    border: 0;
+    background: var(--bg);
+}
+.studio .appbar__inner {
+    padding: 0 26px;
+}
+.studio .appbar__row--top {
+    min-height: 66px;
+    gap: 18px;
+}
+.studio .appbar .page-head {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 0;
+    margin: 0;
+}
+.studio .appbar .page-head__title {
+    font-family: var(--font-ui);
+    font-size: 20px;
+    letter-spacing: -0.8px;
+    font-weight: 650;
+    line-height: 1.2;
+}
+.studio .appbar .page-head__count {
+    align-self: center;
+    font: 450 10px/1 var(--font-ui);
+    margin: 0;
+    padding: 5px 6px;
+    border-radius: 5px;
+    background: var(--surface-hover);
+}
+.studio .appbar .page-head__aside {
+    display: contents;
+}
+.studio .search {
+    flex: 0 1 265px;
+    max-width: 265px;
+    margin-left: auto;
+}
+.studio .search .field {
+    height: 32px;
+    padding-left: 9px;
+    border: 0;
+    background: var(--surface-hover);
+    border-radius: 7px;
+}
+.studio .search input {
+    font-size: 11px;
+}
+.studio .search .field__icon {
+    width: 13px;
+    height: 13px;
+}
+.studio .appbar__spacer {
+    display: none;
+}
+.studio .appbar__actions {
+    gap: 7px;
+    --ctl: 32px;
+    --ctl-inner: 26px;
+}
+.studio .appbar__actions .icon-btn svg {
+    width: 14px;
+    height: 14px;
+}
+.studio .btn-group--view {
+    border: 0;
+    background: var(--surface-hover);
+    box-shadow: none;
+}
+.studio .content {
+    padding: 2px 26px 42px;
+}
+/* Regular contact sheet: no hero panel, no headline occupying a third of the screen. */
+.studio .grid:not(.grid--list) .card:first-child {
+    grid-column: auto;
+}
+.studio .grid:not(.grid--list) .card__frame,
+.studio .grid:not(.grid--list) .card:first-child .card__frame {
+    border-radius: 12px;
+}
+.studio .grid:not(.grid--list) .card__body {
+    padding: var(--card-padding);
+    min-height: 58px;
+    gap: 3px;
+}
+.studio .grid:not(.grid--list) .card__head::before {
+    display: none;
+}
+.studio .card__name {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+}
+.studio .card__meta {
+    font-size: 9px;
+    letter-spacing: 0;
+}
+.studio .card__menu-btn {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    min-height: 26px;
+}
+.studio .card__badges {
+    padding: 10px;
+}
+.studio .on-media {
+    border-radius: 5px;
+    font-size: 9px;
+    padding: 4px 6px;
+}
+.studio .sheet__title,
+.studio .dialog__title {
+    font-family: var(--font-ui);
+    font-weight: 650;
+    letter-spacing: -0.6px;
+}
+.studio .foot {
+    margin: 0 26px;
+    font-size: 10px;
+    border-top: 0;
+}
+@media (max-width: 1050px) {
+    :root.studio {
+        --rail-width: 166px;
+    }
+    .studio .catalog-rail {
+        padding-inline: 12px;
+    }
+    .studio .appbar__inner {
+        padding-inline: 20px;
+    }
+    .studio .content {
+        padding-inline: 20px;
+    }
+    .studio .appbar__row--top {
+        gap: 12px;
+    }
+}
+@media (max-width: 760px) {
+    .studio .catalog-label {
+        display: none;
+    }
+    .studio .shell {
+        padding: 0;
+    }
+    .studio .catalog-rail {
+        position: relative;
+        top: auto;
+        width: 100%;
+        padding: 15px 16px 9px;
+        grid-template-columns: 1fr auto;
+        gap: 12px;
+        border: 0;
+    }
+    .studio .catalog-rail .brand {
+        margin: 0;
+    }
+    .studio .catalog-rail #newLinkBtn {
+        margin: 0;
+        width: auto;
+        min-height: 36px;
+    }
+    .studio .catalog-rail .chip {
+        min-height: 36px;
+        font-size: 11px;
+    }
+    .studio-utilities {
+        grid-column: 1/-1;
+        flex-wrap: nowrap;
+        margin: 0;
+        padding: 0;
+        position: absolute;
+        top: 14px;
+        right: 155px;
+    }
+    .studio .appbar {
+        top: 0;
+    }
+    .studio .appbar__inner {
+        padding-inline: 16px;
+    }
+    .studio .appbar__row--top {
+        padding: 9px 0 14px;
+        min-height: 56px;
+        gap: 10px;
+    }
+    .studio .appbar .page-head {
+        order: 0;
+    }
+    .studio .appbar__actions {
+        order: 1;
+        margin-left: auto;
+    }
+    .studio .search {
+        order: 2;
+        max-width: none;
+        flex: 1 1 100%;
+        margin: 0;
+    }
+    .studio .search .field {
+        height: 36px;
+    }
+    .studio .content {
+        padding: 0 16px 30px;
+    }
+    .studio .grid:not(.grid--list) .card__frame {
+        border-radius: 8px;
+    }
+    .studio .card__name {
+        font-size: 11px;
+    }
+    .studio .card__meta {
+        font-size: 9px;
+    }
+    .studio .foot {
+        margin-inline: 16px;
+    }
+}
+@media (max-width: 460px) {
+    .studio .catalog-rail .brand__name {
+        display: none;
+    }
+    .studio-utilities {
+        right: 148px;
+    }
+}
+@media (hover: none) {
+    .studio .card__menu-btn {
+        min-width: 36px;
+        min-height: 36px;
+    }
+    .studio-utilities .icon-btn {
+        min-width: 36px;
+        min-height: 36px;
+    }
+}
+
+/* ============================================================
+   STUDIO FINISH — a shared control language, not a new layout.
+   Keep text, radio inputs, disabled states and focus rings functional.
+   ============================================================ */
+:root.studio {
+    --studio-control-radius: 9px;
+    --studio-inner-radius: 6px;
+    --studio-control-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+    --studio-popover-shadow: 0 12px 32px -16px rgb(0 0 0 / 24%);
+}
+.studio[data-theme="dark"] {
+    --studio-control-shadow: 0 1px 2px rgb(0 0 0 / 18%);
+    --studio-popover-shadow: 0 14px 38px -14px rgb(0 0 0 / 55%);
+}
+/* Secondary buttons have a hairline edge; primary actions stay ink-solid. */
+.studio .btn {
+    border-radius: var(--studio-control-radius);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    gap: 7px;
+    box-shadow: var(--studio-control-shadow);
+}
+.studio .btn:not(.btn--primary):not(.btn--soft):not(.btn--danger) {
+    border-color: var(--border);
+    background: var(--surface);
+}
+.studio .btn--primary {
+    border-color: rgba(var(--accent-rgb), 0.12);
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 10%),
+        var(--studio-control-shadow);
+}
+.studio .btn--soft {
+    box-shadow: none;
+}
+.studio .btn:active:not(:disabled) {
+    transform: translateY(1px);
+}
+.studio .catalog-rail #newLinkBtn {
+    border-radius: var(--studio-control-radius);
+}
+.studio .icon-btn {
+    border-radius: var(--studio-control-radius);
+    transition:
+        background 140ms ease,
+        border-color 140ms ease,
+        color 140ms ease,
+        transform 140ms ease;
+}
+.studio .icon-btn:active:not(:disabled) {
+    transform: scale(0.96);
+}
+.studio .icon-btn[aria-pressed="true"] {
+    color: var(--text);
+    background: var(--surface-hover);
+    border-color: var(--border);
+}
+/* Match the sliding selection to the actual button geometry (26/36px),
+   rather than inheriting the production switch's circular 30px marker. */
+.studio .btn-group--view {
+    --seg: var(--ctl-inner, 30px);
+    padding: 2px;
+    gap: 2px;
+    border-radius: var(--studio-control-radius);
+    background: var(--surface-hover);
+}
+.studio .btn-group--view::before {
+    border-radius: var(--studio-inner-radius);
+    background: var(--surface);
+    box-shadow: var(--studio-control-shadow);
+    transition: transform 180ms var(--ease-out);
+}
+.studio .btn-group--view .icon-btn {
+    border-radius: var(--studio-inner-radius);
+    border-color: transparent;
+    box-shadow: none;
+}
+.studio .btn-group--view .icon-btn[aria-pressed="true"] {
+    background: transparent;
+}
+.studio .segment {
+    padding: 3px;
+    gap: 3px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-2);
+}
+.studio .segment__item {
+    border-radius: 7px;
+    font-weight: 550;
+}
+.studio .segment__item[aria-selected="true"],
+.studio .segment__item[aria-pressed="true"],
+.studio .segment__item[aria-checked="true"],
+.studio .segment__opt input:checked + .segment__item {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--studio-control-shadow);
+}
+.studio .catalog-rail .chip {
+    border-radius: 8px;
+}
+.studio .catalog-rail .chip[aria-pressed="true"] {
+    box-shadow: inset 0 0 0 1px var(--border);
+}
+.studio .select,
+.studio .input,
+.studio .field {
+    border-radius: var(--studio-control-radius);
+}
+.studio .select {
+    font-weight: 550;
+}
+.studio .select--mini {
+    border-radius: 6px;
+}
+.studio .field__clear {
+    border-radius: 5px;
+}
+/* The same treatment inside menus and sheets, not only on the home screen. */
+.studio .menu {
+    padding: 5px;
+    border-radius: 12px;
+    border-color: var(--border);
+    box-shadow: var(--studio-popover-shadow);
+}
+.studio .menu__item {
+    border-radius: 7px;
+    gap: 10px;
+    padding: 10px;
+}
+.studio .menu__label {
+    font-size: 9px;
+    letter-spacing: 0.06em;
+}
+.studio .menu__sep {
+    margin: 5px 7px;
+}
+.studio .row,
+.studio .picker__item,
+.studio .choice {
+    border-radius: 10px;
+}
+.studio .toast {
+    border-radius: 12px;
+    box-shadow: var(--studio-popover-shadow);
+}
+.studio .toast__action {
+    border-radius: 6px;
+    font-weight: 600;
+}
+.studio .toast__close {
+    border-radius: 6px;
+}
+.studio .load-more .btn {
+    padding-inline: 20px;
+}
+.studio .card__menu-btn {
+    border-radius: 7px;
+}
+.studio .card__menu-btn[aria-expanded="true"] {
+    background: var(--surface-hover);
+    border-color: var(--border);
+}
+/* Quiet resting state; hover only on pointers that really support it. */
+@media (hover: hover) {
+    .studio .btn:not(.btn--primary):not(.btn--soft):not(.btn--danger):hover:not(:disabled) {
+        border-color: var(--border-2);
+        background: var(--surface-hover);
+    }
+    .studio .icon-btn:hover:not(:disabled) {
+        border-color: var(--border);
+    }
+    .studio .btn-group--view .icon-btn:hover {
+        border-color: transparent;
+    }
+    .studio .menu__item:hover {
+        background: var(--surface-hover);
+    }
+}
+/* Explicit, high-contrast keyboard outline. Radio-label focus stays visible. */
+.studio
+    :where(
+        .btn,
+        .icon-btn,
+        .chip,
+        .select,
+        .menu__item,
+        .segment__item,
+        .field__clear,
+        .toast__action,
+        .toast__close,
+        .card__name
+    ):focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 3px;
+}
+.studio .segment__opt input:focus-visible + .segment__item {
+    outline: 2px solid var(--text);
+    outline-offset: 1px;
+    box-shadow: none;
+}
+.studio :is(.btn, .icon-btn, .chip, .select, .menu__item):disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+.studio :is(.btn, .icon-btn, .chip, .menu__item):disabled svg {
+    transform: none;
+}
+/* Keep the approved phone structure. Icons remain small; hit areas do not. */
+@media (hover: none), (pointer: coarse) {
+    .studio .appbar__actions {
+        --ctl: 40px;
+        --ctl-inner: 36px;
+    }
+    .studio .card__menu-btn,
+    .studio-utilities .icon-btn {
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+        min-height: 40px;
+    }
+    .studio .catalog-rail #newLinkBtn {
+        min-height: 40px;
+        height: 40px;
+    }
+    .studio .catalog-rail .chip {
+        min-height: 40px;
+    }
+    .studio .segment__item {
+        min-height: 36px;
+        height: auto;
+        padding-block: 8px;
+    }
+    .studio .menu__item {
+        min-height: 44px;
+    }
+    .studio .select--mini {
+        min-height: 36px;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .studio .btn-group--view::before,
+    .studio .icon-btn {
+        transition: none;
+    }
+    .studio .btn:active:not(:disabled),
+    .studio .icon-btn:active:not(:disabled) {
+        transform: none;
+    }
+}
+
+/* Collapsible navigation: same controls, relocated rather than duplicated. */
+:root.studio.sidebar-collapsed {
+    --rail-width: 0px;
+}
+.studio.sidebar-collapsed .catalog-rail {
+    display: none;
+}
+.studio .studio-nav-toggle {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+}
+.studio .studio-nav-toggle svg {
+    transform: none;
+}
+.studio.sidebar-collapsed .studio-nav-toggle svg {
+    transform: scaleX(-1);
+}
+.studio .appbar__row--top {
+    flex-wrap: wrap;
+}
+.studio.sidebar-collapsed .appbar #newLinkBtn {
+    display: inline-flex;
+    width: 32px;
+    min-width: 32px;
+    padding: 0;
+    margin: 0;
+}
+.studio.sidebar-collapsed .appbar #newLinkBtn span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+/* Keep the production checkerboard for alpha and placeholders for video. */
+.studio .card__frame {
+    background-color: var(--matte);
+}
+.studio .card__frame--empty {
+    background-color: var(--surface-2);
+}
+.studio .card__frame--empty .card__play svg {
+    width: 15px;
+    height: 15px;
+}
+.studio .card__frame--empty .card__open svg,
+.studio .card__frame--empty .card__check svg {
+    width: 16px;
+    height: 16px;
+    opacity: 1;
+}
+.studio .card__frame--empty .on-media svg {
+    width: 12px;
+    height: 12px;
+    color: inherit;
+    opacity: 1;
+}
+/* Inspector and settings share Studio's typography and control surfaces. */
+.studio .sheet {
+    width: min(440px, 100%);
+    background: var(--bg);
+    border-color: var(--border);
+    box-shadow: -16px 0 48px -32px rgb(0 0 0 / 28%);
+}
+.studio .sheet__head {
+    padding: 20px 20px 16px;
+    align-items: center;
+}
+.studio .sheet__title {
+    font: 650 19px/1.3 var(--font-ui);
+    letter-spacing: -0.6px;
+}
+.studio .sheet__sub {
+    font-size: 11px;
+}
+.studio .sheet__tabs {
+    padding: 8px 20px 12px;
+    margin-top: 0;
+    background: var(--bg);
+    box-shadow: none;
+}
+.studio .sheet__tabs .segment {
+    background: var(--surface-2);
+}
+.studio .sheet__body {
+    padding: 20px;
+    gap: 22px;
+    min-height: 0;
+}
+.studio .sheet__foot {
+    padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+    background: var(--bg);
+}
+.studio .sheet .section__title {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+}
+.studio .sheet .card-block {
+    border-radius: 10px;
+    box-shadow: none;
+    background: var(--surface);
+}
+.studio .sheet .url-line {
+    background: var(--surface);
+    border-radius: 9px;
+    font-size: 12px;
+}
+.studio .sheet .url-line__host {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.studio .sheet .panel-preview {
+    aspect-ratio: 16 / 9;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+}
+.studio .sheet .row__title {
+    font-size: 12px;
+}
+.studio .sheet .row__sub {
+    font-size: 11px;
+}
+.studio .sheet .row,
+.studio .sheet .vrow {
+    background: var(--surface);
+}
+.studio .sheet .vrow--current {
+    background: var(--accent-soft);
+}
+@media (max-width: 760px) {
+    .studio .studio-nav-toggle {
+        order: 0;
+    }
+    .studio .appbar .page-head {
+        gap: 6px;
+    }
+    .studio .appbar .page-head__title {
+        font-size: 18px;
+    }
+    .studio .appbar__row--top {
+        gap: 8px;
+    }
+    .studio .appbar__actions {
+        gap: 3px;
+    }
+}
+@media (max-width: 720px) {
+    .studio .sheet {
+        width: 100%;
+        border-radius: 16px 16px 0 0;
+    }
+    .studio .sheet__head {
+        padding: 12px 16px;
+    }
+    .studio .sheet__tabs {
+        padding: 6px 16px 12px;
+    }
+    .studio .sheet__body {
+        padding: 16px;
+    }
+    .studio .sheet__foot {
+        padding-inline: 16px;
+    }
+}
+@media (hover: none), (pointer: coarse) {
+    .studio .studio-nav-toggle,
+    .studio.sidebar-collapsed .appbar #newLinkBtn {
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+        min-height: 40px;
+    }
+}
+
+/* Multilingual UI: one family for headings, fields, labels and numeric metadata.
+   Extended Latin covers names beyond the six translated interface languages. */
+@font-face {
+    font-family: "Manrope Studio";
+    font-style: normal;
+    font-weight: 200 800;
+    font-display: swap;
+    src: url("/static/fonts/manrope-latin-ext-wght-normal.woff2") format("woff2");
+    unicode-range:
+        U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+        U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+        U+2C60-2C7F, U+A720-A7FF;
+}
+:root.studio {
+    --font-ui: "Manrope Studio", "Golos Text", system-ui, sans-serif;
+    --font-display: var(--font-ui);
+    --font-mono: var(--font-ui);
+    --studio-canvas-dot: rgb(0 0 0 / 3%);
+}
+.studio[data-theme="dark"] {
+    --studio-canvas-dot: rgb(255 255 255 / 3%);
+}
+.studio :is(button, input, select, textarea) {
+    font-family: var(--font-ui);
+}
+.studio :is(.num, .card__meta, .chip__count, .page-head__count) {
+    font-variant-numeric: tabular-nums;
+}
+/* Static, barely visible dot-paper texture; no image requests, filters or motion.
+   Only the library canvas is textured, controls and photographs stay clean. */
+.studio .content {
+    background-image: radial-gradient(circle, var(--studio-canvas-dot) 0.65px, transparent 0.85px);
+    background-size: 9px 9px;
+}
+@media (prefers-contrast: more), (forced-colors: active) {
+    .studio .content {
+        background-image: none;
+    }
+}
+/* Create/rename uses the same template. Remove BOTH the input outline and its
+   parent's focus halo. A bottom rule and changed fill still indicate focus. */
+.studio .studio-name-field,
+.studio .studio-name-field:hover {
+    border: 0;
+    background: var(--surface-2);
+    box-shadow: none;
+    border-radius: 8px 8px 0 0;
+}
+.studio .studio-name-field:focus-within {
+    border: 0;
+    background: var(--surface-hover);
+    box-shadow: inset 0 -2px 0 var(--text);
+}
+.studio .studio-name-field input,
+.studio .studio-name-field input:focus,
+.studio .studio-name-field input:focus-visible {
+    outline: none;
+    box-shadow: none;
+    border: 0;
+}
+.studio .studio-name-field input[aria-invalid="true"] {
+    color: var(--danger);
+}
+.studio .studio-name-field .url-line__host {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 45%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+@media (forced-colors: active) {
+    .studio .studio-name-field:focus-within {
+        border-bottom: 2px solid Highlight;
+    }
+}
+/* List thumbnails must not take their natural image height. A portrait, icon
+   or panorama occupies the SAME stable frame; badges and native actions stay. */
+.studio .grid--list .card__media {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+.studio .grid--list .card__body {
+    min-width: 0;
+    flex: 1;
+}
+.studio .grid--list .card__access {
+    min-width: 0;
+    max-width: 100%;
+}
+.studio .grid--list .card__play svg {
+    width: 13px;
+    height: 13px;
+}
+.studio .grid--list .card__badges {
+    padding: 0;
+    inset: 5px 5px auto;
+}
+.studio .grid--list .on-media {
+    font-size: 8px;
+    padding: 3px 4px;
+}
+.studio .grid--list {
+    container-type: inline-size;
+}
+@media (min-width: 721px) {
+    /* Base list uses two lines: the sidebar narrows it before viewport-based
+       production breakpoints would notice. The wide layout is container-based. */
+    .studio .grid--list .card__body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 144px 40px;
+        gap: 6px 12px;
+        padding: 10px 12px;
+    }
+    .studio .grid--list .card__name {
+        grid-column: 1;
+        grid-row: 1;
+    }
+    .studio .grid--list .card__access {
+        grid-column: 2;
+        grid-row: 1;
+        width: 144px;
+    }
+    .studio .grid--list .card__menu-btn {
+        grid-column: 3;
+        grid-row: 1;
+    }
+    .studio .grid--list .card__meta {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+    .studio .grid--list .card__tags {
+        grid-column: 1 / -1;
+        grid-row: 3;
+    }
+    @container (min-width: 1050px) {
+        .studio .grid--list .card__body {
+            grid-template-columns: minmax(0, 1fr) 240px 110px 144px 40px;
+        }
+        .studio .grid--list .card__meta {
+            grid-column: 2;
+            grid-row: 1;
+        }
+        .studio .grid--list .card__tags {
+            grid-column: 3;
+            grid-row: 1;
+        }
+        .studio .grid--list .card__access {
+            grid-column: 4;
+            grid-row: 1;
+        }
+        .studio .grid--list .card__menu-btn {
+            grid-column: 5;
+            grid-row: 1;
+        }
+    }
+}
+@media (max-width: 560px) {
+    .studio .grid--list .card__body {
+        padding: 9px 10px;
+    }
+}
+
+/* Production card geometry, Studio appearance.
+   Keep these breakpoints in sync with static/css/style.css. Media fitting is
+   intentionally inherited: cover for landscape; contain for portraits,
+   squares and PNG via the class assigned by the real cardFor()/fitMode(). */
+.studio .grid:not(.grid--list) {
+    grid-template-columns: repeat(auto-fill, minmax(236px, 1fr));
+    gap: var(--s-4);
+}
+.studio .grid:not(.grid--list) .card__frame,
+.studio .grid:not(.grid--list) .card:first-child .card__frame {
+    aspect-ratio: 16 / 9;
+}
+@media (max-width: 1080px) {
+    .studio .grid:not(.grid--list) {
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: var(--s-3);
+    }
+}
+@media (max-width: 720px) {
+    .studio .grid:not(.grid--list) {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: var(--s-3);
+    }
+}
+@media (max-width: 560px) {
+    .studio .grid:not(.grid--list) {
+        grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+        gap: var(--s-2-5);
+    }
+}
+@media (max-width: 340px) {
+    .studio .grid:not(.grid--list) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+@media (min-width: 1280px) {
+    .studio .grid:not(.grid--list) {
+        grid-template-columns: repeat(auto-fill, minmax(252px, 1fr));
+    }
+}
+/* Mobile navigation lives ABOVE the content. Rotate the whole desktop glyph
+   clockwise; preserve its mirrored arrow in the collapsed state. */
+@media (max-width: 760px) {
+    .studio .studio-nav-toggle svg {
+        transform: rotate(90deg);
+    }
+    .studio.sidebar-collapsed .studio-nav-toggle svg {
+        transform: rotate(90deg) scaleX(-1);
+    }
+}
+
+/* A single mobile action row keeps the plus, sun and gear on the same axis.
+   No absolute offsets: longer translations can grow the create button safely. */
+@media (max-width: 760px) {
+    .studio .catalog-rail {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+    }
+    .studio .catalog-rail .brand {
+        grid-column: 1;
+        grid-row: 1;
+        min-width: 0;
+    }
+    .studio .catalog-rail .tools {
+        grid-row: 2;
+    }
+    .studio .studio-utilities {
+        display: none;
+    }
+    .studio .studio-mobile-actions {
+        grid-column: 2;
+        grid-row: 1;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+        min-width: 0;
+    }
+    .studio .studio-mobile-actions > .icon-btn,
+    .studio .studio-mobile-actions > #newLinkBtn {
+        height: 40px;
+        min-height: 40px;
+        margin: 0;
+        align-self: center;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .studio .studio-mobile-actions > .icon-btn {
+        width: 40px;
+        min-width: 40px;
+    }
+    .studio .studio-mobile-actions > #newLinkBtn {
+        width: auto;
+        max-width: 160px;
+        padding-inline: 10px;
+    }
+    .studio .studio-mobile-actions > #newLinkBtn span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+}
+.studio #appVersion {
+    font-family: var(--font-ui);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-3);
+    white-space: nowrap;
+}
+
+/* Stable palette row: label is populated before the sheet is mounted. */
+.palette-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+}
+.palette-controls .swatches {
+    flex: none;
+}
+.palette-controls #paletteName {
+    flex: 1;
+    min-width: 0;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+.video-preview {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: grid;
+    place-items: center;
+}
+.video-preview__player {
+    min-width: 0;
+    min-height: 0;
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+}
+.video-preview .field-hint {
+    padding: 16px;
+    text-align: center;
+}
+/* Preserve the compact visible handle while exposing a real 44px button. */
+.studio .sheet__grip {
+    flex: none;
+    border: 0;
+    padding: 0;
+    margin: 0 auto;
+    width: 88px;
+    height: 44px;
+    background: transparent;
+    border-radius: 8px;
+    touch-action: none;
+    cursor: grab;
+}
+.studio .sheet__grip::before {
+    content: "";
+    display: block;
+    margin: auto;
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border-strong);
+}
+.studio .sheet__grip:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -4px;
+}
+.studio .sheet__grip:active {
+    cursor: grabbing;
+}
+@media (pointer: coarse) {
+    .studio .sheet__grip {
+        display: block;
+    }
+    .studio .icon-btn,
+    .studio .card__menu-btn,
+    .studio .studio-mobile-actions > .icon-btn,
+    .studio .studio-mobile-actions > #newLinkBtn,
+    .studio .catalog-rail #newLinkBtn,
+    .studio .catalog-rail .chip,
+    .studio .sheet .btn,
+    .studio .tab {
+        min-height: 44px;
+    }
+    .studio .icon-btn,
+    .studio .card__menu-btn,
+    .studio .studio-mobile-actions > .icon-btn {
+        min-width: 44px;
+    }
+    .studio .btn-group--view {
+        --seg: 44px;
+    }
+    .studio .search .field {
+        height: 44px;
+    }
+    .studio :is(input, select, textarea) {
+        font-size: 16px;
+    }
+}
+@media (max-width: 340px) {
+    .studio .appbar .page-head__title {
+        font-size: 17px;
+    }
+    .palette-controls {
+        gap: 8px;
+    }
+}
+
+/* Editable tile density retains the shared spacing-token contract. */
+:root.studio {
+    --card-padding: 10px 2px 0;
+    --card-padding-phone: 10px 2px 0;
+}
+@media (max-width: 560px) {
+    .studio .grid:not(.grid--list) .card__body {
+        padding: var(--card-padding-phone);
+    }
+}
+
+@media (pointer: coarse) {
+    .studio .studio-nav-toggle,
+    .studio.sidebar-collapsed .appbar #newLinkBtn {
+        min-width: 44px;
+        min-height: 44px;
+    }
+    .studio .sheet .segment__item {
+        min-height: 44px;
+    }
+}
+
+.studio .sheet .panel-preview {
+    flex: none;
+}
+.studio .card__frame--empty .card__play svg {
+    color: #fff;
+    opacity: 1;
+}

@@ -1,0 +1,27 @@
+/* SPDX-License-Identifier: MIT — sandbox controls, not part of the proposal. */
+.demo-bar { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px 24px; padding:10px max(20px,calc((100vw - 1360px)/2)); background:#202020; color:#d5d5d5; font:11px/1.5 var(--font-ui); }
+.demo-label b { font-weight:600; letter-spacing:.13em; color:#fff; margin-right:16px; }
+.demo-bar nav { display:flex; gap:16px; align-items:center; }
+.demo-bar a { color:#bdbdbd; white-space:nowrap; text-decoration:none; padding:3px 0; border-bottom:1px solid transparent; }
+.demo-bar a[aria-current="page"] { color:#fff; border-bottom-color:#fff; }
+.demo-bar a:focus-visible { outline:2px solid white; outline-offset:4px; }
+.demo-divider { height:12px; border-left:1px solid #626262; }
+@media(max-width:600px) { .demo-note { display:none; } .demo-bar { padding:8px 14px; } .demo-bar nav { gap:14px; } }
+
+/* Embedded phone preview hides only the sandbox switcher, not app controls. */
+html.demo-embedded .demo-bar { display: none; }
+html.demo-embedded .shell { padding-top: 0; }
+html.demo-embedded .catalog-rail { top: 0; }
+html.demo-embedded .appbar { top: 0; }
+
+/* Lab chrome only; the shipped Studio CSS has no sandbox offsets. */
+@media (min-width:761px) {
+    .studio:not(.demo-embedded) .demo-bar { position:fixed; inset:0 0 auto; z-index:200; height:30px; padding:0 20px; font-size:9px; background:var(--bg); color:var(--text-3); border-bottom:1px solid var(--border); }
+    .studio:not(.demo-embedded) .demo-bar a { color:var(--text-3); }
+    .studio:not(.demo-embedded) .demo-bar a[aria-current=page] { color:var(--text); border-color:var(--text); }
+    .studio .demo-note { display:none; }
+    .studio:not(.demo-embedded) .shell { padding-top:30px; }
+    .studio:not(.demo-embedded) .catalog-rail,
+    .studio:not(.demo-embedded) .appbar { top:30px; }
+    .studio:not(.demo-embedded) .sheet { top:30px; height:calc(100dvh - 30px); }
+}

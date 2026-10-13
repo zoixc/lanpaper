@@ -164,7 +164,7 @@ test('offline notice stays below header controls and clears on reconnect', async
   try {
     const banner = page.locator('#networkBanner');
     await expect(banner).toBeVisible();
-    const tools = await page.locator('.appbar__row--tools').boundingBox();
+    const tools = await page.locator('.appbar__row--top').boundingBox();
     const notice = await banner.boundingBox();
     expect(notice.y).toBeGreaterThanOrEqual(tools.y + tools.height);
     await expect(page.locator('#settingsBtn')).toBeVisible();

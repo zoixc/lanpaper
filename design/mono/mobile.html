@@ -1,0 +1,26 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: MIT -->
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lanpaper Studio — мобильный макет</title>
+<link rel="stylesheet" href="/demo/mobile.css">
+<script src="/demo/mobile.js" defer></script>
+</head>
+<body>
+<header class="viewer-head">
+  <div><span class="eyebrow">LANPAPER / STUDIO 03</span><h1>Мобильная версия</h1><p>Тот же интерфейс, настоящее окно браузера внутри рамки.</p></div>
+  <a href="/admin?design=studio&amp;sample=collection&amp;embedded=1" target="_blank" rel="noopener">Открыть без рамки ↗</a>
+</header>
+<main>
+<div class="controls" role="group" aria-label="Ширина экрана">
+  <button type="button" data-width="360" aria-pressed="false">360 px</button>
+  <button type="button" data-width="390" aria-pressed="true">390 px</button>
+  <button type="button" data-width="430" aria-pressed="false">430 px</button>
+</div>
+<div class="phone" id="phone"><iframe id="screen" title="Интерактивная мобильная версия Lanpaper" src="/admin?design=studio&amp;sample=collection&amp;embedded=1"></iframe></div>
+<p class="hint">Можно прокручивать, искать, менять вид и открывать карточки.<br>Данные демонстрационные. Изменение и загрузка отключены.</p>
+</main>
+</body>
+</html>

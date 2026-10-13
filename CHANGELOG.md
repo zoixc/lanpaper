@@ -7,6 +7,15 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Fixed
 
+- Settings show the selected palette name immediately, centered beside its
+  swatches without a first-selection layout shift.
+- Video cards no longer fetch media as images. The link panel loads a native
+  player only after activation, uses the authenticated preview endpoint and
+  releases media on tab changes and dismissal. Portrait video and native
+  controls stay inside the preview frame. Unsupported media gets a clear error.
+- The design sandbox uses a static GIF thumbnail and real on-demand video
+  fixtures, rather than animated thumbnails or metadata-only video placeholders.
+
 - Libraries larger than 12 links now render icons and load subsequent chunks
   without an undefined `CHUNK` exception. Rendering uses the shared state limit.
 - The offline banner lives inside the sticky header instead of covering its
@@ -17,6 +26,17 @@ Notable changes to Lanpaper. Docker images are published as
   nested surfaces. The old design-check entry point delegates to the same checker.
 
 ### Changed
+
+- Release version `0.19.0`: bring the approved Studio layout into the main
+  application, with local Manrope fonts, restrained chrome, collapsible navigation,
+  stable grid/list media geometry, subtle texture and the visible version footer.
+  The sign-in page retains its separate presentation.
+- Add handle-only touch dismissal for sheets, larger coarse-pointer targets,
+  preserved scrolling/focus and translated navigation/video labels in all six
+  languages. Persistent and covered dialogs cannot be dismissed by the gesture.
+- Precache Studio's public assets in static cache v15. Authentication, CSP,
+  protected-media caching boundaries and the image upload pipeline are unchanged;
+  no server video codecs or runtime dependencies are added.
 
 - **Production CSS is easier to edit without changing the design.** Consistent
   formatting, a section map, spacing/component-padding tokens and documented

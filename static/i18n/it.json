@@ -238,5 +238,12 @@
   "import_cancelled": "Importazione annullata",
   "offline_now": "Sei offline. Le operazioni di rete potrebbero non riuscire finché la connessione non torna.",
   "operation_in_progress": "Questa operazione è già in corso",
-  "regen_progress": "Anteprime: {{done}} di {{total}}"
+  "regen_progress": "Anteprime: {{done}} di {{total}}",
+  "navigation": "Navigazione",
+  "app_actions": "Azioni dell’applicazione",
+  "expand_navigation": "Espandi navigazione",
+  "collapse_navigation": "Comprimi navigazione",
+  "video_play": "Riproduci video",
+  "video_error": "Questo browser non può riprodurre il video. Apri il file originale.",
+  "collection": "Collezione"
 }

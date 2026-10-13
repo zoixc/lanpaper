@@ -45,7 +45,8 @@ export function checkCSS(source) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const file = fileURLToPath(new URL('../static/css/style.css', import.meta.url));
-    const errors = checkCSS(readFileSync(file, 'utf8'));
+    const studio = fileURLToPath(new URL('../static/css/studio.css', import.meta.url));
+    const errors = checkCSS(readFileSync(file, 'utf8') + '\n' + readFileSync(studio, 'utf8'));
     if (errors.length) {
         console.error(errors.join('\n'));
         process.exitCode = 1;

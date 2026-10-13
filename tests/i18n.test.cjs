@@ -25,7 +25,7 @@ for (const lang of LANGS) {
 }
 
 const adminHtml = fs.readFileSync(path.join(ROOT, 'admin.html'), 'utf8');
-const scripts = ['app.js', 'compressor.js', 'export-import.js', 'settings-menu.js', 'prepaint.js']
+const scripts = ['app.js', 'compressor.js', 'export-import.js', 'settings-menu.js', 'prepaint.js', 'studio-layout.js', 'media-preview.js']
   .map(name => fs.readFileSync(path.join(ROOT, 'static/js', name), 'utf8'))
   .join('\n');
 const workerSource = fs.readFileSync(path.join(ROOT, 'static/sw.js'), 'utf8');

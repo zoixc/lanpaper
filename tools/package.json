@@ -2,8 +2,8 @@
   "name": "lanpaper-css-tools",
   "private": true,
   "scripts": {
-    "check": "prettier --check ../static/css/style.css && node check-css.mjs && node --test css.test.mjs",
-    "format": "prettier --write ../static/css/style.css"
+    "check": "prettier --check ../static/css/style.css ../static/css/studio.css && node check-css.mjs && node --test css.test.mjs ../design/mono/media-contract.test.mjs && node check-contrast.mjs --studio",
+    "format": "prettier --write ../static/css/style.css ../static/css/studio.css"
   },
   "devDependencies": {
     "postcss": "8.5.29",

@@ -15,7 +15,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const raw = readFileSync(join(here, '..', 'static', 'css', 'style.css'), 'utf8');
+const raw = readFileSync(join(here, '..', 'static', 'css', 'style.css'), 'utf8') +
+    (process.argv.includes('--studio') ? readFileSync(join(here, '..', 'static', 'css', 'studio.css'), 'utf8') : '');
 
 /* Блоки @media вырезаем целиком: внутри них те же :root, но со
    «усиленным» контрастом — это отдельный режим, а не база. */
@@ -64,9 +65,10 @@ function themeVars(palette, theme) {
     // beats a later generic theme rule, just as it does in the browser.
     const rules = all.flatMap(({ sel, vars }, order) => sel.split(',').map(selector => ({
         sel: selector.trim(), vars, order,
-        specificity: (selector.match(/\[/g) || []).length
+        specificity: (selector.match(/\[|:root|\.studio/g) || []).length
     }))).filter(({ sel }) => {
-        if (sel === ':root') return true;
+        sel = sel.replace(/^:root/, 'html').replace(/^\.studio/, 'html').replace(/\.studio/g, '');
+        if (sel === 'html') return true;
         if (!/^html(?:\[data-(?:theme|palette)="[a-z]+"\])+$/.test(sel)) return false;
         return [...sel.matchAll(/\[data-(theme|palette)="([a-z]+)"\]/g)]
             .every(([, key, value]) => value === (key === 'theme' ? theme : palette));

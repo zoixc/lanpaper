@@ -238,5 +238,12 @@
   "import_cancelled": "Import abgebrochen",
   "offline_now": "Sie sind offline. Netzwerkvorgänge können bis zur Wiederherstellung der Verbindung fehlschlagen.",
   "operation_in_progress": "Dieser Vorgang läuft bereits",
-  "regen_progress": "Vorschauen: {{done}} von {{total}}"
+  "regen_progress": "Vorschauen: {{done}} von {{total}}",
+  "navigation": "Navigation",
+  "app_actions": "Anwendungsaktionen",
+  "expand_navigation": "Navigation ausklappen",
+  "collapse_navigation": "Navigation einklappen",
+  "video_play": "Video abspielen",
+  "video_error": "Dieses Video lässt sich in diesem Browser nicht abspielen. Öffnen Sie das Original.",
+  "collection": "Sammlung"
 }

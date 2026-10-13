@@ -1,0 +1,47 @@
+{
+  "app-icon.png": {
+    "width": 512,
+    "height": 512,
+    "sizeBytes": 10909
+  },
+  "wp-abstract.jpg": {
+    "width": 1376,
+    "height": 768,
+    "sizeBytes": 65915
+  },
+  "wp-city.jpg": {
+    "width": 1376,
+    "height": 768,
+    "sizeBytes": 118022
+  },
+  "wp-dawn.jpg": {
+    "width": 1376,
+    "height": 768,
+    "sizeBytes": 77028
+  },
+  "wp-forest.jpg": {
+    "width": 1376,
+    "height": 768,
+    "sizeBytes": 222941
+  },
+  "wp-mono.jpg": {
+    "width": 1376,
+    "height": 768,
+    "sizeBytes": 106064
+  },
+  "wp-panorama.jpg": {
+    "width": 1584,
+    "height": 672,
+    "sizeBytes": 92193
+  },
+  "wp-square.jpg": {
+    "width": 1024,
+    "height": 1024,
+    "sizeBytes": 135807
+  },
+  "wp-vertical.jpg": {
+    "width": 768,
+    "height": 1376,
+    "sizeBytes": 70169
+  }
+}

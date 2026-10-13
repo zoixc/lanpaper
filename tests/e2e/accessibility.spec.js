@@ -45,11 +45,11 @@ test('narrow viewport and 200 percent zoom keep primary actions reachable', asyn
   await page.setViewportSize({ width: 320, height: 640 });
   await signIn(page);
   await page.evaluate(() => { document.documentElement.style.zoom = '2'; });
-  await expect(page.locator('#fabBtn')).toBeVisible();
+  await expect(page.locator('#newLinkBtn')).toBeVisible();
   // At 200% CSS zoom the visual box can sit outside Playwright's actionability
   // viewport even though a touch user can pan to it; dispatch the activation
   // and assert that the resulting dialog remains usable.
-  await page.locator('#fabBtn').evaluate((button) => button.click());
+  await page.locator('#newLinkBtn').evaluate((button) => button.click());
   await expect(page.locator('#createInput')).toBeVisible();
 });
 
