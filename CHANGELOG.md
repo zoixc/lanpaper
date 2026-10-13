@@ -96,6 +96,12 @@ Notable changes to Lanpaper. Docker images are published as
   screen reader. The content's padding follows the same curve rather than
   jumping to the new width once it is over. The slide respects the system's
   reduced-motion switch like every other movement in the panel.
+- **The library canvas carries registration marks instead of dots.** A sparse
+  96px grid of rings with a crosshair — the marks a proof sheet carries, and
+  the character a monochrome photo library can afford. It is still a drawing
+  baked into a data URI (no requests, no filters, no motion), one per theme
+  because the colour has to be part of the drawing, and it is dropped when the
+  reader asks for more contrast.
 - Hovering a card zooms its photograph by 4% instead of 1.5%. At 1.5% a 400px
   card grew by two pixels a side, which read as nothing at all; the frame clips
   the movement (`overflow: hidden`), so the card itself stays the same size.

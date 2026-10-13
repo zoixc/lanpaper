@@ -636,7 +636,10 @@
     --studio-inner-radius: 6px;
     --studio-control-shadow: 0 1px 2px rgb(0 0 0 / 4%);
     --studio-popover-shadow: 0 12px 32px -16px rgb(0 0 0 / 24%);
-    --studio-canvas-dot: rgb(0 0 0 / 3%);
+    /* Текстура канвы: приводочные метки — кольцо с перекрестием, как на
+       типографских оттисках и плёнке. Цвет вшит в рисунок, поэтому на
+       каждую тему свой: метка не может быть тёмной на тёмном фоне. */
+    --studio-canvas-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cg fill='none' stroke='%23000' stroke-opacity='.06' stroke-width='1'%3E%3Ccircle cx='48' cy='48' r='5'/%3E%3Cpath d='M48 39v6M48 51v6M39 48h6M51 48h6'/%3E%3C/g%3E%3C/svg%3E");
     --studio-sheet-shadow: -16px 0 48px -32px rgb(0 0 0 / 28%);
     /* Высота верхней строки: её делят шапка и блок марки в рельсе (см. ниже),
        поэтому знак, название и заголовок стоят на одной центральной линии. */
@@ -645,7 +648,7 @@
 .studio[data-theme="dark"] {
     --studio-control-shadow: 0 1px 2px rgb(0 0 0 / 18%);
     --studio-popover-shadow: 0 14px 38px -14px rgb(0 0 0 / 55%);
-    --studio-canvas-dot: rgb(255 255 255 / 3%);
+    --studio-canvas-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.07' stroke-width='1'%3E%3Ccircle cx='48' cy='48' r='5'/%3E%3Cpath d='M48 39v6M48 51v6M39 48h6M51 48h6'/%3E%3C/g%3E%3C/svg%3E");
     --studio-sheet-shadow: -16px 0 48px -32px rgb(0 0 0 / 55%);
 }
 .studio[data-palette="mono"] {
@@ -1401,11 +1404,13 @@
 .studio :is(.num, .card__meta, .chip__count, .page-head__count) {
     font-variant-numeric: tabular-nums;
 }
-/* Static, barely visible dot-paper texture; no image requests, filters or motion.
-   Only the library canvas is textured, controls and photographs stay clean. */
+/* Static, barely visible texture: registration marks on a sparse 96px grid,
+   as on a proof print. No image requests, filters or motion — one drawing per
+   theme, tiled by the browser. Only the library canvas is textured; controls
+   and photographs stay clean. */
 .studio .content {
-    background-image: radial-gradient(circle, var(--studio-canvas-dot) 0.65px, transparent 0.85px);
-    background-size: 9px 9px;
+    background-image: var(--studio-canvas-mark);
+    background-size: 96px 96px;
 }
 @media (prefers-contrast: more), (forced-colors: active) {
     .studio .content {
