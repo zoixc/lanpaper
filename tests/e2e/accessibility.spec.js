@@ -16,6 +16,14 @@ async function signIn(page) {
 }
 
 async function expectNoSeriousViolations(page) {
+  // Measure the settled UI, not partially transparent sheet-entry frames.
+  // Keep animations enabled; ignore only perpetual decorative animations.
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await Promise.allSettled(document.getAnimations()
+      .filter(animation => animation.effect.getTiming().iterations !== Infinity)
+      .map(animation => animation.finished));
+  });
   const results = await new AxeBuilder({ page }).analyze();
   const violations = results.violations.filter((item) => ['serious', 'critical'].includes(item.impact));
   expect(violations, JSON.stringify(violations, null, 2)).toEqual([]);
