@@ -23,16 +23,27 @@
             var root = document.documentElement;
             var theme = saved.theme || (legacyTheme === 'dark' ? 'dark' : (legacyTheme === 'light' ? 'light' : 'auto'));
             var dark = theme === 'dark' || (theme === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+            var palette = saved.palette || 'mono';
             root.dataset.theme = dark ? 'dark' : 'light';
             root.dataset.themeMode = theme;
+            root.dataset.palette = palette;
+            if (root.dataset.layout === 'studio') {
+                root.classList.add('studio', 'radical');
+                if (localStorage.getItem('lp-studio-nav-collapsed') === 'true') {
+                    root.classList.add('sidebar-collapsed');
+                }
+            } else if (root.dataset.layout) {
+                root.classList.remove('studio', 'radical', 'sidebar-collapsed');
+            }
             /* Полоса браузера: у <meta name="theme-color"> только media-варианты,
                и ручной выбор темы они не видят. Цвет действующей темы ставим
                обеим меткам — до первой отрисовки, иначе полоса мигнёт системным
                цветом. */
-            var ring = dark ? '#14161B' : '#F5F6F9';
+            var ring = palette === 'mono'
+                ? (dark ? '#171717' : '#FAFAFA')
+                : (dark ? '#14161B' : '#F5F6F9');
             var metas = document.querySelectorAll('meta[name="theme-color"]');
             for (var i = 0; i < metas.length; i++) metas[i].setAttribute('content', ring);
-            root.dataset.palette = saved.palette || 'mono';
             root.dataset.view = saved.view || legacyView || 'grid';
             if (saved.lang || legacyLang) root.lang = saved.lang || legacyLang;
         } catch (e) { /* приватный режим: остаются значения по умолчанию */ }

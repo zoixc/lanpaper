@@ -24,7 +24,6 @@ var staticAssets = map[string]bool{
 	"css/studio.css":                            true,
 	"js/studio-layout.js":                       true,
 	"js/media-preview.js":                       true,
-	"js/sheet-gesture.js":                       true,
 	"fonts/manrope-latin-wght-normal.woff2":     true,
 	"fonts/manrope-latin-ext-wght-normal.woff2": true,
 	"fonts/manrope-cyrillic-wght-normal.woff2":  true,

@@ -29,3 +29,11 @@ test('login.html has no inline script or style', () => {
   assert.doesNotMatch(html, /<style[\s>]/i);
   assert.doesNotMatch(html, /\sstyle="/i);
 });
+
+test('login page applies saved theme/palette before first paint and supports all six languages', () => {
+  assert.match(html, /<script src="\/static\/js\/prepaint\.js"><\/script>/);
+  assert.match(html, /<link rel="stylesheet" href="\/static\/css\/studio\.css">/);
+  for (const lang of ['en', 'ru', 'de', 'es', 'fr', 'it']) {
+    assert.match(script, new RegExp(`\\b${lang}:\\s*\\{`), `login.js missing language ${lang}`);
+  }
+});

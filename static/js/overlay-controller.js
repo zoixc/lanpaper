@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: MIT */
 
-import { attachSheetGesture } from './sheet-gesture.js';
 import { stopMedia } from './media-preview.js';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -17,7 +16,6 @@ export function createOverlayController(options) {
     };
 
     function remove(entry, keepFocus, dismiss) {
-        if (entry.cleanupGesture) entry.cleanupGesture();
         stopMedia(entry.node);
         entry.node.remove();
         entry.scrim.remove();
@@ -63,11 +61,6 @@ export function createOverlayController(options) {
             onDismiss: opts.onDismiss || null,
             label: opts.label || node.getAttribute('aria-label') || (heading && heading.textContent) || '' };
         stack.push(entry);
-        const grip = node.querySelector('.sheet__grip');
-        if (grip) entry.cleanupGesture = attachSheetGesture(grip, {
-            canDismiss: () => current() === entry && !entry.persistent && grip.offsetParent !== null,
-            dismiss: () => close()
-        });
         options.host().append(scrim, node);
         notify();
         const target = opts.focus || node.querySelector('[autofocus], input, button, [tabindex]:not([tabindex="-1"])');

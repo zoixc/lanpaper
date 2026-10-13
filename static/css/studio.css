@@ -433,65 +433,16 @@
     align-items: flex-start;
     gap: 22px;
 }
-.radical .page-head__title {
-    font-size: clamp(62px, 7.4vw, 108px);
-    font-weight: 600;
-    line-height: 1.05;
-    letter-spacing: -0.07em;
-}
-.radical .page-head__count {
-    align-self: flex-start;
-    margin-top: 16px;
-    font-size: 17px;
-    font-variant-numeric: tabular-nums;
-}
 .radical .page-head__count::before {
     display: none;
 }
-.radical .grid:not(.grid--list) {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 30px 22px;
-    counter-reset: catalog-card;
-}
 .radical .grid:not(.grid--list) .card {
-    counter-increment: catalog-card;
     background: transparent;
     border: 0;
     border-radius: 0;
     box-shadow: none;
     padding: 0;
     overflow: visible;
-}
-.radical .grid:not(.grid--list) .card:first-child {
-    grid-column: span 2;
-}
-.radical .grid:not(.grid--list) .card__frame {
-    aspect-ratio: 4/3;
-    border-radius: 8px;
-}
-.radical .grid:not(.grid--list) .card:first-child .card__frame {
-    aspect-ratio: 2.73;
-}
-.radical .grid:not(.grid--list) .card__body {
-    padding: 14px 0 8px;
-    min-height: 76px;
-    gap: 6px;
-}
-.radical .grid:not(.grid--list) .card__head::before {
-    content: counter(catalog-card, decimal-leading-zero);
-    font-size: 10px;
-    font-weight: 400;
-    color: var(--text-3);
-    margin-right: 7px;
-    align-self: center;
-}
-.radical .card__name {
-    font-size: 14px;
-    font-weight: 500;
-}
-.radical .card__meta {
-    font-size: 10px;
-    letter-spacing: 0.015em;
 }
 .radical .card:hover {
     transform: none;
@@ -538,15 +489,6 @@
     }
     .radical .content {
         padding-inline: 28px;
-    }
-    .radical .grid:not(.grid--list) {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .radical .grid:not(.grid--list) .card:first-child {
-        grid-column: auto;
-    }
-    .radical .grid:not(.grid--list) .card:first-child .card__frame {
-        aspect-ratio: 4/3;
     }
 }
 @media (max-width: 760px) {
@@ -661,16 +603,40 @@
     font-style: normal;
     font-weight: 200 800;
     font-display: swap;
+    src: url("/static/fonts/manrope-latin-ext-wght-normal.woff2") format("woff2");
+    unicode-range:
+        U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+        U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+        U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+    font-family: "Manrope Studio";
+    font-style: normal;
+    font-weight: 200 800;
+    font-display: swap;
     src: url("/static/fonts/manrope-cyrillic-wght-normal.woff2") format("woff2");
     unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
 }
 :root.studio {
-    --font-ui: "Manrope Studio", "Golos Text", sans-serif;
+    --font-ui: "Manrope Studio", "Golos Text", system-ui, sans-serif;
     --font-display: var(--font-ui);
+    --font-mono: var(--font-ui);
     --rail-width: 184px;
     --r-full: 8px;
     --r-lg: 12px;
     --r-xl: 16px;
+    --card-padding: 10px 2px 0;
+    --card-padding-phone: 10px 2px 0;
+    --studio-control-radius: 9px;
+    --studio-inner-radius: 6px;
+    --studio-control-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+    --studio-popover-shadow: 0 12px 32px -16px rgb(0 0 0 / 24%);
+    --studio-canvas-dot: rgb(0 0 0 / 3%);
+}
+.studio[data-theme="dark"] {
+    --studio-control-shadow: 0 1px 2px rgb(0 0 0 / 18%);
+    --studio-popover-shadow: 0 14px 38px -14px rgb(0 0 0 / 55%);
+    --studio-canvas-dot: rgb(255 255 255 / 3%);
 }
 .studio[data-palette="mono"] {
     --bg: #fafafa;
@@ -881,6 +847,7 @@
     height: 26px;
     min-width: 26px;
     min-height: 26px;
+    margin: -2px -4px -2px 0;
 }
 .studio .card__badges {
     padding: 10px;
@@ -937,6 +904,10 @@
     .studio .catalog-rail .brand {
         margin: 0;
     }
+    .studio .catalog-rail .brand__name {
+        display: block;
+        font-size: 17px;
+    }
     .studio .catalog-rail #newLinkBtn {
         margin: 0;
         width: auto;
@@ -945,15 +916,6 @@
     .studio .catalog-rail .chip {
         min-height: 36px;
         font-size: 11px;
-    }
-    .studio-utilities {
-        grid-column: 1/-1;
-        flex-wrap: nowrap;
-        margin: 0;
-        padding: 0;
-        position: absolute;
-        top: 14px;
-        right: 155px;
     }
     .studio .appbar {
         top: 0;
@@ -998,39 +960,11 @@
         margin-inline: 16px;
     }
 }
-@media (max-width: 460px) {
-    .studio .catalog-rail .brand__name {
-        display: none;
-    }
-    .studio-utilities {
-        right: 148px;
-    }
-}
-@media (hover: none) {
-    .studio .card__menu-btn {
-        min-width: 36px;
-        min-height: 36px;
-    }
-    .studio-utilities .icon-btn {
-        min-width: 36px;
-        min-height: 36px;
-    }
-}
 
 /* ============================================================
    STUDIO FINISH — a shared control language, not a new layout.
    Keep text, radio inputs, disabled states and focus rings functional.
    ============================================================ */
-:root.studio {
-    --studio-control-radius: 9px;
-    --studio-inner-radius: 6px;
-    --studio-control-shadow: 0 1px 2px rgb(0 0 0 / 4%);
-    --studio-popover-shadow: 0 12px 32px -16px rgb(0 0 0 / 24%);
-}
-.studio[data-theme="dark"] {
-    --studio-control-shadow: 0 1px 2px rgb(0 0 0 / 18%);
-    --studio-popover-shadow: 0 14px 38px -14px rgb(0 0 0 / 55%);
-}
 /* Secondary buttons have a hairline edge; primary actions stay ink-solid. */
 .studio .btn {
     border-radius: var(--studio-control-radius);
@@ -1059,6 +993,8 @@
     border-radius: var(--studio-control-radius);
 }
 .studio .icon-btn {
+    min-width: 0;
+    min-height: 0;
     border-radius: var(--studio-control-radius);
     transition:
         background 140ms ease,
@@ -1078,12 +1014,14 @@
    rather than inheriting the production switch's circular 30px marker. */
 .studio .btn-group--view {
     --seg: var(--ctl-inner, 30px);
-    padding: 2px;
+    padding: 3px;
     gap: 2px;
     border-radius: var(--studio-control-radius);
     background: var(--surface-hover);
 }
 .studio .btn-group--view::before {
+    top: 3px;
+    left: 3px;
     border-radius: var(--studio-inner-radius);
     background: var(--surface);
     box-shadow: var(--studio-control-shadow);
@@ -1097,6 +1035,10 @@
 .studio .btn-group--view .icon-btn[aria-pressed="true"] {
     background: transparent;
 }
+.studio #themeBtn .theme-icon {
+    inset: 0;
+    margin: auto;
+}
 .studio .segment {
     padding: 3px;
     gap: 3px;
@@ -1107,6 +1049,14 @@
 .studio .segment__item {
     border-radius: 7px;
     font-weight: 550;
+    line-height: 1;
+}
+.studio .segment__item svg {
+    flex: none;
+}
+.studio .segment--full .segment__item,
+.studio .segment--full .segment__opt {
+    flex: 1 0 auto;
 }
 .studio .segment__item[aria-selected="true"],
 .studio .segment__item[aria-pressed="true"],
@@ -1125,6 +1075,7 @@
 .studio .select,
 .studio .input,
 .studio .field {
+    min-height: 0;
     border-radius: var(--studio-control-radius);
 }
 .studio .select {
@@ -1228,38 +1179,6 @@
 .studio :is(.btn, .icon-btn, .chip, .menu__item):disabled svg {
     transform: none;
 }
-/* Keep the approved phone structure. Icons remain small; hit areas do not. */
-@media (hover: none), (pointer: coarse) {
-    .studio .appbar__actions {
-        --ctl: 40px;
-        --ctl-inner: 36px;
-    }
-    .studio .card__menu-btn,
-    .studio-utilities .icon-btn {
-        width: 40px;
-        height: 40px;
-        min-width: 40px;
-        min-height: 40px;
-    }
-    .studio .catalog-rail #newLinkBtn {
-        min-height: 40px;
-        height: 40px;
-    }
-    .studio .catalog-rail .chip {
-        min-height: 40px;
-    }
-    .studio .segment__item {
-        min-height: 36px;
-        height: auto;
-        padding-block: 8px;
-    }
-    .studio .menu__item {
-        min-height: 44px;
-    }
-    .studio .select--mini {
-        min-height: 36px;
-    }
-}
 @media (prefers-reduced-motion: reduce) {
     .studio .btn-group--view::before,
     .studio .icon-btn {
@@ -1283,6 +1202,7 @@
     width: 32px;
     height: 32px;
     min-width: 32px;
+    min-height: 32px;
 }
 .studio .studio-nav-toggle svg {
     transform: none;
@@ -1441,39 +1361,13 @@
     .studio .sheet__foot {
         padding-inline: 16px;
     }
-}
-@media (hover: none), (pointer: coarse) {
-    .studio .studio-nav-toggle,
-    .studio.sidebar-collapsed .appbar #newLinkBtn {
-        width: 40px;
-        height: 40px;
-        min-width: 40px;
-        min-height: 40px;
+    .studio .section--shortcuts,
+    .studio .section:has(#shortcutList) {
+        display: none;
     }
 }
 
-/* Multilingual UI: one family for headings, fields, labels and numeric metadata.
-   Extended Latin covers names beyond the six translated interface languages. */
-@font-face {
-    font-family: "Manrope Studio";
-    font-style: normal;
-    font-weight: 200 800;
-    font-display: swap;
-    src: url("/static/fonts/manrope-latin-ext-wght-normal.woff2") format("woff2");
-    unicode-range:
-        U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
-        U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
-        U+2C60-2C7F, U+A720-A7FF;
-}
-:root.studio {
-    --font-ui: "Manrope Studio", "Golos Text", system-ui, sans-serif;
-    --font-display: var(--font-ui);
-    --font-mono: var(--font-ui);
-    --studio-canvas-dot: rgb(0 0 0 / 3%);
-}
-.studio[data-theme="dark"] {
-    --studio-canvas-dot: rgb(255 255 255 / 3%);
-}
+/* Multilingual UI: one family for headings, fields, labels and numeric metadata. */
 .studio :is(button, input, select, textarea) {
     font-family: var(--font-ui);
 }
@@ -1766,64 +1660,6 @@
     padding: 16px;
     text-align: center;
 }
-/* Preserve the compact visible handle while exposing a real 44px button. */
-.studio .sheet__grip {
-    flex: none;
-    border: 0;
-    padding: 0;
-    margin: 0 auto;
-    width: 88px;
-    height: 44px;
-    background: transparent;
-    border-radius: 8px;
-    touch-action: none;
-    cursor: grab;
-}
-.studio .sheet__grip::before {
-    content: "";
-    display: block;
-    margin: auto;
-    width: 36px;
-    height: 4px;
-    border-radius: 2px;
-    background: var(--border-strong);
-}
-.studio .sheet__grip:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: -4px;
-}
-.studio .sheet__grip:active {
-    cursor: grabbing;
-}
-@media (pointer: coarse) {
-    .studio .sheet__grip {
-        display: block;
-    }
-    .studio .icon-btn,
-    .studio .card__menu-btn,
-    .studio .studio-mobile-actions > .icon-btn,
-    .studio .studio-mobile-actions > #newLinkBtn,
-    .studio .catalog-rail #newLinkBtn,
-    .studio .catalog-rail .chip,
-    .studio .sheet .btn,
-    .studio .tab {
-        min-height: 44px;
-    }
-    .studio .icon-btn,
-    .studio .card__menu-btn,
-    .studio .studio-mobile-actions > .icon-btn {
-        min-width: 44px;
-    }
-    .studio .btn-group--view {
-        --seg: 44px;
-    }
-    .studio .search .field {
-        height: 44px;
-    }
-    .studio :is(input, select, textarea) {
-        font-size: 16px;
-    }
-}
 @media (max-width: 340px) {
     .studio .appbar .page-head__title {
         font-size: 17px;
@@ -1833,25 +1669,9 @@
     }
 }
 
-/* Editable tile density retains the shared spacing-token contract. */
-:root.studio {
-    --card-padding: 10px 2px 0;
-    --card-padding-phone: 10px 2px 0;
-}
 @media (max-width: 560px) {
     .studio .grid:not(.grid--list) .card__body {
         padding: var(--card-padding-phone);
-    }
-}
-
-@media (pointer: coarse) {
-    .studio .studio-nav-toggle,
-    .studio.sidebar-collapsed .appbar #newLinkBtn {
-        min-width: 44px;
-        min-height: 44px;
-    }
-    .studio .sheet .segment__item {
-        min-height: 44px;
     }
 }
 

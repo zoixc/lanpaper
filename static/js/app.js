@@ -371,9 +371,12 @@ import { RENDER_CHUNK, createAppState, normalizeLink, mediaExt, isVideoMedia, ma
        4. ТЕМА, АКЦЕНТ, ЯЗЫК
        ======================================================== */
     const prefersDark = () => matchMedia('(prefers-color-scheme: dark)').matches;
-    /* Цвет полосы браузера; те же значения стоят в <meta name="theme-color">
-       в admin.html. */
-    const THEME_COLOR = { light: '#F5F6F9', dark: '#14161B' };
+    /* Цвет полосы браузера; учитывает палитру mono (#FAFAFA / #171717) и
+       цветные палитры (#F5F6F9 / #14161B), как и prepaint.js. */
+    const THEME_COLOR = {
+        mono: { light: '#FAFAFA', dark: '#171717' },
+        default: { light: '#F5F6F9', dark: '#14161B' }
+    };
     function effectiveTheme() {
         return state.theme === 'auto' ? (prefersDark() ? 'dark' : 'light') : state.theme;
     }
@@ -392,7 +395,8 @@ import { RENDER_CHUNK, createAppState, normalizeLink, mediaExt, isVideoMedia, ma
            name="theme-color"> есть лишь media-варианты, и ручной выбор темы
            они не видят — полоса оставалась чужого цвета. Обе метки получают
            цвет действующей темы, какая бы media ни совпала. */
-        const ring = dark ? THEME_COLOR.dark : THEME_COLOR.light;
+        const pair = state.palette === 'mono' ? THEME_COLOR.mono : THEME_COLOR.default;
+        const ring = dark ? pair.dark : pair.light;
         $$('meta[name="theme-color"]').forEach(function (meta) { meta.setAttribute('content', ring); });
         /* Тёмная тема меняет оттенок образцов акцента: цвет ставим заново,
            иначе на тёмном фоне останутся светлые кружки. */
@@ -408,6 +412,10 @@ import { RENDER_CHUNK, createAppState, normalizeLink, mediaExt, isVideoMedia, ma
     }
     function applyPalette(root) {
         document.documentElement.dataset.palette = state.palette;
+        const dark = effectiveTheme() === 'dark';
+        const pair = state.palette === 'mono' ? THEME_COLOR.mono : THEME_COLOR.default;
+        const ring = dark ? pair.dark : pair.light;
+        $$('meta[name="theme-color"]').forEach(function (meta) { meta.setAttribute('content', ring); });
         $$('#paletteRow .swatch input', root).forEach(function (input) {
             input.checked = input.value === state.palette;
         });

@@ -19,9 +19,39 @@
       locked: 'Слишком много неудачных попыток. Попробуйте через несколько минут.',
       network: 'Нет связи с сервером. Проверьте подключение и попробуйте снова.',
       error: 'Не удалось войти. Попробуйте снова.'
+    },
+    de: {
+      username: 'Benutzername', password: 'Passwort', signIn: 'Anmelden',
+      invalid: 'Falscher Benutzername oder falsches Passwort.',
+      locked: 'Zu viele Fehlversuche. Bitte versuchen Sie es in einigen Minuten erneut.',
+      network: 'Server nicht erreichbar. Prüfen Sie die Verbindung und versuchen Sie es erneut.',
+      error: 'Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.'
+    },
+    es: {
+      username: 'Usuario', password: 'Contraseña', signIn: 'Iniciar sesión',
+      invalid: 'Usuario o contraseña incorrectos.',
+      locked: 'Demasiados intentos fallidos. Inténtalo de nuevo en unos minutos.',
+      network: 'No se pudo conectar con el servidor. Comprueba la conexión e inténtalo de nuevo.',
+      error: 'No se pudo iniciar sesión. Inténtalo de nuevo.'
+    },
+    fr: {
+      username: 'Nom d’utilisateur', password: 'Mot de passe', signIn: 'Se connecter',
+      invalid: 'Nom d’utilisateur ou mot de passe incorrect.',
+      locked: 'Trop de tentatives échouées. Réessayez dans quelques minutes.',
+      network: 'Impossible de joindre le serveur. Vérifiez la connexion et réessayez.',
+      error: 'Connexion impossible. Veuillez réessayer.'
+    },
+    it: {
+      username: 'Nome utente', password: 'Password', signIn: 'Accedi',
+      invalid: 'Nome utente o password non validi.',
+      locked: 'Troppi tentativi falliti. Riprova tra qualche minuto.',
+      network: 'Impossibile raggiungere il server. Controlla la connessione e riprova.',
+      error: 'Impossibile accedere. Riprova.'
     }
   };
-  var lang = /^ru/i.test(navigator.language || '') ? 'ru' : 'en';
+  var savedLang = document.documentElement.lang;
+  var rawLang = (savedLang && savedLang !== 'en' ? savedLang : (navigator.language || 'en')).slice(0, 2).toLowerCase();
+  var lang = messages[rawLang] ? rawLang : 'en';
   var t = messages[lang];
 
   document.documentElement.lang = lang;

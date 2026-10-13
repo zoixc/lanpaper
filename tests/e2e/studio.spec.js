@@ -130,9 +130,17 @@ test('GIF upload produces a static WebP thumbnail', async ({ page }) => {
   expect(bytes.includes(Buffer.from('ANIM'))).toBe(false);
 });
 
-test('touch scroll is independent of grip; grip swipe closes and restores focus', async ({ page, context }, info) => {
+test('phone layout preserves compact Studio geometry and native sheet scroll', async ({ page, context }, info) => {
   test.skip(info.project.name !== 'phone', 'CDP touch input on Chromium phone emulation');
   await signIn(page);
+  const viewSwitch = await page.locator('.btn-group--view').boundingBox();
+  const gridBtn = await page.locator('#viewGridBtn').boundingBox();
+  const searchField = await page.locator('.search .field').boundingBox();
+  expect(viewSwitch.height).toBe(32);
+  expect(gridBtn.width).toBe(26);
+  expect(gridBtn.height).toBe(26);
+  expect(searchField.height).toBe(36);
+
   await page.click('#settingsBtn');
   const sheet = page.locator('#settingsSheet');
   const body = page.locator('#settingsSheet .sheet__body');
@@ -147,8 +155,8 @@ test('touch scroll is independent of grip; grip swipe closes and restores focus'
   await expect.poll(() => body.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
   await expect(sheet).toBeVisible();
   const grip = await sheet.locator('.sheet__grip').boundingBox();
-  expect(grip.height).toBeGreaterThanOrEqual(44);
-  await swipe(grip.x + grip.width / 2, grip.y + grip.height / 2, 100);
+  expect(grip.height).toBeLessThanOrEqual(8);
+  await sheet.locator('[data-close]').first().click();
   await expect(sheet).toBeHidden();
   await expect(page.locator('#settingsBtn')).toBeFocused();
   expect(await page.evaluate(() => document.body.style.overflow)).toBe('');

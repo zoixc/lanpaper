@@ -3,7 +3,7 @@
 <!-- Разметка панели — порт макета design/v2 (см. design/06-redesign-v2.md).
      Классы, состояния и шаблоны совпадают с макетом; отличия только в
      источниках данных и путях: /static/... вместо относительных. -->
-<html data-layout="studio" lang="en" data-theme="light" data-palette="mono" data-view="grid">
+<html class="studio radical" data-layout="studio" lang="en" data-theme="light" data-palette="mono" data-view="grid">
 <head>
   <meta charset="utf-8">
   <title>Lanpaper</title>
@@ -17,10 +17,10 @@
   <meta name="apple-mobile-web-app-title" content="Lanpaper">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <!-- theme-color: respects system preference before JS loads -->
-  <meta name="theme-color" content="#F5F6F9" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#14161B" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#FAFAFA" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#171717" media="(prefers-color-scheme: dark)">
   <link rel="manifest" href="/static/manifest.json">
-  <link rel="preload" href="/static/fonts/golos-text-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/manrope-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="stylesheet" href="/static/css/studio.css">
 
@@ -244,7 +244,7 @@
      ============================================================ -->
 <template id="tplPanel">
     <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="panelTitle" data-sheet="panel">
-        <button class="sheet__grip" type="button" data-i18n-aria="close" aria-label="Close"></button>
+        <div class="sheet__grip"></div>
         <div class="sheet__head">
             <div class="grow">
                 <div class="eyebrow" data-i18n="panel_title">Пульт ссылки</div>
@@ -303,7 +303,7 @@
      ============================================================ -->
 <template id="tplSettings">
     <div class="sheet" id="settingsSheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" data-sheet="settings">
-        <button class="sheet__grip" type="button" data-i18n-aria="close" aria-label="Close"></button>
+        <div class="sheet__grip"></div>
         <div class="sheet__head">
             <div class="grow">
                 <div class="eyebrow" data-i18n="settings_appearance">Оформление</div>
@@ -378,7 +378,7 @@
                 </div>
             </div>
 
-            <div class="section">
+            <div class="section section--shortcuts">
                 <div class="section__head"><span class="section__title" data-i18n="settings_shortcuts">Горячие клавиши</span></div>
                 <div class="stack stack--tight" id="shortcutList"></div>
             </div>
@@ -424,7 +424,7 @@
      ============================================================ -->
 <template id="tplServer">
     <div class="sheet sheet--picker" role="dialog" aria-modal="true" aria-labelledby="serverTitle" data-sheet>
-        <button class="sheet__grip" type="button" data-i18n-aria="close" aria-label="Close"></button>
+        <div class="sheet__grip"></div>
         <div class="sheet__head">
             <div class="grow">
                 <div class="eyebrow" data-i18n="upload_server">Из галереи сервера</div>
