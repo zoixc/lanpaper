@@ -162,6 +162,18 @@ test('phone layout preserves compact Studio geometry and native sheet scroll', a
   expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
 });
 
+test('the panel appears assembled instead of flashing an unstyled layout', async ({ page }) => {
+  // admin.html ships a layout that initializeStudio() rebuilds after the
+  // language file arrives, so the markup on its own is not the panel the user
+  // gets. The boot screen covers it until app.js says the panel is built; if
+  // that release ever stops happening, the panel stays invisible.
+  await signIn(page);
+  await expect(page.locator('#bootScreen')).toHaveCount(0);
+  await expect(page.locator('#library')).toBeVisible();
+  await expect(page.locator('#studioNavigation')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.dataset.boot || '')).toBe('done');
+});
+
 test.describe('playback failure', () => {
 // Route interception must not be bypassed by a controlling service worker.
 // Other Studio tests retain real SW coverage, including protected cache checks.

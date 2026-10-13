@@ -283,8 +283,53 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v17/,
+  assert.match(code, /lanpaper-static-v18/,
     'the precache generation must be bumped whenever the panel assets change');
+});
+
+test('the boot screen covers the unassembled panel and is always released', () => {
+  // Разметка admin.html — не тот вид, который получится: initializeStudio()
+  // переносит шапку в рельсу, hydrateIcons() рисует значки,
+  // applyTranslations() ставит подписи. Пока этого не произошло, панель
+  // выглядит иначе, поэтому её закрывает экран загрузки. Три вещи обязаны
+  // выполняться вместе: метку ставит prepaint.js (единственный скрипт до
+  // первой отрисовки), app.js снимает её после сборки, и она снимается сама,
+  // если app.js не выполнится, — иначе панель останется пустой навсегда.
+  const prepaint = read('static/js/prepaint.js');
+  assert.match(adminHtml, /id="bootScreen"/, 'the boot screen disappeared from admin.html');
+  assert.match(prepaint, /dataset\.boot = 'pending'/,
+    'prepaint.js no longer arms the boot screen before the first paint');
+  assert.match(prepaint, /dataset\.layout !== 'studio'/,
+    'nothing keeps the sign-in page, which no script assembles, out of the boot screen');
+  assert.match(prepaint, /window\.LANPAPER_BOOT = \{ reveal: reveal \}/,
+    'prepaint.js no longer publishes the release app.js has to call');
+  assert.match(prepaint, /setTimeout\(reveal, \d+\)/,
+    'nothing releases the boot screen when app.js never runs');
+  // Ресурс, который не загрузился, события не всплывает: без capture скрипт
+  // панели молча остаётся за экраном до таймаута.
+  const listener = prepaint.match(
+    /addEventListener\('error', function \(event\) \{([\s\S]*?)\n        \}, true\);/);
+  assert.ok(listener, 'the boot screen no longer listens for a panel script that failed');
+  assert.match(listener[1], /tagName !== 'SCRIPT'/,
+    'a failed image or stylesheet now releases the boot screen as if app.js had failed');
+  const init = scriptSource.match(/async function init\(\) \{([\s\S]*?)\n    \}/);
+  assert.ok(init, 'init() disappeared');
+  assert.match(init[1], /window\.LANPAPER_BOOT\?\.reveal\(\)/,
+    'app.js no longer releases the boot screen');
+  for (const step of ['initializeStudio(t)', 'applyTranslations()', 'hydrateIcons(document)', 'render();']) {
+    assert.ok(init[1].indexOf(step) < init[1].indexOf('LANPAPER_BOOT'),
+      `the boot screen is released before ${step}, so the panel flashes half-built`);
+  }
+  // Без метки экран должен оставаться выключенным: prepaint.js — отдельный
+  // файл, и если он не загрузится, панель грузится как раньше.
+  const studioCss = read('static/css/studio.css');
+  const boot = studioCss.slice(studioCss.indexOf('\n.boot {'));
+  assert.match(boot, /\.boot \{\s*display: none;/,
+    'the boot screen shows even when prepaint.js never armed it');
+  assert.match(boot, /:root\[data-boot\] \.boot[\s\S]*?display: flex;/,
+    'nothing turns the boot screen on once it is armed');
+  assert.match(boot, /:root\[data-boot="done"\] \.boot[\s\S]*?opacity: 0;/,
+    'the boot screen no longer fades out when it is released');
 });
 
 test('copying reports the truth, and the upload toast stays until the upload ends', () => {

@@ -1682,3 +1682,219 @@
     color: #fff;
     opacity: 1;
 }
+
+/* ============================================================
+   ЗАГРУЗКА
+   Панель собирается скриптом: initializeStudio() переносит шапку в
+   рельсу, hydrateIcons() рисует значки, applyTranslations() ставит
+   подписи. Пока этого не произошло, разметка — не тот вид, который
+   получится, и показывать её незачем: экран ниже рисует каркас
+   будущего вида, а prepaint.js и app.js держат его ровно до
+   готовности панели.
+   ============================================================ */
+
+/* Экран показывается, только если его включил prepaint.js: без метки на
+   <html> панель грузится как раньше, а не остаётся пустой навсегда. */
+.boot {
+    display: none;
+}
+:root[data-boot] .boot {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: flex;
+    background: var(--bg);
+    overflow: hidden;
+}
+/* Панель под экраном невидима, но остаётся в потоке: initializeStudio()
+   раскладывает её по настоящим размерам, а display: none их бы убрал. */
+:root[data-boot="pending"] .shell,
+:root[data-boot="pending"] .fab,
+:root[data-boot="pending"] .toasts {
+    visibility: hidden;
+}
+:root[data-boot="done"] .boot {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+.boot__rail {
+    flex: none;
+    width: var(--rail-width);
+    padding: 25px 16px 18px;
+    display: flex;
+    flex-direction: column;
+}
+.boot__main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0 26px;
+    overflow: hidden;
+}
+/* Каркас рельсы повторяет настоящую: те же марка, название и отступы. */
+.boot__brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0 7px 26px;
+}
+.boot__mark {
+    flex: none;
+    width: 25px;
+    height: 25px;
+    border-radius: 7px;
+}
+.boot__name {
+    font-family: var(--font-ui);
+    font-size: 18px;
+    font-weight: 750;
+    letter-spacing: -0.8px;
+    color: var(--text);
+}
+/* Заготовки под «Новую ссылку», подпись и фильтры — тех же размеров,
+   что настоящие кнопка и чипы в рельсе. */
+.boot__line {
+    display: block;
+    border-radius: 8px;
+}
+.boot__line--action {
+    height: 36px;
+    margin-bottom: 29px;
+}
+.boot__line--label {
+    width: 52px;
+    height: 8px;
+    margin: 0 10px 11px;
+    border-radius: 4px;
+}
+.boot__chips {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.boot__line--chip {
+    height: 34px;
+}
+.boot__bar {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    min-height: 66px;
+}
+.boot__line--title {
+    width: 96px;
+    height: 20px;
+    border-radius: 5px;
+}
+.boot__line--search {
+    flex: 0 1 265px;
+    height: 32px;
+    margin-left: auto;
+    border-radius: 7px;
+}
+.boot__dot {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+}
+/* Мерцание то же, что у скелетонов плиток: экран не должен выглядеть
+   замершим рядом с ними. */
+.boot__line,
+.boot__mark,
+.boot__dot {
+    background-color: var(--surface-hover);
+    background-image: linear-gradient(
+        90deg,
+        transparent 0%,
+        var(--surface-3) 50%,
+        transparent 100%
+    );
+    background-size: 220% 100%;
+    background-repeat: no-repeat;
+    animation: shimmer 1.5s linear infinite;
+}
+/* Колонки и отступы — как у сетки панели, чтобы плитки не сдвигались
+   в момент, когда экран сменится настоящей панелью. */
+.boot__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(236px, 1fr));
+    gap: var(--s-4);
+    align-content: start;
+    overflow: hidden;
+}
+/* Вид «список» известен до отрисовки — prepaint.js пишет его в data-view,
+   поэтому каркас сразу в одну колонку, как сетка панели. */
+:root[data-view="list"] .boot__grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-2-5);
+}
+@media (max-width: 1080px) {
+    .boot__grid {
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: var(--s-3);
+    }
+    .boot__main {
+        padding-inline: 20px;
+    }
+    .boot__bar {
+        gap: 12px;
+    }
+}
+@media (max-width: 760px) {
+    /* На телефоне рельса — верхняя строка, как в самой панели. */
+    .boot {
+        flex-direction: column;
+    }
+    .boot__rail {
+        width: 100%;
+        flex-direction: row;
+        align-items: center;
+        gap: 12px;
+        padding: 15px 16px 9px;
+    }
+    .boot__brand {
+        margin: 0 auto 0 0;
+    }
+    .boot__line--action {
+        width: 96px;
+        margin-bottom: 0;
+    }
+    .boot__line--label,
+    .boot__chips {
+        display: none;
+    }
+    .boot__main {
+        padding-inline: 16px;
+    }
+    .boot__bar {
+        flex-wrap: wrap;
+        gap: 10px;
+        min-height: 56px;
+        padding: 9px 0 14px;
+    }
+    .boot__line--search {
+        order: 2;
+        flex: 1 1 100%;
+        height: 36px;
+        margin-left: 0;
+    }
+}
+@media (max-width: 720px) {
+    .boot__grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    }
+}
+@media (max-width: 560px) {
+    .boot__grid {
+        grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+        gap: var(--s-2-5);
+    }
+}
+@media (max-width: 340px) {
+    .boot__grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

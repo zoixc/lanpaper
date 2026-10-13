@@ -5,7 +5,9 @@
  * The panel runs under a Content-Security-Policy without 'unsafe-inline', so
  * this cannot be an inline <script>. It is loaded synchronously in <head>:
  * the saved theme must be applied before the browser paints, otherwise a dark
- * panel flashes white on every load.
+ * panel flashes white on every load. For the same reason it arms the boot
+ * screen: the panel keeps its unassembled markup hidden until app.js has
+ * built the real one.
  *
  * Keys: 'lp-ui' is the current one; 'theme', 'viewMode', 'sortBy' and 'lang'
  * are the keys panels installed before 2.0 wrote, and they are read so an
@@ -13,6 +15,45 @@
  */
 (function () {
     'use strict';
+
+    (function () {
+        /* Экран загрузки включается здесь, до первой отрисовки: app.js —
+           модуль, он выполняется после разбора документа и ждёт словарь,
+           а до этого разметка панели — не тот вид, который получится.
+           Снимает экран app.js; если он не выполнится (нет модулей, упала
+           сеть, ошибка в скрипте), экран снимается по таймауту: пустая
+           страница хуже промежуточной. Входной страницы это не касается —
+           она статична и собирается без скрипта. */
+        if (document.documentElement.dataset.layout !== 'studio') return;
+        var timer = 0;
+
+        function reveal() {
+            if (document.documentElement.dataset.boot !== 'pending') return;
+            document.documentElement.dataset.boot = 'done';
+            clearTimeout(timer);
+            /* Узел снимаем позже: метка убирает его с глаз (opacity), а
+               сама панель к этому моменту уже нарисована. */
+            setTimeout(function () {
+                var screen = document.getElementById('bootScreen');
+                if (screen && screen.parentNode) screen.parentNode.removeChild(screen);
+            }, 300);
+        }
+
+        document.documentElement.dataset.boot = 'pending';
+        /* 8 с: панель успевает собраться даже на медленном сервере, а
+           сломанный скрипт не оставит её пустой навсегда. */
+        timer = setTimeout(reveal, 8000);
+        /* capture: так ловится и скрипт, который не загрузился (у события
+           нет всплытия), и необработанное исключение — в обоих случаях
+           init() до своей метки не дойдёт. Остальные ресурсы (картинка,
+           шрифт, стили) в счёт не идут: без них панель собирается. */
+        window.addEventListener('error', function (event) {
+            var target = event.target;
+            if (target && target !== window && target.tagName !== 'SCRIPT') return;
+            reveal();
+        }, true);
+        window.LANPAPER_BOOT = { reveal: reveal };
+    })();
 
     (function () {
         try {

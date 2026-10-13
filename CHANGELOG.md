@@ -5,6 +5,18 @@ Notable changes to Lanpaper. Docker images are published as
 
 ## [Unreleased]
 
+### Fixed
+
+- The panel no longer flashes its unassembled markup while it loads. The saved
+  markup is not the layout the user gets — `initializeStudio()` moves the header
+  into the navigation rail, `hydrateIcons()` draws the icons and
+  `applyTranslations()` writes the labels — so a boot screen showing that final
+  skeleton (rail, header row and a grid of shimmering tiles) now covers the
+  panel from the first paint until `app.js` reports it built. `prepaint.js`
+  arms it, and it releases itself on a timeout or on a panel script that failed
+  to load, so a broken script can never leave the panel permanently blank.
+  Precache generation moves to `lanpaper-static-v18`.
+
 ## [0.19.1] – 2026-10-13
 
 ### Fixed

@@ -2533,6 +2533,11 @@ import { RENDER_CHUNK, createAppState, normalizeLink, mediaExt, isVideoMedia, ma
         applyView();
         renderChips();
         render();
+        /* Панель собрана: шапка перенесена в рельсу, значки нарисованы,
+           подписи поставлены. Экран загрузки снимается здесь, а не после
+           списка: в сетке те же скелетоны, что нарисовал render(), поэтому
+           смена одного на другое почти незаметна. */
+        window.LANPAPER_BOOT?.reveal();
         initGridEvents();
         initDragDrop();
         initShortcuts();
