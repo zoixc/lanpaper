@@ -201,24 +201,31 @@ ol {
     --info: #3e4147;
     --info-soft: rgba(27, 28, 30, 0.07);
 
-    /* Матование превью: поля вокруг вписанного кадра */
+    /* Матование превью: поля вокруг вписанного кадра. Шашечка под
+       прозрачный кадр — те же две ступени подложки: отдельные цвета для
+       неё жили только в базе и на чужих палитрах оставались синими. */
     --matte: #eceef2;
-    --checker-a: #f4f5f7;
-    --checker-b: #e7e9ed;
     --shade: rgba(16, 17, 20, 0.62); /* подписи на кадре */
 
     /* Тени. У каждой поверхности — своя высота, и это видно без «парения»:
        мягкий разлёт с отрицательным spread держит тень под элементом, а не
-       вокруг него. Свечения и цветных градиентов нет ни у одной. */
-    --shadow-xs: 0 1px 1px rgba(20, 22, 32, 0.03);
-    --shadow-md: 0 2px 5px rgba(20, 22, 32, 0.04), 0 8px 18px -14px rgba(20, 22, 32, 0.12);
-    --shadow-lg: 0 4px 10px rgba(20, 22, 32, 0.05), 0 18px 36px -26px rgba(20, 22, 32, 0.18);
+       вокруг него. Свечения и цветных градиентов нет ни у одной. Оттенок
+       самой тени задаёт --shadow-rgb: на шалфее тень не должна быть синей,
+       поэтому у каждой палитры свой. */
+    --shadow-rgb: 20, 22, 32;
+    --shadow-xs: 0 1px 1px rgba(var(--shadow-rgb), 0.03);
+    --shadow-md:
+        0 2px 5px rgba(var(--shadow-rgb), 0.04), 0 8px 18px -14px rgba(var(--shadow-rgb), 0.12);
+    --shadow-lg:
+        0 4px 10px rgba(var(--shadow-rgb), 0.05), 0 18px 36px -26px rgba(var(--shadow-rgb), 0.18);
     /* Плитка. На светлом фоне сама поверхность белее фона, поэтому хватает
        одной мягкой тени по нижнему краю — карточка перестаёт быть наклейкой. */
-    --shadow-card: 0 1px 2px rgba(20, 22, 32, 0.03), 0 4px 10px -8px rgba(20, 22, 32, 0.1);
-    --shadow-card-hover: 0 1px 3px rgba(20, 22, 32, 0.04), 0 8px 18px -12px rgba(20, 22, 32, 0.14);
+    --shadow-card:
+        0 1px 2px rgba(var(--shadow-rgb), 0.03), 0 4px 10px -8px rgba(var(--shadow-rgb), 0.1);
+    --shadow-card-hover:
+        0 1px 3px rgba(var(--shadow-rgb), 0.04), 0 8px 18px -12px rgba(var(--shadow-rgb), 0.14);
     /* Липкая шапка: тень уходит вниз, отделяя её от содержимого */
-    --shadow-bar: 0 6px 14px -14px rgba(20, 22, 32, 0.2);
+    --shadow-bar: 0 6px 14px -14px rgba(var(--shadow-rgb), 0.2);
     --shadow-focus: 0 0 0 3px rgba(var(--accent-rgb), 0.22);
 
     /* Радиусы */
@@ -347,8 +354,7 @@ html[data-theme="dark"] {
     --info-soft: rgba(233, 234, 236, 0.08);
 
     --matte: #23262c;
-    --checker-a: #22262e;
-    --checker-b: #2a2f38;
+    --shadow-rgb: 14, 16, 24;
     --shade: rgba(8, 9, 11, 0.66);
 
     --shadow-xs: 0 1px 1px rgba(0, 0, 0, 0.25);
@@ -384,6 +390,7 @@ html[data-palette="indigo"] {
     --surface-hover: #eff1f6;
     --surface-3: #e7eaf1;
     --matte: #eceef2;
+    --shadow-rgb: 20, 22, 32;
     --accent: #5a66b5;
     --accent-rgb: 90, 102, 181;
     --accent-hover: #4e5aa9;
@@ -399,6 +406,7 @@ html[data-palette="indigo"][data-theme="dark"] {
     --surface-hover: #242830;
     --surface-3: #2a2f38;
     --matte: #23262c;
+    --shadow-rgb: 14, 16, 24;
     --accent: #9aa4e8;
     --accent-rgb: 154, 164, 232;
     --accent-hover: #aab3ee;
@@ -418,6 +426,7 @@ html[data-palette="sage"] {
     --border-2: #cfd9d3;
     --border-strong: #b9c6be;
     --matte: #eaefeb;
+    --shadow-rgb: 20, 28, 24;
     --accent: #4f7c68;
     --accent-rgb: 79, 124, 104;
     --accent-hover: #45705d;
@@ -436,6 +445,7 @@ html[data-palette="sage"][data-theme="dark"] {
     --border-2: #39423e;
     --border-strong: #4b564f;
     --matte: #222724;
+    --shadow-rgb: 12, 18, 15;
     --accent: #93c7b2;
     --accent-rgb: 147, 199, 178;
     --accent-hover: #a3d2bf;
@@ -455,6 +465,7 @@ html[data-palette="clay"] {
     --border-2: #d8ccc4;
     --border-strong: #c4b4a9;
     --matte: #efe9e4;
+    --shadow-rgb: 30, 25, 21;
     --accent: #a25d44;
     --accent-rgb: 162, 93, 68;
     --accent-hover: #94533c;
@@ -473,6 +484,7 @@ html[data-palette="clay"][data-theme="dark"] {
     --border-2: #3f382f;
     --border-strong: #524a3e;
     --matte: #262320;
+    --shadow-rgb: 18, 14, 11;
     --accent: #e0a489;
     --accent-rgb: 224, 164, 137;
     --accent-hover: #e9b199;
@@ -492,6 +504,7 @@ html[data-palette="graphite"] {
     --border-2: #d2d3d7;
     --border-strong: #bcbdc3;
     --matte: #ededef;
+    --shadow-rgb: 24, 25, 27;
     --accent: #4e5763;
     --accent-rgb: 78, 87, 99;
     --accent-hover: #444c57;
@@ -510,6 +523,7 @@ html[data-palette="graphite"][data-theme="dark"] {
     --border-2: #3c3f43;
     --border-strong: #4e5257;
     --matte: #242628;
+    --shadow-rgb: 13, 14, 15;
     --accent: #aab4c2;
     --accent-rgb: 170, 180, 194;
     --accent-hover: #bac3cf;
@@ -529,6 +543,7 @@ html[data-palette="ocean"] {
     --border-2: #cdd9dc;
     --border-strong: #b6c6ca;
     --matte: #e9eff1;
+    --shadow-rgb: 19, 26, 29;
     --accent: #2f7c88;
     --accent-rgb: 47, 124, 136;
     --accent-hover: #296e79;
@@ -547,6 +562,7 @@ html[data-palette="ocean"][data-theme="dark"] {
     --border-2: #384144;
     --border-strong: #4a5458;
     --matte: #222729;
+    --shadow-rgb: 11, 16, 18;
     --accent: #7cc6d2;
     --accent-rgb: 124, 198, 210;
     --accent-hover: #90d1db;
@@ -1694,7 +1710,7 @@ html[data-theme="dark"] .select {
     border-bottom: 1px solid var(--border);
 }
 .card__frame--checker {
-    background-image: repeating-conic-gradient(var(--checker-a) 0% 25%, var(--checker-b) 0% 50%);
+    background-image: repeating-conic-gradient(var(--surface-2) 0% 25%, var(--surface-3) 0% 50%);
     background-size: 16px 16px;
     background-position: 50% 50%;
 }

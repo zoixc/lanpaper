@@ -159,6 +159,29 @@ Notable changes to Lanpaper. Docker images are published as
   visual viewport, not the layout, so a centred dialog would otherwise stay
   put and sink.
 
+- **Shadows and the transparency checker follow the palette too.** All six
+  shadows were painted with one hard-coded indigo grey (`rgba(20, 22, 32, …)`)
+  in every palette and both themes; every palette now sets `--shadow-rgb` and
+  the shadow tokens read it, so a sage panel casts a sage shadow. The
+  checkerboard behind a transparent frame had two colours of its own, declared
+  in the base only and therefore blue everywhere: it now uses the same two
+  surface steps the rest of the panel uses, which is one fewer set of literals
+  to keep in sync and one fewer place where a palette can be forgotten.
+- **The brand matches the button it stands above.** The mark and the app name
+  span the same width as «Новая ссылка», and the mark starts where the icon
+  inside that button starts (12px for both), so the two left edges line up.
+  The gap between the mark and the name is 12px — the same proportion to a
+  25px mark that the button keeps between its 7px gap and 14px icon. The name
+  is set in the size of the page title: both read one `--studio-title-size`
+  token (20px, 18px on a phone, 17px below 340px), and the name keeps its own
+  face and weight.
+- **«Ссылки» is no longer cut short before the search has given way.** An
+  earlier change put the appbar row on one line and let the title shrink with
+  an ellipsis, so near the phone breakpoint the word was cut to «Ссы…». The
+  title does not shrink at all now — the search narrows to its floor instead,
+  which keeps the word whole in every language, including with the «select
+  all» chip beside it in selection mode.
+
 ## [0.19.1] – 2026-10-13
 
 ### Fixed

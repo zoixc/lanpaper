@@ -12,8 +12,8 @@
     --card-padding: 16px 12px 19px;
     --card-padding-phone: 12px 5px 14px;
     --card-gap: 7px;
-    --shadow-card: 0 2px 3px rgba(0, 0, 0, 0.025);
-    --shadow-card-hover: 0 6px 16px -10px rgba(0, 0, 0, 0.18);
+    --shadow-card: 0 2px 3px rgba(var(--shadow-rgb), 0.025);
+    --shadow-card-hover: 0 6px 16px -10px rgba(var(--shadow-rgb), 0.18);
 }
 :root[data-palette="mono"] {
     --bg: #f4f4f4;
@@ -33,6 +33,7 @@
     --border-2: #c5c5c5;
     --border-strong: #a0a0a0;
     --matte: #ececec;
+    --shadow-rgb: 26, 26, 26;
 }
 :root[data-palette="mono"][data-theme="dark"] {
     --bg: #171717;
@@ -53,8 +54,9 @@
     --border-2: #555555;
     --border-strong: #747474;
     --matte: #292929;
-    --shadow-card: 0 2px 3px rgba(0, 0, 0, 0.12);
-    --shadow-card-hover: 0 6px 16px -10px rgba(0, 0, 0, 0.5);
+    --shadow-rgb: 10, 10, 10;
+    --shadow-card: 0 2px 3px rgba(var(--shadow-rgb), 0.12);
+    --shadow-card-hover: 0 6px 16px -10px rgba(var(--shadow-rgb), 0.5);
 }
 /* Identity lives in type, proportion and a few black rules — not decoration. */
 .brand__name {
@@ -636,6 +638,9 @@
     --r-xl: 16px;
     --card-padding: 10px 2px 0;
     --card-padding-phone: 10px 2px 0;
+    /* Один размер у названия приложения в рельсе и у заголовка «Ссылки»
+       в шапке: они стоят на одной линии и читаются одним голосом. */
+    --studio-title-size: 20px;
     --studio-control-radius: 9px;
     --studio-inner-radius: 6px;
     --studio-control-shadow: 0 1px 2px rgb(0 0 0 / 4%);
@@ -681,9 +686,13 @@
         transform var(--dur-slow) var(--ease),
         visibility 0s;
 }
+/* Блок марки — той же ширины, что кнопка «Новая ссылка», а значок стоит
+   там же, где значок в кнопке: свои 12px отступа у них общие. Отступ до
+   названия (12px на 25px значок) держит ту же пропорцию, что внутри
+   кнопки (7px на 14px). */
 .studio .catalog-rail .brand {
     margin: 0 7px 26px;
-    gap: 9px;
+    gap: 12px;
 }
 /* Одна верхняя линия на двоих. Блок марки занимает ту же высоту, что строка
    шапки, и начинается от самого верха рельсы: знак, название и заголовок
@@ -698,6 +707,8 @@
     .studio .catalog-rail .brand {
         height: var(--studio-head-height);
         flex: none;
+        margin-inline: 0;
+        padding-inline: 12px;
     }
 }
 .studio .catalog-rail .brand__mark {
@@ -711,7 +722,7 @@
 }
 .studio .catalog-rail .brand__name {
     font-family: var(--font-ui);
-    font-size: 18px;
+    font-size: var(--studio-title-size);
     font-weight: 750;
     letter-spacing: -0.8px;
 }
@@ -770,16 +781,16 @@
 }
 /* Одна строка, всегда: при раскрытой рельсе содержимое шапки уезжает вправо на
    ширину колонки, и с переносом кнопки в этот момент прыгали бы на вторую
-   строку. Место уступает поиск, а за ним заголовок — он обрезается
-   многоточием, поэтому строка не расползается ни при какой ширине. */
+   строку. Место уступает поиск, а не заголовок: «Ссылки» должно читаться
+   целиком на любом языке, поэтому заголовок не сжимается вовсе, а поле
+   поиска сужается до своего предела. */
 .studio .appbar__row--top {
     min-height: var(--studio-head-height);
     gap: 18px;
     flex-wrap: nowrap;
 }
 .studio .appbar .page-head {
-    flex: 0 1 auto;
-    min-width: 0;
+    flex: none;
     display: flex;
     align-items: center;
     gap: 9px;
@@ -788,7 +799,7 @@
 }
 .studio .appbar .page-head__title {
     font-family: var(--font-ui);
-    font-size: 20px;
+    font-size: var(--studio-title-size);
     letter-spacing: -0.8px;
     font-weight: 650;
     line-height: 1.2;
@@ -941,7 +952,6 @@
     }
     .studio .catalog-rail .brand__name {
         display: block;
-        font-size: 17px;
     }
     .studio .catalog-rail #newLinkBtn {
         margin: 0;
@@ -960,6 +970,7 @@
     }
     :root.studio {
         --studio-head-height: 56px;
+        --studio-title-size: 18px;
     }
     .studio .appbar__row--top {
         padding: 9px 0 14px;
@@ -1416,9 +1427,6 @@
     .studio .appbar .page-head {
         gap: 6px;
     }
-    .studio .appbar .page-head__title {
-        font-size: 18px;
-    }
     .studio .appbar__row--top {
         gap: 8px;
         flex-wrap: wrap;
@@ -1744,8 +1752,8 @@
     text-align: center;
 }
 @media (max-width: 340px) {
-    .studio .appbar .page-head__title {
-        font-size: 17px;
+    :root.studio {
+        --studio-title-size: 17px;
     }
     .palette-controls {
         gap: 8px;

@@ -283,7 +283,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v26/,
+  assert.match(code, /lanpaper-static-v27/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 
@@ -663,12 +663,8 @@ test('the appbar row stays on one line when the rail opens', () => {
     'only the phone row may wrap — there the search takes a line of its own'
   );
   assert.match(studio, /\.studio \.search \{[\s\S]*?min-width: \d+px;/, 'the search has no floor: it shrinks into a slot');
-  assert.match(studio, /\.studio \.appbar \.page-head \{\s*flex: 0 1 auto;/, 'the title cannot give way, so the row overflows');
-  assert.match(
-    studio,
-    /\.studio \.appbar \.page-head__title \{[\s\S]*?text-overflow: ellipsis;/,
-    'a long title is not cut short with an ellipsis'
-  );
+  assert.match(studio, /\.studio \.appbar \.page-head \{\s*flex: none;/,
+    'the title gives way again: «Ссылки» is cut to «Ссы…» long before the search has spent its width');
 });
 
 test('the compact new-link button collapses instead of vanishing', () => {
@@ -724,17 +720,27 @@ test('every palette carries its own surface ramp', () => {
   const dark = block(style, /^html\[data-theme="dark"\] \{([\s\S]*?)^\}/m, 'the dark base tokens');
   const palettes = [...style.matchAll(/^html\[data-palette="(\w+)"\](?:\[data-theme="(\w+)"\])? \{([\s\S]*?)^\}/gm)];
   assert.equal(palettes.length, 10, 'a palette block appeared or disappeared: check the list');
-  for (const [, palette, theme, body] of palettes) {
-    const own = values(body);
-    const root = theme === 'dark' ? dark : base;
-    assert.ok(own['--surface-hover'], `${palette} ${theme}: no --surface-hover, so the indigo wash stays`);
+  const check = (name, own, root) => {
+    assert.ok(own['--surface-hover'], `${name}: no --surface-hover, so the indigo wash stays`);
+    assert.ok(own['--shadow-rgb'], `${name}: no --shadow-rgb, so the shadows keep the indigo tint`);
     if (own['--surface-2'] && own['--surface-2'] !== root['--surface-2']) {
       assert.notEqual(own['--surface-hover'], root['--surface-hover'],
-        `${palette} ${theme} paints --surface-2 in its own colour but keeps the base hover`);
+        `${name} paints --surface-2 in its own colour but keeps the base hover`);
+      assert.notEqual(own['--shadow-rgb'], root['--shadow-rgb'],
+        `${name} paints its own surfaces but keeps the base shadow tint`);
     }
+  };
+  for (const [, palette, theme, body] of palettes) {
+    check(`${palette} ${theme}`, values(body), theme === 'dark' ? dark : base);
   }
-  const mono = block(studio, /^:root\[data-palette="mono"\] \{([\s\S]*?)^\}/m, 'the mono tokens');
-  assert.notEqual(mono['--surface-hover'], base['--surface-hover'], 'mono keeps the indigo hover');
+  check('mono light', block(studio, /^:root\[data-palette="mono"\] \{([\s\S]*?)^\}/m, 'the mono tokens'), base);
+  check('mono dark', block(studio, /^:root\[data-palette="mono"\]\[data-theme="dark"\] \{([\s\S]*?)^\}/m, 'the mono dark tokens'), dark);
+  // Шашечка под прозрачный кадр — ступени той же подложки, а не свой цвет:
+  // отдельные токены жили только в базе и на чужих палитрах были синими.
+  assert.ok(!/--checker-[ab]\s*:/.test(style), 'the checkerboard has its own colours again');
+  assert.match(style, /repeating-conic-gradient\(var\(--surface-2\)[\s\S]*?var\(--surface-3\)/,
+    'the checkerboard no longer follows the palette surface ramp');
+  assert.ok(!/rgba\(20, 22, 32/.test(style), 'a shadow is tinted by hand: it has to read --shadow-rgb');
 });
 
 test('a text field marks focus with its fill, not with a frame', () => {
@@ -782,4 +788,33 @@ test('the create dialog stays centred on a phone', () => {
   const overlay = read('static/js/overlay-controller.js');
   assert.match(overlay, /setProperty\('--keyboard-inset'/,
     'nothing measures the keyboard, so the dialog stays under it');
+});
+
+test('the brand block matches the new-link button it stands above', () => {
+  // Марка и кнопка начинаются на одной вертикали: блок — той же ширины, что
+  // кнопка, и значок отстоит от края так же, как значок внутри неё. Название
+  // приложения набрано тем же кеглем, что «Ссылки» в шапке, — одним токеном,
+  // чтобы они не разъезжались по размеру на разных ширинах.
+  const studio = read('static/css/studio.css');
+  const brand = studio.match(/\.studio \.catalog-rail \.brand \{([\s\S]*?)\n\}/);
+  assert.ok(brand, 'the brand rule disappeared');
+  assert.match(brand[1], /gap: \d+px;/, 'the gap between the mark and the name is back to the inherited one');
+  const wide = studio.match(/@media \(min-width: 761px\) \{([\s\S]*?)\n\}\n/);
+  assert.ok(wide, 'the desktop rail rules disappeared');
+  const wideBrand = wide[1].match(/\.studio \.catalog-rail \.brand \{([\s\S]*?)\n    \}/);
+  assert.ok(wideBrand, 'the brand is no longer stretched on a wide screen');
+  assert.match(wideBrand[1], /margin-inline: 0;/, 'the brand is narrower than the button by its own margins');
+  assert.match(wideBrand[1], /padding-inline: 12px;/,
+    'the mark no longer starts where the icon inside the button starts');
+  const button = studio.match(/\.studio \.catalog-rail #newLinkBtn \{([\s\S]*?)\n\}/);
+  assert.ok(button, 'the rail button rule disappeared');
+  const inset = button[1].match(/padding-inline: (\d+)px;/);
+  assert.equal(inset && inset[1], '12', 'the button padding moved: the brand inset has to move with it');
+  assert.match(studio, /--studio-title-size: 20px;/, 'the shared title size token disappeared');
+  const sources = [...studio.matchAll(/font-size: var\(--studio-title-size\)/g)];
+  assert.equal(sources.length, 2, 'the title and the brand name no longer share one size');
+  assert.ok(!/^\.studio \.catalog-rail \.brand__name \{[^}]*font-size: \d+px/m.test(studio),
+    'the brand name has a size of its own again');
+  assert.ok(!/\.studio \.appbar \.page-head__title \{[^}]*font-size: \d+px/.test(studio),
+    'the title has a size of its own again');
 });
