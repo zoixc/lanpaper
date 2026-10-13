@@ -22,3 +22,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+
+  - package-ecosystem: npm
+    directory: /tools
+    schedule:
+      interval: weekly
+    groups:
+      css-tools:
+        patterns: [ "*" ]

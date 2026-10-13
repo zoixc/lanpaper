@@ -9,13 +9,15 @@
    состояние, которого нет.
    ============================================================ */
 import { request, ApiError } from './api.js';
+import { initializeStudio } from './studio-layout.js';
+import { createVideoPreview, stopMedia } from './media-preview.js';
 import { registerPanelFacade, getFeature } from './features.js';
 import { accessMeta, entryMeta as formatEntryMeta, entryTitle as formatEntryTitle,
     panelSnapshot } from './feature-domain.js';
 import { createUploadFeature } from './upload-feature.js';
 import { createOverlayController } from './overlay-controller.js';
 import { observeConnectivity } from './operation-state.js';
-import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as linkMatchesQuery,
+import { RENDER_CHUNK, createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as linkMatchesQuery,
     countFilteredLinks, resetIncrementalRender, selectVisibleLinks } from './state.js';
 
 (function () {
@@ -264,6 +266,7 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
     function validLinkName(name) {
         return LINK_NAME_RE.test(name) && RESERVED_NAMES.indexOf(name.toLowerCase()) < 0;
     }
+    let studioLayout = null;
     const state = createAppState({ config: {
         maxUploadMB: 50, playlistMax: 8, historyLimit: 3,
         historyBudgetBytes: 0, langs: LANGS
@@ -338,6 +341,7 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
            подчёркивает каждое слово. prepaint.js ставит язык только для
            сохранённого выбора — здесь он ставится всегда. */
         document.documentElement.lang = state.lang;
+        if (studioLayout) studioLayout.labels();
         $$('[data-i18n]', root || document).forEach(function (el) {
             el.textContent = t(el.dataset.i18n);
         });
@@ -402,12 +406,12 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
             dot.style.background = swatchColor(dot.dataset.palette);
         });
     }
-    function applyPalette() {
+    function applyPalette(root) {
         document.documentElement.dataset.palette = state.palette;
-        $$('#paletteRow .swatch input').forEach(function (input) {
+        $$('#paletteRow .swatch input', root).forEach(function (input) {
             input.checked = input.value === state.palette;
         });
-        const name = $('#paletteName');
+        const name = $('#paletteName', root);
         if (name) name.textContent = t('palette_' + state.palette);
     }
     function applyView() {
@@ -651,7 +655,7 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
         if (!hasFrame(link)) {
             frame.classList.add('card__frame--empty');
             img.remove();
-            frame.append(icon('imageOff'));
+            if (!isVideoMedia(link)) frame.append(icon('imageOff'));
         } else {
             img.src = previewSrc(link);
             img.alt = '';
@@ -824,7 +828,7 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
         const left = Math.max(0, list.length - state.shown);
         box.classList.toggle('is-hidden', state.loading || left === 0);
         if (!left) return;
-        $('#loadMoreBtn').textContent = t('loading_more', { count: Math.min(CHUNK, left) });
+        $('#loadMoreBtn').textContent = t('loading_more', { count: Math.min(RENDER_CHUNK, left) });
         box.querySelector('[data-left]').textContent = t('shown_of', { shown: state.shown, total: list.length });
     }
 
@@ -869,7 +873,7 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
     function showMore() {
         const list = visibleLinks();
         const before = state.shown;
-        state.shown = Math.min(list.length, state.shown + CHUNK);
+        state.shown = Math.min(list.length, state.shown + RENDER_CHUNK);
         const grid = $('#grid');
         const frag = document.createDocumentFragment();
         list.slice(before, state.shown).forEach(link => frag.append(cardFor(link)));
@@ -1457,6 +1461,7 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
         }
 
         const body = $('[data-body]', node);
+        stopMedia(body);
         body.innerHTML = '';
         const builders = { media: panelMedia, versions: panelVersions, playlist: panelPlaylist, access: panelAccess };
         body.append((builders[state.panelTab] || panelMedia)(link));
@@ -1478,9 +1483,14 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
         /* Превью текущего файла */
         const fit = fitMode(link);
         const frame = h('div', { class: 'card__frame panel-preview' });
-        if (!hasFrame(link)) {
+        if (link.hasImage && isVideoMedia(link)) {
+            frame.append(createVideoPreview(document, {
+                src: '/api/preview/' + encodeURIComponent(link.linkName),
+                label: t('video_play'), error: t('video_error')
+            }));
+        } else if (!hasFrame(link)) {
             frame.classList.add('card__frame--empty');
-            frame.append(icon('imageOff'));
+            frame.append(icon(isVideoMedia(link) ? 'play' : 'imageOff'));
         } else {
             const img = h('img', {
                 class: 'card__media' + (fit === 'contain' ? ' card__media--contain' : ''),
@@ -2181,7 +2191,7 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
                 h('span', { class: 'swatch__dot', 'data-palette': name }));
             row.append(swatch);
         });
-        applyPalette();
+        applyPalette(node);
         paintSwatches(node);
 
         /* Язык */
@@ -2508,6 +2518,7 @@ import { createAppState, normalizeLink, mediaExt, isVideoMedia, matchesQuery as 
         hydrateIcons(document);
         observeConnectivity(window, updateConnectivity);
         await loadDict();
+        studioLayout = initializeStudio(t);
         applyTranslations();
         applyTheme();
         applyPalette();

@@ -5,7 +5,44 @@ Notable changes to Lanpaper. Docker images are published as
 
 ## [Unreleased]
 
+### Fixed
+
+- Settings show the selected palette name immediately, centered beside its
+  swatches without a first-selection layout shift.
+- Video cards no longer fetch media as images. The link panel loads a native
+  player only after activation, uses the authenticated preview endpoint and
+  releases media on tab changes and dismissal. Portrait video and native
+  controls stay inside the preview frame. Unsupported media gets a clear error.
+- The design sandbox uses a static GIF thumbnail and real on-demand video
+  fixtures, rather than animated thumbnails or metadata-only video placeholders.
+
+- Libraries larger than 12 links now render icons and load subsequent chunks
+  without an undefined `CHUNK` exception. Rendering uses the shared state limit.
+- The offline banner lives inside the sticky header instead of covering its
+  controls. Dark-theme secondary text and select arrows have stronger contrast;
+  neutral hover fills and focus rings are consistent. Conflicting mobile search
+  rules were consolidated, preserving the full-width search and scrolling filters.
+- CI checks production CSS contrast in all six palettes and both themes, including
+  nested surfaces. The old design-check entry point delegates to the same checker.
+
 ### Changed
+
+- Release version `0.19.0`: bring the approved Studio layout into the main
+  application, with local Manrope fonts, restrained chrome, collapsible navigation,
+  stable grid/list media geometry, subtle texture and the visible version footer.
+  The sign-in page retains its separate presentation.
+- Add handle-only touch dismissal for sheets, larger coarse-pointer targets,
+  preserved scrolling/focus and translated navigation/video labels in all six
+  languages. Persistent and covered dialogs cannot be dismissed by the gesture.
+- Precache Studio's public assets in static cache v15. Authentication, CSP,
+  protected-media caching boundaries and the image upload pipeline are unchanged;
+  no server video codecs or runtime dependencies are added.
+
+- **Production CSS is easier to edit without changing the design.** Consistent
+  formatting, a section map, spacing/component-padding tokens and documented
+  layer tokens preserve the existing values and cascade. Animation contracts
+  tolerate whitespace changes. Development-only formatting and structural/token
+  checks run in CI; `docs/STYLE_GUIDE.md` documents safe edits and cache updates.
 
 - **The sign-in card says "Lanpaper" once, in a readable size.** `logo.svg` is
   the full wordmark — the icon plus the word — but the card drew it inside a
@@ -33,7 +70,7 @@ Notable changes to Lanpaper. Docker images are published as
     app accepts (36 MP) still fits on its own — and the refused upload gets the
     existing 429 "image processing busy, retry shortly"; preview regeneration
     waits for a free slot, exactly as it already did for the pixel budget.
-- **PNG uploads no longer spend two seconds re-encoding identical pixels.**- **PNG uploads no longer spend two seconds re-encoding identical pixels.**
+- **PNG uploads no longer spend two seconds re-encoding identical pixels.**
   With `COMPRESSION_SCALE=100` (the default) and a quality below 100, a PNG used
   to go through the full compression pass: decode, scale by 100% and re-encode
   the same pixels with the stdlib encoder. PNG is lossless, so the result

@@ -16,6 +16,14 @@ async function signIn(page) {
 }
 
 async function expectNoSeriousViolations(page) {
+  // Measure the settled UI, not partially transparent sheet-entry frames.
+  // Keep animations enabled; ignore only perpetual decorative animations.
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await Promise.allSettled(document.getAnimations()
+      .filter(animation => animation.effect.getTiming().iterations !== Infinity)
+      .map(animation => animation.finished));
+  });
   const results = await new AxeBuilder({ page }).analyze();
   const violations = results.violations.filter((item) => ['serious', 'critical'].includes(item.impact));
   expect(violations, JSON.stringify(violations, null, 2)).toEqual([]);
@@ -45,11 +53,11 @@ test('narrow viewport and 200 percent zoom keep primary actions reachable', asyn
   await page.setViewportSize({ width: 320, height: 640 });
   await signIn(page);
   await page.evaluate(() => { document.documentElement.style.zoom = '2'; });
-  await expect(page.locator('#fabBtn')).toBeVisible();
+  await expect(page.locator('#newLinkBtn')).toBeVisible();
   // At 200% CSS zoom the visual box can sit outside Playwright's actionability
   // viewport even though a touch user can pan to it; dispatch the activation
   // and assert that the resulting dialog remains usable.
-  await page.locator('#fabBtn').evaluate((button) => button.click());
+  await page.locator('#newLinkBtn').evaluate((button) => button.click());
   await expect(page.locator('#createInput')).toBeVisible();
 });
 

@@ -21,6 +21,15 @@ import (
 // Arbitrary files or symlinks placed in static/ (particularly the legacy
 // static/images directory or files on mounted volumes) are never served.
 var staticAssets = map[string]bool{
+	"css/studio.css":                            true,
+	"js/studio-layout.js":                       true,
+	"js/media-preview.js":                       true,
+	"js/sheet-gesture.js":                       true,
+	"fonts/manrope-latin-wght-normal.woff2":     true,
+	"fonts/manrope-latin-ext-wght-normal.woff2": true,
+	"fonts/manrope-cyrillic-wght-normal.woff2":  true,
+	"fonts/OFL-Manrope.txt":                     true,
+
 	"css/style.css":                   true,
 	"js/app.js":                       true,
 	"js/api.js":                       true,

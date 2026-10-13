@@ -238,5 +238,12 @@
   "import_cancelled": "Importation annulée",
   "offline_now": "Vous êtes hors ligne. Les opérations réseau peuvent échouer jusqu’au retour de la connexion.",
   "operation_in_progress": "Cette opération est déjà en cours",
-  "regen_progress": "Aperçus : {{done}} sur {{total}}"
+  "regen_progress": "Aperçus : {{done}} sur {{total}}",
+  "navigation": "Navigation",
+  "app_actions": "Actions de l’application",
+  "expand_navigation": "Développer la navigation",
+  "collapse_navigation": "Réduire la navigation",
+  "video_play": "Lire la vidéo",
+  "video_error": "Ce navigateur ne peut pas lire cette vidéo. Ouvrez le fichier original.",
+  "collection": "Collection"
 }

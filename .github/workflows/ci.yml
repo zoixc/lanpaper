@@ -97,6 +97,14 @@ jobs:
       - name: Syntax check
         run: for f in static/js/*.js static/sw.js; do node --input-type=module --check < "$f"; done
 
+      - name: CSS formatting and structural checks
+        run: |
+          npm ci --prefix tools --ignore-scripts
+          npm run check --prefix tools
+
+      - name: Production palette contrast
+        run: node tools/check-contrast.mjs
+
       - name: Unit tests
         run: node --test tests/*.test.cjs
 
@@ -116,7 +124,7 @@ jobs:
           node-version: lts/*
 
       - name: Build the server
-        run: go build -o "$RUNNER_TEMP/lanpaper" .
+        run: go build -trimpath -ldflags="-X main.Version=$(cat VERSION)" -o "$RUNNER_TEMP/lanpaper" .
 
       - name: Install browser tests
         working-directory: tests/e2e

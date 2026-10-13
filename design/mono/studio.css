@@ -1,0 +1,490 @@
+/* SPDX-License-Identifier: MIT
+ * STUDIO / 03 — quiet chrome, contemporary type, image-first workspace.
+ * Composes with design.css + radical.css; production styles remain untouched.
+ */
+@font-face {
+    font-family: "Manrope Studio";
+    font-style: normal;
+    font-weight: 200 800;
+    font-display: swap;
+    src: url("/demo/fonts/manrope-latin-wght-normal.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+    font-family: "Manrope Studio";
+    font-style: normal;
+    font-weight: 200 800;
+    font-display: swap;
+    src: url("/demo/fonts/manrope-cyrillic-wght-normal.woff2") format("woff2");
+    unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+:root.studio {
+    --font-ui: "Manrope Studio", "Golos Text", sans-serif;
+    --font-display: var(--font-ui);
+    --rail-width: 184px;
+    --r-full: 8px;
+    --r-lg: 12px;
+    --r-xl: 16px;
+}
+.studio[data-palette="mono"] {
+    --bg: #fafafa;
+    --surface: #fff;
+    --border: #e8e8e8;
+    --surface-hover: #ededed;
+    --text-3: #696969;
+}
+.studio[data-palette="mono"][data-theme="dark"] {
+    --bg: #171717;
+    --surface: #222;
+    --border: #303030;
+    --surface-hover: #303030;
+    --text-3: #a0a0a0;
+}
+/* Lab controls are visually separate, but no longer a heavy black strip. */
+.studio .demo-bar { height:30px; background:var(--bg); color:var(--text-3); font-size:9px; padding-inline:20px; border-bottom:1px solid var(--border); }
+.studio .demo-label { font-size:0; }
+.studio .demo-label b { font-size:9px; color:var(--text-3); letter-spacing:.12em; }
+.studio .demo-bar a { color:var(--text-3); padding:2px 0; }
+.studio .demo-bar a[aria-current="page"] { color:var(--text); border-bottom-color:var(--text); }
+.studio .demo-bar a:focus-visible { outline-color:var(--text); }
+.studio .demo-divider { border-color:var(--border-2); }
+.studio .shell { padding-top:30px; }
+.studio .catalog-rail { top:30px; padding:25px 16px 18px; background:var(--bg); border:0; }
+.studio .catalog-rail .brand { margin:0 7px 26px; gap:9px; }
+.studio .catalog-rail .brand__mark { width:25px; height:25px; border-radius:7px; }
+.studio .catalog-rail .brand__mark img { width:25px; height:25px; }
+.studio .catalog-rail .brand__name { font-family:var(--font-ui); font-size:18px; font-weight:750; letter-spacing:-.8px; }
+.studio .catalog-rail #newLinkBtn { min-height:36px; height:36px; margin-bottom:29px; font-size:11px; padding-inline:12px; border-radius:8px; }
+.studio .catalog-label { font-size:8px; letter-spacing:.12em; margin:0 10px 11px; }
+.studio .catalog-rail .chip-row { gap:3px; }
+.studio .catalog-rail .chip { min-height:34px; padding:8px 10px; font-size:11px; font-weight:550; }
+.studio .catalog-rail .chip[aria-pressed="true"] { background:var(--surface-hover); color:var(--text); }
+.studio .catalog-rail .chip[aria-pressed="true"]::before { content:""; width:4px; height:4px; background:var(--text); border-radius:50%; flex:none; }
+.studio .catalog-rail .chip__count { font-size:10px; font-weight:400; }
+.studio .catalog-rail .chip--ghost { font-size:10px; font-weight:450; }
+.studio .catalog-rail .chip-row__sep { margin:9px 10px; }
+.studio-utilities { display:flex; align-items:center; flex-wrap:wrap; gap:4px; margin-top:auto; padding:30px 7px 0; }
+.studio-caption { width:100%; color:var(--text-3); font-size:9px; margin-bottom:7px; }
+.studio-utilities .icon-btn { width:32px; height:32px; min-width:32px; min-height:32px; }
+.studio .appbar { top:30px; border:0; background:var(--bg); }
+.studio .appbar__inner { padding:0 26px; }
+.studio .appbar__row--top { min-height:66px; gap:18px; }
+.studio .appbar .page-head { flex:none; display:flex; align-items:center; gap:9px; padding:0; margin:0; }
+.studio .appbar .page-head__title { font-family:var(--font-ui); font-size:20px; letter-spacing:-.8px; font-weight:650; line-height:1.2; }
+.studio .appbar .page-head__count { align-self:center; font:450 10px/1 var(--font-ui); margin:0; padding:5px 6px; border-radius:5px; background:var(--surface-hover); }
+.studio .appbar .page-head__aside { display:contents; }
+.studio .search { flex:0 1 265px; max-width:265px; margin-left:auto; }
+.studio .search .field { height:32px; padding-left:9px; border:0; background:var(--surface-hover); border-radius:7px; }
+.studio .search input { font-size:11px; }
+.studio .search .field__icon { width:13px; height:13px; }
+.studio .appbar__spacer { display:none; }
+.studio .appbar__actions { gap:7px; --ctl:32px; --ctl-inner:26px; }
+.studio .appbar__actions .icon-btn svg { width:14px; height:14px; }
+.studio .btn-group--view { border:0; background:var(--surface-hover); box-shadow:none; }
+.studio .content { padding:2px 26px 42px; }
+/* Regular contact sheet: no hero panel, no headline occupying a third of the screen. */
+.studio .grid:not(.grid--list) .card:first-child { grid-column:auto; }
+.studio .grid:not(.grid--list) .card__frame,
+.studio .grid:not(.grid--list) .card:first-child .card__frame { border-radius:12px; }
+.studio .grid:not(.grid--list) .card__body { padding:10px 2px 0; min-height:58px; gap:3px; }
+.studio .grid:not(.grid--list) .card__head::before { display:none; }
+.studio .card__name { font-family:var(--font-ui); font-size:12px; font-weight:600; letter-spacing:-.3px; }
+.studio .card__meta { font-size:9px; letter-spacing:0; }
+.studio .card__menu-btn { width:26px; height:26px; min-width:26px; min-height:26px; }
+.studio .card__badges { padding:10px; }
+.studio .on-media { border-radius:5px; font-size:9px; padding:4px 6px; }
+.studio .sheet__title,.studio .dialog__title { font-family:var(--font-ui); font-weight:650; letter-spacing:-.6px; }
+.studio .foot { margin:0 26px; font-size:10px; border-top:0; }
+@media(max-width:1050px) {
+    :root.studio { --rail-width:166px; }
+    .studio .catalog-rail { padding-inline:12px; }
+    .studio .appbar__inner { padding-inline:20px; }
+    .studio .content { padding-inline:20px; }
+    .studio .appbar__row--top { gap:12px; }
+}
+@media(max-width:760px) {
+    .studio .demo-bar { position:relative; height:auto; min-height:28px; padding:5px 14px; }
+    .studio .demo-bar nav { gap:10px; }
+    .studio .shell { padding:0; }
+    .studio .catalog-rail { position:relative; top:auto; width:100%; padding:15px 16px 9px; grid-template-columns:1fr auto; gap:12px; border:0; }
+    .studio .catalog-rail .brand { margin:0; }
+    .studio .catalog-rail #newLinkBtn { margin:0; width:auto; min-height:36px; }
+    .studio .catalog-rail .chip { min-height:36px; font-size:11px; }
+    .studio-utilities { grid-column:1/-1; flex-wrap:nowrap; margin:0; padding:0; position:absolute; top:14px; right:155px; }
+    .studio-caption { display:none; }
+    .studio .appbar { top:0; }
+    .studio .appbar__inner { padding-inline:16px; }
+    .studio .appbar__row--top { padding:9px 0 14px; min-height:56px; gap:10px; }
+    .studio .appbar .page-head { order:0; }
+    .studio .appbar__actions { order:1; margin-left:auto; }
+    .studio .search { order:2; max-width:none; flex:1 1 100%; margin:0; }
+    .studio .search .field { height:36px; }
+    .studio .content { padding:0 16px 30px; }
+    .studio .grid:not(.grid--list) .card__frame { border-radius:8px; }
+    .studio .card__name { font-size:11px; }
+    .studio .card__meta { font-size:9px; }
+    .studio .foot { margin-inline:16px; }
+}
+@media(max-width:460px) {
+    .studio .catalog-rail .brand__name { display:none; }
+    .studio-utilities { right:148px; }
+}
+@media(hover:none) {
+    .studio .card__menu-btn { min-width:36px; min-height:36px; }
+    .studio-utilities .icon-btn { min-width:36px; min-height:36px; }
+}
+
+/* ============================================================
+   STUDIO FINISH — a shared control language, not a new layout.
+   Keep text, radio inputs, disabled states and focus rings functional.
+   ============================================================ */
+:root.studio {
+    --studio-control-radius: 9px;
+    --studio-inner-radius: 6px;
+    --studio-control-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+    --studio-popover-shadow: 0 12px 32px -16px rgb(0 0 0 / 24%);
+}
+.studio[data-theme="dark"] {
+    --studio-control-shadow: 0 1px 2px rgb(0 0 0 / 18%);
+    --studio-popover-shadow: 0 14px 38px -14px rgb(0 0 0 / 55%);
+}
+/* Secondary buttons have a hairline edge; primary actions stay ink-solid. */
+.studio .btn {
+    border-radius: var(--studio-control-radius);
+    font-weight: 600;
+    letter-spacing: -.015em;
+    gap: 7px;
+    box-shadow: var(--studio-control-shadow);
+}
+.studio .btn:not(.btn--primary):not(.btn--soft):not(.btn--danger) {
+    border-color: var(--border);
+    background: var(--surface);
+}
+.studio .btn--primary {
+    border-color: rgba(var(--accent-rgb), .12);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 10%), var(--studio-control-shadow);
+}
+.studio .btn--soft { box-shadow: none; }
+.studio .btn:active:not(:disabled) { transform: translateY(1px); }
+.studio .catalog-rail #newLinkBtn { border-radius: var(--studio-control-radius); }
+.studio .icon-btn {
+    border-radius: var(--studio-control-radius);
+    transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
+}
+.studio .icon-btn:active:not(:disabled) { transform: scale(.96); }
+.studio .icon-btn[aria-pressed="true"] {
+    color: var(--text);
+    background: var(--surface-hover);
+    border-color: var(--border);
+}
+/* Match the sliding selection to the actual button geometry (26/36px),
+   rather than inheriting the production switch's circular 30px marker. */
+.studio .btn-group--view {
+    --seg: var(--ctl-inner, 30px);
+    padding: 2px;
+    gap: 2px;
+    border-radius: var(--studio-control-radius);
+    background: var(--surface-hover);
+}
+.studio .btn-group--view::before {
+    border-radius: var(--studio-inner-radius);
+    background: var(--surface);
+    box-shadow: var(--studio-control-shadow);
+    transition: transform 180ms var(--ease-out);
+}
+.studio .btn-group--view .icon-btn {
+    border-radius: var(--studio-inner-radius);
+    border-color: transparent;
+    box-shadow: none;
+}
+.studio .btn-group--view .icon-btn[aria-pressed="true"] { background: transparent; }
+.studio .segment {
+    padding: 3px;
+    gap: 3px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-2);
+}
+.studio .segment__item { border-radius: 7px; font-weight: 550; }
+.studio .segment__item[aria-selected="true"],
+.studio .segment__item[aria-pressed="true"],
+.studio .segment__item[aria-checked="true"],
+.studio .segment__opt input:checked + .segment__item {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--studio-control-shadow);
+}
+.studio .catalog-rail .chip { border-radius: 8px; }
+.studio .catalog-rail .chip[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--border); }
+.studio .select,
+.studio .input,
+.studio .field { border-radius: var(--studio-control-radius); }
+.studio .select { font-weight: 550; }
+.studio .select--mini { border-radius: 6px; }
+.studio .field__clear { border-radius: 5px; }
+/* The same treatment inside menus and sheets, not only on the home screen. */
+.studio .menu {
+    padding: 5px;
+    border-radius: 12px;
+    border-color: var(--border);
+    box-shadow: var(--studio-popover-shadow);
+}
+.studio .menu__item { border-radius: 7px; gap: 10px; padding: 10px; }
+.studio .menu__label { font-size: 9px; letter-spacing: .06em; }
+.studio .menu__sep { margin: 5px 7px; }
+.studio .row,
+.studio .picker__item,
+.studio .choice { border-radius: 10px; }
+.studio .toast { border-radius: 12px; box-shadow: var(--studio-popover-shadow); }
+.studio .toast__action { border-radius: 6px; font-weight: 600; }
+.studio .toast__close { border-radius: 6px; }
+.studio .load-more .btn { padding-inline: 20px; }
+.studio .card__menu-btn { border-radius: 7px; }
+.studio .card__menu-btn[aria-expanded="true"] { background: var(--surface-hover); border-color: var(--border); }
+/* Quiet resting state; hover only on pointers that really support it. */
+@media (hover: hover) {
+    .studio .btn:not(.btn--primary):not(.btn--soft):not(.btn--danger):hover:not(:disabled) {
+        border-color: var(--border-2);
+        background: var(--surface-hover);
+    }
+    .studio .icon-btn:hover:not(:disabled) { border-color: var(--border); }
+    .studio .btn-group--view .icon-btn:hover { border-color: transparent; }
+    .studio .menu__item:hover { background: var(--surface-hover); }
+}
+/* Explicit, high-contrast keyboard outline. Radio-label focus stays visible. */
+.studio :where(.btn, .icon-btn, .chip, .select, .menu__item, .segment__item,
+    .field__clear, .toast__action, .toast__close, .card__name):focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 3px;
+}
+.studio .segment__opt input:focus-visible + .segment__item {
+    outline: 2px solid var(--text);
+    outline-offset: 1px;
+    box-shadow: none;
+}
+.studio :is(.btn, .icon-btn, .chip, .select, .menu__item):disabled {
+    opacity: .45;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+.studio :is(.btn, .icon-btn, .chip, .menu__item):disabled svg { transform: none; }
+/* Keep the approved phone structure. Icons remain small; hit areas do not. */
+@media (hover: none), (pointer: coarse) {
+    .studio .appbar__actions { --ctl: 40px; --ctl-inner: 36px; }
+    .studio .card__menu-btn,
+    .studio-utilities .icon-btn { width: 40px; height: 40px; min-width: 40px; min-height: 40px; }
+    .studio .catalog-rail #newLinkBtn { min-height: 40px; height: 40px; }
+    .studio .catalog-rail .chip { min-height: 40px; }
+    .studio .segment__item { min-height: 36px; height: auto; padding-block: 8px; }
+    .studio .menu__item { min-height: 44px; }
+    .studio .select--mini { min-height: 36px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .studio .btn-group--view::before, .studio .icon-btn { transition: none; }
+    .studio .btn:active:not(:disabled), .studio .icon-btn:active:not(:disabled) { transform: none; }
+}
+
+/* Collapsible navigation: same controls, relocated rather than duplicated. */
+:root.studio.sidebar-collapsed { --rail-width: 0px; }
+.studio.sidebar-collapsed .catalog-rail { display: none; }
+.studio .studio-nav-toggle { flex: none; width: 32px; height: 32px; min-width: 32px; }
+.studio .studio-nav-toggle svg { transform: none; }
+.studio.sidebar-collapsed .studio-nav-toggle svg { transform: scaleX(-1); }
+.studio .appbar__row--top { flex-wrap: wrap; }
+.studio.sidebar-collapsed .appbar #newLinkBtn { width: 32px; min-width: 32px; padding: 0; margin: 0; }
+.studio.sidebar-collapsed .appbar #newLinkBtn span {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+/* Keep the production checkerboard for alpha and placeholders for video. */
+.studio .card__frame { background-color: var(--matte); }
+.studio .card__frame--empty { background-color: var(--surface-2); }
+.studio .card__frame--empty .card__play svg { width: 15px; height: 15px; }
+.studio .card__frame--empty .card__open svg,
+.studio .card__frame--empty .card__check svg { width: 16px; height: 16px; opacity: 1; }
+.studio .card__frame--empty .on-media svg { width: 12px; height: 12px; color: inherit; opacity: 1; }
+/* Inspector and settings share Studio's typography and control surfaces. */
+.studio .sheet {
+    width: min(440px, 100%);
+    background: var(--bg);
+    border-color: var(--border);
+    box-shadow: -16px 0 48px -32px rgb(0 0 0 / 28%);
+}
+.studio .sheet__head { padding: 20px 20px 16px; align-items: center; }
+.studio .sheet__title { font: 650 19px/1.3 var(--font-ui); letter-spacing: -.6px; }
+.studio .sheet__sub { font-size: 11px; }
+.studio .sheet__tabs { padding: 8px 20px 12px; margin-top: 0; background: var(--bg); box-shadow: none; }
+.studio .sheet__tabs .segment { background: var(--surface-2); }
+.studio .sheet__body { padding: 20px; gap: 22px; min-height: 0; }
+.studio .sheet__foot { padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); background: var(--bg); }
+.studio .sheet .section__title { font-size: 10px; letter-spacing: .08em; font-weight: 600; }
+.studio .sheet .card-block { border-radius: 10px; box-shadow: none; background: var(--surface); }
+.studio .sheet .url-line { background: var(--surface); border-radius: 9px; font-size: 12px; }
+.studio .sheet .url-line__host { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.studio .sheet .panel-preview { aspect-ratio: 16 / 9; border: 1px solid var(--border); border-radius: 10px; }
+.studio .sheet .row__title { font-size: 12px; }
+.studio .sheet .row__sub { font-size: 11px; }
+.studio .sheet .row, .studio .sheet .vrow { background: var(--surface); }
+.studio .sheet .vrow--current { background: var(--accent-soft); }
+@media(max-width:760px) {
+    .studio .studio-nav-toggle { order: 0; }
+    .studio .appbar .page-head { gap: 6px; }
+    .studio .appbar .page-head__title { font-size: 18px; }
+    .studio .appbar__row--top { gap: 8px; }
+    .studio .appbar__actions { gap: 3px; }
+}
+@media(max-width:720px) {
+    .studio .sheet { width: 100%; border-radius: 16px 16px 0 0; }
+    .studio .sheet__head { padding: 12px 16px; }
+    .studio .sheet__tabs { padding: 6px 16px 12px; }
+    .studio .sheet__body { padding: 16px; }
+    .studio .sheet__foot { padding-inline: 16px; }
+}
+@media(hover:none), (pointer:coarse) {
+    .studio .studio-nav-toggle,
+    .studio.sidebar-collapsed .appbar #newLinkBtn { width: 40px; height: 40px; min-width: 40px; min-height: 40px; }
+}
+/* The sandbox switcher must not cover the inspector's close button. */
+@media(min-width:721px) {
+    .studio:not(.demo-embedded) .sheet { top: 30px; height: calc(100dvh - 30px); }
+}
+
+/* Multilingual UI: one family for headings, fields, labels and numeric metadata.
+   Extended Latin covers names beyond the six translated interface languages. */
+@font-face {
+    font-family: "Manrope Studio";
+    font-style: normal;
+    font-weight: 200 800;
+    font-display: swap;
+    src: url("/demo/fonts/manrope-latin-ext-wght-normal.woff2") format("woff2");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+        U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+        U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+        U+A720-A7FF;
+}
+:root.studio {
+    --font-ui: "Manrope Studio", "Golos Text", system-ui, sans-serif;
+    --font-display: var(--font-ui);
+    --font-mono: var(--font-ui);
+    --studio-canvas-dot: rgb(0 0 0 / 3%);
+}
+.studio[data-theme="dark"] { --studio-canvas-dot: rgb(255 255 255 / 3%); }
+.studio :is(button, input, select, textarea) { font-family: var(--font-ui); }
+.studio :is(.num, .card__meta, .chip__count, .page-head__count) { font-variant-numeric: tabular-nums; }
+/* Static, barely visible dot-paper texture; no image requests, filters or motion.
+   Only the library canvas is textured, controls and photographs stay clean. */
+.studio .content {
+    background-image: radial-gradient(circle, var(--studio-canvas-dot) .65px, transparent .85px);
+    background-size: 9px 9px;
+}
+@media (prefers-contrast: more), (forced-colors: active) {
+    .studio .content { background-image: none; }
+}
+/* Create/rename uses the same template. Remove BOTH the input outline and its
+   parent's focus halo. A bottom rule and changed fill still indicate focus. */
+.studio .studio-name-field,
+.studio .studio-name-field:hover {
+    border: 0;
+    background: var(--surface-2);
+    box-shadow: none;
+    border-radius: 8px 8px 0 0;
+}
+.studio .studio-name-field:focus-within {
+    border: 0;
+    background: var(--surface-hover);
+    box-shadow: inset 0 -2px 0 var(--text);
+}
+.studio .studio-name-field input,
+.studio .studio-name-field input:focus,
+.studio .studio-name-field input:focus-visible { outline: none; box-shadow: none; border: 0; }
+.studio .studio-name-field input[aria-invalid="true"] { color: var(--danger); }
+.studio .studio-name-field .url-line__host {
+    flex: 0 1 auto; min-width: 0; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+@media (forced-colors: active) {
+    .studio .studio-name-field:focus-within { border-bottom: 2px solid Highlight; }
+}
+/* List thumbnails must not take their natural image height. A portrait, icon
+   or panorama occupies the SAME stable frame; badges and native actions stay. */
+.studio .grid--list .card__media { position: absolute; inset: 0; width: 100%; height: 100%; }
+.studio .grid--list .card__body { min-width: 0; flex: 1; }
+.studio .grid--list .card__access { min-width: 0; max-width: 100%; }
+.studio .grid--list .card__play svg { width: 13px; height: 13px; }
+.studio .grid--list .card__badges { padding: 0; inset: 5px 5px auto; }
+.studio .grid--list .on-media { font-size: 8px; padding: 3px 4px; }
+.studio .grid--list { container-type: inline-size; }
+@media (min-width: 721px) {
+    /* Base list uses two lines: the sidebar narrows it before viewport-based
+       production breakpoints would notice. The wide layout is container-based. */
+    .studio .grid--list .card__body { display: grid; grid-template-columns: minmax(0, 1fr) 144px 40px; gap: 6px 12px; padding: 10px 12px; }
+    .studio .grid--list .card__name { grid-column: 1; grid-row: 1; }
+    .studio .grid--list .card__access { grid-column: 2; grid-row: 1; width: 144px; }
+    .studio .grid--list .card__menu-btn { grid-column: 3; grid-row: 1; }
+    .studio .grid--list .card__meta { grid-column: 1 / -1; grid-row: 2; }
+    .studio .grid--list .card__tags { grid-column: 1 / -1; grid-row: 3; }
+    @container (min-width: 1050px) {
+        .studio .grid--list .card__body { grid-template-columns: minmax(0, 1fr) 240px 110px 144px 40px; }
+        .studio .grid--list .card__meta { grid-column: 2; grid-row: 1; }
+        .studio .grid--list .card__tags { grid-column: 3; grid-row: 1; }
+        .studio .grid--list .card__access { grid-column: 4; grid-row: 1; }
+        .studio .grid--list .card__menu-btn { grid-column: 5; grid-row: 1; }
+    }
+}
+@media (max-width: 560px) {
+    .studio .grid--list .card__body { padding: 9px 10px; }
+}
+
+/* Production card geometry, Studio appearance.
+   Keep these breakpoints in sync with static/css/style.css. Media fitting is
+   intentionally inherited: cover for landscape; contain for portraits,
+   squares and PNG via the class assigned by the real cardFor()/fitMode(). */
+.studio .grid:not(.grid--list) {
+    grid-template-columns: repeat(auto-fill, minmax(236px, 1fr));
+    gap: var(--s-4);
+}
+.studio .grid:not(.grid--list) .card__frame,
+.studio .grid:not(.grid--list) .card:first-child .card__frame { aspect-ratio: 16 / 9; }
+@media (max-width: 1080px) {
+    .studio .grid:not(.grid--list) { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--s-3); }
+}
+@media (max-width: 720px) {
+    .studio .grid:not(.grid--list) { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--s-3); }
+}
+@media (max-width: 560px) {
+    .studio .grid:not(.grid--list) { grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: var(--s-2-5); }
+}
+@media (max-width: 340px) {
+    .studio .grid:not(.grid--list) { grid-template-columns: minmax(0, 1fr); }
+}
+@media (min-width: 1280px) {
+    .studio .grid:not(.grid--list) { grid-template-columns: repeat(auto-fill, minmax(252px, 1fr)); }
+}
+/* Mobile navigation lives ABOVE the content. Rotate the whole desktop glyph
+   clockwise; preserve its mirrored arrow in the collapsed state. */
+@media (max-width: 760px) {
+    .studio .studio-nav-toggle svg { transform: rotate(90deg); }
+    .studio.sidebar-collapsed .studio-nav-toggle svg { transform: rotate(90deg) scaleX(-1); }
+}
+
+/* A single mobile action row keeps the plus, sun and gear on the same axis.
+   No absolute offsets: longer translations can grow the create button safely. */
+@media (max-width: 760px) {
+    .studio .catalog-rail { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+    .studio .catalog-rail .brand { grid-column: 1; grid-row: 1; min-width: 0; }
+    .studio .catalog-rail .tools { grid-row: 2; }
+    .studio .studio-utilities { display: none; }
+    .studio .studio-mobile-actions {
+        grid-column: 2; grid-row: 1;
+        display: flex; align-items: center; justify-content: flex-end; gap: 6px;
+        min-width: 0;
+    }
+    .studio .studio-mobile-actions > .icon-btn,
+    .studio .studio-mobile-actions > #newLinkBtn {
+        height: 40px; min-height: 40px; margin: 0; align-self: center;
+        display: inline-flex; align-items: center; justify-content: center;
+    }
+    .studio .studio-mobile-actions > .icon-btn { width: 40px; min-width: 40px; }
+    .studio .studio-mobile-actions > #newLinkBtn { width: auto; max-width: 160px; padding-inline: 10px; }
+    .studio .studio-mobile-actions > #newLinkBtn span { overflow: hidden; text-overflow: ellipsis; }
+}
+.studio #appVersion { font-family: var(--font-ui); font-size: 10px; font-weight: 500; color: var(--text-3); white-space: nowrap; }

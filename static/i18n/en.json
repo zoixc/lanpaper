@@ -238,5 +238,12 @@
   "import_cancelled": "Import cancelled",
   "offline_now": "You are offline. Network operations may fail until the connection returns.",
   "operation_in_progress": "This operation is already in progress",
-  "regen_progress": "Previews: {{done}} of {{total}}"
+  "regen_progress": "Previews: {{done}} of {{total}}",
+  "navigation": "Navigation",
+  "app_actions": "Application actions",
+  "expand_navigation": "Expand navigation",
+  "collapse_navigation": "Collapse navigation",
+  "video_play": "Play video",
+  "video_error": "This video cannot be played in this browser. Use Open to view the original.",
+  "collection": "Collection"
 }

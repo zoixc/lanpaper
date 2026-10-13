@@ -3,7 +3,7 @@
 <!-- Разметка панели — порт макета design/v2 (см. design/06-redesign-v2.md).
      Классы, состояния и шаблоны совпадают с макетом; отличия только в
      источниках данных и путях: /static/... вместо относительных. -->
-<html lang="en" data-theme="light" data-palette="mono" data-view="grid">
+<html data-layout="studio" lang="en" data-theme="light" data-palette="mono" data-view="grid">
 <head>
   <meta charset="utf-8">
   <title>Lanpaper</title>
@@ -22,6 +22,7 @@
   <link rel="manifest" href="/static/manifest.json">
   <link rel="preload" href="/static/fonts/golos-text-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/studio.css">
 
   <!-- Тема, акцент, вид и язык применяются до первой отрисовки: иначе при
        загрузке мигает светлый вариант. Настройки читаются из localStorage;
@@ -43,7 +44,7 @@
         <div class="appbar__inner">
 
             <div class="appbar__row appbar__row--top">
-                <a class="brand" href="/admin">
+                <a class="brand" href="/admin" aria-label="Lanpaper">
                     <span class="brand__mark"><img src="/static/favicon.svg" alt="" width="30" height="30"></span>
                     <span class="brand__name">Lanpaper</span>
                 </a>
@@ -98,13 +99,13 @@
             </div>
 
         </div>
-    </header>
 
-    <div class="network-banner is-hidden" id="networkBanner" role="status" aria-live="polite">
-        <svg data-icon="alert"></svg>
-        <span data-i18n="offline_now">You are offline. Changes are paused until the connection returns.</span>
-        <button class="btn btn--sm" id="networkRetryBtn" type="button" data-i18n="retry">Retry</button>
-    </div>
+        <div class="network-banner is-hidden" id="networkBanner" role="status" aria-live="polite">
+            <svg data-icon="alert"></svg>
+            <span data-i18n="offline_now">You are offline. Changes are paused until the connection returns.</span>
+            <button class="btn btn--sm" id="networkRetryBtn" type="button" data-i18n="retry">Retry</button>
+        </div>
+    </header>
 
     <!-- ============================================================
          БИБЛИОТЕКА
@@ -243,7 +244,7 @@
      ============================================================ -->
 <template id="tplPanel">
     <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="panelTitle" data-sheet="panel">
-        <div class="sheet__grip"></div>
+        <button class="sheet__grip" type="button" data-i18n-aria="close" aria-label="Close"></button>
         <div class="sheet__head">
             <div class="grow">
                 <div class="eyebrow" data-i18n="panel_title">Пульт ссылки</div>
@@ -281,7 +282,7 @@
         <p class="dialog__text" data-i18n="create_hint">Латиница, цифры, дефис и подчёркивание — до 64 символов.</p>
         <div class="dialog__body">
             <label class="field-label" for="createInput" data-i18n="create_label">ID ссылки</label>
-            <div class="field field--plain field--lg has-value">
+            <div class="field field--plain field--lg has-value studio-name-field">
                 <span class="url-line__host" id="createHost"></span>
                 <input id="createInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
                        maxlength="64" pattern="[a-zA-Z0-9_\-]+" data-i18n-placeholder="create_placeholder"
@@ -302,7 +303,7 @@
      ============================================================ -->
 <template id="tplSettings">
     <div class="sheet" id="settingsSheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" data-sheet="settings">
-        <div class="sheet__grip"></div>
+        <button class="sheet__grip" type="button" data-i18n-aria="close" aria-label="Close"></button>
         <div class="sheet__head">
             <div class="grow">
                 <div class="eyebrow" data-i18n="settings_appearance">Оформление</div>
@@ -334,9 +335,11 @@
             <div class="section">
                 <div class="section__head">
                     <span class="section__title" id="paletteLabel" data-i18n="palette">Акцент</span>
-                    <span class="label num" id="paletteName"></span>
                 </div>
-                <div class="swatches" role="radiogroup" aria-labelledby="paletteLabel" id="paletteRow"></div>
+                <div class="palette-controls">
+                    <div class="swatches" role="radiogroup" aria-labelledby="paletteLabel" id="paletteRow"></div>
+                    <span class="label num" id="paletteName" aria-live="polite"></span>
+                </div>
             </div>
 
             <div class="section">
@@ -400,7 +403,7 @@
         <p class="dialog__text" data-i18n="url_hint">Сервер скачает файл сам. Годится прямая ссылка на картинку или видео.</p>
         <div class="dialog__body">
             <label class="field-label" for="urlInput" data-i18n="url_label">Адрес файла</label>
-            <div class="field field--plain field--lg has-value">
+            <div class="field field--plain field--lg has-value studio-name-field">
                 <input id="urlInput" type="url" inputmode="url" autocomplete="off" spellcheck="false"
                        placeholder="https://…" aria-describedby="urlStatus">
             </div>
@@ -421,7 +424,7 @@
      ============================================================ -->
 <template id="tplServer">
     <div class="sheet sheet--picker" role="dialog" aria-modal="true" aria-labelledby="serverTitle" data-sheet>
-        <div class="sheet__grip"></div>
+        <button class="sheet__grip" type="button" data-i18n-aria="close" aria-label="Close"></button>
         <div class="sheet__head">
             <div class="grow">
                 <div class="eyebrow" data-i18n="upload_server">Из галереи сервера</div>

@@ -1,0 +1,17 @@
+/* SPDX-License-Identifier: MIT — viewer only; no effect on the framed app. */
+* { box-sizing:border-box; }
+body { margin:0; background:#ececec; color:#232323; font:14px/1.5 system-ui,sans-serif; }
+.viewer-head { max-width:1050px; margin:auto; padding:30px 26px 15px; display:flex; align-items:center; justify-content:space-between; gap:20px; }
+.eyebrow { font-size:10px; letter-spacing:.15em; color:#686868; }
+h1 { font-size:23px; font-weight:600; letter-spacing:-.7px; margin:5px 0; }
+p { margin:0; color:#666; font-size:12px; }
+a { color:inherit; text-underline-offset:4px; font-size:12px; white-space:nowrap; }
+main { display:flex; align-items:center; flex-direction:column; padding:8px 12px 35px; }
+.controls { display:flex; padding:4px; border:1px solid #d5d5d5; border-radius:10px; gap:4px; margin-bottom:20px; }
+.controls button { font:inherit; font-size:11px; padding:7px 14px; background:none; border:0; border-radius:6px; color:#555; cursor:pointer; }
+.controls button[aria-pressed="true"] { background:#242424; color:#fff; }
+.controls button:focus-visible { outline:2px solid #222; outline-offset:2px; }
+.phone { width:406px; max-width:100%; border:8px solid #242424; border-radius:30px; overflow:hidden; background:#fafafa; box-shadow:0 20px 55px -28px #0008; }
+iframe { border:0; display:block; width:100%; height:780px; background:#fafafa; }
+.hint { margin-top:20px; text-align:center; line-height:1.8; }
+@media(max-width:600px) { .viewer-head { padding:20px 18px 12px; flex-direction:column; align-items:flex-start; gap:10px; } iframe { height:720px; } }
