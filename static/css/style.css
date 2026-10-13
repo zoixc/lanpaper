@@ -1299,6 +1299,24 @@ svg.is-pulse {
 .input::placeholder {
     color: var(--text-3);
 }
+/* Браузер красит автозаполненное поле своей краской и не отдаёт её
+   свойству background-color: перекрыть её можно только внутренней тенью.
+   Без этого сохранённый логин или пароль приезжает бледно-голубым в
+   светлой теме и сизым в тёмной — единственное место, где панель
+   показывает цвет, которого не выбирала. */
+.field input:-webkit-autofill,
+.input:-webkit-autofill {
+    -webkit-text-fill-color: var(--text);
+    caret-color: var(--text);
+    box-shadow: inset 0 0 0 1000px var(--surface);
+}
+/* У .input рамка фокуса живёт на самом поле, поэтому она возвращается
+   вместе с заливкой: иначе автозаполненное поле теряет фокусный круг. */
+.input:-webkit-autofill:focus {
+    box-shadow:
+        inset 0 0 0 1000px var(--surface),
+        var(--shadow-focus);
+}
 .input:focus {
     outline: none;
     border-color: var(--accent);
@@ -2994,6 +3012,14 @@ html[data-theme="dark"] .select {
     box-shadow: var(--shadow-xs);
     flex: none;
 }
+/* Знак — один рисунок на обе темы: тёмная плитка со светлым знаком внутри.
+   На тёмной рельсе (#171717) плитка #1B1C1E сливается с фоном: контраст
+   1.06:1, виден только светлый штрих, и знак перестаёт быть плиткой.
+   Инверсия возвращает ему вид: светлая плитка с тёмным знаком — тот же
+   приём, что у wordmark на странице входа (.login-card__logo). */
+html[data-theme="dark"] .brand__mark img {
+    filter: invert(1);
+}
 .brand__name {
     font-family: var(--font-display);
     font-size: 0.9375rem;
@@ -3673,6 +3699,19 @@ html[data-theme="dark"] .login-card__logo {
 .login-card__field input:focus-visible {
     outline: none;
     box-shadow: var(--shadow-focus);
+}
+/* Поля входа залиты --surface-2, поэтому автозаполнение перекрашивается
+   в него, а не в --surface: на --surface поле слилось бы с карточкой и
+   потеряло заливку — в светлой теме белым, в тёмной провалом. */
+.login-card__field input:-webkit-autofill {
+    -webkit-text-fill-color: var(--text);
+    caret-color: var(--text);
+    box-shadow: inset 0 0 0 1000px var(--surface-2);
+}
+.login-card__field input:-webkit-autofill:focus-visible {
+    box-shadow:
+        inset 0 0 0 1000px var(--surface-2),
+        var(--shadow-focus);
 }
 .login-card__error {
     margin: 0;

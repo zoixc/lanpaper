@@ -634,11 +634,13 @@
     --studio-control-shadow: 0 1px 2px rgb(0 0 0 / 4%);
     --studio-popover-shadow: 0 12px 32px -16px rgb(0 0 0 / 24%);
     --studio-canvas-dot: rgb(0 0 0 / 3%);
+    --studio-sheet-shadow: -16px 0 48px -32px rgb(0 0 0 / 28%);
 }
 .studio[data-theme="dark"] {
     --studio-control-shadow: 0 1px 2px rgb(0 0 0 / 18%);
     --studio-popover-shadow: 0 14px 38px -14px rgb(0 0 0 / 55%);
     --studio-canvas-dot: rgb(255 255 255 / 3%);
+    --studio-sheet-shadow: -16px 0 48px -32px rgb(0 0 0 / 55%);
 }
 .studio[data-palette="mono"] {
     --bg: #fafafa;
@@ -1258,7 +1260,7 @@
     width: min(440px, 100%);
     background: var(--bg);
     border-color: var(--border);
-    box-shadow: -16px 0 48px -32px rgb(0 0 0 / 28%);
+    box-shadow: var(--studio-sheet-shadow);
 }
 .studio .sheet__head {
     padding: 20px 20px 16px;

@@ -27,6 +27,20 @@ Notable changes to Lanpaper. Docker images are published as
   `theme_color`; both now use the Studio light background (`#fafafa`), which is
   also the only safe choice for the splash screen, because the icon is dark and
   opaque.
+- The brand mark no longer melts into a dark rail. It is one bitmap for both
+  themes — a dark tile (`#1B1C1E`) carrying a light glyph — and on the dark
+  canvas (`#171717`) the tile had 1.06:1 against it, so the mark stopped being
+  a tile and read as a floating glyph. It is inverted in the dark theme, the
+  same move the sign-in wordmark (`.login-card__logo`) already made: a light
+  tile carrying a dark glyph.
+- A field the browser filled in keeps the panel's colours. Chrome and Safari
+  paint an autofilled input with their own background and ignore
+  `background-color`, so a saved username or password arrived pale blue in the
+  light theme and blue-grey in the dark one — the one place the panel showed a
+  colour it never chose. The fill is now covered with an inset shadow in
+  `--surface` (`--surface-2` on the sign-in card) and the text with
+  `-webkit-text-fill-color`, the only two layers the browser does not
+  overwrite; the focus ring is kept in both.
 
 ### Changed
 
@@ -51,6 +65,16 @@ Notable changes to Lanpaper. Docker images are published as
 - `design/README.md` now says that the app has looked like Studio since 0.19.0
   and that `v2/` and the earlier mockups are history, and points at the
   screenshot gate instead of a manual browser pass.
+- The settings and inspector sheet takes its edge shadow from a
+  `--studio-sheet-shadow` token instead of a literal `rgb(0 0 0 / 28%)`. Every
+  other shadow in the file is declared per theme — a dark theme needs a much
+  heavier one (55% where a menu takes 24%) — and a literal cannot follow the
+  switch, so the sheet was the only piece of chrome whose shadow stayed the
+  same in both themes. The light value is unchanged.
+- A contract test fails on a colour literal anywhere except the badges, play
+  and select buttons painted on top of a frame, whose backing is dark in both
+  themes by design. Anything else that picks a colour of its own is the shade
+  that does not follow the switch, so it has to read a token instead.
 
 ## [0.19.1] – 2026-10-13
 

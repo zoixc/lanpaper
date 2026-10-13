@@ -283,7 +283,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v19/,
+  assert.match(code, /lanpaper-static-v20/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 
@@ -426,4 +426,93 @@ test('Studio mobile layout avoids coarse-pointer distortions and button sheet gr
     'settings shortcuts section must carry section--shortcuts class');
   assert.match(studioCss, /\.studio\s+\.section--shortcuts[\s\S]*?display:\s*none/,
     'keyboard shortcuts section must be hidden on mobile viewports');
+});
+
+// Innermost declaration blocks, comments and @media/@keyframes wrappers
+// skipped. Enough to see which selector paints which literal colour; the
+// cascade itself is not modelled here — the two CSS files are read as text.
+function colorDeclarations(file) {
+  const css = read(file).replace(/\/\*[\s\S]*?\*\//g, '');
+  const found = [];
+  const block = /([^{}]*?)\{([^{}]*)\}/g;
+  let match;
+  while ((match = block.exec(css)) !== null) {
+    const selector = match[1].trim().replace(/\s+/g, ' ');
+    if (!selector || selector.startsWith('@') || /^(from|to|\d+%)$/.test(selector)) continue;
+    for (const [, prop, value] of match[2].matchAll(/([-\w]+)\s*:\s*([^;]+);/g)) {
+      found.push({ selector, prop, value: value.trim(), file,
+        line: css.slice(0, match.index).split('\n').length });
+    }
+  }
+  return found;
+}
+
+test('the brand mark and the sign-in wordmark follow the theme they are drawn on', () => {
+  // Both are one bitmap for two themes: a dark tile with a light glyph. Left
+  // alone, the tile (#1B1C1E) melts into the dark rail (#171717) at 1.06:1 —
+  // the mark stops reading as a mark. The sign-in wordmark already inverted;
+  // the rail mark did not.
+  const style = read('static/css/style.css');
+  for (const selector of ['.login-card__logo', '.brand__mark img']) {
+    const rule = new RegExp(
+      `html\\[data-theme="dark"\\]\\s+${selector.replace(/[.[\]]/g, '\\$&')}\\s*\\{([^}]*)\\}`);
+    const body = style.match(rule);
+    assert.ok(body, `${selector} is not repainted for the dark theme`);
+    assert.match(body[1], /filter:\s*invert\(1\)/, `${selector} keeps its light-theme colours in the dark theme`);
+  }
+});
+
+test('an autofilled field keeps the panel colours, not the browser ones', () => {
+  // Chrome and Safari paint their own background on an autofilled input and
+  // ignore background-color: only an inset shadow covers it. Without this the
+  // saved username and password arrive pale blue (light theme) or blue-grey
+  // (dark) in a panel that never chose those colours.
+  const style = read('static/css/style.css');
+  const panel = style.match(/\.field input:-webkit-autofill,\s*\.input:-webkit-autofill\s*\{([^}]*)\}/);
+  assert.ok(panel, 'panel fields have no autofill rule');
+  assert.match(panel[1], /-webkit-text-fill-color:\s*var\(--text\)/, 'autofilled text keeps the browser colour');
+  assert.match(panel[1], /box-shadow:\s*inset 0 0 0 1000px var\(--surface\)/, 'autofill background is not repainted');
+  assert.match(style, /\.input:-webkit-autofill:focus\s*\{[^}]*var\(--shadow-focus\)/,
+    'an autofilled field loses its focus ring');
+
+  const login = style.match(/\.login-card__field input:-webkit-autofill\s*\{([^}]*)\}/);
+  assert.ok(login, 'the sign-in fields have no autofill rule');
+  assert.match(login[1], /box-shadow:\s*inset 0 0 0 1000px var\(--surface-2\)/,
+    'the sign-in fields are filled with --surface-2, so autofill must match it');
+  assert.match(style, /\.login-card__field input:-webkit-autofill:focus-visible\s*\{[^}]*var\(--shadow-focus\)/,
+    'an autofilled sign-in field loses its focus ring');
+});
+
+test('every colour outside a media overlay comes from a theme token', () => {
+  // A literal cannot follow the theme: it is one colour in both. The only
+  // ones allowed are the badges, play and select buttons painted on top of a
+  // photograph or a frame, where the backing is dark in both themes by
+  // design (--shade and the stage). Everything else — chrome, controls,
+  // shadows — has to read a token, or it carries one shade into the theme
+  // where it does not belong.
+  const allowed = new Set([
+    // Всё, что нарисовано поверх кадра: подложка там всегда тёмная, какой
+    // бы ни была тема интерфейса вокруг.
+    '.on-media|background',
+    '.on-media|box-shadow',
+    '.on-media|color',
+    '.card__open|color',
+    '.card__open:hover|background',
+    '.card__play|color',
+    '.card__play|box-shadow',
+    '.card__check|border',
+    '.studio .card__frame--empty .card__play svg|color'
+  ]);
+  const literal = /(?:#[0-9a-f]{3,8}\b|\brgba?\([^)]*\)|\bhsla?\([^)]*\))/i;
+  const offenders = [];
+  for (const file of ['static/css/style.css', 'static/css/studio.css']) {
+    for (const decl of colorDeclarations(file)) {
+      if (decl.prop.startsWith('--')) continue;      // сами токены — значения тем
+      if (!literal.test(decl.value) || /\bvar\(/.test(decl.value)) continue;
+      if (allowed.has(`${decl.selector}|${decl.prop}`)) continue;
+      offenders.push(`${file}:${decl.line} ${decl.selector} { ${decl.prop}: ${decl.value} }`);
+    }
+  }
+  assert.deepEqual(offenders, [],
+    'a hardcoded colour cannot follow the theme — add a token instead');
 });
