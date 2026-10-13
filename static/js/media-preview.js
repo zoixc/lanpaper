@@ -18,20 +18,28 @@ export function createVideoPreview(doc, options) {
         video.playsInline = true;
         video.preload = 'none';
         video.setAttribute('aria-label', options.label);
-        video.addEventListener('error', () => {
+        function showError() {
+            if (!box.contains(video) || !video.hasAttribute('src')) return;
+            video.removeEventListener('error', showError);
             stopMedia(box);
             const message = doc.createElement('p');
             message.className = 'field-hint field-hint--error';
             message.setAttribute('role', 'status');
             message.textContent = options.error;
             box.replaceChildren(message);
-        }, { once: true });
+        }
+        video.addEventListener('error', showError, { once: true });
         box.replaceChildren(video);
         video.src = options.src;
         // play() is called only in the user activation handler. Rejection may
         // simply mean the browser wants its native play control; keep it usable.
         const playing = video.play();
-        if (playing && playing.catch) playing.catch(() => {});
+        if (playing && playing.catch) playing.catch(error => {
+            // Some engines reject unsupported playback before firing 'error'.
+            // Permission rejection and deliberate load cancellation are not
+            // corrupt media: keep native controls usable in those cases.
+            if (error.name === 'NotSupportedError' || video.error) showError();
+        });
     });
     return box;
 }

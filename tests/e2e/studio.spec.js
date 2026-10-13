@@ -154,6 +154,10 @@ test('touch scroll is independent of grip; grip swipe closes and restores focus'
   expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
 });
 
+test.describe('playback failure', () => {
+// Route interception must not be bypassed by a controlling service worker.
+// Other Studio tests retain real SW coverage, including protected cache checks.
+test.use({ serviceWorkers: 'block' });
 test('unplayable video reports an error without leaving a player or breaking the panel', async ({ page }) => {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -169,4 +173,6 @@ test('unplayable video reports an error without leaving a player or breaking the
   await expect(page.locator('video')).toHaveCount(0);
   await page.locator('[data-sheet=panel] [data-close]').first().click();
   expect(errors).toEqual([]);
+});
+
 });
