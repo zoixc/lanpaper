@@ -283,7 +283,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v15/,
+  assert.match(code, /lanpaper-static-v17/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 
@@ -328,4 +328,20 @@ test('a link the server refused to delete stays on screen', () => {
   assert.match(block[1], /removed\.push\(name\)/, 'the bulk delete no longer tracks what was deleted');
   assert.ok(!/state\.links = state\.links\.filter\(l => names\.indexOf/.test(scriptSource),
     'the panel still hides links the server never deleted');
+});
+
+test('Studio mobile layout avoids coarse-pointer distortions and button sheet grips', () => {
+  const studioCss = read('static/css/studio.css');
+  assert.ok(!/@media\s*\([^)]*pointer:\s*coarse/.test(studioCss),
+    'studio.css must not distort control sizes on coarse pointers');
+  assert.ok(!/@media\s*\([^)]*hover:\s*none/.test(studioCss),
+    'studio.css must not override control geometry on touch devices');
+  assert.ok(!/<button[^>]+class="sheet__grip"/.test(adminHtml),
+    'sheet grips must remain decorative divs so they do not steal focus or add a 44px header gap');
+  assert.equal((adminHtml.match(/<div class="sheet__grip"><\/div>/g) || []).length, 3,
+    'each sheet template must keep its decorative grip div');
+  assert.match(adminHtml, /class="section section--shortcuts"/,
+    'settings shortcuts section must carry section--shortcuts class');
+  assert.match(studioCss, /\.studio\s+\.section--shortcuts[\s\S]*?display:\s*none/,
+    'keyboard shortcuts section must be hidden on mobile viewports');
 });

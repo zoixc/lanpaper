@@ -2165,6 +2165,10 @@ html[data-theme="dark"] .select {
     .sheet__body {
         padding-bottom: var(--s-6);
     }
+    .section--shortcuts,
+    .section:has(#shortcutList) {
+        display: none;
+    }
 }
 
 /* Центрированный диалог для коротких подтверждений */
@@ -3664,6 +3668,9 @@ body.is-selecting .grid .card__open {
     margin: 0 auto;
     width: min(100%, 220px);
     height: auto;
+}
+html[data-theme="dark"] .login-card__logo {
+    filter: invert(1);
 }
 .login-card__form {
     display: grid;

@@ -5,6 +5,27 @@ Notable changes to Lanpaper. Docker images are published as
 
 ## [Unreleased]
 
+## [0.19.1] – 2026-10-13
+
+### Fixed
+
+- Mobile Studio layout keeps the `Lanpaper` brand name visible in the top bar,
+  removes coarse-pointer control distortions and button sheet-grip overrides,
+  and hides the desktop keyboard-shortcuts reference inside mobile settings.
+- Sliding view-mode and segmented control indicators (`grid`/`list`, panel tabs
+  and theme selector) align flush with their button icons across desktop and
+  mobile viewports.
+- First-paint bootstrap (`prepaint.js`, `admin.html`, `login.html`) applies the
+  Studio layout classes, collapsed-rail state, `Manrope Studio` font preload and
+  palette-aware `theme-color` before initial render, and brings dark-theme wordmark
+  and six-language translations (`en`, `ru`, `de`, `es`, `fr`, `it`) to the sign-in
+  page.
+- Consolidated `static/css/studio.css` by removing dead prototype overrides and
+  merging scattered `@font-face` and `:root.studio` blocks; bumped precache to
+  `lanpaper-static-v17`.
+
+## [0.19.0] – 2026-10-13
+
 ### Fixed
 
 - Settings show the selected palette name immediately, centered beside its
@@ -29,12 +50,10 @@ Notable changes to Lanpaper. Docker images are published as
 
 - Release version `0.19.0`: bring the approved Studio layout into the main
   application, with local Manrope fonts, restrained chrome, collapsible navigation,
-  stable grid/list media geometry, subtle texture and the visible version footer.
-  The sign-in page retains its separate presentation.
-- Add handle-only touch dismissal for sheets, larger coarse-pointer targets,
-  preserved scrolling/focus and translated navigation/video labels in all six
-  languages. Persistent and covered dialogs cannot be dismissed by the gesture.
-- Precache Studio's public assets in static cache v15. Authentication, CSP,
+  stable grid/list media geometry, subtle texture, translated navigation/video
+  labels in all six languages and the visible version footer. The sign-in page
+  retains its separate presentation.
+- Precache Studio's public assets in static cache v16. Authentication, CSP,
   protected-media caching boundaries and the image upload pipeline are unchanged;
   no server video codecs or runtime dependencies are added.
 

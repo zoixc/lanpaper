@@ -90,7 +90,7 @@
 .studio .grid:not(.grid--list) .card__head::before { display:none; }
 .studio .card__name { font-family:var(--font-ui); font-size:12px; font-weight:600; letter-spacing:-.3px; }
 .studio .card__meta { font-size:9px; letter-spacing:0; }
-.studio .card__menu-btn { width:26px; height:26px; min-width:26px; min-height:26px; }
+.studio .card__menu-btn { width:26px; height:26px; min-width:26px; min-height:26px; margin:-2px -4px -2px 0; }
 .studio .card__badges { padding:10px; }
 .studio .on-media { border-radius:5px; font-size:9px; padding:4px 6px; }
 .studio .sheet__title,.studio .dialog__title { font-family:var(--font-ui); font-weight:650; letter-spacing:-.6px; }
@@ -108,9 +108,9 @@
     .studio .shell { padding:0; }
     .studio .catalog-rail { position:relative; top:auto; width:100%; padding:15px 16px 9px; grid-template-columns:1fr auto; gap:12px; border:0; }
     .studio .catalog-rail .brand { margin:0; }
+    .studio .catalog-rail .brand__name { display:block; font-size:17px; }
     .studio .catalog-rail #newLinkBtn { margin:0; width:auto; min-height:36px; }
     .studio .catalog-rail .chip { min-height:36px; font-size:11px; }
-    .studio-utilities { grid-column:1/-1; flex-wrap:nowrap; margin:0; padding:0; position:absolute; top:14px; right:155px; }
     .studio-caption { display:none; }
     .studio .appbar { top:0; }
     .studio .appbar__inner { padding-inline:16px; }
@@ -124,14 +124,6 @@
     .studio .card__name { font-size:11px; }
     .studio .card__meta { font-size:9px; }
     .studio .foot { margin-inline:16px; }
-}
-@media(max-width:460px) {
-    .studio .catalog-rail .brand__name { display:none; }
-    .studio-utilities { right:148px; }
-}
-@media(hover:none) {
-    .studio .card__menu-btn { min-width:36px; min-height:36px; }
-    .studio-utilities .icon-btn { min-width:36px; min-height:36px; }
 }
 
 /* ============================================================
@@ -168,6 +160,8 @@
 .studio .btn:active:not(:disabled) { transform: translateY(1px); }
 .studio .catalog-rail #newLinkBtn { border-radius: var(--studio-control-radius); }
 .studio .icon-btn {
+    min-width: 0;
+    min-height: 0;
     border-radius: var(--studio-control-radius);
     transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
 }
@@ -181,12 +175,14 @@
    rather than inheriting the production switch's circular 30px marker. */
 .studio .btn-group--view {
     --seg: var(--ctl-inner, 30px);
-    padding: 2px;
+    padding: 3px;
     gap: 2px;
     border-radius: var(--studio-control-radius);
     background: var(--surface-hover);
 }
 .studio .btn-group--view::before {
+    top: 3px;
+    left: 3px;
     border-radius: var(--studio-inner-radius);
     background: var(--surface);
     box-shadow: var(--studio-control-shadow);
@@ -198,6 +194,7 @@
     box-shadow: none;
 }
 .studio .btn-group--view .icon-btn[aria-pressed="true"] { background: transparent; }
+.studio #themeBtn .theme-icon { inset: 0; margin: auto; }
 .studio .segment {
     padding: 3px;
     gap: 3px;
@@ -205,7 +202,10 @@
     border-radius: 10px;
     background: var(--surface-2);
 }
-.studio .segment__item { border-radius: 7px; font-weight: 550; }
+.studio .segment__item { border-radius: 7px; font-weight: 550; line-height: 1; }
+.studio .segment__item svg { flex: none; }
+.studio .segment--full .segment__item,
+.studio .segment--full .segment__opt { flex: 1 0 auto; }
 .studio .segment__item[aria-selected="true"],
 .studio .segment__item[aria-pressed="true"],
 .studio .segment__item[aria-checked="true"],
@@ -218,7 +218,7 @@
 .studio .catalog-rail .chip[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--border); }
 .studio .select,
 .studio .input,
-.studio .field { border-radius: var(--studio-control-radius); }
+.studio .field { min-height: 0; border-radius: var(--studio-control-radius); }
 .studio .select { font-weight: 550; }
 .studio .select--mini { border-radius: 6px; }
 .studio .field__clear { border-radius: 5px; }
@@ -269,17 +269,6 @@
     box-shadow: none;
 }
 .studio :is(.btn, .icon-btn, .chip, .menu__item):disabled svg { transform: none; }
-/* Keep the approved phone structure. Icons remain small; hit areas do not. */
-@media (hover: none), (pointer: coarse) {
-    .studio .appbar__actions { --ctl: 40px; --ctl-inner: 36px; }
-    .studio .card__menu-btn,
-    .studio-utilities .icon-btn { width: 40px; height: 40px; min-width: 40px; min-height: 40px; }
-    .studio .catalog-rail #newLinkBtn { min-height: 40px; height: 40px; }
-    .studio .catalog-rail .chip { min-height: 40px; }
-    .studio .segment__item { min-height: 36px; height: auto; padding-block: 8px; }
-    .studio .menu__item { min-height: 44px; }
-    .studio .select--mini { min-height: 36px; }
-}
 @media (prefers-reduced-motion: reduce) {
     .studio .btn-group--view::before, .studio .icon-btn { transition: none; }
     .studio .btn:active:not(:disabled), .studio .icon-btn:active:not(:disabled) { transform: none; }
@@ -288,7 +277,7 @@
 /* Collapsible navigation: same controls, relocated rather than duplicated. */
 :root.studio.sidebar-collapsed { --rail-width: 0px; }
 .studio.sidebar-collapsed .catalog-rail { display: none; }
-.studio .studio-nav-toggle { flex: none; width: 32px; height: 32px; min-width: 32px; }
+.studio .studio-nav-toggle { flex: none; width: 32px; height: 32px; min-width: 32px; min-height: 32px; }
 .studio .studio-nav-toggle svg { transform: none; }
 .studio.sidebar-collapsed .studio-nav-toggle svg { transform: scaleX(-1); }
 .studio .appbar__row--top { flex-wrap: wrap; }
@@ -339,10 +328,8 @@
     .studio .sheet__tabs { padding: 6px 16px 12px; }
     .studio .sheet__body { padding: 16px; }
     .studio .sheet__foot { padding-inline: 16px; }
-}
-@media(hover:none), (pointer:coarse) {
-    .studio .studio-nav-toggle,
-    .studio.sidebar-collapsed .appbar #newLinkBtn { width: 40px; height: 40px; min-width: 40px; min-height: 40px; }
+    .studio .section--shortcuts,
+    .studio .section:has(#shortcutList) { display: none; }
 }
 /* The sandbox switcher must not cover the inspector's close button. */
 @media(min-width:721px) {
