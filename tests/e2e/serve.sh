@@ -10,5 +10,9 @@ WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 cp -r "$ROOT/admin.html" "$ROOT/login.html" "$ROOT/static" "$WORK/"
 cd "$WORK"
+# Every browser project and every spec shares this one server, and so one
+# client address: the production default (20 uploads a minute) is exhausted
+# by the suite's fixtures alone. The limiter stays on; only its budget grows.
 export PORT=${PORT:-18090} ADMIN_USER=e2e-admin ADMIN_PASS=e2e-test-password-123
+export RATE_UPLOAD_PER_MIN=${RATE_UPLOAD_PER_MIN:-600}
 "$BIN"
