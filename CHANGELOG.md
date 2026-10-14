@@ -3,7 +3,7 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
-## [Unreleased]
+## [0.20.0] – 2026-10-14
 
 ### Fixed
 
@@ -19,6 +19,7 @@ Notable changes to Lanpaper. Docker images are published as
 - The service worker no longer precaches `/static/logo-dark.svg`. Nothing on
   the panel or the sign-in page asks for it: the wordmark is one file,
   recoloured for the dark theme.
+
 - `h()` lost its `html` key, the one place where a string could reach
   `innerHTML`. Nothing passed anything to it — nodes are built from nodes and
   text — and keeping an unused sink is how a name or an address ends up being

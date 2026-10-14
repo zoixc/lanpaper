@@ -101,8 +101,10 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Semver tags plus :latest, so "ptabi/lanpaper:0.12" keeps working for
-      # anyone who pins a minor and ":latest" always points at a released tag.
+      # Only the exact version and :latest. Versions are always three
+      # components (0.20.0), so there is no minor alias to keep in step: an
+      # immutable tag is the one people pin, and :latest points at the newest
+      # release.
       - name: Build and push with attestations
         id: release-image
         run: |
@@ -114,7 +116,6 @@ jobs:
             --sbom=true \
             --metadata-file=/tmp/release-metadata.json \
             -t "ptabi/lanpaper:${version}" \
-            -t "ptabi/lanpaper:${version%.*}" \
             -t "ptabi/lanpaper:latest" \
             --push .
           digest="$(jq -r '."containerimage.digest"' /tmp/release-metadata.json)"
