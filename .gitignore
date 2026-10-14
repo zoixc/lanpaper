@@ -50,6 +50,8 @@ docker-compose.yml
 tests/e2e/node_modules/
 tests/e2e/test-results/
 tests/e2e/playwright-report/
+# Screenshots from visual.spec.js: reviewed as a CI artifact, never committed
+tests/e2e/screenshots/
 
 # Development-only CSS lint/format tooling
 tools/node_modules/

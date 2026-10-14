@@ -166,7 +166,6 @@ ol {
 :root {
     /* Фон и поверхности */
     --bg: #f5f6f9;
-    --bg-2: #edeff4;
     --surface: #fff;
     --surface-2: #f1f3f7;
     --surface-3: #e7eaf1;
@@ -197,33 +196,36 @@ ol {
     /* Статусы: монохром — различаются значком и текстом, не цветом */
     --success: #3e4147;
     --success-soft: rgba(27, 28, 30, 0.07);
-    --warning: #3e4147;
-    --warning-soft: rgba(27, 28, 30, 0.07);
     --danger: #b04a45;
     --danger-soft: rgba(176, 74, 69, 0.1);
     --info: #3e4147;
     --info-soft: rgba(27, 28, 30, 0.07);
 
-    /* Матование превью: поля вокруг вписанного кадра */
+    /* Матование превью: поля вокруг вписанного кадра. Шашечка под
+       прозрачный кадр — те же две ступени подложки: отдельные цвета для
+       неё жили только в базе и на чужих палитрах оставались синими. */
     --matte: #eceef2;
-    --matte-line: rgba(27, 28, 30, 0.06);
-    --checker-a: #f4f5f7;
-    --checker-b: #e7e9ed;
     --shade: rgba(16, 17, 20, 0.62); /* подписи на кадре */
 
     /* Тени. У каждой поверхности — своя высота, и это видно без «парения»:
        мягкий разлёт с отрицательным spread держит тень под элементом, а не
-       вокруг него. Свечения и цветных градиентов нет ни у одной. */
-    --shadow-xs: 0 1px 1px rgba(20, 22, 32, 0.03);
-    --shadow-sm: 0 1px 2px rgba(20, 22, 32, 0.04);
-    --shadow-md: 0 2px 5px rgba(20, 22, 32, 0.04), 0 8px 18px -14px rgba(20, 22, 32, 0.12);
-    --shadow-lg: 0 4px 10px rgba(20, 22, 32, 0.05), 0 18px 36px -26px rgba(20, 22, 32, 0.18);
+       вокруг него. Свечения и цветных градиентов нет ни у одной. Оттенок
+       самой тени задаёт --shadow-rgb: на шалфее тень не должна быть синей,
+       поэтому у каждой палитры свой. */
+    --shadow-rgb: 20, 22, 32;
+    --shadow-xs: 0 1px 1px rgba(var(--shadow-rgb), 0.03);
+    --shadow-md:
+        0 2px 5px rgba(var(--shadow-rgb), 0.04), 0 8px 18px -14px rgba(var(--shadow-rgb), 0.12);
+    --shadow-lg:
+        0 4px 10px rgba(var(--shadow-rgb), 0.05), 0 18px 36px -26px rgba(var(--shadow-rgb), 0.18);
     /* Плитка. На светлом фоне сама поверхность белее фона, поэтому хватает
        одной мягкой тени по нижнему краю — карточка перестаёт быть наклейкой. */
-    --shadow-card: 0 1px 2px rgba(20, 22, 32, 0.03), 0 4px 10px -8px rgba(20, 22, 32, 0.1);
-    --shadow-card-hover: 0 1px 3px rgba(20, 22, 32, 0.04), 0 8px 18px -12px rgba(20, 22, 32, 0.14);
+    --shadow-card:
+        0 1px 2px rgba(var(--shadow-rgb), 0.03), 0 4px 10px -8px rgba(var(--shadow-rgb), 0.1);
+    --shadow-card-hover:
+        0 1px 3px rgba(var(--shadow-rgb), 0.04), 0 8px 18px -12px rgba(var(--shadow-rgb), 0.14);
     /* Липкая шапка: тень уходит вниз, отделяя её от содержимого */
-    --shadow-bar: 0 6px 14px -14px rgba(20, 22, 32, 0.2);
+    --shadow-bar: 0 6px 14px -14px rgba(var(--shadow-rgb), 0.2);
     --shadow-focus: 0 0 0 3px rgba(var(--accent-rgb), 0.22);
 
     /* Радиусы */
@@ -267,7 +269,6 @@ ol {
     --t-lg: 1rem; /* 16 — акцентные подписи */
     --t-xl: 1.25rem; /* 20 — заголовок страницы (телефон) */
     --t-2xl: 1.5rem; /* 24 — заголовок страницы (десктоп) */
-    --t-3xl: 1.875rem; /* 30 — заголовок пустоты */
 
     --fw-normal: 400;
     --fw-medium: 500;
@@ -285,7 +286,6 @@ ol {
     --dur-slow: 260ms;
 
     /* Слои */
-    --z-sticky: 20;
     --z-appbar: 30;
     --z-fab: 35;
     --z-dropdown: 60;
@@ -306,6 +306,10 @@ ol {
     --card-gap: 3px;
     --row-padding: var(--s-2-5) var(--s-3);
     --sheet-body-padding: var(--s-4);
+    /* Сколько экрана снизу заняла экранная клавиатура. Клавиатура меняет
+       визуальный вьюпорт, а не раскладку, поэтому ноль до первого измерения
+       и на всех устройствах без неё. */
+    --keyboard-inset: 0px;
     --menu-item-padding: var(--s-2) var(--s-2-5);
     --version-row-padding: 9px var(--s-2-5);
     --picker-item-padding: var(--s-2) var(--s-2-5);
@@ -318,7 +322,6 @@ html[data-theme="dark"] {
     color-scheme: dark;
 
     --bg: #14161b;
-    --bg-2: #0f1114;
     --surface: #1b1e24;
     --surface-2: #22262e;
     --surface-3: #2a2f38;
@@ -345,21 +348,16 @@ html[data-theme="dark"] {
 
     --success: #b9bcc2;
     --success-soft: rgba(233, 234, 236, 0.08);
-    --warning: #b9bcc2;
-    --warning-soft: rgba(233, 234, 236, 0.08);
     --danger: #e79a96;
     --danger-soft: rgba(231, 154, 150, 0.14);
     --info: #b9bcc2;
     --info-soft: rgba(233, 234, 236, 0.08);
 
     --matte: #23262c;
-    --matte-line: rgba(255, 255, 255, 0.05);
-    --checker-a: #22262e;
-    --checker-b: #2a2f38;
+    --shadow-rgb: 14, 16, 24;
     --shade: rgba(8, 9, 11, 0.66);
 
     --shadow-xs: 0 1px 1px rgba(0, 0, 0, 0.25);
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28);
     --shadow-md: 0 2px 5px rgba(0, 0, 0, 0.28), 0 8px 18px -14px rgba(0, 0, 0, 0.45);
     --shadow-lg: 0 4px 10px rgba(0, 0, 0, 0.32), 0 18px 36px -26px rgba(0, 0, 0, 0.55);
     /* В темноте форму задают фон и границы, тень лишь усиливает глубину.
@@ -375,6 +373,11 @@ html[data-theme="dark"] {
    границы и статусы остаются общими, поэтому контраст не
    зависит от выбора пользователя.
    Переключатель: <html data-palette="sage">.
+   Палитра обязана определить весь набор подложек целиком —
+   --surface-2, --surface-hover, --surface-3: подложки поля поиска,
+   группы вида, счётчика и нажатого фильтра красятся
+   --surface-hover, и пока токен жил только в :root, на шалфее,
+   глине, графите и океане они оставались голубоватыми.
    ============================================================ */
 
 /* --- Монохром (по умолчанию, значения в :root) — акцент = текст: без цвета ---
@@ -383,10 +386,11 @@ html[data-theme="dark"] {
 /* --- Индиго — спокойный синий --- */
 html[data-palette="indigo"] {
     --bg: #f5f6f9;
-    --bg-2: #edeff4;
     --surface-2: #f1f3f7;
+    --surface-hover: #eff1f6;
     --surface-3: #e7eaf1;
     --matte: #eceef2;
+    --shadow-rgb: 20, 22, 32;
     --accent: #5a66b5;
     --accent-rgb: 90, 102, 181;
     --accent-hover: #4e5aa9;
@@ -397,11 +401,12 @@ html[data-palette="indigo"] {
 }
 html[data-palette="indigo"][data-theme="dark"] {
     --bg: #14161b;
-    --bg-2: #0f1114;
     --surface: #1b1e24;
     --surface-2: #22262e;
+    --surface-hover: #242830;
     --surface-3: #2a2f38;
     --matte: #23262c;
+    --shadow-rgb: 14, 16, 24;
     --accent: #9aa4e8;
     --accent-rgb: 154, 164, 232;
     --accent-hover: #aab3ee;
@@ -414,13 +419,14 @@ html[data-palette="indigo"][data-theme="dark"] {
 /* --- Шалфей — приглушённая зелень --- */
 html[data-palette="sage"] {
     --bg: #f4f7f5;
-    --bg-2: #ebf1ed;
     --surface-2: #f0f4f1;
+    --surface-hover: #eef2ef;
     --surface-3: #e5ebe7;
     --border: #e0e7e2;
     --border-2: #cfd9d3;
     --border-strong: #b9c6be;
     --matte: #eaefeb;
+    --shadow-rgb: 20, 28, 24;
     --accent: #4f7c68;
     --accent-rgb: 79, 124, 104;
     --accent-hover: #45705d;
@@ -431,14 +437,15 @@ html[data-palette="sage"] {
 }
 html[data-palette="sage"][data-theme="dark"] {
     --bg: #131715;
-    --bg-2: #0e1211;
     --surface: #1a1f1d;
     --surface-2: #212725;
+    --surface-hover: #232927;
     --surface-3: #29302d;
     --border: #29302d;
     --border-2: #39423e;
     --border-strong: #4b564f;
     --matte: #222724;
+    --shadow-rgb: 12, 18, 15;
     --accent: #93c7b2;
     --accent-rgb: 147, 199, 178;
     --accent-hover: #a3d2bf;
@@ -451,13 +458,14 @@ html[data-palette="sage"][data-theme="dark"] {
 /* --- Глина — тёплая, «бумага и терракота» --- */
 html[data-palette="clay"] {
     --bg: #f8f5f3;
-    --bg-2: #f1eae6;
     --surface-2: #f4efeb;
+    --surface-hover: #f2ede9;
     --surface-3: #eae2dc;
     --border: #e7dfd9;
     --border-2: #d8ccc4;
     --border-strong: #c4b4a9;
     --matte: #efe9e4;
+    --shadow-rgb: 30, 25, 21;
     --accent: #a25d44;
     --accent-rgb: 162, 93, 68;
     --accent-hover: #94533c;
@@ -468,14 +476,15 @@ html[data-palette="clay"] {
 }
 html[data-palette="clay"][data-theme="dark"] {
     --bg: #171512;
-    --bg-2: #111010;
     --surface: #1e1b17;
     --surface-2: #26221d;
+    --surface-hover: #28241f;
     --surface-3: #2f2a24;
     --border: #2e2923;
     --border-2: #3f382f;
     --border-strong: #524a3e;
     --matte: #262320;
+    --shadow-rgb: 18, 14, 11;
     --accent: #e0a489;
     --accent-rgb: 224, 164, 137;
     --accent-hover: #e9b199;
@@ -488,13 +497,14 @@ html[data-palette="clay"][data-theme="dark"] {
 /* --- Графит — почти монохром, для тех, кто не любит цвет --- */
 html[data-palette="graphite"] {
     --bg: #f5f5f6;
-    --bg-2: #ededef;
     --surface-2: #f1f1f3;
+    --surface-hover: #efeff1;
     --surface-3: #e6e7e9;
     --border: #e3e3e6;
     --border-2: #d2d3d7;
     --border-strong: #bcbdc3;
     --matte: #ededef;
+    --shadow-rgb: 24, 25, 27;
     --accent: #4e5763;
     --accent-rgb: 78, 87, 99;
     --accent-hover: #444c57;
@@ -505,14 +515,15 @@ html[data-palette="graphite"] {
 }
 html[data-palette="graphite"][data-theme="dark"] {
     --bg: #151617;
-    --bg-2: #101112;
     --surface: #1c1d1f;
     --surface-2: #242628;
+    --surface-hover: #26282a;
     --surface-3: #2d2f32;
     --border: #2c2e31;
     --border-2: #3c3f43;
     --border-strong: #4e5257;
     --matte: #242628;
+    --shadow-rgb: 13, 14, 15;
     --accent: #aab4c2;
     --accent-rgb: 170, 180, 194;
     --accent-hover: #bac3cf;
@@ -525,13 +536,14 @@ html[data-palette="graphite"][data-theme="dark"] {
 /* --- Океан — холодный бирюзовый --- */
 html[data-palette="ocean"] {
     --bg: #f3f6f7;
-    --bg-2: #e9f0f2;
     --surface-2: #eff4f5;
+    --surface-hover: #edf2f3;
     --surface-3: #e3ecee;
     --border: #dfe8ea;
     --border-2: #cdd9dc;
     --border-strong: #b6c6ca;
     --matte: #e9eff1;
+    --shadow-rgb: 19, 26, 29;
     --accent: #2f7c88;
     --accent-rgb: 47, 124, 136;
     --accent-hover: #296e79;
@@ -542,14 +554,15 @@ html[data-palette="ocean"] {
 }
 html[data-palette="ocean"][data-theme="dark"] {
     --bg: #131618;
-    --bg-2: #0e1113;
     --surface: #1a1e20;
     --surface-2: #212628;
+    --surface-hover: #23282a;
     --surface-3: #293033;
     --border: #293032;
     --border-2: #384144;
     --border-strong: #4a5458;
     --matte: #222729;
+    --shadow-rgb: 11, 16, 18;
     --accent: #7cc6d2;
     --accent-rgb: 124, 198, 210;
     --accent-hover: #90d1db;
@@ -1253,14 +1266,16 @@ svg.is-pulse {
     background: var(--surface);
     transition:
         border-color var(--dur-fast) var(--ease),
-        box-shadow var(--dur-fast) var(--ease);
+        background var(--dur-fast) var(--ease);
 }
 .field:hover {
     border-color: var(--border-2);
 }
+/* Фокус текстового поля обозначен заливкой, а не рамкой: поле и без того
+   показывает, куда попадает набор, — курсором и жестом значка, — а ободок
+   вокруг превращал строку поиска в отдельный объект на панели. */
 .field:focus-within {
-    border-color: var(--accent);
-    box-shadow: var(--shadow-focus);
+    background: var(--surface-3);
 }
 .field__icon {
     flex: none;
@@ -1316,15 +1331,30 @@ svg.is-pulse {
     font-size: var(--t-sm);
     transition:
         border-color var(--dur-fast) var(--ease),
-        box-shadow var(--dur-fast) var(--ease);
+        background var(--dur-fast) var(--ease);
 }
 .input::placeholder {
     color: var(--text-3);
 }
+/* Браузер красит автозаполненное поле своей краской и не отдаёт её
+   свойству background-color: перекрыть её можно только внутренней тенью.
+   Без этого сохранённый логин или пароль приезжает бледно-голубым в
+   светлой теме и сизым в тёмной — единственное место, где панель
+   показывает цвет, которого не выбирала. */
+.field input:-webkit-autofill,
+.input:-webkit-autofill {
+    -webkit-text-fill-color: var(--text);
+    caret-color: var(--text);
+    box-shadow: inset 0 0 0 1000px var(--surface);
+}
+/* У .input фокус обозначен заливкой на самом поле, а не ободком, поэтому
+   автозаполненное поле возвращает только свою заливку. */
+.input:-webkit-autofill:focus {
+    box-shadow: inset 0 0 0 1000px var(--surface-2);
+}
 .input:focus {
     outline: none;
-    border-color: var(--accent);
-    box-shadow: var(--shadow-focus);
+    background: var(--surface-2);
 }
 .input[aria-invalid="true"] {
     border-color: var(--danger);
@@ -1680,7 +1710,7 @@ html[data-theme="dark"] .select {
     border-bottom: 1px solid var(--border);
 }
 .card__frame--checker {
-    background-image: repeating-conic-gradient(var(--checker-a) 0% 25%, var(--checker-b) 0% 50%);
+    background-image: repeating-conic-gradient(var(--surface-2) 0% 25%, var(--surface-3) 0% 50%);
     background-size: 16px 16px;
     background-position: 50% 50%;
 }
@@ -1695,8 +1725,11 @@ html[data-theme="dark"] .select {
 .card__media--contain {
     object-fit: contain;
 }
+/* 1.5% было незаметно: на карточке в 400px это два пикселя на сторону.
+   Кадр обрезает движение (overflow: hidden), поэтому кадр не растёт —
+   приближается только фотография внутри него. */
 .card:hover .card__media {
-    transform: scale(1.015);
+    transform: scale(1.04);
 }
 .card:hover .card__media--contain {
     transform: none;
@@ -2189,6 +2222,12 @@ html[data-theme="dark"] .select {
     border: 1px solid var(--border);
     box-shadow: var(--shadow-lg);
     animation: dialog-in var(--dur-slow) var(--ease-out);
+    /* Клавиатура подъезжает поверх раскладки: диалог приподнимается на
+       половину её высоты, иначе центр экрана — и поле, ради которого диалог
+       открыт, — оказываются под клавиатурой. Смещение живёт в отдельном
+       свойстве translate, поэтому не спорит ни с центрированием, ни с
+       анимацией появления: те правят transform. */
+    translate: 0 calc(var(--keyboard-inset) * -0.5);
 }
 
 @keyframes dialog-in {
@@ -2218,22 +2257,6 @@ html[data-theme="dark"] .select {
 }
 .dialog__foot .btn {
     flex: 1;
-}
-
-@media (max-width: 520px) {
-    /* На телефоне диалог становится шторкой снизу: до верхних кнопок
-       не дотянуться одной рукой, а нижняя шторка закрывается жестом. */
-    .dialog {
-        top: auto;
-        bottom: 0;
-        left: 0;
-        transform: none;
-        width: 100%;
-        max-width: none;
-        border-radius: var(--r-xl) var(--r-xl) 0 0;
-        padding-bottom: calc(20px + env(safe-area-inset-bottom));
-        animation: sheet-up var(--dur-slow) var(--ease-out);
-    }
 }
 
 /* ============================================================
@@ -3016,6 +3039,14 @@ html[data-theme="dark"] .select {
     box-shadow: var(--shadow-xs);
     flex: none;
 }
+/* Знак — один рисунок на обе темы: тёмная плитка со светлым знаком внутри.
+   На тёмной рельсе (#171717) плитка #1B1C1E сливается с фоном: контраст
+   1.06:1, виден только светлый штрих, и знак перестаёт быть плиткой.
+   Инверсия возвращает ему вид: светлая плитка с тёмным знаком — тот же
+   приём, что у wordmark на странице входа (.login-card__logo). */
+html[data-theme="dark"] .brand__mark img {
+    filter: invert(1);
+}
 .brand__name {
     font-family: var(--font-display);
     font-size: 0.9375rem;
@@ -3695,6 +3726,19 @@ html[data-theme="dark"] .login-card__logo {
 .login-card__field input:focus-visible {
     outline: none;
     box-shadow: var(--shadow-focus);
+}
+/* Поля входа залиты --surface-2, поэтому автозаполнение перекрашивается
+   в него, а не в --surface: на --surface поле слилось бы с карточкой и
+   потеряло заливку — в светлой теме белым, в тёмной провалом. */
+.login-card__field input:-webkit-autofill {
+    -webkit-text-fill-color: var(--text);
+    caret-color: var(--text);
+    box-shadow: inset 0 0 0 1000px var(--surface-2);
+}
+.login-card__field input:-webkit-autofill:focus-visible {
+    box-shadow:
+        inset 0 0 0 1000px var(--surface-2),
+        var(--shadow-focus);
 }
 .login-card__error {
     margin: 0;

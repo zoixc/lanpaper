@@ -283,8 +283,103 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v17/,
+  assert.match(code, /lanpaper-static-v29/,
     'the precache generation must be bumped whenever the panel assets change');
+});
+
+test('the boot screen covers the unassembled panel and is always released', () => {
+  // Разметка admin.html — не тот вид, который получится: initializeStudio()
+  // переносит шапку в рельсу, hydrateIcons() рисует значки,
+  // applyTranslations() ставит подписи. Пока этого не произошло, панель
+  // выглядит иначе, поэтому её закрывает экран загрузки. Три вещи обязаны
+  // выполняться вместе: метку ставит prepaint.js (единственный скрипт до
+  // первой отрисовки), app.js снимает её после сборки, и она снимается сама,
+  // если app.js не выполнится, — иначе панель останется пустой навсегда.
+  const prepaint = read('static/js/prepaint.js');
+  assert.match(adminHtml, /id="bootScreen"/, 'the boot screen disappeared from admin.html');
+  assert.match(prepaint, /dataset\.boot = 'pending'/,
+    'prepaint.js no longer arms the boot screen before the first paint');
+  assert.match(prepaint, /dataset\.layout !== 'studio'/,
+    'nothing keeps the sign-in page, which no script assembles, out of the boot screen');
+  assert.match(prepaint, /window\.LANPAPER_BOOT = \{ reveal: reveal \}/,
+    'prepaint.js no longer publishes the release app.js has to call');
+  assert.match(prepaint, /setTimeout\(reveal, \d+\)/,
+    'nothing releases the boot screen when app.js never runs');
+  // Ресурс, который не загрузился, события не всплывает: без capture скрипт
+  // панели молча остаётся за экраном до таймаута.
+  const listener = prepaint.match(
+    /addEventListener\('error', function \(event\) \{([\s\S]*?)\n        \}, true\);/);
+  assert.ok(listener, 'the boot screen no longer listens for a panel script that failed');
+  assert.match(listener[1], /tagName !== 'SCRIPT'/,
+    'a failed image or stylesheet now releases the boot screen as if app.js had failed');
+  const init = scriptSource.match(/async function init\(\) \{([\s\S]*?)\n    \}/);
+  assert.ok(init, 'init() disappeared');
+  assert.match(init[1], /window\.LANPAPER_BOOT\?\.reveal\(\)/,
+    'app.js no longer releases the boot screen');
+  for (const step of ['initializeStudio(t)', 'applyTranslations()', 'hydrateIcons(document)', 'render();']) {
+    assert.ok(init[1].indexOf(step) < init[1].indexOf('LANPAPER_BOOT'),
+      `the boot screen is released before ${step}, so the panel flashes half-built`);
+  }
+  // Без метки экран должен оставаться выключенным: prepaint.js — отдельный
+  // файл, и если он не загрузится, панель грузится как раньше.
+  const studioCss = read('static/css/studio.css');
+  const boot = studioCss.slice(studioCss.indexOf('\n.boot {'));
+  assert.match(boot, /\.boot \{\s*display: none;/,
+    'the boot screen shows even when prepaint.js never armed it');
+  assert.match(boot, /:root\[data-boot\] \.boot[\s\S]*?display: flex;/,
+    'nothing turns the boot screen on once it is armed');
+  assert.match(boot, /:root\[data-boot="done"\] \.boot[\s\S]*?opacity: 0;/,
+    'the boot screen no longer fades out when it is released');
+});
+
+test('the panel preloads the typeface subset its language needs', () => {
+  // Интерфейс — Manrope, а в разметке предзагружен только латинский поднабор:
+  // его хватает на имена ссылок при любом языке. Если интерфейс русский,
+  // кириллический поднабор тоже нужен до первой отрисовки, иначе бренд,
+  // заголовок и названия карточек рисуются подменой и перещёлкиваются.
+  // prepaint.js знает сохранённый язык и добавляет предзагрузку сам.
+  const prepaint = read('static/js/prepaint.js');
+  assert.match(adminHtml, /rel="preload"[^>]*manrope-latin-wght-normal\.woff2/,
+    'the latin subset is no longer preloaded in the markup');
+  assert.match(prepaint, /manrope-cyrillic-wght-normal\.woff2/,
+    'prepaint.js no longer preloads the subset a Russian panel needs');
+  assert.match(prepaint, /navigator\.language/,
+    'the preload no longer falls back to the browser language, as langFromPrefs() does');
+  // Шрифты загружаются в CORS-режиме: без crossorigin предзагрузка не
+  // совпадёт с настоящим запросом, и файл придёт дважды.
+  assert.match(prepaint, /crossOrigin = 'anonymous'/, 'the font preload lost crossorigin');
+  // Ещё один способ привезти файл дважды — попросить его по другому URL:
+  // сервер добавляет ?v=<хеш> к ссылкам в разметке, а таблицы стилей
+  // отдаются как есть, без версии. Предзагруженная копия тогда не
+  // используется вовсе, а шрифт всё равно скачивается по ссылке из CSS.
+  const style = read('static/css/studio.css') + read('static/css/style.css');
+  const cssFonts = new Set(matches(style, /url\("?(\/static\/fonts\/[^")]+)"?\)/g));
+  assert.ok(cssFonts.size >= 3, 'the stylesheets no longer reference the fonts by their /static/ path');
+  const preloaded = matches(adminHtml, /<link rel="preload"[^>]*href="([^"]+)"/g);
+  assert.ok(preloaded.length, 'nothing is preloaded in the markup any more');
+  for (const href of preloaded) {
+    assert.ok(cssFonts.has(href),
+      `${href} is not the URL the stylesheet asks for: the file would be fetched twice`);
+  }
+  assert.match(prepaint, /link\.as = 'font'/, 'the font preload is no longer announced as a font');
+  for (const subset of ['latin', 'cyrillic']) {
+    assert.ok(exists(`/static/fonts/manrope-${subset}-wght-normal.woff2`),
+      `the ${subset} subset is gone from static/fonts`);
+  }
+});
+
+test('the manifest colours agree with the background the panel paints', () => {
+  // Android рисует экран запуска цветом background_color и кладёт на него
+  // иконку. Иконка — тёмная и непрозрачная, поэтому фон обязан оставаться
+  // светлым и совпадать с реальным --bg Studio, иначе установленное
+  // приложение открывается чужим цветом (а в тёмной теме — светлой вспышкой).
+  const manifest = JSON.parse(read('static/manifest.json'));
+  const studio = read('static/css/studio.css');
+  for (const key of ['background_color', 'theme_color']) {
+    assert.equal(manifest[key], '#fafafa', `${key} is no longer the Studio light background`);
+  }
+  assert.match(studio, /--bg:\s*#fafafa/,
+    'the Studio background moved; the manifest has to move with it');
 });
 
 test('copying reports the truth, and the upload toast stays until the upload ends', () => {
@@ -344,4 +439,403 @@ test('Studio mobile layout avoids coarse-pointer distortions and button sheet gr
     'settings shortcuts section must carry section--shortcuts class');
   assert.match(studioCss, /\.studio\s+\.section--shortcuts[\s\S]*?display:\s*none/,
     'keyboard shortcuts section must be hidden on mobile viewports');
+});
+
+// Innermost declaration blocks, comments and @media/@keyframes wrappers
+// skipped. Enough to see which selector paints which literal colour; the
+// cascade itself is not modelled here — the two CSS files are read as text.
+function colorDeclarations(file) {
+  const css = read(file).replace(/\/\*[\s\S]*?\*\//g, '');
+  const found = [];
+  const block = /([^{}]*?)\{([^{}]*)\}/g;
+  let match;
+  while ((match = block.exec(css)) !== null) {
+    const selector = match[1].trim().replace(/\s+/g, ' ');
+    if (!selector || selector.startsWith('@') || /^(from|to|\d+%)$/.test(selector)) continue;
+    for (const [, prop, value] of match[2].matchAll(/([-\w]+)\s*:\s*([^;]+);/g)) {
+      found.push({ selector, prop, value: value.trim(), file,
+        line: css.slice(0, match.index).split('\n').length });
+    }
+  }
+  return found;
+}
+
+test('the brand mark and the sign-in wordmark follow the theme they are drawn on', () => {
+  // Both are one bitmap for two themes: a dark tile with a light glyph. Left
+  // alone, the tile (#1B1C1E) melts into the dark rail (#171717) at 1.06:1 —
+  // the mark stops reading as a mark. The sign-in wordmark already inverted;
+  // the rail mark did not.
+  const style = read('static/css/style.css');
+  for (const selector of ['.login-card__logo', '.brand__mark img']) {
+    const rule = new RegExp(
+      `html\\[data-theme="dark"\\]\\s+${selector.replace(/[.[\]]/g, '\\$&')}\\s*\\{([^}]*)\\}`);
+    const body = style.match(rule);
+    assert.ok(body, `${selector} is not repainted for the dark theme`);
+    assert.match(body[1], /filter:\s*invert\(1\)/, `${selector} keeps its light-theme colours in the dark theme`);
+  }
+});
+
+test('an autofilled field keeps the panel colours, not the browser ones', () => {
+  // Chrome and Safari paint their own background on an autofilled input and
+  // ignore background-color: only an inset shadow covers it. Without this the
+  // saved username and password arrive pale blue (light theme) or blue-grey
+  // (dark) in a panel that never chose those colours.
+  const style = read('static/css/style.css');
+  const panel = style.match(/\.field input:-webkit-autofill,\s*\.input:-webkit-autofill\s*\{([^}]*)\}/);
+  assert.ok(panel, 'panel fields have no autofill rule');
+  assert.match(panel[1], /-webkit-text-fill-color:\s*var\(--text\)/, 'autofilled text keeps the browser colour');
+  assert.match(panel[1], /box-shadow:\s*inset 0 0 0 1000px var\(--surface\)/, 'autofill background is not repainted');
+  assert.match(style, /\.input:-webkit-autofill:focus\s*\{[^}]*inset 0 0 0 1000px var\(--surface-2\)/,
+    'a focused autofilled field loses the fill that marks focus');
+
+  const login = style.match(/\.login-card__field input:-webkit-autofill\s*\{([^}]*)\}/);
+  assert.ok(login, 'the sign-in fields have no autofill rule');
+  assert.match(login[1], /box-shadow:\s*inset 0 0 0 1000px var\(--surface-2\)/,
+    'the sign-in fields are filled with --surface-2, so autofill must match it');
+  assert.match(style, /\.login-card__field input:-webkit-autofill:focus-visible\s*\{[^}]*var\(--shadow-focus\)/,
+    'an autofilled sign-in field loses its focus ring');
+});
+
+test('every colour outside a media overlay comes from a theme token', () => {
+  // A literal cannot follow the theme: it is one colour in both. The only
+  // ones allowed are the badges, play and select buttons painted on top of a
+  // photograph or a frame, where the backing is dark in both themes by
+  // design (--shade and the stage). Everything else — chrome, controls,
+  // shadows — has to read a token, or it carries one shade into the theme
+  // where it does not belong.
+  const allowed = new Set([
+    // Всё, что нарисовано поверх кадра: подложка там всегда тёмная, какой
+    // бы ни была тема интерфейса вокруг.
+    '.on-media|background',
+    '.on-media|box-shadow',
+    '.on-media|color',
+    '.card__open|color',
+    '.card__open:hover|background',
+    '.card__play|color',
+    '.card__play|box-shadow',
+    '.card__check|border',
+    '.studio .card__frame--empty .card__play svg|color'
+  ]);
+  const literal = /(?:#[0-9a-f]{3,8}\b|\brgba?\([^)]*\)|\bhsla?\([^)]*\))/i;
+  const offenders = [];
+  for (const file of ['static/css/style.css', 'static/css/studio.css']) {
+    for (const decl of colorDeclarations(file)) {
+      if (decl.prop.startsWith('--')) continue;      // сами токены — значения тем
+      if (!literal.test(decl.value) || /\bvar\(/.test(decl.value)) continue;
+      if (allowed.has(`${decl.selector}|${decl.prop}`)) continue;
+      offenders.push(`${file}:${decl.line} ${decl.selector} { ${decl.prop}: ${decl.value} }`);
+    }
+  }
+  assert.deepEqual(offenders, [],
+    'a hardcoded colour cannot follow the theme — add a token instead');
+});
+
+test('a phone keeps its rail open: the filters and the action buttons live in it', () => {
+  // .studio.sidebar-collapsed .catalog-rail is display: none — collapsing
+  // removes the whole band, not only its width. On a phone the band carries
+  // the filters, the new-link button and the only copy of the theme and
+  // settings buttons, so folding it would leave nowhere to reach them.
+  // The saved preference is therefore honoured only where the rail is a
+  // sidebar, and the toggle is not offered where it cannot be used.
+  const studio = read('static/css/studio.css');
+  // Свёрнутая рельса уезжает за край и снимается с visibility — её фильтры
+  // и кнопки всё равно перестают существовать, поэтому на телефоне она
+  // не сворачивается (см. collapsible()/folded() ниже).
+  assert.match(studio, /\.studio\.sidebar-collapsed \.catalog-rail \{\s*transform: translateX\(-100%\);\s*visibility: hidden;/,
+    'collapsing no longer removes the whole rail, so the rule below is stale');
+
+  const layout = read('static/js/studio-layout.js');
+  const apply = layout.match(/function apply\(\) \{([\s\S]*?)\n    \}/);
+  assert.ok(apply, 'apply() disappeared');
+  assert.match(apply[1], /classList\.toggle\('sidebar-collapsed', folded\(\)\)/,
+    'the rail is collapsed from its saved state without asking whether it can collapse');
+  assert.match(apply[1], /toggle\.hidden = !collapsible\(\)/,
+    'a phone is still offered a control that can only hide its filters and buttons');
+  assert.match(layout, /const collapsible = \(\) => !mobile\.matches;/,
+    'the phone breakpoint no longer decides whether the rail can collapse');
+  assert.match(layout, /mobile\.addEventListener\('change', apply\)/,
+    'a rotation between phone and desktop no longer re-applies the collapsed state');
+
+  // Before the first paint the class comes from prepaint.js, so a phone would
+  // flash an empty band until studio-layout.js put it back.
+  const prepaint = read('static/js/prepaint.js');
+  const saved = prepaint.match(
+    /if \(localStorage\.getItem\('lp-studio-nav-collapsed'\) === 'true'[\s\S]{0,160}?\{\s*root\.classList\.add\('sidebar-collapsed'\);/);
+  assert.ok(saved, 'the saved collapse state is no longer applied before the first paint');
+  assert.match(saved[0], /matchMedia\('\(max-width: 760px\)'\)\.matches/,
+    'prepaint.js collapses the rail on a phone, where nothing can expand it back');
+});
+
+test('the theme and settings buttons have one home', () => {
+  // Они переезжали: раскрытая рельса держала их внизу, свёрнутая — в шапке.
+  // Узел один (id один, фокус один), а дубль ломает и то и другое, значит
+  // дом у кнопок один: шапка на широком экране, строка действий в полосе
+  // рельсы на телефоне.
+  const layout = read('static/js/studio-layout.js');
+  const studio = read('static/css/studio.css');
+  assert.ok(!/studio-utilities/.test(layout + studio),
+    'the rail-bottom utilities are back: the buttons jump between the rail and the appbar again');
+  const place = layout.match(/function placeActions\(\) \{([\s\S]*?)\n    \}/);
+  assert.ok(place, 'placeActions() disappeared');
+  assert.match(place[1], /actionRow\.append\(theme, settings\)/,
+    'the theme and settings buttons no longer live in the appbar');
+  assert.ok(!/utilities\.append/.test(layout), 'something still moves the buttons into the rail');
+});
+
+test('the rail head and the appbar share one top line', () => {
+  // Блок марки по высоте равен строке шапки, поэтому знак, название и
+  // заголовок «Ссылки» стоят на одной центральной линии. А верх «Новой
+  // ссылки» совпадёт с верхом сетки, только если отступ сетки сверху равен
+  // отступу марки снизу: до марки отступов нет ни сверху, ни сбоку.
+  const studio = read('static/css/studio.css');
+  assert.match(studio, /--studio-head-height: 66px/, 'the head height token disappeared');
+  assert.match(studio, /\.studio \.appbar__row--top \{\s*min-height: var\(--studio-head-height\)/,
+    'the appbar row no longer takes its height from the shared token');
+  assert.match(studio, /\.studio \.catalog-rail \.brand \{\s*height: var\(--studio-head-height\)/,
+    'the brand block is no longer as tall as the appbar row, so the name and the title drift apart');
+  const brand = studio.match(/\.studio \.catalog-rail \.brand \{\s*margin: 0 7px (\d+)px;/);
+  const content = studio.match(/\.studio \.content \{[^}]*padding: (\d+)px/);
+  assert.ok(brand && content, 'the brand margin or the content padding is gone');
+  assert.equal(content[1], brand[1],
+    'the grid no longer starts level with the new-link button');
+});
+
+test('folding the rail animates instead of snapping', () => {
+  const studio = read('static/css/studio.css');
+  assert.ok(!/\.sidebar-collapsed \.catalog-rail \{\s*display: none/.test(studio),
+    'the rail is removed with display: none again: no transition can run');
+  const collapsed = studio.match(/\.studio\.sidebar-collapsed \.catalog-rail \{([\s\S]*?)\n\}/);
+  assert.ok(collapsed, 'the collapsed rail rule disappeared');
+  assert.match(collapsed[1], /transform: translateX\(-100%\)/, 'the rail no longer slides out of view');
+  assert.match(collapsed[1], /transition:[\s\S]*transform var\(--dur-slow\)/, 'the rail slides without a transition');
+  assert.match(collapsed[1], /visibility 0s var\(--dur-slow\)/,
+    'a folded rail stays focusable — and readable for a screen reader — until the movement ends');
+  assert.match(studio, /\.radical \.shell \{[^}]*transition: padding-left/,
+    'the content still jumps to its new width when the movement has already finished');
+  // Движение уважает системную настройку: общий блок гасит переходы целиком.
+  assert.match(read('static/css/style.css'), /prefers-reduced-motion/,
+    'the "less motion" switch disappeared, so the slide cannot be turned off');
+});
+
+test('the library canvas is textured for both themes', () => {
+  // Текстура — данные, а не градиент: цвет вшит в рисунок, поэтому на каждую
+  // тему свой файл. Один на обе темы означает, что в одной из них метки
+  // пропадают (тёмные на тёмном фоне или светлые на светлом).
+  const studio = read('static/css/studio.css');
+  const marks = matches(studio, /--studio-canvas-mark: url\("([^"]+)"\)/g);
+  assert.equal(marks.length, 2, 'the canvas needs one drawing per theme, not one for both');
+  assert.notEqual(marks[0], marks[1], 'both themes draw the same marks, so one of them loses them');
+  assert.match(studio, /\.studio \.content \{\s*background-image: var\(--studio-canvas-mark\);/,
+    'the canvas no longer reads its texture from the shared token');
+  assert.match(studio,
+    /@media \(prefers-contrast: more\), \(forced-colors: active\) \{\s*\.studio \.content \{\s*background-image: none;/,
+    'the texture is no longer dropped when the reader asks for more contrast');
+});
+
+test('accent details take the palette colour, not the text colour', () => {
+  // В монохромной палитре акцент совпадает с цветом текста и ошибку не видно:
+  // на цветных палитрах нажатый фильтр, его точка, рамка фокуса и
+  // подчёркивание поля оставались нейтрально-серыми, хотя красить их — ровно
+  // та работа, для которой палитра и выбирается.
+  const studio = read('static/css/studio.css');
+  const details = [
+    [/\)?\s*:focus-visible \{\s*outline: 2px solid var\(--accent\)/, 'the focus ring is not painted with the palette'],
+    [/\.chip\[aria-pressed="true"\] \{[\s\S]*?box-shadow: inset 0 -2px var\(--accent\)/, 'the pressed chip keeps a neutral underline'],
+    [
+      /\.catalog-rail \.chip\[aria-pressed="true"\] \{\s*background: var\(--accent\)/,
+      'the active collection is filled with the text colour instead of the palette'
+    ],
+    [
+      /\.studio \.catalog-rail \.chip\[aria-pressed="true"\]::before \{[\s\S]*?background: var\(--accent\)/,
+      'the dot of the active collection is not painted with the palette'
+    ],
+    [
+      /\.studio \.catalog-rail \.chip\[aria-pressed="true"\] \{[\s\S]*?color: var\(--accent\)/,
+      'the active collection is labelled with the text colour instead of the palette'
+    ]
+  ];
+  for (const [re, message] of details) assert.match(studio, re, message);
+  assert.ok(
+    !/outline: 2px solid var\(--text\)/.test(studio),
+    'a focus ring is back to the text colour: it ignores the palette'
+  );
+});
+
+test('the appbar row stays on one line when the rail opens', () => {
+  // Раскрытая рельса отъедает у шапки ширину колонки, и с переносом кнопки
+  // прыгали бы на вторую строку. Теперь место уступает поиск (но не до нуля),
+  // а за ним — заголовок, который обрезается многоточием.
+  const studio = read('static/css/studio.css');
+  const row = studio.match(/\.studio \.appbar__row--top \{([\s\S]*?)\n\}/);
+  assert.ok(row, 'the appbar row rule disappeared');
+  assert.match(row[1], /flex-wrap: nowrap/, 'the row wraps on desktop again: the buttons drop to a second line');
+  const rows = matches(studio, /\.studio \.appbar__row--top \{([\s\S]*?)\n\s*\}/g);
+  assert.equal(
+    rows.filter((body) => /flex-wrap: wrap/.test(body)).length,
+    1,
+    'only the phone row may wrap — there the search takes a line of its own'
+  );
+  assert.match(studio, /\.studio \.search \{[\s\S]*?min-width: \d+px;/, 'the search has no floor: it shrinks into a slot');
+  assert.match(studio, /\.studio \.appbar \.page-head \{\s*flex: none;/,
+    'the title gives way again: «Ссылки» is cut to «Ссы…» long before the search has spent its width');
+});
+
+test('the compact new-link button collapses instead of vanishing', () => {
+  // Кнопка одна на обеих сторонах и переезжает по DOM, а переезд не
+  // анимируется: она исчезала рывком, и поиск прыгал на её место. Теперь
+  // кнопка лежит в коробке, которая всегда в шапке, и анимируется ширина
+  // коробки — вместе с ней разъезжаются остальные элементы строки.
+  const studio = read('static/css/studio.css');
+  const closed = studio.match(/\.studio \.appbar__create \{([\s\S]*?)\n\}/);
+  const open = studio.match(/\.studio\.sidebar-collapsed \.appbar__create \{([\s\S]*?)\n\}/);
+  assert.ok(closed && open, 'the create slot is gone: the button disappears at once again');
+  assert.match(closed[1], /width: 0;/, 'the slot does not collapse');
+  assert.match(open[1], /width: 32px;/, 'the slot does not open to the width of the button');
+  assert.match(closed[1], /transition:[\s\S]*width var\(--dur-slow\)/, 'the slot changes width without a transition');
+  assert.match(closed[1], /visibility 0s var\(--dur-slow\)/, 'an empty slot stays focusable until the movement ends');
+  assert.match(
+    closed[1],
+    /margin-right: calc\(var\(--studio-actions-gap\) \* -1\)/,
+    'an empty slot leaves the gap between the controls behind, and the row jumps by it'
+  );
+  assert.match(open[1], /margin-right: 0;/, 'the open slot cancels the gap it needs when it is closed');
+  const layout = read('static/js/studio-layout.js');
+  assert.match(layout, /className = 'appbar__create'/, 'the panel no longer builds the create slot');
+  assert.match(layout, /createSlot\.append\(create\)/, 'the button is not put into the slot');
+  assert.match(
+    layout,
+    /appbar__create--leaving/,
+    'while the slot collapses the button keeps the compact form, or the full caption flashes inside it'
+  );
+  assert.match(
+    layout,
+    /setTimeout\([\s\S]*?rail\.insertBefore\(create, label\)/,
+    'the button returns to the rail before the slot has collapsed, so it vanishes at once'
+  );
+});
+
+test('every palette carries its own surface ramp', () => {
+  // Подложки — поле поиска, группа вида, счётчик возле «Ссылки», нажатый
+  // фильтр — красятся --surface-hover. Токен жил только в :root со значением
+  // индиго, и палитры, переопределявшие --surface-2, продолжали брать его
+  // оттуда: на шалфее, глине, графите и океане подложки оставались
+  // голубоватыми, хотя в монохроме и индиго были своими.
+  const style = read('static/css/style.css');
+  const studio = read('static/css/studio.css');
+  const values = (body) =>
+    Object.fromEntries([...body.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
+  const block = (source, re, what) => {
+    const found = source.match(re);
+    assert.ok(found, `${what} disappeared`);
+    return values(found[1]);
+  };
+  const base = block(style, /^:root \{([\s\S]*?)^\}/m, 'the light base tokens');
+  const dark = block(style, /^html\[data-theme="dark"\] \{([\s\S]*?)^\}/m, 'the dark base tokens');
+  const palettes = [...style.matchAll(/^html\[data-palette="(\w+)"\](?:\[data-theme="(\w+)"\])? \{([\s\S]*?)^\}/gm)];
+  assert.equal(palettes.length, 10, 'a palette block appeared or disappeared: check the list');
+  const check = (name, own, root) => {
+    assert.ok(own['--surface-hover'], `${name}: no --surface-hover, so the indigo wash stays`);
+    assert.ok(own['--shadow-rgb'], `${name}: no --shadow-rgb, so the shadows keep the indigo tint`);
+    if (own['--surface-2'] && own['--surface-2'] !== root['--surface-2']) {
+      assert.notEqual(own['--surface-hover'], root['--surface-hover'],
+        `${name} paints --surface-2 in its own colour but keeps the base hover`);
+      assert.notEqual(own['--shadow-rgb'], root['--shadow-rgb'],
+        `${name} paints its own surfaces but keeps the base shadow tint`);
+    }
+  };
+  for (const [, palette, theme, body] of palettes) {
+    check(`${palette} ${theme}`, values(body), theme === 'dark' ? dark : base);
+  }
+  check('mono light', block(studio, /^:root\[data-palette="mono"\] \{([\s\S]*?)^\}/m, 'the mono tokens'), base);
+  check('mono dark', block(studio, /^:root\[data-palette="mono"\]\[data-theme="dark"\] \{([\s\S]*?)^\}/m, 'the mono dark tokens'), dark);
+  // Шашечка под прозрачный кадр — ступени той же подложки, а не свой цвет:
+  // отдельные токены жили только в базе и на чужих палитрах были синими.
+  assert.ok(!/--checker-[ab]\s*:/.test(style), 'the checkerboard has its own colours again');
+  assert.match(style, /repeating-conic-gradient\(var\(--surface-2\)[\s\S]*?var\(--surface-3\)/,
+    'the checkerboard no longer follows the palette surface ramp');
+  assert.ok(!/rgba\(20, 22, 32/.test(style), 'a shadow is tinted by hand: it has to read --shadow-rgb');
+});
+
+test('a text field marks focus with its fill, not with a frame', () => {
+  // Рамка превращала строку поиска в отдельный объект на панели. Фокус
+  // обозначен заливкой на шаг глубже, курсором и жестом значка: поле и так
+  // показывает, куда попадает набор.
+  const style = read('static/css/style.css');
+  const studio = read('static/css/studio.css');
+  const framed = /box-shadow:\s*var\(--shadow-focus\)|outline: 2px solid/;
+  const rule = (source, re, what) => {
+    const found = source.match(re);
+    assert.ok(found, `${what} disappeared`);
+    return found[1];
+  };
+  const field = rule(style, /\.field:focus-within\s*\{([\s\S]*?)\n\}/, 'the field focus rule');
+  assert.ok(!framed.test(field), 'the field is framed on focus again');
+  assert.match(field, /background:\s*var\(--surface-3\)/, 'a focused field no longer changes: give it a fill');
+  const input = rule(style, /\.input:focus\s*\{([\s\S]*?)\n\}/, 'the bare input focus rule');
+  assert.ok(!framed.test(input), 'the bare input is framed on focus again');
+  assert.match(input, /background:\s*var\(--surface-2\)/, 'a focused input no longer changes');
+  const search = rule(studio, /\.search \.field:focus-within\s*\{([\s\S]*?)\n\}/, 'the search focus rule');
+  assert.ok(!framed.test(search), 'the search field is framed on focus again');
+  const name = rule(studio, /\.studio \.studio-name-field:focus-within\s*\{([\s\S]*?)\n\}/, 'the name field focus rule');
+  assert.ok(!/box-shadow:\s*inset 0 -2px/.test(name), 'the name field draws a rule under itself on focus');
+  assert.match(name, /background:\s*var\(--surface-hover\)/, 'a focused name field no longer changes');
+});
+
+test('the create dialog stays centred on a phone', () => {
+  // На телефоне диалог создания ссылки становился шторкой снизу во всю
+  // ширину, и экранная клавиатура накрывала его вместе с полем, ради
+  // которого он открыт. Теперь он centred на любом экране — значит, и не во
+  // всю ширину: к нижней грани он больше не приклеен, — и приподнимается над
+  // клавиатурой, которая меняет визуальный вьюпорт, но не раскладку.
+  const style = read('static/css/style.css');
+  assert.ok(!/max-width: 520px\)\s*\{[\s\S]*?\.dialog \{/.test(style),
+    'the dialog is a bottom sheet on a phone again');
+  const dialog = style.match(/\.dialog \{([\s\S]*?)\n\}/);
+  assert.ok(dialog, 'the dialog rule disappeared');
+  assert.match(dialog[1], /transform: translate\(-50%, -50%\)/, 'the dialog is no longer centred');
+  assert.match(dialog[1], /width: min\(420px, calc\(100vw - 32px\)\)/,
+    'the dialog is full width again, though it is no longer glued to the bottom edge');
+  assert.match(dialog[1], /translate: 0 calc\(var\(--keyboard-inset\) \* -0\.5\)/,
+    'the dialog does not lift over the keyboard, so a phone covers it');
+  assert.match(style, /--keyboard-inset: 0px;/, 'the keyboard inset token disappeared');
+  const overlay = read('static/js/overlay-controller.js');
+  assert.match(overlay, /setProperty\('--keyboard-inset'/,
+    'nothing measures the keyboard, so the dialog stays under it');
+});
+
+test('the brand block matches the new-link button it stands above', () => {
+  // Марка и кнопка начинаются на одной вертикали: блок — той же ширины, что
+  // кнопка, и значок отстоит от края так же, как значок внутри неё. Название
+  // приложения набрано тем же кеглем, что «Ссылки» в шапке, — одним токеном,
+  // чтобы они не разъезжались по размеру на разных ширинах.
+  const studio = read('static/css/studio.css');
+  const brand = studio.match(/\.studio \.catalog-rail \.brand \{([\s\S]*?)\n\}/);
+  assert.ok(brand, 'the brand rule disappeared');
+  assert.match(brand[1], /gap: \d+px;/, 'the gap between the mark and the name is back to the inherited one');
+  const wide = studio.match(/@media \(min-width: 761px\) \{([\s\S]*?)\n\}\n/);
+  assert.ok(wide, 'the desktop rail rules disappeared');
+  const wideBrand = wide[1].match(/\.studio \.catalog-rail \.brand \{([\s\S]*?)\n    \}/);
+  assert.ok(wideBrand, 'the brand is no longer stretched on a wide screen');
+  assert.match(wideBrand[1], /margin-inline: 0;/, 'the brand is narrower than the button by its own margins');
+  assert.ok(!/padding-inline:/.test(wideBrand[1]),
+    'the brand has an inset of its own again: the mark no longer starts at the left edge of the button');
+  const name = studio.match(/\.studio \.catalog-rail \.brand__name \{([\s\S]*?)\n\}/);
+  assert.ok(name, 'the brand name rule disappeared');
+  assert.match(name[1], /overflow: visible;/,
+    'the app name is clipped again: it is cut to «Lanpa…» instead of fitting the rail');
+  assert.match(name[1], /flex: none;/, 'the app name gives way again, so it can be squeezed short');
+  // Худший случай: рельса 166px (шире 1050px она 184px) минус её 12px
+  // отступов — 142px. Слово «Lanpaper» в 20-м кегле Manrope — 85px, замерено
+  // по самому файлу шрифта (static/fonts/manrope-latin-wght-normal.woff2).
+  const mark = Number(studio.match(/\.studio \.catalog-rail \.brand__mark \{\s*width: (\d+)px/)[1]);
+  const gap = Number(brand[1].match(/gap: (\d+)px/)[1]);
+  assert.ok(mark + gap + 86 <= 142,
+    `the mark, the gap and the name need ${mark + gap + 86}px, but the narrowest rail gives 142px`);
+  assert.match(studio, /--studio-title-size: 20px;/, 'the shared title size token disappeared');
+  const sources = [...studio.matchAll(/font-size: var\(--studio-title-size\)/g)];
+  assert.equal(sources.length, 2, 'the title and the brand name no longer share one size');
+  assert.ok(!/^\.studio \.catalog-rail \.brand__name \{[^}]*font-size: \d+px/m.test(studio),
+    'the brand name has a size of its own again');
+  assert.ok(!/\.studio \.appbar \.page-head__title \{[^}]*font-size: \d+px/.test(studio),
+    'the title has a size of its own again');
 });

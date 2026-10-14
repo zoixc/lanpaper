@@ -52,7 +52,21 @@ test('palette name exists on first mount, stays centered, and updates without mo
 
 test('navigation collapse retains controls, translations and preference across reloads', async ({ page }) => {
   await signIn(page);
-  if (await page.evaluate(() => innerWidth <= 760)) await expect(page.locator('.catalog-label')).toBeHidden();
+  if (await page.evaluate(() => innerWidth <= 760)) {
+    // A phone keeps its rail: the filters and the only copy of the action
+    // buttons live in it, so there is nothing to collapse and no control
+    // offered for it — not even a preference saved on a wider window.
+    await expect(page.locator('.catalog-label')).toBeHidden();
+    await expect(page.locator('#studioNavToggle')).toBeHidden();
+    await expect(page.locator('#studioNavigation')).toBeVisible();
+    await expect(page.locator('#studioNavigation .chip-row')).toBeVisible();
+    await page.evaluate(() => localStorage.setItem('lp-studio-nav-collapsed', 'true'));
+    await page.reload();
+    await expect(page.locator('#studioNavigation')).toBeVisible();
+    for (const id of ['newLinkBtn', 'themeBtn', 'settingsBtn']) await expect(page.locator(`#${id}`)).toBeVisible();
+    await expect(page.locator('#appVersion')).toHaveText('v' + fs.readFileSync(path.join(__dirname, '../../VERSION'), 'utf8').trim());
+    return;
+  }
   await page.click('#studioNavToggle');
   await expect(page.locator('#studioNavigation')).toBeHidden();
   for (const id of ['newLinkBtn', 'themeBtn', 'settingsBtn']) await expect(page.locator(`#${id}`)).toBeVisible();
@@ -160,6 +174,18 @@ test('phone layout preserves compact Studio geometry and native sheet scroll', a
   await expect(sheet).toBeHidden();
   await expect(page.locator('#settingsBtn')).toBeFocused();
   expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
+});
+
+test('the panel appears assembled instead of flashing an unstyled layout', async ({ page }) => {
+  // admin.html ships a layout that initializeStudio() rebuilds after the
+  // language file arrives, so the markup on its own is not the panel the user
+  // gets. The boot screen covers it until app.js says the panel is built; if
+  // that release ever stops happening, the panel stays invisible.
+  await signIn(page);
+  await expect(page.locator('#bootScreen')).toHaveCount(0);
+  await expect(page.locator('#library')).toBeVisible();
+  await expect(page.locator('#studioNavigation')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.dataset.boot || '')).toBe('done');
 });
 
 test.describe('playback failure', () => {

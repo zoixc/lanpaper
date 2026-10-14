@@ -3,7 +3,205 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
-## [Unreleased]
+## [0.20.0] – 2026-10-14
+
+### Fixed
+
+- The typeface is no longer downloaded twice. The panel preloaded
+  `/static/fonts/manrope-latin-wght-normal.woff2` with a `?v=` hash that the
+  stylesheet never adds to its own request, so the two were different URLs:
+  the preloaded copy was never used — the browser warned about it — and the
+  font came a second time for the CSS. Fonts in the markup now stay
+  unversioned, exactly as the stylesheets ask for them.
+
+### Changed
+
+- The service worker no longer precaches `/static/logo-dark.svg`. Nothing on
+  the panel or the sign-in page asks for it: the wordmark is one file,
+  recoloured for the dark theme.
+
+- `h()` lost its `html` key, the one place where a string could reach
+  `innerHTML`. Nothing passed anything to it — nodes are built from nodes and
+  text — and keeping an unused sink is how a name or an address ends up being
+  parsed as markup.
+
+- The panel no longer flashes its unassembled markup while it loads. The saved
+  markup is not the layout the user gets — `initializeStudio()` moves the header
+  into the navigation rail, `hydrateIcons()` draws the icons and
+  `applyTranslations()` writes the labels — so a boot screen showing that final
+  skeleton (rail, header row and a grid of shimmering tiles) now covers the
+  panel from the first paint until `app.js` reports it built. `prepaint.js`
+  arms it, and it releases itself on a timeout or on a panel script that failed
+  to load, so a broken script can never leave the panel permanently blank.
+- A Russian panel no longer swaps its typeface after the first paint. The
+  markup preloads the Latin subset of Manrope, which covers link names in every
+  language but not the labels of a Russian interface, so the brand, the page
+  title and the card names were drawn with a fallback and then re-drawn.
+  `prepaint.js` now preloads the Cyrillic subset for the language the panel will
+  actually use — resolved the way `langFromPrefs()` does it: the saved choice,
+  then the browser language.
+- The installed app opens in the colour the panel paints. `manifest.json` still
+  carried a pre-Studio background (`#f5f6f9`) for `background_color` and
+  `theme_color`; both now use the Studio light background (`#fafafa`), which is
+  also the only safe choice for the splash screen, because the icon is dark and
+  opaque.
+- The brand mark no longer melts into a dark rail. It is one bitmap for both
+  themes — a dark tile (`#1B1C1E`) carrying a light glyph — and on the dark
+  canvas (`#171717`) the tile had 1.06:1 against it, so the mark stopped being
+  a tile and read as a floating glyph. It is inverted in the dark theme, the
+  same move the sign-in wordmark (`.login-card__logo`) already made: a light
+  tile carrying a dark glyph.
+- A field the browser filled in keeps the panel's colours. Chrome and Safari
+  paint an autofilled input with their own background and ignore
+  `background-color`, so a saved username or password arrived pale blue in the
+  light theme and blue-grey in the dark one — the one place the panel showed a
+  colour it never chose. The fill is now covered with an inset shadow in
+  `--surface` (`--surface-2` on the sign-in card) and the text with
+  `-webkit-text-fill-color`, the only two layers the browser does not
+  overwrite; the focus ring is kept in both.
+
+### Changed
+
+- **UI work can be reviewed by eye before it merges.** `tests/e2e/visual.spec.js`
+  shoots the states ROADMAP.md asks for — desktop, tablet and phone, both
+  themes, a full and an empty library, the link panel and the settings sheet —
+  into `tests/e2e/screenshots/` (gitignored), and CI uploads them as the
+  `visual-review` artifact on every run, including failed ones. It seeds the
+  saved theme and language, so shots do not depend on the runner's locale or
+  colour scheme, and filters the grid to links it created itself, so shots do
+  not depend on what other specs left on the shared server. Nothing is asserted
+  about pixels: the gate is a person looking at the picture, which is exactly
+  what 0.13.0 was missing.
+- The video stage in the link panel takes its colour from a `--stage` token
+  instead of a literal `#000`, so the letterbox around a fitted video is one
+  declared value rather than a colour no palette could reach.
+- Removed tokens nothing referenced any more: `--bg-2` (declared per palette and
+  per theme), `--warning` and `--warning-soft` (a state the monochrome palettes
+  deliberately do not have), `--matte-line`, `--shadow-sm`, `--t-3xl` and
+  `--z-sticky`. The structural check already fails on a `var()` reference to an
+  undeclared token, so a future use of a removed name cannot pass silently.
+- `design/README.md` now says that the app has looked like Studio since 0.19.0
+  and that `v2/` and the earlier mockups are history, and points at the
+  screenshot gate instead of a manual browser pass.
+- The settings and inspector sheet takes its edge shadow from a
+  `--studio-sheet-shadow` token instead of a literal `rgb(0 0 0 / 28%)`. Every
+  other shadow in the file is declared per theme — a dark theme needs a much
+  heavier one (55% where a menu takes 24%) — and a literal cannot follow the
+  switch, so the sheet was the only piece of chrome whose shadow stayed the
+  same in both themes. The light value is unchanged.
+- The theme and settings buttons no longer change place when the rail is
+  folded. They used to sit at the bottom of the rail and fly into the appbar
+  every time it collapsed — one node cannot be in two places (one id, one
+  focus) and a duplicate would break both, so their only home is the appbar,
+  or the action row in the rail band on a phone. «Новая ссылка» still moves
+  into the appbar when the rail is folded: its home is the rail, and a folded
+  rail is removed entirely.
+- A contract test fails on a colour literal anywhere except the badges, play
+  and select buttons painted on top of a frame, whose backing is dark in both
+  themes by design. Anything else that picks a colour of its own is the shade
+  that does not follow the switch, so it has to read a token instead.
+- **The rail and the appbar share one top line.** The brand block is now
+  exactly as tall as the appbar row (`--studio-head-height`, 66px, 56px on a
+  phone), so the mark, the name and the «Ссылки» title sit on the same centre
+  line instead of three different ones. The brand's bottom margin and the
+  grid's top padding are the same 26px, which puts the top edge of «Новая
+  ссылка» level with the top edge of the first card. The boot skeleton reads
+  the same token, so it keeps standing in for the header it copies.
+- Folding the rail now animates. `.studio.sidebar-collapsed` removed it with
+  `display: none`, which no transition can run on, so the panel snapped. The
+  rail slides out over 260ms instead, and `visibility` is taken away only when
+  the movement ends — a folded rail cannot be reached by Tab or read out by a
+  screen reader. The content's padding follows the same curve rather than
+  jumping to the new width once it is over. The slide respects the system's
+  reduced-motion switch like every other movement in the panel.
+- **The library canvas carries registration marks instead of dots.** A sparse
+  96px grid of rings with a crosshair — the marks a proof sheet carries, and
+  the character a monochrome photo library can afford. It is still a drawing
+  baked into a data URI (no requests, no filters, no motion), one per theme
+  because the colour has to be part of the drawing, and it is dropped when the
+  reader asks for more contrast.
+- Hovering a card zooms its photograph by 4% instead of 1.5%. At 1.5% a 400px
+  card grew by two pixels a side, which read as nothing at all; the frame clips
+  the movement (`overflow: hidden`), so the card itself stays the same size.
+- **A phone no longer folds its navigation away.** Collapsing sets
+  `.sidebar-collapsed`, and that rule removes the rail entirely
+  (`display: none`) — not only its width. On a phone the rail is not a sidebar
+  but a horizontal band, and it carries the filters, the new-link button and
+  the only copy of the theme and settings buttons, so folding it left nothing
+  to reach them with. The saved preference is now honoured only where the rail
+  is a sidebar, and the toggle is not offered where it cannot be used;
+  `prepaint.js` keeps the band up before the first paint, so a rotation or a
+  reload cannot flash an empty strip. On a desktop nothing changed.
+
+- **The header no longer reshuffles when the navigation rail opens.** Opening
+  the rail takes the width of a column away from the header, and the row was
+  allowed to wrap, so the controls could drop to a second line; the compact
+  new-link button — one node that moves between the rail and the header, and a
+  move in the DOM cannot be animated — vanished at once, and the search jumped
+  into the space it left. The button now lives in a slot that is always in the
+  header, so it is the slot that opens and closes (width `0` ↔ `32px`, together
+  with the gap it carries and its own opacity), and the rest of the row travels
+  with it; the button goes back to the rail only after the slot has closed, and
+  it keeps its compact form on the way out, so the full caption cannot flash
+  inside a narrowing slot. The row stays on one line: when the space runs out
+  the search gives way down to a floor of `132px`, and then the title is cut
+  short with an ellipsis.
+- **Accent details follow the palette.** In the monochrome palette the accent
+  *is* the text colour, so a detail painted with `var(--text)` looked right
+  there and wrong everywhere else: the focus ring, the underline of a pressed
+  chip, the dot and the fill of the active collection and the underline of the
+  focused name field stayed neutral grey on every colour palette. They are
+  painted with `var(--accent)` now — the same colour in monochrome, and the
+  colour the user picked everywhere else.
+
+- **The washes follow the palette.** The search field, the view-toggle group,
+  the count next to the title and the active filter are all painted with
+  `--surface-hover`, and that token existed in the base `:root` only, with the
+  indigo value: every palette that redefines `--surface-2` — sage, clay,
+  graphite and ocean — kept the blue-grey wash, in both themes. A palette now
+  declares the whole ramp it repaints, and a test fails when one of the five
+  washes is left behind.
+- **A text field no longer draws a frame on focus.** The caret already shows
+  where the typing goes, and a ring turned the search row into a separate
+  object on a flat panel: focus is a fill one step deeper now (`--surface-3`,
+  `--surface-2` for a bare input, `--surface-hover` for the create/rename
+  field) together with the icon gesture the field already had. Buttons, chips,
+  switches and selects keep their focus ring — it marks a control you are
+  about to press, not a line you are typing.
+- **The create dialog no longer hides under the phone keyboard.** Below 520px
+  `.dialog` became a full-width bottom sheet, so the keyboard covered it
+  together with the field it was opened for. It is centred again on every
+  screen — and no longer full width, since it is not glued to the bottom edge
+  any more — and it lifts by half of the keyboard height, which the overlay
+  controller publishes as `--keyboard-inset`: a virtual keyboard changes the
+  visual viewport, not the layout, so a centred dialog would otherwise stay
+  put and sink.
+
+- **Shadows and the transparency checker follow the palette too.** All six
+  shadows were painted with one hard-coded indigo grey (`rgba(20, 22, 32, …)`)
+  in every palette and both themes; every palette now sets `--shadow-rgb` and
+  the shadow tokens read it, so a sage panel casts a sage shadow. The
+  checkerboard behind a transparent frame had two colours of its own, declared
+  in the base only and therefore blue everywhere: it now uses the same two
+  surface steps the rest of the panel uses, which is one fewer set of literals
+  to keep in sync and one fewer place where a palette can be forgotten.
+- **The brand matches the button it stands above.** The mark and the app name
+  span the same width as «Новая ссылка», and the mark starts at the left edge
+  of that button, so the two left edges line up. The gap between the mark and
+  the name is 12px — the same proportion to a 25px mark that the button keeps
+  between its 7px gap and 14px icon. The name is set in the size of the page
+  title: both read one `--studio-title-size` token (20px, 18px on a phone,
+  17px below 340px), and the name keeps its own face and weight. It is not
+  clipped with an ellipsis any more: the mark, the gap and «Lanpaper» — 85px
+  in 20px Manrope, measured against the shipped font file — need 122px of the
+  142px the narrowest rail gives the button, so the word reads in full, and a
+  test fails if the row ever stops fitting.
+- **«Ссылки» is no longer cut short before the search has given way.** An
+  earlier change put the appbar row on one line and let the title shrink with
+  an ellipsis, so near the phone breakpoint the word was cut to «Ссы…». The
+  title does not shrink at all now — the search narrows to its floor instead,
+  which keeps the word whole in every language, including with the «select
+  all» chip beside it in selection mode.
 
 ## [0.19.1] – 2026-10-13
 

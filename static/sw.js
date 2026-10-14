@@ -4,7 +4,7 @@
  * In particular, an image that was public yesterday must not be replayed
  * offline after its link is changed to token-only or admin-only.
  */
-const STATIC_CACHE = 'lanpaper-static-v17';
+const STATIC_CACHE = 'lanpaper-static-v29';
 const STATIC_ASSETS = [
   '/static/css/studio.css',
   '/static/js/studio-layout.js',
@@ -27,7 +27,6 @@ const STATIC_ASSETS = [
   '/static/js/settings-menu.js',
   '/static/js/compressor.js',
   '/static/logo.svg',
-  '/static/logo-dark.svg',
   '/static/favicon.svg',
   '/static/manifest.json',
   '/static/icons/apple-touch-icon.png',

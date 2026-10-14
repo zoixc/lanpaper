@@ -36,8 +36,10 @@ import { RENDER_CHUNK, createAppState, normalizeLink, mediaExt, isVideoMedia, ma
             const val = attrs[key];
             if (val === null || val === undefined || val === false) continue;
             if (key === 'class') el.className = val;
+            /* Ключа 'html' здесь нет и не будет: узлы собираются из узлов и
+               текста. Строка в innerHTML — это XSS там, где в ней окажется
+               имя ссылки, адрес или ответ сервера. */
             else if (key === 'text') el.textContent = val;
-            else if (key === 'html') el.innerHTML = val;
             /* CSSOM, а не атрибут style: панель живёт под CSP без
                'unsafe-inline', и атрибут браузер бы проигнорировал. */
             else if (key === 'style') el.style.cssText = val;
@@ -2533,6 +2535,11 @@ import { RENDER_CHUNK, createAppState, normalizeLink, mediaExt, isVideoMedia, ma
         applyView();
         renderChips();
         render();
+        /* Панель собрана: шапка перенесена в рельсу, значки нарисованы,
+           подписи поставлены. Экран загрузки снимается здесь, а не после
+           списка: в сетке те же скелетоны, что нарисовал render(), поэтому
+           смена одного на другое почти незаметна. */
+        window.LANPAPER_BOOT?.reveal();
         initGridEvents();
         initDragDrop();
         initShortcuts();

@@ -12,12 +12,11 @@
     --card-padding: 16px 12px 19px;
     --card-padding-phone: 12px 5px 14px;
     --card-gap: 7px;
-    --shadow-card: 0 2px 3px rgba(0, 0, 0, 0.025);
-    --shadow-card-hover: 0 6px 16px -10px rgba(0, 0, 0, 0.18);
+    --shadow-card: 0 2px 3px rgba(var(--shadow-rgb), 0.025);
+    --shadow-card-hover: 0 6px 16px -10px rgba(var(--shadow-rgb), 0.18);
 }
 :root[data-palette="mono"] {
     --bg: #f4f4f4;
-    --bg-2: #ededed;
     --surface: #ffffff;
     --surface-2: #f0f0f0;
     --surface-3: #e7e7e7;
@@ -34,10 +33,10 @@
     --border-2: #c5c5c5;
     --border-strong: #a0a0a0;
     --matte: #ececec;
+    --shadow-rgb: 26, 26, 26;
 }
 :root[data-palette="mono"][data-theme="dark"] {
     --bg: #171717;
-    --bg-2: #121212;
     --surface: #222222;
     --surface-2: #282828;
     --surface-3: #323232;
@@ -55,8 +54,9 @@
     --border-2: #555555;
     --border-strong: #747474;
     --matte: #292929;
-    --shadow-card: 0 2px 3px rgba(0, 0, 0, 0.12);
-    --shadow-card-hover: 0 6px 16px -10px rgba(0, 0, 0, 0.5);
+    --shadow-rgb: 10, 10, 10;
+    --shadow-card: 0 2px 3px rgba(var(--shadow-rgb), 0.12);
+    --shadow-card-hover: 0 6px 16px -10px rgba(var(--shadow-rgb), 0.5);
 }
 /* Identity lives in type, proportion and a few black rules — not decoration. */
 .brand__name {
@@ -97,7 +97,7 @@
     box-shadow: none;
 }
 .search .field:focus-within {
-    box-shadow: var(--shadow-focus);
+    background: var(--surface-3);
 }
 .chip-row {
     gap: 5px;
@@ -112,11 +112,15 @@
 .chip:not(.chip--ghost):hover {
     background: var(--surface-hover);
 }
+/* Акцентные детали — подчёркивание нажатого фильтра, точка активной подборки
+   и рамка фокуса — красятся акцентом: в монохромной палитре акцент совпадает
+   с цветом текста и вид не меняется, а в цветной эти детали берут цвет
+   палитры, а не остаются нейтрально-серыми. */
 .chip[aria-pressed="true"] {
     color: var(--text);
     background: transparent;
     border-color: transparent;
-    box-shadow: inset 0 -2px var(--text);
+    box-shadow: inset 0 -2px var(--accent);
 }
 .chip__count {
     color: var(--text-3);
@@ -298,10 +302,17 @@
     --rail-width: 232px;
     --r-full: 8px;
     --maxw: 1800px;
+    /* Подложка под вписанным видео: поля вокруг кадра. Почти чёрная в обеих
+       темах — иначе поля спорят с яркостью самого кадра. Объявлена здесь, а
+       не в палитрах: у всех палитр она одна, и var() не останется без значения. */
+    --stage: #0d0d0e;
 }
 .radical .shell {
     padding-top: 0;
     padding-left: var(--rail-width);
+    /* Содержимое расправляется тем же движением, что и рельса: иначе
+       карточки прыгают на новое место, когда анимация заканчивается. */
+    transition: padding-left var(--dur-slow) var(--ease);
 }
 .catalog-rail {
     position: fixed;
@@ -376,7 +387,7 @@
     font-size: 11px;
 }
 .catalog-rail .chip[aria-pressed="true"] {
-    background: var(--text);
+    background: var(--accent);
     color: var(--surface);
     box-shadow: none;
 }
@@ -627,16 +638,27 @@
     --r-xl: 16px;
     --card-padding: 10px 2px 0;
     --card-padding-phone: 10px 2px 0;
+    /* Один размер у названия приложения в рельсе и у заголовка «Ссылки»
+       в шапке: они стоят на одной линии и читаются одним голосом. */
+    --studio-title-size: 20px;
     --studio-control-radius: 9px;
     --studio-inner-radius: 6px;
     --studio-control-shadow: 0 1px 2px rgb(0 0 0 / 4%);
     --studio-popover-shadow: 0 12px 32px -16px rgb(0 0 0 / 24%);
-    --studio-canvas-dot: rgb(0 0 0 / 3%);
+    /* Текстура канвы: приводочные метки — кольцо с перекрестием, как на
+       типографских оттисках и плёнке. Цвет вшит в рисунок, поэтому на
+       каждую тему свой: метка не может быть тёмной на тёмном фоне. */
+    --studio-canvas-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cg fill='none' stroke='%23000' stroke-opacity='.06' stroke-width='1'%3E%3Ccircle cx='48' cy='48' r='5'/%3E%3Cpath d='M48 39v6M48 51v6M39 48h6M51 48h6'/%3E%3C/g%3E%3C/svg%3E");
+    --studio-sheet-shadow: -16px 0 48px -32px rgb(0 0 0 / 28%);
+    /* Высота верхней строки: её делят шапка и блок марки в рельсе (см. ниже),
+       поэтому знак, название и заголовок стоят на одной центральной линии. */
+    --studio-head-height: 66px;
 }
 .studio[data-theme="dark"] {
     --studio-control-shadow: 0 1px 2px rgb(0 0 0 / 18%);
     --studio-popover-shadow: 0 14px 38px -14px rgb(0 0 0 / 55%);
-    --studio-canvas-dot: rgb(255 255 255 / 3%);
+    --studio-canvas-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.07' stroke-width='1'%3E%3Ccircle cx='48' cy='48' r='5'/%3E%3Cpath d='M48 39v6M48 51v6M39 48h6M51 48h6'/%3E%3C/g%3E%3C/svg%3E");
+    --studio-sheet-shadow: -16px 0 48px -32px rgb(0 0 0 / 55%);
 }
 .studio[data-palette="mono"] {
     --bg: #fafafa;
@@ -660,10 +682,33 @@
     padding: 25px 16px 18px;
     background: var(--bg);
     border: 0;
+    transition:
+        transform var(--dur-slow) var(--ease),
+        visibility 0s;
 }
+/* Блок марки — той же ширины, что кнопка «Новая ссылка», и начинается на
+   той же вертикали: значок стоит у левой грани кнопки, без своего отступа.
+   Отступ до названия (12px на 25px значок) держит ту же пропорцию, что
+   внутри кнопки (7px на 14px). */
 .studio .catalog-rail .brand {
     margin: 0 7px 26px;
-    gap: 9px;
+    gap: 12px;
+}
+/* Одна верхняя линия на двоих. Блок марки занимает ту же высоту, что строка
+   шапки, и начинается от самого верха рельсы: знак, название и заголовок
+   «Ссылки» оказываются на одной центральной линии (66/2 = 33px), а верх
+   кнопки «Новая ссылка» — на одной линии с верхом сетки, потому что отступ
+   марки снизу (26px) равен отступу сетки сверху. Ниже 761px рельса — не
+   колонка, а полоса над шапкой, и её отступы заданы отдельно. */
+@media (min-width: 761px) {
+    .studio .catalog-rail {
+        padding-top: 0;
+    }
+    .studio .catalog-rail .brand {
+        height: var(--studio-head-height);
+        flex: none;
+        margin-inline: 0;
+    }
 }
 .studio .catalog-rail .brand__mark {
     width: 25px;
@@ -674,11 +719,18 @@
     width: 25px;
     height: 25px;
 }
+/* Название не сжимается и не обрезается: многоточие в марке означало бы,
+   что места не хватило, а его хватает. Худший случай — рельса 166px (шире
+   1050px она 184px) минус её 12px отступов: 142px на знак 25px, отступ 12px
+   и слово «Lanpaper», которое в 20-м кегле Manrope занимает 85px. Итого
+   122px из 142px — запас 20px, и название читается целиком. */
 .studio .catalog-rail .brand__name {
     font-family: var(--font-ui);
-    font-size: 18px;
+    font-size: var(--studio-title-size);
     font-weight: 750;
     letter-spacing: -0.8px;
+    flex: none;
+    overflow: visible;
 }
 .studio .catalog-rail #newLinkBtn {
     min-height: 36px;
@@ -704,13 +756,13 @@
 }
 .studio .catalog-rail .chip[aria-pressed="true"] {
     background: var(--surface-hover);
-    color: var(--text);
+    color: var(--accent);
 }
 .studio .catalog-rail .chip[aria-pressed="true"]::before {
     content: "";
     width: 4px;
     height: 4px;
-    background: var(--text);
+    background: var(--accent);
     border-radius: 50%;
     flex: none;
 }
@@ -725,20 +777,6 @@
 .studio .catalog-rail .chip-row__sep {
     margin: 9px 10px;
 }
-.studio-utilities {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-top: auto;
-    padding: 30px 7px 0;
-}
-.studio-utilities .icon-btn {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
-    min-height: 32px;
-}
 .studio .appbar {
     top: 0;
     border: 0;
@@ -747,9 +785,15 @@
 .studio .appbar__inner {
     padding: 0 26px;
 }
+/* Одна строка, всегда: при раскрытой рельсе содержимое шапки уезжает вправо на
+   ширину колонки, и с переносом кнопки в этот момент прыгали бы на вторую
+   строку. Место уступает поиск, а не заголовок: «Ссылки» должно читаться
+   целиком на любом языке, поэтому заголовок не сжимается вовсе, а поле
+   поиска сужается до своего предела. */
 .studio .appbar__row--top {
-    min-height: 66px;
+    min-height: var(--studio-head-height);
     gap: 18px;
+    flex-wrap: nowrap;
 }
 .studio .appbar .page-head {
     flex: none;
@@ -761,10 +805,13 @@
 }
 .studio .appbar .page-head__title {
     font-family: var(--font-ui);
-    font-size: 20px;
+    font-size: var(--studio-title-size);
     letter-spacing: -0.8px;
     font-weight: 650;
     line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .studio .appbar .page-head__count {
     align-self: center;
@@ -779,6 +826,8 @@
 }
 .studio .search {
     flex: 0 1 265px;
+    /* Поиск уступает место первым, но не до нуля: уже не поле, а щель. */
+    min-width: 132px;
     max-width: 265px;
     margin-left: auto;
 }
@@ -800,7 +849,8 @@
     display: none;
 }
 .studio .appbar__actions {
-    gap: 7px;
+    gap: var(--studio-actions-gap);
+    --studio-actions-gap: 7px;
     --ctl: 32px;
     --ctl-inner: 26px;
 }
@@ -814,7 +864,9 @@
     box-shadow: none;
 }
 .studio .content {
-    padding: 2px 26px 42px;
+    /* 26px сверху — ровно отступ марки снизу: верх кнопки «Новая ссылка»
+       в рельсе и верх первой карточки в сетке оказываются на одной линии. */
+    padding: 26px 26px 42px;
 }
 /* Regular contact sheet: no hero panel, no headline occupying a third of the screen. */
 .studio .grid:not(.grid--list) .card:first-child {
@@ -906,7 +958,6 @@
     }
     .studio .catalog-rail .brand__name {
         display: block;
-        font-size: 17px;
     }
     .studio .catalog-rail #newLinkBtn {
         margin: 0;
@@ -923,9 +974,13 @@
     .studio .appbar__inner {
         padding-inline: 16px;
     }
+    :root.studio {
+        --studio-head-height: 56px;
+        --studio-title-size: 18px;
+    }
     .studio .appbar__row--top {
         padding: 9px 0 14px;
-        min-height: 56px;
+        min-height: var(--studio-head-height);
         gap: 10px;
     }
     .studio .appbar .page-head {
@@ -1162,11 +1217,11 @@
         .toast__close,
         .card__name
     ):focus-visible {
-    outline: 2px solid var(--text);
+    outline: 2px solid var(--accent);
     outline-offset: 3px;
 }
 .studio .segment__opt input:focus-visible + .segment__item {
-    outline: 2px solid var(--text);
+    outline: 2px solid var(--accent);
     outline-offset: 1px;
     box-shadow: none;
 }
@@ -1194,8 +1249,16 @@
 :root.studio.sidebar-collapsed {
     --rail-width: 0px;
 }
+/* Рельса уезжает за левый край, а не исчезает: display: none не оставляет
+   перехода, и сворачивание щёлкало. Видимость снимается в конце движения
+   (visibility с задержкой), чтобы свёрнутая рельса не ловила фокус и не
+   читалась скринридером, а при раскрытии возвращалась сразу. */
 .studio.sidebar-collapsed .catalog-rail {
-    display: none;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition:
+        transform var(--dur-slow) var(--ease),
+        visibility 0s var(--dur-slow);
 }
 .studio .studio-nav-toggle {
     flex: none;
@@ -1210,17 +1273,53 @@
 .studio.sidebar-collapsed .studio-nav-toggle svg {
     transform: scaleX(-1);
 }
-.studio .appbar__row--top {
-    flex-wrap: wrap;
+/* Уменьшенная «Новая ссылка» живёт в коробке, которая лежит в шапке всегда:
+   саму кнопку анимировать нельзя — она переезжает между рельсой и шапкой, а
+   переезд по DOM не анимируется, кнопка просто исчезала и поиск рядом с ней
+   прыгал на освободившееся место. Теперь анимируется ширина коробки (0 ↔
+   32px), и поиск с остальными элементами разъезжается вместе с ней. Пустая
+   коробка не оставляет после себя зазора: её отрицательный отступ равен
+   зазору между органами управления. Видимость снимается в конце движения,
+   чтобы свёрнутая коробка не ловила фокус и не читалась скринридером. */
+.studio .appbar__create {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    overflow: hidden;
+    width: 0;
+    margin-right: calc(var(--studio-actions-gap) * -1);
+    opacity: 0;
+    visibility: hidden;
+    transition:
+        width var(--dur-slow) var(--ease),
+        margin-right var(--dur-slow) var(--ease),
+        opacity var(--dur) var(--ease),
+        visibility 0s var(--dur-slow);
 }
-.studio.sidebar-collapsed .appbar #newLinkBtn {
+.studio .appbar__create:focus-within {
+    overflow: visible;
+}
+.studio.sidebar-collapsed .appbar__create {
+    width: 32px;
+    margin-right: 0;
+    opacity: 1;
+    visibility: visible;
+    transition:
+        width var(--dur-slow) var(--ease),
+        margin-right var(--dur-slow) var(--ease),
+        opacity var(--dur) var(--ease),
+        visibility 0s;
+}
+.studio.sidebar-collapsed .appbar #newLinkBtn,
+.studio .appbar__create--leaving #newLinkBtn {
     display: inline-flex;
     width: 32px;
     min-width: 32px;
     padding: 0;
     margin: 0;
 }
-.studio.sidebar-collapsed .appbar #newLinkBtn span {
+.studio.sidebar-collapsed .appbar #newLinkBtn span,
+.studio .appbar__create--leaving #newLinkBtn span {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -1256,7 +1355,7 @@
     width: min(440px, 100%);
     background: var(--bg);
     border-color: var(--border);
-    box-shadow: -16px 0 48px -32px rgb(0 0 0 / 28%);
+    box-shadow: var(--studio-sheet-shadow);
 }
 .studio .sheet__head {
     padding: 20px 20px 16px;
@@ -1334,14 +1433,12 @@
     .studio .appbar .page-head {
         gap: 6px;
     }
-    .studio .appbar .page-head__title {
-        font-size: 18px;
-    }
     .studio .appbar__row--top {
         gap: 8px;
+        flex-wrap: wrap;
     }
     .studio .appbar__actions {
-        gap: 3px;
+        --studio-actions-gap: 3px;
     }
 }
 @media (max-width: 720px) {
@@ -1374,11 +1471,13 @@
 .studio :is(.num, .card__meta, .chip__count, .page-head__count) {
     font-variant-numeric: tabular-nums;
 }
-/* Static, barely visible dot-paper texture; no image requests, filters or motion.
-   Only the library canvas is textured, controls and photographs stay clean. */
+/* Static, barely visible texture: registration marks on a sparse 96px grid,
+   as on a proof print. No image requests, filters or motion — one drawing per
+   theme, tiled by the browser. Only the library canvas is textured; controls
+   and photographs stay clean. */
 .studio .content {
-    background-image: radial-gradient(circle, var(--studio-canvas-dot) 0.65px, transparent 0.85px);
-    background-size: 9px 9px;
+    background-image: var(--studio-canvas-mark);
+    background-size: 96px 96px;
 }
 @media (prefers-contrast: more), (forced-colors: active) {
     .studio .content {
@@ -1386,18 +1485,19 @@
     }
 }
 /* Create/rename uses the same template. Remove BOTH the input outline and its
-   parent's focus halo. A bottom rule and changed fill still indicate focus. */
+   parent's focus halo: the field shows focus with its fill, not with a frame —
+   a rule under the field drew a border around a borderless control. */
 .studio .studio-name-field,
 .studio .studio-name-field:hover {
     border: 0;
     background: var(--surface-2);
     box-shadow: none;
     border-radius: 8px 8px 0 0;
+    transition: background var(--dur-fast) var(--ease);
 }
 .studio .studio-name-field:focus-within {
     border: 0;
     background: var(--surface-hover);
-    box-shadow: inset 0 -2px 0 var(--text);
 }
 .studio .studio-name-field input,
 .studio .studio-name-field input:focus,
@@ -1577,9 +1677,6 @@
     .studio .catalog-rail .tools {
         grid-row: 2;
     }
-    .studio .studio-utilities {
-        display: none;
-    }
     .studio .studio-mobile-actions {
         grid-column: 2;
         grid-row: 1;
@@ -1654,15 +1751,15 @@
     width: 100%;
     height: 100%;
     object-fit: contain;
-    background: #000;
+    background: var(--stage);
 }
 .video-preview .field-hint {
     padding: 16px;
     text-align: center;
 }
 @media (max-width: 340px) {
-    .studio .appbar .page-head__title {
-        font-size: 17px;
+    :root.studio {
+        --studio-title-size: 17px;
     }
     .palette-controls {
         gap: 8px;
@@ -1681,4 +1778,221 @@
 .studio .card__frame--empty .card__play svg {
     color: #fff;
     opacity: 1;
+}
+
+/* ============================================================
+   ЗАГРУЗКА
+   Панель собирается скриптом: initializeStudio() переносит шапку в
+   рельсу, hydrateIcons() рисует значки, applyTranslations() ставит
+   подписи. Пока этого не произошло, разметка — не тот вид, который
+   получится, и показывать её незачем: экран ниже рисует каркас
+   будущего вида, а prepaint.js и app.js держат его ровно до
+   готовности панели.
+   ============================================================ */
+
+/* Экран показывается, только если его включил prepaint.js: без метки на
+   <html> панель грузится как раньше, а не остаётся пустой навсегда. */
+.boot {
+    display: none;
+}
+:root[data-boot] .boot {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: flex;
+    background: var(--bg);
+    overflow: hidden;
+}
+/* Панель под экраном невидима, но остаётся в потоке: initializeStudio()
+   раскладывает её по настоящим размерам, а display: none их бы убрал. */
+:root[data-boot="pending"] .shell,
+:root[data-boot="pending"] .fab,
+:root[data-boot="pending"] .toasts {
+    visibility: hidden;
+}
+:root[data-boot="done"] .boot {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+.boot__rail {
+    flex: none;
+    width: var(--rail-width);
+    padding: 25px 16px 18px;
+    display: flex;
+    flex-direction: column;
+}
+.boot__main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0 26px;
+    overflow: hidden;
+}
+/* Каркас рельсы повторяет настоящую: те же марка, название и отступы. */
+.boot__brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0 7px 26px;
+}
+.boot__mark {
+    flex: none;
+    width: 25px;
+    height: 25px;
+    border-radius: 7px;
+}
+.boot__name {
+    font-family: var(--font-ui);
+    font-size: 18px;
+    font-weight: 750;
+    letter-spacing: -0.8px;
+    color: var(--text);
+}
+/* Заготовки под «Новую ссылку», подпись и фильтры — тех же размеров,
+   что настоящие кнопка и чипы в рельсе. */
+.boot__line {
+    display: block;
+    border-radius: 8px;
+}
+.boot__line--action {
+    height: 36px;
+    margin-bottom: 29px;
+}
+.boot__line--label {
+    width: 52px;
+    height: 8px;
+    margin: 0 10px 11px;
+    border-radius: 4px;
+}
+.boot__chips {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.boot__line--chip {
+    height: 34px;
+}
+.boot__bar {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    /* Та же высота, что у строки шапки: каркас повторяет настоящий вид. */
+    min-height: var(--studio-head-height);
+}
+.boot__line--title {
+    width: 96px;
+    height: 20px;
+    border-radius: 5px;
+}
+.boot__line--search {
+    flex: 0 1 265px;
+    height: 32px;
+    margin-left: auto;
+    border-radius: 7px;
+}
+.boot__dot {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+}
+/* Мерцание то же, что у скелетонов плиток: экран не должен выглядеть
+   замершим рядом с ними. */
+.boot__line,
+.boot__mark,
+.boot__dot {
+    background-color: var(--surface-hover);
+    background-image: linear-gradient(
+        90deg,
+        transparent 0%,
+        var(--surface-3) 50%,
+        transparent 100%
+    );
+    background-size: 220% 100%;
+    background-repeat: no-repeat;
+    animation: shimmer 1.5s linear infinite;
+}
+/* Колонки и отступы — как у сетки панели, чтобы плитки не сдвигались
+   в момент, когда экран сменится настоящей панелью. */
+.boot__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(236px, 1fr));
+    gap: var(--s-4);
+    align-content: start;
+    overflow: hidden;
+}
+/* Вид «список» известен до отрисовки — prepaint.js пишет его в data-view,
+   поэтому каркас сразу в одну колонку, как сетка панели. */
+:root[data-view="list"] .boot__grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-2-5);
+}
+@media (max-width: 1080px) {
+    .boot__grid {
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: var(--s-3);
+    }
+    .boot__main {
+        padding-inline: 20px;
+    }
+    .boot__bar {
+        gap: 12px;
+    }
+}
+@media (max-width: 760px) {
+    /* На телефоне рельса — верхняя строка, как в самой панели. */
+    .boot {
+        flex-direction: column;
+    }
+    .boot__rail {
+        width: 100%;
+        flex-direction: row;
+        align-items: center;
+        gap: 12px;
+        padding: 15px 16px 9px;
+    }
+    .boot__brand {
+        margin: 0 auto 0 0;
+    }
+    .boot__line--action {
+        width: 96px;
+        margin-bottom: 0;
+    }
+    .boot__line--label,
+    .boot__chips {
+        display: none;
+    }
+    .boot__main {
+        padding-inline: 16px;
+    }
+    .boot__bar {
+        flex-wrap: wrap;
+        gap: 10px;
+        min-height: var(--studio-head-height);
+        padding: 9px 0 14px;
+    }
+    .boot__line--search {
+        order: 2;
+        flex: 1 1 100%;
+        height: 36px;
+        margin-left: 0;
+    }
+}
+@media (max-width: 720px) {
+    .boot__grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    }
+}
+@media (max-width: 560px) {
+    .boot__grid {
+        grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+        gap: var(--s-2-5);
+    }
+}
+@media (max-width: 340px) {
+    .boot__grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
