@@ -8,7 +8,16 @@ async function signIn(page) {
   await page.fill('[name=username]', 'e2e-admin');
   await page.fill('[name=password]', 'e2e-test-password-123');
   await page.click('#loginSubmit');
-  await expect(page.locator('#studioNavToggle')).toBeVisible();
+  // The Studio is mounted in the document that login.js navigates to. A phone
+  // keeps its rail open and offers no collapse control, so the toggle is only
+  // expected on wider viewports (the test sets the viewport itself).
+  await expect(page.locator('#library')).toBeVisible();
+  if (page.viewportSize().width > 760) {
+    await expect(page.locator('#studioNavToggle')).toBeVisible();
+  } else {
+    await expect(page.locator('#studioNavToggle')).toBeHidden();
+    await expect(page.locator('#studioNavigation')).toBeVisible();
+  }
 }
 async function media(page, name, file, type) {
   const bytes = fs.readFileSync(path.join(__dirname, 'fixtures', file)).toString('base64');

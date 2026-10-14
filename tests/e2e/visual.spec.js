@@ -48,9 +48,14 @@ async function signIn(page) {
   await page.fill('input[name=username]', USER);
   await page.fill('input[name=password]', PASS);
   await page.click('#loginSubmit');
+  // login.js replaces the document after the session is created. Reading the
+  // page before the Studio has mounted races that navigation ("Execution
+  // context was destroyed"), so wait for the new page first.
+  await expect(page.locator('#library')).toBeVisible();
   // A phone keeps its rail open — it carries the filters and the only copy
   // of the action buttons — so it is offered no collapse control at all.
-  if (await page.evaluate(() => innerWidth > 760)) {
+  // The viewport is set by the test itself, so no need to ask the page.
+  if (page.viewportSize().width > 760) {
     await expect(page.locator('#studioNavToggle')).toBeVisible();
   } else {
     await expect(page.locator('#studioNavToggle')).toBeHidden();
