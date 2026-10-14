@@ -686,10 +686,10 @@
         transform var(--dur-slow) var(--ease),
         visibility 0s;
 }
-/* Блок марки — той же ширины, что кнопка «Новая ссылка», а значок стоит
-   там же, где значок в кнопке: свои 12px отступа у них общие. Отступ до
-   названия (12px на 25px значок) держит ту же пропорцию, что внутри
-   кнопки (7px на 14px). */
+/* Блок марки — той же ширины, что кнопка «Новая ссылка», и начинается на
+   той же вертикали: значок стоит у левой грани кнопки, без своего отступа.
+   Отступ до названия (12px на 25px значок) держит ту же пропорцию, что
+   внутри кнопки (7px на 14px). */
 .studio .catalog-rail .brand {
     margin: 0 7px 26px;
     gap: 12px;
@@ -708,7 +708,6 @@
         height: var(--studio-head-height);
         flex: none;
         margin-inline: 0;
-        padding-inline: 12px;
     }
 }
 .studio .catalog-rail .brand__mark {
@@ -720,11 +719,18 @@
     width: 25px;
     height: 25px;
 }
+/* Название не сжимается и не обрезается: многоточие в марке означало бы,
+   что места не хватило, а его хватает. Худший случай — рельса 166px (шире
+   1050px она 184px) минус её 12px отступов: 142px на знак 25px, отступ 12px
+   и слово «Lanpaper», которое в 20-м кегле Manrope занимает 85px. Итого
+   122px из 142px — запас 20px, и название читается целиком. */
 .studio .catalog-rail .brand__name {
     font-family: var(--font-ui);
     font-size: var(--studio-title-size);
     font-weight: 750;
     letter-spacing: -0.8px;
+    flex: none;
+    overflow: visible;
 }
 .studio .catalog-rail #newLinkBtn {
     min-height: 36px;

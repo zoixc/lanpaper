@@ -283,7 +283,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v27/,
+  assert.match(code, /lanpaper-static-v28/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 
@@ -804,12 +804,20 @@ test('the brand block matches the new-link button it stands above', () => {
   const wideBrand = wide[1].match(/\.studio \.catalog-rail \.brand \{([\s\S]*?)\n    \}/);
   assert.ok(wideBrand, 'the brand is no longer stretched on a wide screen');
   assert.match(wideBrand[1], /margin-inline: 0;/, 'the brand is narrower than the button by its own margins');
-  assert.match(wideBrand[1], /padding-inline: 12px;/,
-    'the mark no longer starts where the icon inside the button starts');
-  const button = studio.match(/\.studio \.catalog-rail #newLinkBtn \{([\s\S]*?)\n\}/);
-  assert.ok(button, 'the rail button rule disappeared');
-  const inset = button[1].match(/padding-inline: (\d+)px;/);
-  assert.equal(inset && inset[1], '12', 'the button padding moved: the brand inset has to move with it');
+  assert.ok(!/padding-inline:/.test(wideBrand[1]),
+    'the brand has an inset of its own again: the mark no longer starts at the left edge of the button');
+  const name = studio.match(/\.studio \.catalog-rail \.brand__name \{([\s\S]*?)\n\}/);
+  assert.ok(name, 'the brand name rule disappeared');
+  assert.match(name[1], /overflow: visible;/,
+    'the app name is clipped again: it is cut to «Lanpa…» instead of fitting the rail');
+  assert.match(name[1], /flex: none;/, 'the app name gives way again, so it can be squeezed short');
+  // Худший случай: рельса 166px (шире 1050px она 184px) минус её 12px
+  // отступов — 142px. Слово «Lanpaper» в 20-м кегле Manrope — 85px, замерено
+  // по самому файлу шрифта (static/fonts/manrope-latin-wght-normal.woff2).
+  const mark = Number(studio.match(/\.studio \.catalog-rail \.brand__mark \{\s*width: (\d+)px/)[1]);
+  const gap = Number(brand[1].match(/gap: (\d+)px/)[1]);
+  assert.ok(mark + gap + 86 <= 142,
+    `the mark, the gap and the name need ${mark + gap + 86}px, but the narrowest rail gives 142px`);
   assert.match(studio, /--studio-title-size: 20px;/, 'the shared title size token disappeared');
   const sources = [...studio.matchAll(/font-size: var\(--studio-title-size\)/g)];
   assert.equal(sources.length, 2, 'the title and the brand name no longer share one size');
