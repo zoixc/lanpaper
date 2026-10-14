@@ -96,9 +96,18 @@ var staticRefPattern = regexp.MustCompile(`"/static/([A-Za-z0-9_./-]+)"`)
 
 // versionStaticRefs adds ?v=<hash> to every double-quoted allowlisted /static/
 // reference in the admin page. Other references are left as they are.
+//
+// Fonts are the exception. The stylesheets ask for them too, and they are
+// served as they are, without a hash: a versioned URL here would not be the
+// URL the CSS requests, so the browser would fetch the file twice — the
+// preloaded copy left unused and the cache entry split in two. The hash
+// buys nothing for them either, because .woff2 carries its own cache rule.
 func versionStaticRefs(page []byte) []byte {
 	return staticRefPattern.ReplaceAllFunc(page, func(m []byte) []byte {
 		name := string(m[len(`"/static/`) : len(m)-1])
+		if strings.HasPrefix(name, "fonts/") {
+			return m
+		}
 		v := staticVersion(name)
 		if !staticAssets[name] || v == "" {
 			return m

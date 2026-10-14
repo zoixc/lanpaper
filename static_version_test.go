@@ -30,6 +30,17 @@ func TestVersionStaticRefs(t *testing.T) {
 	}
 }
 
+func TestVersionStaticRefsLeavesStylesheetAssetsAlone(t *testing.T) {
+	// The stylesheets ask for the fonts without a hash, and they are not
+	// rewritten. A versioned URL in the page is a second, different URL for the
+	// same file: the preload is then fetched and never used, and the font is
+	// downloaded twice.
+	in := `<link rel="preload" href="/static/fonts/manrope-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>`
+	if out := string(versionStaticRefs([]byte(in))); strings.Contains(out, "?v=") {
+		t.Fatalf("font reference was versioned, so it no longer matches the stylesheet: %s", out)
+	}
+}
+
 func TestStaticAssetCacheDependsOnVersion(t *testing.T) {
 	v := staticVersion("js/app.js")
 	cases := []struct {

@@ -283,7 +283,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v28/,
+  assert.match(code, /lanpaper-static-v29/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 
@@ -348,6 +348,19 @@ test('the panel preloads the typeface subset its language needs', () => {
   // Шрифты загружаются в CORS-режиме: без crossorigin предзагрузка не
   // совпадёт с настоящим запросом, и файл придёт дважды.
   assert.match(prepaint, /crossOrigin = 'anonymous'/, 'the font preload lost crossorigin');
+  // Ещё один способ привезти файл дважды — попросить его по другому URL:
+  // сервер добавляет ?v=<хеш> к ссылкам в разметке, а таблицы стилей
+  // отдаются как есть, без версии. Предзагруженная копия тогда не
+  // используется вовсе, а шрифт всё равно скачивается по ссылке из CSS.
+  const style = read('static/css/studio.css') + read('static/css/style.css');
+  const cssFonts = new Set(matches(style, /url\("?(\/static\/fonts\/[^")]+)"?\)/g));
+  assert.ok(cssFonts.size >= 3, 'the stylesheets no longer reference the fonts by their /static/ path');
+  const preloaded = matches(adminHtml, /<link rel="preload"[^>]*href="([^"]+)"/g);
+  assert.ok(preloaded.length, 'nothing is preloaded in the markup any more');
+  for (const href of preloaded) {
+    assert.ok(cssFonts.has(href),
+      `${href} is not the URL the stylesheet asks for: the file would be fetched twice`);
+  }
   assert.match(prepaint, /link\.as = 'font'/, 'the font preload is no longer announced as a font');
   for (const subset of ['latin', 'cyrillic']) {
     assert.ok(exists(`/static/fonts/manrope-${subset}-wght-normal.woff2`),

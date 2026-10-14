@@ -7,6 +7,23 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Fixed
 
+- The typeface is no longer downloaded twice. The panel preloaded
+  `/static/fonts/manrope-latin-wght-normal.woff2` with a `?v=` hash that the
+  stylesheet never adds to its own request, so the two were different URLs:
+  the preloaded copy was never used — the browser warned about it — and the
+  font came a second time for the CSS. Fonts in the markup now stay
+  unversioned, exactly as the stylesheets ask for them.
+
+### Changed
+
+- The service worker no longer precaches `/static/logo-dark.svg`. Nothing on
+  the panel or the sign-in page asks for it: the wordmark is one file,
+  recoloured for the dark theme.
+- `h()` lost its `html` key, the one place where a string could reach
+  `innerHTML`. Nothing passed anything to it — nodes are built from nodes and
+  text — and keeping an unused sink is how a name or an address ends up being
+  parsed as markup.
+
 - The panel no longer flashes its unassembled markup while it loads. The saved
   markup is not the layout the user gets — `initializeStudio()` moves the header
   into the navigation rail, `hydrateIcons()` draws the icons and
