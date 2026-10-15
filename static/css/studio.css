@@ -652,6 +652,18 @@
     --studio-canvas-wash-accent: rgba(var(--accent-rgb), 0.05);
     --studio-canvas-wash-depth: rgba(var(--shadow-rgb), 0.05);
     --studio-canvas-wash-sheen: rgba(var(--accent-rgb), 0.035);
+    /* Подложка элемента управления в шапке — «плитка»: непрозрачная заливка
+       плюс кайма. До неё кнопки ряда («выделить карточки», тема, настройки)
+       стояли совсем без заливки, и на градиентном поле от них оставался один
+       значок. Одной --surface-3 для светлых палитр мало: поле под шапкой идёт
+       от --bg почти до #e6e6e6, и плитка тонула в нём. Поэтому краска
+       уплотнена к --border-2 — ровно настолько, чтобы отойти от самого
+       тёмного места поля, не потеряв тихий значок (--text-2, нужно 4.5:1).
+       Выбранный сегмент переключателя вида лежит при этом на --surface —
+       на той же краске, что и содержимое карточки. Значения пар и обоих
+       смешений сверены с tools/check-contrast.mjs. */
+    --studio-control-face: color-mix(in srgb, var(--surface-3) 40%, var(--border-2));
+    --studio-control-edge: var(--border-strong);
     /* Всё поле целиком, одним значением: его рисуют и слой на всё окно, и
        шапка (она непрозрачная — скрывает карточки, уезжающие под неё, — и
        поэтому не может пропустить слой сквозь себя). Одно значение на двоих
@@ -670,6 +682,13 @@
 .studio[data-theme="dark"] {
     --studio-control-shadow: 0 1px 2px rgb(0 0 0 / 18%);
     --studio-popover-shadow: 0 14px 38px -14px rgb(0 0 0 / 55%);
+    /* В тёмных палитрах --surface-3 поднят над фоном слишком слабо, чтобы
+       плитка читалась, поэтому подложка собрана смешением: --surface-hover
+       и немного белого. 91 % — не вкусовое число: светлее плитка начинает
+       терять тихий значок (--text-2, нужно 4.5:1), темнее — сливается с
+       полем. Крайние значения перебирает tools/check-contrast.mjs. */
+    --studio-control-face: color-mix(in srgb, var(--surface-hover) 91%, #ffffff);
+    --studio-control-edge: color-mix(in srgb, #ffffff 16%, transparent);
     /* В тёмных темах и пятна, и угловой свет светлее фона: так фон читается
        подсветкой, а не грязным пятном. */
     --studio-canvas-wash-accent: rgba(var(--accent-rgb), 0.075);
@@ -890,8 +909,6 @@
     height: 14px;
 }
 .studio .btn-group--view {
-    border: 0;
-    background: var(--surface-hover);
     box-shadow: none;
 }
 .studio .content {
@@ -1100,10 +1117,14 @@
    rather than inheriting the production switch's circular 30px marker. */
 .studio .btn-group--view {
     --seg: var(--ctl-inner, 30px);
-    padding: 3px;
+    /* 2px внутренних плюс 1px каймы — те же 3px до кнопок, что и у ряда без
+       каймы: группа остаётся 32px высотой, вровень с соседними кнопками, и
+       маркер (top/left 3px) садится на первую кнопку точно. */
+    padding: 2px;
     gap: 2px;
+    border: 1px solid var(--studio-control-edge);
     border-radius: var(--studio-control-radius);
-    background: var(--surface-hover);
+    background: var(--studio-control-face);
 }
 .studio .btn-group--view::before {
     top: 3px;
@@ -1112,6 +1133,31 @@
     background: var(--surface);
     box-shadow: var(--studio-control-shadow);
     transition: transform 180ms var(--ease-out);
+}
+/* Кнопки ряда — «выделить карточки», тема, настройки — получают плитку на
+   том же основании, что и группа вида. Наведение и включённое состояние
+   меняют не заливку, а значок и кайму: так они читаются и на светлой
+   плитке, и на тёмной, где «приподнять» заливку уже некуда. */
+.studio .appbar .appbar__actions .icon-btn {
+    background: var(--studio-control-face);
+    border-color: var(--studio-control-edge);
+}
+.studio .appbar .appbar__actions .icon-btn:hover:not(:disabled) {
+    border-color: var(--studio-control-edge);
+    color: var(--text);
+}
+.studio .appbar .appbar__actions .icon-btn[aria-pressed="true"] {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+/* Внутри группы подложку держит она сама, а выбранный вид показывает
+   едущий маркер: своим фоном кнопка перекрыла бы его, а кайма спорила бы
+   с каймой группы. */
+.studio .appbar .appbar__actions .btn-group--view .icon-btn,
+.studio .appbar .appbar__actions .btn-group--view .icon-btn:hover:not(:disabled),
+.studio .appbar .appbar__actions .btn-group--view .icon-btn[aria-pressed="true"] {
+    background: transparent;
+    border-color: transparent;
 }
 .studio .btn-group--view .icon-btn {
     border-radius: var(--studio-inner-radius);

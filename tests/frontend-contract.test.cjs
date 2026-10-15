@@ -283,7 +283,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v38/,
+  assert.match(code, /lanpaper-static-v39/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 
@@ -677,6 +677,86 @@ test('the canvas wash is one field: a full-window layer, plus the opaque header 
   assert.match(studio,
     /@media \(prefers-contrast: more\), \(forced-colors: active\) \{[\s\S]*?\.studio \.appbar \{\s*background-image: none;/,
     'with the wash gone the header must not keep painting it');
+});
+
+test('the header buttons keep a plate of their own over the gradient', () => {
+  // Кнопки ряда («выделить карточки», вид, тема, настройки) стояли на поле
+  // совсем без заливки, и на градиенте от них оставался один значок. Плитка —
+  // это непрозрачная заливка плюс кайма, и обе краски обязаны быть
+  // переменными палитры: свой цвет здесь разошёлся бы с темой.
+  const studio = read('static/css/studio.css');
+  const checker = read('tools/check-contrast.mjs');
+
+  const faces = [...studio.matchAll(/--studio-control-face: ([^;]+);/g)].map(([, v]) => v.trim());
+  assert.equal(faces.length, 2, 'плитка должна быть определена ровно для двух тем');
+  const lightFace = faces[0].match(
+    /^color-mix\(in srgb, var\(--surface-3\) (\d+)%, var\(--border-2\)\)$/);
+  assert.ok(lightFace,
+    'светлая плитка — --surface-3, уплотнённый к --border-2; без уплотнения поле под шапкой её съедает');
+  const darkFace = faces[1].match(
+    /^color-mix\(in srgb, var\(--surface-hover\) (\d+)%, #ffffff\)$/);
+  assert.ok(darkFace, 'тёмная плитка — смешение --surface-hover с белым, а не готовый цвет');
+
+  const edges = [...studio.matchAll(/--studio-control-edge: ([^;]+);/g)].map(([, v]) => v.trim());
+  assert.equal(edges.length, 2, 'кайма должна быть определена ровно для двух тем');
+  assert.equal(edges[0], 'var(--border-strong)',
+    'светлая кайма на --border-2 сливается с самой плиткой');
+  const edgeMix = edges[1].match(/^color-mix\(in srgb, #ffffff (\d+)%, transparent\)$/);
+  assert.ok(edgeMix, 'тёмная кайма — белый с прозрачностью поверх плитки');
+
+  // Числа смешений чекер считает у себя: если они разойдутся с CSS, проверка
+  // контраста будет считать не тот цвет, который видно на экране.
+  const constants = Object.fromEntries(
+    [...checker.matchAll(/const (CONTROL_[A-Z_]+) = (\d+);/g)].map(([, name, value]) => [name, Number(value)]));
+  assert.deepEqual(Object.keys(constants).sort(),
+    ['CONTROL_EDGE_WHITE', 'CONTROL_FACE_LIGHT_MIX', 'CONTROL_FACE_MIX'],
+    'набор весов плитки в tools/check-contrast.mjs изменился');
+  assert.equal(Number(lightFace[1]), constants.CONTROL_FACE_LIGHT_MIX,
+    'уплотнение светлой плитки в tools/check-contrast.mjs разошлось с CSS');
+  assert.equal(Number(darkFace[1]), constants.CONTROL_FACE_MIX,
+    'смешение тёмной плитки в tools/check-contrast.mjs разошлось с CSS');
+  assert.equal(Number(edgeMix[1]), constants.CONTROL_EDGE_WHITE,
+    'прозрачность каймы в tools/check-contrast.mjs разошлась с CSS');
+
+  // Пара «что на чём» должна существовать и в чекере: иначе об этой плитке
+  // никто не узнает при следующей правке палитр.
+  for (const label of [
+    'значок на подложке управления',
+    'значок покоя на подложке управления',
+    'акцентный значок на подложке управления',
+    'выбранный сегмент отличим от подложки',
+    'подложка отличима от фона',
+    'кайма подложки различима',
+  ]) {
+    assert.ok(checker.includes(label), `чекер контраста потерял пару «${label}»`);
+  }
+
+  const button = studio.match(/\.studio \.appbar \.appbar__actions \.icon-btn \{[^}]+\}/)[0];
+  assert.match(button, /background: var\(--studio-control-face\)/,
+    'кнопки ряда снова без заливки — на градиенте они пропадут');
+  assert.match(button, /border-color: var\(--studio-control-edge\)/,
+    'без каймы плитка на светлых палитрах почти не отличается от поля');
+
+  // Внутри группы вида подложку держит сама группа, а выбранный вид — маркер:
+  // своя заливка у внутренней кнопки перекрыла бы его.
+  const inner = studio.match(/\.studio \.appbar \.appbar__actions \.btn-group--view \.icon-btn,[^}]+\}/)[0];
+  assert.match(inner, /background: transparent/,
+    'внутренняя кнопка группы перекрывает маркер выбранного вида');
+  const marker = studio.match(/\.studio \.btn-group--view::before \{[^}]+\}/)[0];
+  assert.match(marker, /background: var\(--surface\)/,
+    'маркер выбранного вида потерял краску содержимого карточки');
+
+  // Группа вида стоит в одном ряду с кнопками, у которых каймы нет: её
+  // внутренние 2px плюс 1px каймы должны давать ровно то же поле до кнопок,
+  // иначе группа окажется выше соседей и разъедется по центру.
+  const actions = studio.match(/\.studio \.appbar__actions \{[^}]+\}/)[0];
+  const group = studio.match(/\.studio \.btn-group--view \{[^}]*--seg[^}]*\}/)[0];
+  const ctl = Number(actions.match(/--ctl: (\d+)px/)[1]);
+  const innerSize = Number(actions.match(/--ctl-inner: (\d+)px/)[1]);
+  const padding = Number(group.match(/padding: (\d+)px/)[1]);
+  const edgeWidth = Number(group.match(/border: (\d+)px/)[1]);
+  assert.equal(innerSize + 2 * padding + 2 * edgeWidth, ctl,
+    'группа вида перестала быть вровень с соседними кнопками');
 });
 
 test('accent details take the palette colour, not the text colour', () => {

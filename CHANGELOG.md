@@ -107,6 +107,28 @@ Notable changes to Lanpaper. Docker images are published as
   as the server does, so a Cyrillic address no longer passes here and fails
   there. `STATIC_CACHE` bumped.
 
+- **The header buttons carry a plate of their own and stay visible over the
+  gradient field.** Select-multiple, theme and settings drew their glyph
+  straight on the canvas — no fill, no border — so what the user saw was a bare
+  icon whose contrast depended on whatever the field was doing under it; and the
+  view switch did not help, because its chosen tile used `--surface`, which in
+  every dark palette is *darker* than the plate it sat on, so the picked view
+  read as a hole rather than as the picked one. Every button in the row now has
+  the same plate: an opaque palette fill plus a hairline. In dark themes the
+  fill is `--surface-hover` lifted towards white, in light themes `--surface-3`
+  densified towards `--border-2` — one surface step down was not enough, because
+  under the header the light field runs from `--bg` down to about `#e6e6e6` and
+  a plate that close to it disappeared again. On the rendered field the step is
+  now 24 levels in light mono (235 → 211) and 25 in dark ocean (30 → 55), and
+  the view switch keeps its 32 px height with the border folded into its
+  padding. Hover and the pressed state move the glyph and the edge rather than
+  the fill, so they read the same on a light plate and on a dark one, and the
+  chosen view keeps the sliding `--surface` tile. Six new contrast pairs cover
+  the plate, its resting and accent glyphs, its edge and the tile on top of it,
+  for all six palettes in both themes; the weights the CSS and the checker share
+  are asserted against each other in `tests/frontend-contract.test.cjs`.
+  `STATIC_CACHE` bumped.
+
 ### Changed
 
 - Replaced the library canvas registration-mark pattern with a subtle, static,
