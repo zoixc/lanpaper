@@ -124,13 +124,15 @@ func WithoutHistoryVersion(current []HistoryEntry, version uint64) ([]HistoryEnt
 
 // ArchiveReplaced moves the backup an upload kept for the file it replaced into
 // the link's history directory and records the entry. backupPath is the
-// hardlink publishStaged created, so archiving a version costs one rename: no
+// hardlink publishStaged created, or the old live path when formats change.
+// Archiving a version costs one rename: no
 // extra read, no extra write and no extra disk block while the file is linked.
 //
 // prev is the record as it was before the upload committed. The entry is
 // recorded only if the rename succeeded; on failure the backup is left where it
 // is so the caller's normal cleanup still applies.
-func ArchiveReplaced(prev *Wallpaper, backupPath, ext string, limit int) (*Wallpaper, error) {
+// The caller holds the link lock and has committed the new live metadata in s.
+func (s *Store) ArchiveReplaced(prev *Wallpaper, backupPath, ext string, limit int) (*Wallpaper, error) {
 	if prev == nil || !utils.IsValidLinkName(prev.LinkName) {
 		return nil, errors.New("invalid link for history archive")
 	}
@@ -177,7 +179,7 @@ func ArchiveReplaced(prev *Wallpaper, backupPath, ext string, limit int) (*Wallp
 	}
 
 	var dropped []HistoryEntry
-	updated, err := Global.Update(prev.LinkName, func(wp *Wallpaper) error {
+	updated, err := s.Update(prev.LinkName, func(wp *Wallpaper) error {
 		before := HistoryBytes(wp.History)
 		kept, over := PrependHistory(wp.History, entry, limit)
 		wp.History = kept

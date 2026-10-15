@@ -8,7 +8,7 @@ link, which is handy for digital frames, smart TVs, kiosks and other displays.
 
 ## Features
 
-- **Stable named links.** The content can be JPEG, PNG, GIF, WebP, BMP, TIFF,
+- **Stable named links.** The content can be JPEG, PNG, GIF, WebP, AVIF, BMP, TIFF,
   MP4 or WebM, and can be swapped at any time.
 - **Version history and rollback.** Replacing a file archives the previous one
   (three versions and a 512 MB global budget by default). Old versions stay
@@ -106,11 +106,17 @@ named volumes or Docker Desktop.
 ### Build from source
 
 You need Go 1.26 or newer (preferably the latest patch release). No C compiler
-is required: WebP encoding is pure Go.
+is required: WebP encoding is pure Go and AVIF decoding uses an embedded WASM
+module. AVIF's JIT needs executable anonymous memory on supported platforms;
+see the [systemd hardening notes](docs/DEPLOYMENT.md#systemd-binary).
 
 ```sh
 go build -trimpath -o lanpaper .
-ADMIN_USER=admin ADMIN_PASS='set-a-unique-long-password' ./lanpaper
+# Reads one password line from stdin. Use a private console or a secret-store pipe;
+# do not put the password in argv or shell history.
+ADMIN_PASSWORD_HASH="$(./lanpaper hash-password)"
+export ADMIN_PASSWORD_HASH
+ADMIN_USER=admin ./lanpaper
 ```
 
 If credentials are missing, **admin routes return HTTP 503**; they are never
@@ -302,6 +308,20 @@ already set in the environment take precedence over it.
 - **Other settings.** The server decodes, scales by `COMPRESSION_SCALE` and
   re-encodes. BMP/TIFF become JPEG, and a re-encoded GIF keeps only its first
   frame. MP4/WebM are stored as they are.
+- **AVIF.** Static SDR AVIF is accepted from files, URLs without extensions
+  (including image-CDN URLs), and the gallery. In lossless/original mode its
+  bytes are kept; otherwise it becomes WebP at the configured quality and scale.
+  Previews are always WebP. Lossy AVIF-to-WebP conversion can introduce additional
+  loss and is **not guaranteed to reduce size**. Original AVIF public links
+  require AVIF support on the receiving device.
+  The sandbox is compiled only on first AVIF use, without CGO/system libraries.
+  To stay within the existing memory budget, AVIF input is limited to 32 MiB,
+  output to 16,777,216 pixels at 8-bit or 8,388,608 at 10/12-bit. Decode execution
+  is limited to 30 seconds; memory-heavy streams can fail below those limits.
+  Rotation, mirroring and transparency are supported. Animation, HDR,
+  wide-gamut/ICC profiles and clean-aperture crops are rejected explicitly,
+  including in original mode, rather than producing a misleading preview.
+  HEIC/HEIF remain unsupported. See [the decoder policy](internal/avifcodec/README.md).
 - **Browser pre-processing.** To reduce upload size, the admin panel
   re-encodes **JPEGs** at the configured quality before uploading them:
   - It never resizes; scaling is always done by the server, the same way for
@@ -313,7 +333,7 @@ already set in the environment take precedence over it.
   Images are limited to 16,384 px per side, 36 M pixels per image and 48 M
   decoded pixels in flight. The images decode in two layouts depending on the
   file: 8-bit sources take 4 bytes per pixel, 16-bit ones 8, so a second cap
-  keeps the decodes running at once within 288 MB — the largest allowed image
+  keeps the decodes running at once within 288 MB — the largest allowed non-AVIF image
   still fits on its own, and an upload that would not is answered with the same
   429 "retry shortly" the pixel budget uses. Large or malformed media may be
   rejected even below `MAX_UPLOAD_MB`.

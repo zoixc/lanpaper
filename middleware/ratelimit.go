@@ -42,20 +42,11 @@ func (s *RateStore) Clean(now time.Time) {
 		cleanRateShard(&s.table[i], now)
 	}
 }
-func (s *RateStore) Reset() {
-	for i := range s.table {
-		s.table[i].mu.Lock()
-		s.table[i].counts = nil
-		s.table[i].mu.Unlock()
-	}
-}
 
 var defaultRateStore = NewRateStore()
 
 // DefaultRateStore is the process runtime used by compatibility middleware.
 func DefaultRateStore() *RateStore { return defaultRateStore }
-
-var rateTable = &defaultRateStore.table // compatibility view for existing tests
 
 func shardIndex(key string) uint32 {
 	h := uint32(2166136261)
@@ -65,7 +56,7 @@ func shardIndex(key string) uint32 {
 	}
 	return h % rateShards
 }
-func shardFor(key string) *rateShard             { return &rateTable[shardIndex(key)] }
+func shardFor(key string) *rateShard             { return defaultRateStore.shard(key) }
 func (s *RateStore) shard(key string) *rateShard { return &s.table[shardIndex(key)] }
 
 // Allow is the instance-scoped token-bucket primitive used by injected apps.
@@ -93,26 +84,13 @@ func StartCleaner() {
 		}
 	}
 }
-func resetRateCounts() {
-	for i := range rateTable {
-		rateTable[i].mu.Lock()
-		rateTable[i].counts = nil
-		rateTable[i].mu.Unlock()
-	}
-}
-
-// CleanRateLimits runs one bounded cleanup pass for composition/maintenance.
-func CleanRateLimits(now time.Time) { cleanExpiredCounts(now) }
-
 func cleanExpiredCounts(now time.Time) {
 	defer func() {
 		if p := recover(); p != nil {
 			log.Printf("Critical: rate-limit cleaner recovered from a panic: %v\n%s", p, debug.Stack())
 		}
 	}()
-	for i := range rateTable {
-		cleanRateShard(&rateTable[i], now)
-	}
+	defaultRateStore.Clean(now)
 }
 
 func cleanRateShard(sh *rateShard, now time.Time) {
@@ -151,17 +129,7 @@ func tokenRetry(b *bucket) time.Duration {
 }
 
 func allowBucketEvent(ns, key string, capacity, refill int, span time.Duration) (bool, time.Duration) {
-	now := time.Now()
-	id := ns + ":" + key
-	sh := shardFor(id)
-	sh.mu.Lock()
-	defer sh.mu.Unlock()
-	b := currentBucket(sh, id, capacity, refill, span, now)
-	if b.tokens < 1 {
-		return false, tokenRetry(b)
-	}
-	b.tokens--
-	return true, 0
+	return defaultRateStore.Allow(ns, key, capacity, refill, span)
 }
 func allowEvent(ns, key string, limit int, span time.Duration) (bool, time.Duration) {
 	return allowBucketEvent(ns, key, limit, limit, span)

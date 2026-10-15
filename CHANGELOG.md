@@ -3,6 +3,45 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
+## [Unreleased]
+
+### Added
+
+- Static SDR AVIF input from files, public HTTP(S) URLs without extensions and
+  the server gallery. Original mode keeps the source; compressed mode converts
+  to WebP. Thumbnails and regeneration work in both modes, with alpha and
+  primary-item orientation preserved.
+- A lazy, pinned libavif/dav1d WASM decoder with hard memory and execution limits,
+  caller cancellation, and reservations in the existing shared memory/pixel
+  budgets. Existing image decoders are unchanged. AVIF has tighter resource
+  limits documented in the README; unsupported animation/HDR/colour profiles
+  and clean-aperture crops are explicitly rejected even in original mode.
+- AVIF regression tests for complete uploads, URL sniffing, gallery, scaling,
+  playlists, original-byte retention, regeneration, transparency, corruption,
+  budgets, cancellation, WASM limits and container-parser fuzzing.
+
+### Fixed
+
+- Canceled first-use AVIF requests return promptly while one bounded shared
+  initialization finishes. Runtime failures return 503 instead of 400.
+- Upload replacement history uses the service's injected store rather than
+  silently updating the global store.
+- Clean installations no longer log a failed legacy migration for `.gitkeep`
+  placeholders.
+- Removed a systemd setting incompatible with AVIF's JIT; corrected the metrics
+  endpoint and soft-memory-limit deployment guidance.
+- Version history now also archives the previous live file when a replacement
+  changes the stored extension (including original AVIF to compressed WebP).
+
+### Changed
+
+- Replaced the library canvas registration-mark pattern with a subtle, static,
+  palette-aware gradient in both light and dark themes.
+- Removed unreachable library handlers, redundant decoding/rate-limit paths,
+  production-only test scaffolding and the unused dark-logo asset.
+- Third-party notices now include the embedded AVIF module and wazero, missing
+  Go dependencies and Manrope, with verbatim redistribution licenses.
+
 ## [0.20.0] – 2026-10-14
 
 ### Fixed

@@ -55,6 +55,16 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      - name: Static analysis and unreachable code
+        if: matrix.go == 'stable'
+        run: |
+          go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
+          unreachable="$(go run golang.org/x/tools/cmd/deadcode@v0.51.0 -test -filter='^lanpaper' ./...)"
+          if [ -n "$unreachable" ]; then
+            printf '%s\n' "$unreachable"
+            exit 1
+          fi
+
       - name: Test
         shell: bash
         run: |

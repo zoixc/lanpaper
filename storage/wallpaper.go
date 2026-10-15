@@ -516,7 +516,8 @@ func MigrateMediaToDataDir() {
 }
 
 // countLegacyLeftovers counts regular files still in the legacy static/images
-// tree (top level and previews/). Symlinks and directories are not counted.
+// tree (top level and previews/). Repository placeholders, symlinks and
+// directories are not counted.
 func countLegacyLeftovers() int {
 	count := 0
 	for _, dir := range []string{config.LegacyMedia, filepath.Join(config.LegacyMedia, "previews")} {
@@ -525,7 +526,7 @@ func countLegacyLeftovers() int {
 			continue
 		}
 		for _, e := range entries {
-			if e.Type().IsRegular() {
+			if e.Type().IsRegular() && e.Name() != ".gitkeep" {
 				count++
 			}
 		}

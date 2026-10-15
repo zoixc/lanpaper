@@ -124,7 +124,7 @@ The API returns links in this shape:
 
 | Field | Notes |
 | --- | --- |
-| `mimeType` | Stored file extension: `jpg`, `png`, `gif`, `webp`, `bmp`, `tiff`, `mp4` or `webm`. |
+| `mimeType` | Stored file extension: `jpg`, `png`, `gif`, `webp`, `avif`, `bmp`, `tiff`, `mp4` or `webm`. |
 | `preview` | Absent for videos and for links without media. |
 | `pinnedAt` | Present only for pinned links. |
 | `accessToken` | Present only when `accessLevel` is `token`. |
@@ -324,11 +324,18 @@ Media handling:
 
 - The type is detected from the file content, not from the file name or the
   `Content-Type` header.
-- Accepted containers are the stored extensions above plus the MP4 brands real
-  cameras write (`isom`, `iso2`, `avc1`, `M4V`…). ISO-BMFF *image* containers
-  are not decoded and are refused with `400 Invalid or unsupported media file`:
-  HEIF/AVIF (`avif`, `avis`, `heic`, `heix`, `heim`, `heis`, `hevc`, `hevx`,
-  `hevm`, `hevs`, `mif1`, `msf1`, `msix`, `mshf`).
+- Static SDR AVIF is supported, including URLs without an extension. Original
+  mode preserves its bytes; other settings convert it to WebP. Previews remain
+  WebP. AVIF-specific limits: 32 MiB compressed, 64 MiB decoded RGBA (16,777,216
+  pixels for 8-bit; 8,388,608 for 10/12-bit), 16,384 px per side, 30-second decode
+  execution deadline. A hard 192 MiB WASM-memory ceiling can reject streams
+  below these limits. Rotation/mirroring and transparency are supported.
+- Decoder initialization failure returns `503 AVIF decoder unavailable`; check
+  the server log and host JIT policy. It is not a malformed-file response.
+- AVIF animation, HDR, wide-gamut/ICC colour and clean-aperture crop are refused
+  with `400 Unsupported AVIF feature (...)`; they are not silently flattened or
+  tone-mapped. HEIC/HEIF image containers remain unsupported and are not treated
+  as MP4. MP4 camera brands (`isom`, `iso2`, `avc1`, `M4V`…) remain supported.
 - Images are fully decoded before they are stored.
 - With `COMPRESSION_QUALITY=100` and `COMPRESSION_SCALE=100`, the original
   bytes are kept. Otherwise images are scaled and re-encoded.

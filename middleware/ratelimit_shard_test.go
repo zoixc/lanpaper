@@ -62,3 +62,14 @@ func TestCleanExpiredCountsCoversAllShards(t *testing.T) {
 		}
 	}
 }
+
+// Test-only access to the default runtime; not part of production middleware.
+var rateTable = &defaultRateStore.table
+
+func resetRateCounts() {
+	for i := range rateTable {
+		rateTable[i].mu.Lock()
+		rateTable[i].counts = nil
+		rateTable[i].mu.Unlock()
+	}
+}

@@ -6,6 +6,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -31,6 +32,7 @@ import (
 	xwebp "golang.org/x/image/webp"
 
 	"lanpaper/config"
+	"lanpaper/internal/avifcodec"
 	"lanpaper/internal/jobs"
 	"lanpaper/utils"
 )
@@ -143,6 +145,9 @@ var mimeToExt = map[string]string{
 func isVideo(ext string) bool { return config.IsVideoExt(ext) }
 
 func storedExt(ext string, lossless bool) string {
+	if ext == "avif" && !lossless {
+		return "webp"
+	}
 	if !lossless && (ext == "bmp" || ext == "tiff") {
 		return "jpg"
 	}
@@ -176,7 +181,7 @@ func canUseLosslessMode() bool {
 
 // isoBMFFImageBrands are the major brands of ISO-BMFF files that are still
 // images, not video: HEIF (heic/heix/hevc…), AVIF (avif/avis) and the generic
-// MIAF brand mif1. They share the ftyp box with MP4 but have no decoder here,
+// MIAF brand mif1. They share the ftyp box with MP4; only AVIF is decoded,
 // so an uploaded one used to be stored as .mp4 and served as video/mp4 — a
 // tile no browser could play, while the previous build rejected the file.
 var isoBMFFImageBrands = map[string]bool{
@@ -210,10 +215,19 @@ func inspectMediaFile(r io.ReadSeeker, name string, size, maxBytes int64) (strin
 	// were rejected — especially URL downloads, which land in a nameless
 	// temp file with no extension to fall back to.
 	if len(head) >= 12 && string(head[4:8]) == "ftyp" {
+		if utils.IsAVIF(head) {
+			return "avif", nil
+		}
 		// An image container is not a video that happens to be unplayable:
 		// name it and refuse it, so the file is not stored under a wrong type.
 		if brand := strings.ToLower(string(head[8:12])); isoBMFFImageBrands[brand] {
 			return "", fmt.Errorf("unsupported image container %q", brand)
+		}
+		size := int(binary.BigEndian.Uint32(head))
+		for off := 16; off+4 <= min(size, len(head)); off += 4 {
+			if isoBMFFImageBrands[strings.ToLower(string(head[off:off+4]))] {
+				return "", errors.New("unsupported image container")
+			}
 		}
 		if !isMP4VideoFtyp(head) {
 			return "", fmt.Errorf("ftyp box declares no known video brand")
@@ -294,7 +308,13 @@ func checkImageDimensions(r io.ReadSeeker, ext string) (pixels, decodedBytes int
 
 // The returned release function must be called after all resizing/encoding
 // is finished, even on failure. Reserve BEFORE allocating a decoded image.
-func decodeImage(r io.ReadSeeker, ext string) (image.Image, func(), error) {
+func decodeImage(ctx context.Context, r io.ReadSeeker, ext string) (image.Image, func(), error) {
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
+	if ext == "avif" {
+		return decodeAVIF(ctx, r)
+	}
 	pixels, decodedBytes, err := checkImageDimensions(r, ext)
 	if err != nil {
 		return nil, nil, err
@@ -420,4 +440,37 @@ func encodeImageWithWebpEffort(w io.Writer, img image.Image, format string, qual
 	default:
 		return fmt.Errorf("unsupported output format %q", format)
 	}
+}
+
+// AVIF's sandbox/input/output envelope shares the SAME byte budget as existing
+// formats. No extra pool permits AVIF to exhaust memory beside JPEG/PNG jobs.
+func decodeAVIF(ctx context.Context, r io.ReadSeeker) (image.Image, func(), error) {
+	releaseBytes, err := reserveDecodedBytes(avifcodec.WorkingBytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	var releasePixels func()
+	release := func() {
+		if releasePixels != nil {
+			releasePixels()
+		}
+		releaseBytes()
+	}
+	img, err := avifcodec.Decode(ctx, r, func(cfg image.Config) error {
+		pixels := int64(cfg.Width) * int64(cfg.Height)
+		if cfg.Width > config.MaxImageDimension || cfg.Height > config.MaxImageDimension || pixels > config.MaxImagePixels {
+			return errors.New("AVIF dimensions exceed limits")
+		}
+		var err error
+		releasePixels, err = processingPool.ReserveMemory(pixels)
+		if err != nil {
+			return errImageBudgetBusy
+		}
+		return nil
+	})
+	if err != nil {
+		release()
+		return nil, nil, err
+	}
+	return img, release, nil
 }

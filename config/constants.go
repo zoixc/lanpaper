@@ -91,7 +91,7 @@ var ValidCategories = map[string]bool{
 // Used by both the upload handler (MIME detection) and the external image browser.
 var AllowedMediaExts = map[string]bool{
 	".jpg": true, ".jpeg": true, ".png": true, ".gif": true,
-	".webp": true, ".bmp": true, ".tiff": true, ".tif": true,
+	".avif": true, ".webp": true, ".bmp": true, ".tiff": true, ".tif": true,
 	".mp4": true, ".webm": true,
 }
 

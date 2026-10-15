@@ -4,6 +4,7 @@ package utils
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -51,6 +52,11 @@ func ValidateFileType(data []byte, expectedExt string) error {
 		ext = "jpg"
 	}
 	switch ext {
+	case "avif":
+		if !IsAVIF(data) {
+			return fmt.Errorf("file does not declare AVIF brands")
+		}
+		return nil
 	case "webp":
 		if !bytes.HasPrefix(data, magicBytes["webp"]) {
 			return fmt.Errorf("file does not match WebP magic bytes")
@@ -84,4 +90,25 @@ func ValidateFileType(data []byte, expectedExt string) error {
 		return fmt.Errorf("file content does not match extension %s", ext)
 	}
 	return nil
+}
+
+// IsAVIF checks the complete bounded ftyp box, including compatible brands.
+// It is only type inspection; the AVIF decoder must still validate the file.
+func IsAVIF(data []byte) bool {
+	if len(data) < 16 || string(data[4:8]) != "ftyp" {
+		return false
+	}
+	size := int64(binary.BigEndian.Uint32(data))
+	if size < 16 || size > int64(len(data)) || size%4 != 0 {
+		return false
+	}
+	if string(data[8:12]) == "avif" || string(data[8:12]) == "avis" {
+		return true
+	}
+	for off := 16; int64(off+4) <= size; off += 4 {
+		if string(data[off:off+4]) == "avif" || string(data[off:off+4]) == "avis" {
+			return true
+		}
+	}
+	return false
 }

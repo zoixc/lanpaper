@@ -130,3 +130,26 @@ func TestSQLiteMigrationRejectsChangedSourceAndRollsBackDestination(t *testing.T
 		t.Fatalf("rollback removed backup: %v", err)
 	}
 }
+
+func TestLegacyLeftoversIgnoreRepositoryPlaceholders(t *testing.T) {
+	testStorageDir(t)
+	for _, name := range []string{"static/images/.gitkeep", "static/images/previews/.gitkeep"} {
+		if err := os.WriteFile(name, nil, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := countLegacyLeftovers(); got != 0 {
+		t.Fatalf("placeholders counted as failed migration: %d", got)
+	}
+	for _, name := range []string{"static/images/photo.avif", "static/images/previews/photo.webp"} {
+		if err := os.WriteFile(name, []byte("leftover"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink("photo.avif", "static/images/unsafe"); err != nil {
+		t.Fatal(err)
+	}
+	if got := countLegacyLeftovers(); got != 2 {
+		t.Fatalf("real leftovers not counted accurately: %d", got)
+	}
+}

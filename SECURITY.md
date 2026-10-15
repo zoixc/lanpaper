@@ -32,6 +32,23 @@ persisted browser sessions after their credential fingerprint has been
 migrated; pre-fingerprint session files are upgraded once without a forced
 logout.
 
+## AVIF execution boundary
+
+AVIF decoding runs in a pinned libavif/dav1d WASM module with no filesystem or
+network capabilities, bounded linear memory and an execution deadline. Runtime
+compilation is lazy and shared; canceled requests stop waiting without starting
+additional compilers. Initialization errors fail closed with HTTP 503 rather
+than being misreported as malformed input. Unsupported animation and colour
+features are rejected explicitly. Other image decoders still run as Go code
+inside the process, so this is not a process-wide decoder sandbox.
+
+The JIT may require executable anonymous mappings; see the
+[systemd notes](docs/DEPLOYMENT.md#systemd-binary). `GOMEMLIMIT` is not a hard RSS
+limit. Keep container/cgroup memory and CPU limits and reserve headroom for
+runtime/encoder overhead. The embedded C codecs are **not covered by
+`govulncheck`**: review upstream advisories and the pinned module provenance
+in [the decoder policy](internal/avifcodec/README.md) before updating releases.
+
 ## Reporting a vulnerability
 
 If private vulnerability reporting is enabled for this repository, use
@@ -57,7 +74,7 @@ revoked session to origin-wide cached Basic credentials.
   `data/wallpapers.db` (the database is mode 0600, and so are its WAL and
   shared-memory files)
   and expire after 14 days. The account settings can durably revoke the current
-  session or every browser session. If the updated file cannot be saved, the
+  session or every browser session. If the database transaction cannot be committed, the
   operation fails without partially revoking sessions and can be retried.
   There is no password database: credentials come from the environment (or
   `config.json`) and must be handled as secrets.
