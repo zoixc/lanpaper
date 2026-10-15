@@ -283,7 +283,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v41/,
+  assert.match(code, /lanpaper-static-v42/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 
@@ -330,6 +330,46 @@ test('the boot screen covers the unassembled panel and is always released', () =
     'nothing turns the boot screen on once it is armed');
   assert.match(boot, /:root\[data-boot="done"\] \.boot[\s\S]*?opacity: 0;/,
     'the boot screen no longer fades out when it is released');
+  // Каркас не рисует панель заново: ни чипов рельсы, ни строки поиска, ни
+  // кнопок шапки — их число и форма меняются с каждой правкой дизайна, и
+  // нарисованная копия расходится (именно это и случилось). Он собирается
+  // из тех же классов, что и панель, а размеры берёт у её токенов.
+  const mark = adminHtml.slice(adminHtml.indexOf('id="bootScreen"'),
+    adminHtml.indexOf('<a class="skip-link"'));
+  assert.match(mark, /<div class="grid boot__grid">/,
+    'the boot grid no longer uses the panel grid, so its columns can drift again');
+  assert.match(mark, /<div class="card boot__tile"><div class="card__frame"><\/div><div class="boot__body"><\/div><\/div>/,
+    'the boot tile is no longer a card with a frame and a caption space');
+  assert.ok(!/boot__(line|dot|chip|bar|pill|search|action)/.test(mark),
+    'the boot screen draws the panel furniture again (chips, search row, header buttons)');
+  // Ни одного своего размера: всё, чем каркас меряется, объявлено у панели и
+  // стоит на её же элементах. Иначе копия снова начнёт расходиться.
+  const sizes = boot.replace(/@media[^{]*/g, '').match(/[\d.]+px/g) || [];
+  assert.deepEqual(sizes, [],
+    'the boot skeleton carries pixel sizes of its own instead of reading the panel tokens');
+  const rootStudio = studioCss.match(/:root\.studio \{([\s\S]*?)\n\}/);
+  assert.ok(rootStudio, ':root.studio disappeared');
+  // Каждый токен объявлен у панели, читается её собственным правилом и
+  // повторяется каркасом: правка дизайна доходит до экрана загрузки сама.
+  const tokens = [
+    ['--rail-width', /\.catalog-rail \{[^}]*width: var\(--rail-width\)/],
+    ['--studio-head-height', /\.studio \.appbar__row--top \{[^}]*min-height: var\(--studio-head-height\)/],
+    ['--studio-rail-pad', /\.studio \.catalog-rail \{[^}]*padding: var\(--studio-rail-pad\)/],
+    ['--studio-pad-top', /\.studio \.content \{[^}]*padding: var\(--studio-pad-top\)/],
+    ['--card-body', /\.studio \.grid:not\(\.grid--list\) \.card__body \{[^}]*min-height: var\(--card-body\)/],
+  ];
+  for (const [token, panel] of tokens) {
+    assert.ok(new RegExp(`\\n    ${token}: `).test(rootStudio[1]),
+      `${token} is no longer a panel token, so the boot skeleton cannot take it from the panel`);
+    assert.match(studioCss, panel, `the panel stopped sizing itself with ${token}`);
+    assert.ok(boot.includes(`var(${token})`), `the boot skeleton stopped reading ${token}`);
+  }
+  // Вид каркас получает тем же классом, что и панель: в сохранённом списке
+  // каркас показывает строки, а не сетку плиток, и ничего не считает сам.
+  assert.match(prepaint, /classList\.add\('grid--list'\)/,
+    'nothing hands the saved list view to the boot skeleton');
+  assert.match(prepaint, /getElementById\('bootScreen'\)[\s\S]{0,120}querySelector\('\.boot__grid'\)/,
+    'the boot grid is looked up somewhere else than in the boot screen');
 });
 
 test('the panel preloads the typeface subset its language needs', () => {
@@ -594,9 +634,11 @@ test('the rail head and the appbar share one top line', () => {
   assert.match(studio, /\.studio \.catalog-rail \.brand \{\s*height: var\(--studio-head-height\)/,
     'the brand block is no longer as tall as the appbar row, so the name and the title drift apart');
   const brand = studio.match(/\.studio \.catalog-rail \.brand \{\s*margin: 0 7px (\d+)px;/);
-  const content = studio.match(/\.studio \.content \{[^}]*padding: (\d+)px/);
-  assert.ok(brand && content, 'the brand margin or the content padding is gone');
-  assert.equal(content[1], brand[1],
+  const top = studio.match(/--studio-pad-top: (\d+)px;/);
+  assert.ok(brand && top, 'the brand margin or the content padding is gone');
+  assert.match(studio, /\.studio \.content \{[^}]*padding: var\(--studio-pad-top\)/,
+    'the content padding stopped reading the token the boot skeleton shares');
+  assert.equal(top[1], brand[1],
     'the grid no longer starts level with the new-link button');
 });
 
@@ -954,8 +996,10 @@ test('the brand block matches the new-link button it stands above', () => {
   // приложения набрано тем же кеглем, что «Ссылки» в шапке, — одним токеном,
   // чтобы они не разъезжались по размеру на разных ширинах.
   const studio = read('static/css/studio.css');
-  const brand = studio.match(/\.studio \.catalog-rail \.brand \{([\s\S]*?)\n\}/);
-  assert.ok(brand, 'the brand rule disappeared');
+  // Правило общее с каркасом загрузки: в нём стоит та же пара значок+название,
+  // поэтому отступ у них один (ниже селектор каркаса — он последний в списке).
+  const brand = studio.match(/\.studio \.boot__brand \{([\s\S]*?)\n\}/);
+  assert.ok(brand, 'the brand gap rule disappeared');
   assert.match(brand[1], /gap: \d+px;/, 'the gap between the mark and the name is back to the inherited one');
   const wide = studio.match(/@media \(min-width: 761px\) \{([\s\S]*?)\n\}\n/);
   assert.ok(wide, 'the desktop rail rules disappeared');
@@ -964,7 +1008,7 @@ test('the brand block matches the new-link button it stands above', () => {
   assert.match(wideBrand[1], /margin-inline: 0;/, 'the brand is narrower than the button by its own margins');
   assert.ok(!/padding-inline:/.test(wideBrand[1]),
     'the brand has an inset of its own again: the mark no longer starts at the left edge of the button');
-  const name = studio.match(/\.studio \.catalog-rail \.brand__name \{([\s\S]*?)\n\}/);
+  const name = studio.match(/\.studio \.boot__name \{([\s\S]*?)\n\}/);
   assert.ok(name, 'the brand name rule disappeared');
   assert.match(name[1], /overflow: visible;/,
     'the app name is clipped again: it is cut to «Lanpa…» instead of fitting the rail');
@@ -972,7 +1016,7 @@ test('the brand block matches the new-link button it stands above', () => {
   // Худший случай: рельса 166px (шире 1050px она 184px) минус её 12px
   // отступов — 142px. Слово «Lanpaper» в 20-м кегле Manrope — 85px, замерено
   // по самому файлу шрифта (static/fonts/manrope-latin-wght-normal.woff2).
-  const mark = Number(studio.match(/\.studio \.catalog-rail \.brand__mark \{\s*width: (\d+)px/)[1]);
+  const mark = Number(studio.match(/\.studio \.boot__mark \{[\s\S]*?width: (\d+)px/)[1]);
   const gap = Number(brand[1].match(/gap: (\d+)px/)[1]);
   assert.ok(mark + gap + 86 <= 142,
     `the mark, the gap and the name need ${mark + gap + 86}px, but the narrowest rail gives 142px`);

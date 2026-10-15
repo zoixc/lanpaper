@@ -35,44 +35,41 @@
 <!-- Экран загрузки. Разметка ниже — ещё не тот вид, который получится:
      app.js переносит шапку в рельсу (initializeStudio), рисует значки
      (hydrateIcons) и подписи (applyTranslations). До этого панель выглядит
-     иначе, и показывать её незачем: здесь нарисован каркас будущего вида —
-     рельса, строка шапки и сетка скелетонов. Экран включает prepaint.js до
-     первой отрисовки, снимает app.js, когда панель собрана; если скрипт не
-     выполнится, экран снимается по таймауту — пустая страница хуже любой
-     промежуточной. Классы свои, а не общие (.brand, .search, .page-head):
-     initializeStudio() находит общие через querySelector и переносит их,
-     а этот блок стоит в начале документа и забрал бы их себе. -->
+     иначе, и показывать её незачем: здесь нарисован каркас будущего вида.
+
+     Каркас не изображает панель: ни чипов рельсы, ни поиска, ни кнопок
+     шапки в нём нет — их число и форма меняются с каждой правкой дизайна, и
+     копия врала бы. Он собран из того же, из чего собран сам экран: место
+     рельсы, строка шапки, отступы содержимого, сетка (.grid) и кадр
+     карточки (.card__frame) — те же классы, поэтому любую правку дизайна
+     каркас повторяет сам. От себя он добавляет только марку и мерцание.
+
+     Общие классы (.grid, .card) брать можно: сборщик панели ищет свои узлы
+     по id и по .brand, .search, .page-head, а сетку и карточки строит
+     render() внутри #grid — этого блока он не касается. Свои имена у марки:
+     initializeStudio() переносит .brand через querySelector, и общий класс
+     этот блок забрал бы себе — он стоит в начале документа.
+
+     Экран включает prepaint.js до первой отрисовки, снимает app.js, когда
+     панель собрана; если скрипт не выполнится, экран снимается по таймауту
+     — пустая страница хуже любой промежуточной. -->
 <div class="boot" id="bootScreen" aria-hidden="true">
     <div class="boot__rail">
         <div class="boot__brand">
             <span class="boot__mark"></span>
             <span class="boot__name">Lanpaper</span>
         </div>
-        <span class="boot__line boot__line--action"></span>
-        <span class="boot__line boot__line--label"></span>
-        <div class="boot__chips">
-            <span class="boot__line boot__line--chip"></span>
-            <span class="boot__line boot__line--chip"></span>
-            <span class="boot__line boot__line--chip"></span>
-            <span class="boot__line boot__line--chip"></span>
-        </div>
     </div>
     <div class="boot__main">
-        <div class="boot__bar">
-            <span class="boot__line boot__line--title"></span>
-            <span class="boot__line boot__line--search"></span>
-            <span class="boot__dot"></span>
-            <span class="boot__dot"></span>
-        </div>
-        <div class="boot__grid">
-            <div class="skeleton"><div class="skeleton__frame"></div><div class="skeleton__line"></div><div class="skeleton__line skeleton__line--short"></div></div>
-            <div class="skeleton"><div class="skeleton__frame"></div><div class="skeleton__line"></div><div class="skeleton__line skeleton__line--short"></div></div>
-            <div class="skeleton"><div class="skeleton__frame"></div><div class="skeleton__line"></div><div class="skeleton__line skeleton__line--short"></div></div>
-            <div class="skeleton"><div class="skeleton__frame"></div><div class="skeleton__line"></div><div class="skeleton__line skeleton__line--short"></div></div>
-            <div class="skeleton"><div class="skeleton__frame"></div><div class="skeleton__line"></div><div class="skeleton__line skeleton__line--short"></div></div>
-            <div class="skeleton"><div class="skeleton__frame"></div><div class="skeleton__line"></div><div class="skeleton__line skeleton__line--short"></div></div>
-            <div class="skeleton"><div class="skeleton__frame"></div><div class="skeleton__line"></div><div class="skeleton__line skeleton__line--short"></div></div>
-            <div class="skeleton"><div class="skeleton__frame"></div><div class="skeleton__line"></div><div class="skeleton__line skeleton__line--short"></div></div>
+        <div class="grid boot__grid">
+            <div class="card boot__tile"><div class="card__frame"></div><div class="boot__body"></div></div>
+            <div class="card boot__tile"><div class="card__frame"></div><div class="boot__body"></div></div>
+            <div class="card boot__tile"><div class="card__frame"></div><div class="boot__body"></div></div>
+            <div class="card boot__tile"><div class="card__frame"></div><div class="boot__body"></div></div>
+            <div class="card boot__tile"><div class="card__frame"></div><div class="boot__body"></div></div>
+            <div class="card boot__tile"><div class="card__frame"></div><div class="boot__body"></div></div>
+            <div class="card boot__tile"><div class="card__frame"></div><div class="boot__body"></div></div>
+            <div class="card boot__tile"><div class="card__frame"></div><div class="boot__body"></div></div>
         </div>
     </div>
 </div>
