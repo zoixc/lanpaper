@@ -13,7 +13,7 @@ import { initializeStudio } from './studio-layout.js';
 import { createVideoPreview, stopMedia } from './media-preview.js';
 import { registerPanelFacade, getFeature } from './features.js';
 import { accessMeta, entryMeta as formatEntryMeta, entryTitle as formatEntryTitle,
-    panelSnapshot } from './feature-domain.js';
+    panelSnapshot, normalizeMediaUrl, mediaUrlKind } from './feature-domain.js';
 import { createUploadFeature } from './upload-feature.js';
 import { createOverlayController } from './overlay-controller.js';
 import { observeConnectivity } from './operation-state.js';
@@ -542,9 +542,16 @@ import { RENDER_CHUNK, createAppState, normalizeLink, mediaExt, isVideoMedia, ma
        выдуманный перевод. */
     function translateServerError(err) {
         const status = err && err.status;
+        /* Запрос не дошёл до сервера: соединение с самой панелью, а не
+           ссылка, которую пользователь вставил. */
+        if (err && err.kind === 'network') return t('network_error');
         if (status === 401) return t('auth_required');
         if (status === 403) return t('forbidden');
         if (status === 413) return t('upload_too_big', { mb: state.config.maxUploadMB });
+        /* 429 приходит от лимитов: потолок частоты загрузок и общий предел
+           одновременных скачиваний. Текст у сервера английский и технический,
+           а панель знает, что делать: подождать. */
+        if (status === 429) return t('server_busy');
         const text = String((err && err.message) || '');
         /* Ручки «дай настройки» у сервера нет, зато предел плейлиста назван
            прямо в отказе: запоминаем его и в следующий раз показываем лимит
@@ -559,10 +566,29 @@ import { RENDER_CHUNK, createAppState, normalizeLink, mediaExt, isVideoMedia, ma
         if (/file too large/i.test(text)) return t('upload_too_big', { mb: state.config.maxUploadMB });
         if (/AVIF decoder unavailable/i.test(text)) return t('avif_unavailable');
         if (/unsupported AVIF feature/i.test(text)) return t('avif_unsupported');
-        if (/no file provided|invalid or unsupported media/i.test(text)) return t('invalid_image');
+        /* Файл распознан, но не проходит по разрешению: это не «битый файл»,
+           и совет другой — уменьшить. Проверка идёт раньше общей. */
+        if (/image dimensions too large/i.test(text)) return t('image_too_large');
+        if (/no file provided|invalid or unsupported media|^invalid image$/im.test(text)) return t('invalid_image');
         if (/playlist is full|playlist full/i.test(text)) return t('playlist_full', { max: state.config.playlistMax });
         if (/no media to add|has no media/i.test(text)) return t('append_needs_media');
         if (/url too long/i.test(text)) return t('url_too_long');
+        /* Сервер не смог дойти до адреса (сеть, DNS, блокировка хоста) — это
+           не «по адресу нет картинки», и говорить так нельзя: искать ошибку
+           в ссылке, когда недоступен хост, — потерянный вечер. Проверка идёт
+           раньше общей: её текст тоже описывает скачивание. */
+        if (/could not reach the address/i.test(text)) return t('url_unreachable');
+        /* Адрес, который сервер не станет скачивать по своим правилам
+           (локальная сеть, адрес метаданных), — это не «нет картинки», и
+           лечится он галереей сервера, а не другой ссылкой. */
+        if (/address is not allowed/i.test(text)) return t('url_blocked_address');
+        /* Диск: полный или каталог без прав. Причина на стороне сервера, и
+           сказать «нет картинки» значит отправить искать её в ссылке. */
+        if (/failed to save media/i.test(text)) return t('save_failed');
+        /* url.Parse в Go отвергает адрес, который не разобрал: обрывок с
+           пробелом или «%» без пары. Панель ловит это до отправки, но API
+           вызывают и снаружи. */
+        if (/^invalid url$/i.test(text)) return t('url_malformed');
         if (/failed to load media|invalid local media path|download/i.test(text)) return t('url_not_media');
         if (/method not allowed/i.test(text)) return t('action_failed');
         return text ? t('action_failed') + ': ' + text : t('action_failed');
@@ -1843,7 +1869,7 @@ import { RENDER_CHUNK, createAppState, normalizeLink, mediaExt, isVideoMedia, ma
     });
     const uploadFileTo = (link, file, mode, opts) => uploadFeature.file(link, file, mode, opts);
     const uploadFilesTo = (link, files, mode) => uploadFeature.files(link, files, mode);
-    const uploadUrlTo = (link, url, mode) => uploadFeature.url(link, url, mode);
+    const uploadUrlTo = (link, url, mode, opts) => uploadFeature.url(link, url, mode, opts);
     const uploadServerFileTo = (link, path) => uploadFeature.url(link, path, 'replace');
 
     /* Ссылки из перетащенных файлов: имя файла становится адресом, поэтому
@@ -1878,11 +1904,18 @@ import { RENDER_CHUNK, createAppState, normalizeLink, mediaExt, isVideoMedia, ma
         if (skipped.length) toast(t('files_skipped') + ': ' + skipped.join(', '), { type: 'info', duration: 5000 });
     }
 
-    /* Расширения, которые сервер принимает как медиа: список один в один
-       с config.AllowedMediaExts (config/constants.go). avif, m4v и mov
-       здесь стояли зря — сервер их не принимает, и подсказка «годится»
-       в диалоге загрузки по адресу обещала то, чего не будет. */
-    const MEDIA_EXT = /\.(jpe?g|png|gif|webp|bmp|tiff?|mp4|webm)([?#]|$)/i;
+    /* Тексты подсказки в диалоге загрузки по адресу: расширение — только
+       примета, поэтому «нет расширения» и «расширение не медийное» не
+       запрет, а объяснение того, что тип определит сервер. */
+    const URL_HINTS = {
+        'empty': () => ({ state: 'idle', text: '' }),
+        'too-long': () => ({ state: 'error', text: t('url_too_long') }),
+        'invalid': () => ({ state: 'error', text: t('url_invalid') }),
+        'malformed': () => ({ state: 'error', text: t('url_malformed') }),
+        'media': () => ({ state: 'ok', text: t('url_ready') }),
+        'no-extension': () => ({ state: 'info', text: t('url_no_extension') }),
+        'other-extension': () => ({ state: 'info', text: t('url_extension_unknown') })
+    };
 
     function openUrlDialog(link) {
         const node = $('#tplUrl').content.firstElementChild.cloneNode(true);
@@ -1896,26 +1929,20 @@ import { RENDER_CHUNK, createAppState, normalizeLink, mediaExt, isVideoMedia, ma
            сервера (MAX_UPLOAD_MB), а не только статичный текст. */
         $('.dialog__text', node).textContent = t('url_hint');
 
-        let timer = 0;
-        /* Проверка до отправки повторяет серверную: адрес, длина, тип файла.
-           Ошибку лучше увидеть здесь, чем после скачивания десятков мегабайт. */
-        function setStatus(text, ok) {
+        /* Запрещает отправку только то, что сервер отвергнет наверняка:
+           пустое поле, длина и схема. Адрес без расширения отправляется
+           наравне с остальными — картинки с CDN так и выглядят, — а
+           «загрузить» открыт и в нейтральном состоянии 'info'. */
+        function setStatus(state, text) {
             status.textContent = text || '';
-            status.classList.toggle('field-hint--error', !!text && !ok);
-            status.classList.toggle('field-hint--ok', !!ok);
-            input.setAttribute('aria-invalid', String(!!text && !ok));
-            submit.disabled = !ok;
+            status.classList.toggle('field-hint--error', state === 'error');
+            status.classList.toggle('field-hint--ok', state === 'ok');
+            input.setAttribute('aria-invalid', String(state === 'error'));
+            submit.disabled = state !== 'ok' && state !== 'info';
         }
         function check() {
-            const value = input.value.trim();
-            clearTimeout(timer);
-            if (!value) { setStatus('', false); return; }
-            if (value.length > 2048) { setStatus(t('url_too_long'), false); return; }
-            if (!/^https?:\/\/[^\s]+$/i.test(value)) { setStatus(t('url_invalid'), false); return; }
-            setStatus(t('url_checking'), false);
-            timer = setTimeout(function () {
-                setStatus(MEDIA_EXT.test(value) ? t('url_ready') : t('url_not_media'), MEDIA_EXT.test(value));
-            }, 420);
+            const hint = URL_HINTS[mediaUrlKind(normalizeMediaUrl(input.value))]();
+            setStatus(hint.state, hint.text);
         }
         input.addEventListener('input', check);
         input.addEventListener('keydown', function (e) {
@@ -1923,18 +1950,25 @@ import { RENDER_CHUNK, createAppState, normalizeLink, mediaExt, isVideoMedia, ma
         });
         function commit() {
             if (submit.disabled) return;
-            const value = input.value.trim();
+            /* В поле остаётся ровно тот адрес, который уйдёт на сервер: у
+               ссылки, скопированной из исходника страницы, «&amp;» развёрнут
+               в настоящий разделитель параметров, а обёртка markdown снята. */
+            const value = normalizeMediaUrl(input.value);
+            input.value = value;
             /* Сервер скачивает файл сам и отвечает готовой записью ссылки:
-               размеры, вес и превью приходят в ответе. Пустое состояние
-               показываем как «идёт загрузка» — запрос может быть долгим. */
-            setStatus(t('uploading'), true);
-            /* setStatus включает кнопку для «адрес годен» — на время запроса
-               гасим её ещё раз, иначе второй клик отправил бы вторую загрузку. */
-            submit.disabled = true;
-            uploadUrlTo(link, value, 'replace').then(function (ok) {
+               размеры, вес и превью приходят в ответе. Состояние запроса —
+               «идёт загрузка» с погашенной кнопкой: второй клик отправил бы
+               вторую загрузку. */
+            setStatus('busy', t('uploading'));
+            /* Причина отказа у сервера содержательная: «адрес не отвечает» —
+               это сеть или блокировка, «ответ не медиа» — это ссылка. Общая
+               фраза «действие не выполнено» скрывала бы разницу. */
+            let failure = t('action_failed');
+            uploadUrlTo(link, value, 'replace', {
+                onError: err => { failure = translateServerError(err); }
+            }).then(function (ok) {
                 if (ok) { closeOverlay(true); return; }
-                submit.disabled = false;
-                setStatus(t('action_failed'), false);
+                setStatus('error', failure);
             });
         }
         submit.addEventListener('click', commit);

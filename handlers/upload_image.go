@@ -285,6 +285,13 @@ func isMP4VideoFtyp(head []byte) bool {
 	return false
 }
 
+// errImageDimensions marks a picture that is simply too big for this service
+// (side over config.MaxImageDimension, or more than config.MaxImagePixels
+// pixels). It is not a damaged file, and saying so matters: a 48 MP photo from
+// a camera and a truncated download need opposite advice, and the panel shows
+// the server's words verbatim.
+var errImageDimensions = errors.New("image dimensions exceed the limit")
+
 // checkImageDimensions runs before any full image decode, including lossless
 // uploads and thumbnail regeneration. A width/height cap alone still allows
 // a 16k x 16k image to allocate >1 GB per decoded copy.
@@ -301,7 +308,7 @@ func checkImageDimensions(r io.ReadSeeker, ext string) (pixels, decodedBytes int
 	pixels = int64(cfg.Width) * int64(cfg.Height)
 	if cfg.Width < 1 || cfg.Height < 1 || cfg.Width > config.MaxImageDimension ||
 		cfg.Height > config.MaxImageDimension || pixels > config.MaxImagePixels {
-		return 0, 0, fmt.Errorf("image %dx%d exceeds limits", cfg.Width, cfg.Height)
+		return 0, 0, fmt.Errorf("%w: %dx%d", errImageDimensions, cfg.Width, cfg.Height)
 	}
 	return pixels, pixels * decodedBytesPerPixel(cfg.ColorModel), nil
 }
@@ -397,8 +404,23 @@ func saveImage(img image.Image, format, path string, quality int) error {
 
 // savePreview writes the WebP thumbnail shown in the admin panel, at the
 // preview effort rather than the stored-image one.
-func savePreview(img image.Image, path string) error {
-	small := thumbnail(img, config.ThumbnailMaxWidth, config.ThumbnailMaxHeight)
+//
+// orientation is the EXIF orientation that the stored bytes still carry: the
+// thumbnail is always EXIF-free, so it has to be turned here. Callers that
+// already baked the orientation into img pass orientationNormal.
+func savePreview(img image.Image, orientation int, path string) error {
+	width, height := config.ThumbnailMaxWidth, config.ThumbnailMaxHeight
+	if orientation >= orientationTrans {
+		// The turn swaps the sides, so the thumbnail is scaled into the box
+		// already swapped: the upright result then fits the box exactly as a
+		// picture that was portrait to begin with, instead of coming out with
+		// the sides of the box.
+		width, height = height, width
+	}
+	small := thumbnail(img, width, height)
+	if orientation > orientationNormal {
+		small = applyOrientation(small, orientation)
+	}
 	return writeFileAtomic(path, func(out *os.File) error {
 		return encodeImageWithWebpEffort(out, small, "webp", config.ThumbnailQuality, webpEffort)
 	})

@@ -4,6 +4,7 @@ package utils
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -96,6 +97,14 @@ func IsPrivateOrLocalIP(ip net.IP) bool {
 		inPrefixes(addr, localPrefixes)
 }
 
+// ErrAddressNotAllowed is returned for an address the server must never
+// contact: an address that is not fetchable in the first place (credentials in
+// the URL), a metadata hostname, or a private, loopback, link-local, CGNAT or
+// special-purpose range. It is deliberately not a network error — nothing was
+// dialled — so a caller can tell a refusal from a host that could not be
+// reached and answer each in its own words.
+var ErrAddressNotAllowed = errors.New("address is not allowed")
+
 // ResolvePublicURL checks the scheme, host and *all* DNS answers, then
 // returns a vetted IP for the connection. The HTTP transport must dial this
 // IP directly (including when using an HTTP/SOCKS proxy); checking DNS before
@@ -104,16 +113,20 @@ func ResolvePublicURL(ctx context.Context, raw string) (net.IP, error) {
 	u, err := url.Parse(raw)
 	if err != nil || !u.IsAbs() || (u.Scheme != "http" && u.Scheme != "https") ||
 		u.Opaque != "" || u.User != nil || u.Hostname() == "" {
-		return nil, fmt.Errorf("invalid URL")
+		// Credentials in the URL are the interesting case here: the link looks
+		// fine to a user ("https://user:pass@host/photo.jpg") but Lanpaper
+		// does not forward them, and an address it will not fetch is a refusal,
+		// not a host that could not be reached.
+		return nil, ErrAddressNotAllowed
 	}
 	host := strings.ToLower(u.Hostname())
 	if host == "localhost" || strings.HasSuffix(host, ".localhost") ||
 		host == "metadata" || host == "metadata.google.internal" {
-		return nil, fmt.Errorf("address is not allowed")
+		return nil, ErrAddressNotAllowed
 	}
 	if ip := net.ParseIP(host); ip != nil {
 		if IsBlockedIP(ip) {
-			return nil, fmt.Errorf("address is not allowed")
+			return nil, ErrAddressNotAllowed
 		}
 		return ip, nil
 	}
@@ -123,7 +136,7 @@ func ResolvePublicURL(ctx context.Context, raw string) (net.IP, error) {
 	}
 	for _, addr := range ips {
 		if IsBlockedIP(addr.IP) {
-			return nil, fmt.Errorf("address is not allowed")
+			return nil, ErrAddressNotAllowed
 		}
 	}
 	return ips[0].IP, nil

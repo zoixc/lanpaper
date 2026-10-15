@@ -22,6 +22,28 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Fixed
 
+- **A photo whose EXIF orientation asks for a turn is no longer stored and
+  served sideways.** That tag is what makes a portrait shot from a phone
+  portrait: the pixels come off the sensor landscape, and every viewer is asked
+  for a quarter turn. Nothing in Lanpaper read it, and the compression pass
+  re-encodes the picture — dropping EXIF on purpose, since it also carries the
+  location — so the turn was gone for good: the link, the panel thumbnail and
+  the display all showed the same photo on its side, while every other viewer
+  showed it upright. The tag is now read before the decode (JPEG, WebP and TIFF;
+  a value outside the eight defined ones is ignored) and baked into the pixels
+  of the stored image and of the thumbnail. Lossless and original mode keep the
+  bytes, and with them the tag, exactly as before — only the thumbnail is turned
+  there, because it never carried a tag of its own — and rebuilding previews
+  applies the same turn. Measured cost on a 12 MP JPEG: ~106 ms and one image's
+  worth of memory, against ~490 ms for a per-pixel copy through the `image.Image`
+  interface. AVIF is unchanged: its `irot`/`imir` are applied by the decoder.
+- A host written in another script is converted to punycode by the panel before
+  the address is sent, so `https://пример.рф/фото.jpg` is fetched instead of
+  answering `502`: the browser's URL parser is the only party here that can do
+  the conversion, and the server passes the host to DNS as it is written. The
+  field shows the address that will really be requested. Credentials, other
+  schemes and anything that does not parse stay as typed — those are refused
+  with their own message. `STATIC_CACHE` bumped.
 - Canceled first-use AVIF requests return promptly while one bounded shared
   initialization finishes. Runtime failures return 503 instead of 400.
 - Upload replacement history uses the service's injected store rather than
@@ -32,6 +54,58 @@ Notable changes to Lanpaper. Docker images are published as
   endpoint and soft-memory-limit deployment guidance.
 - Version history now also archives the previous live file when a replacement
   changes the stored extension (including original AVIF to compressed WebP).
+- **Adding media by URL no longer refuses an address that carries no media
+  extension.** The panel's dialog tested the pasted address against a
+  `\.(jpg|png|…)$` pattern before sending it, so every image-CDN link —
+  `https://images.unsplash.com/photo-…?w=1336`, the shape Unsplash, imgix and
+  most resizing CDNs serve their files under — was refused in the dialog with
+  "No image or video at this address" and the submit button stayed disabled.
+  The server had accepted those addresses since content sniffing replaced the
+  extension, and the panel's own hint text followed the extension. The check now
+  validates only what the server would reject anyway (scheme and length) and
+  describes what will happen: a known media extension is confirmed, everything
+  else is handed to the server, which decides by content.
+- The dialog names the two download failures apart. An address the server cannot
+  reach at all — DNS, a timeout, TLS, a CDN blocked for the server's own country
+  — answers `502` and reads "the server could not connect to this address",
+  while an address that answered with something other than media keeps `400`.
+  Before, every failure said "No image or video at this address", which sends
+  someone hunting for a fault in a link that is fine.
+- `&amp;` in a pasted address becomes the query separator it stands for, in the
+  panel and in `POST /api/upload` alike. Copied out of a page source or a
+  markdown file, a link reached an imgix-based CDN with parameters named
+  `amp;w`, which the CDN ignores: the answer was the full-size original — a
+  different and much larger file than the resized one the user picked.
+- **Every limit on a URL upload and every failure of one now has its own
+  answer**, so a refusal names something the user can act on. The gates were
+  audited end to end (`handlers/url_matrix_test.go` holds the inventory) and
+  four of them were saying the wrong thing:
+  - A download over `MAX_UPLOAD_MB` answered `400 Failed to load media` — the
+    same answer as "your link is wrong", although the address and the file are
+    fine. It is `413 File too large` now, as for a local file, and it is
+    enforced twice: on `Content-Length` and again while the body is streamed,
+    so a chunked answer that declares no length cannot slip past.
+  - An unwritable or full media directory answered as a download failure. The
+    address was fetched successfully; what failed was the write. It is
+    `500 Failed to save media`, with the real cause (`ENOSPC`, `EACCES`,
+    `EROFS` — told apart from a connection that died mid-transfer) in the log.
+  - An address the SSRF rules refuse — private, loopback, CGNAT, a metadata
+    hostname, credentials in the URL — answered the same `400 Failed to load
+    media` as a `404` at the CDN. It is `400 Address is not allowed`, and the
+    panel says what to do instead: the server gallery.
+  - A picture over the dimension limits (36 MP, 16,384 px per side) was reported
+    as `Invalid image or dimensions too large`, indistinguishable from a
+    truncated file, though the fixes are opposite: scale it down, or fetch it
+    again. The two are separate answers (`400 Image dimensions too large` and
+    `400 Invalid image`) and two separate panel messages.
+- In the panel: a `429` from the upload rate limit or the concurrent-download
+  ceiling reads "the server is busy, try again shortly" instead of quoting the
+  server's English log line; pasted addresses lose the quotes, brackets and
+  invisible characters (zero-width space, soft hyphen, BOM) that chat clients,
+  prose and PDFs add — the non-breaking space stays, because it is a real space
+  and now says so (`url_malformed`); and the 2048-byte length check counts bytes
+  as the server does, so a Cyrillic address no longer passes here and fails
+  there. `STATIC_CACHE` bumped.
 
 ### Changed
 

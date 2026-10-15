@@ -281,7 +281,7 @@ which have the highest priority.
 | `TRUSTED_PROXY` | unset | Address the reverse proxy connects from: an IP or CIDR, or a comma-separated list of them when there is more than one hop. Forwarded headers are trusted only from these. |
 | `TLS_CERT_FILE`, `TLS_KEY_FILE` | unset | Serve HTTPS from the process itself (TLS 1.2+). Both or neither: a half-configured certificate is a startup error, not a silent downgrade to plaintext. |
 | `PROXY_TYPE` | `http` | Outbound proxy type: `http`, `https` or `socks5` |
-| `PROXY_HOST`, `PROXY_PORT` | unset | Optional outbound proxy for URL downloads |
+| `PROXY_HOST`, `PROXY_PORT` | unset | Optional outbound proxy for URL downloads; the way to fetch from a CDN that is blocked for the server's own network |
 | `PROXY_USERNAME`, `PROXY_PASSWORD` | unset | Proxy credentials (aliases: `PROXY_USER`, `PROXY_PASS`) |
 | `METRICS_ENABLED` | `false` | Enables the authenticated `/metrics` Prometheus endpoint. |
 | `REMOTE_INSECURE_SKIP_VERIFY` | `false` | Skips downloaded-media TLS verification. Development only. |
@@ -343,9 +343,48 @@ already set in the environment take precedence over it.
 - Only HTTP(S) URLs whose every DNS answer is a public address are allowed.
   Private, loopback, link-local, CGNAT, NAT64, 6to4 and Teredo ranges are
   blocked.
+- The address needs no file extension: the type is detected from the content, so
+  image-CDN addresses such as `https://images.unsplash.com/photo-…?w=1336`
+  work as they are. The panel says as much — it never refuses an address for
+  lacking an extension — and it tells the two failures apart when the download
+  fails: *the server could not reach the address* (DNS, timeout, TLS or a host
+  blocked for the server's own network, answered with `502`) is not the same as
+  *the address answered with something that is not media* (`400`). The first
+  means there is nothing to fix in the link; a server in a country that blocks
+  the CDN needs the proxy below or an address it can reach.
+- A URL pasted as `<…>`, in «quotes», as a markdown link `[label](url)`, with
+  a stray non-breaking or zero-width character, or with the HTML escape `&amp;`
+  between query parameters is normalized before the request. The escape
+  matters: imgix-based CDNs ignore parameters they do not recognize, so
+  `?q=80&amp;w=1336` would silently deliver the full-size original instead of
+  the resized file.
+- **The server's own limits apply to what it downloads**, and each of them
+  answers with its own message: `MAX_UPLOAD_MB` (`413`; 50 MB by default, so a
+  link to a 60 MB file is refused), 36 MP and 16,384 px per side (`400 Image
+  dimensions too large` — a 48 MP camera photo needs scaling first), and the
+  90-second download budget, which is about 570 KiB/s for a 50 MB file
+  (`502` when it runs out). The address itself is capped at 2048 bytes, which
+  long signed CDN URLs can exceed (`400 URL too long`).
+- Addresses the server will not fetch say so (`400 Address is not allowed`):
+  credentials in the URL, anything in the private, loopback, CGNAT or
+  special-purpose ranges, and metadata hostnames. A picture that lives on the
+  LAN itself therefore goes through the gallery (`EXTERNAL_IMAGE_DIR`) rather
+  than a URL. A host in another script is converted to punycode by the panel —
+  `https://пример.рф/фото.jpg` goes out as `https://xn--e1afmkfd.xn--p1ai/фото.jpg`
+  and the field shows that form — because the server passes the host to DNS as
+  written and would answer `502`. `POST /api/upload` does not convert: an API
+  client has to send the `xn--…` form itself.
+- A replacing download briefly needs twice its size on disk (the downloaded
+  temp file plus the stored file) and archives the previous file into the
+  version history, so a small volume can fill up on repeated replacements.
 - The vetted IP is pinned for the connection, even through a configured
   proxy, and each redirect is checked again (at most 5).
 - Downloads are streamed to bounded temporary files.
+- A JPEG, WebP or TIFF whose EXIF says the picture needs turning (`Orientation`
+  3, 6, 8 — what a phone writes for a portrait shot) is turned while it is
+  stored, in the stored file and in the thumbnail alike. The compression pass
+  drops EXIF, so without that the turn was lost and the photo was served on its
+  side.
 - A configured **HTTP proxy must route by the IP in the absolute request
   URI**, not by the `Host` header.
 - Gallery paths never leave `EXTERNAL_IMAGE_DIR`.

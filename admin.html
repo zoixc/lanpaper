@@ -439,13 +439,14 @@
 
 <!-- ============================================================
      МЕДИА ПО ССЫЛКЕ (URL)
-     Адрес проверяется до отправки: сервер скачивает файл сам, и
-     ошибку лучше увидеть здесь, а не после загрузки.
+     До отправки проверяются только схема и длина: расширение
+     ни о чём не говорит (у картинок на CDN его нет), а тип файла
+     сервер определяет по содержимому при загрузке.
      ============================================================ -->
 <template id="tplUrl">
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="urlTitle">
         <h2 class="dialog__title" id="urlTitle" data-i18n="upload_url">По ссылке (URL)</h2>
-        <p class="dialog__text" data-i18n="url_hint">Сервер скачает файл сам. Годится прямая ссылка на картинку или видео.</p>
+        <p class="dialog__text" data-i18n="url_hint">Сервер скачает файл сам. Годится прямая ссылка на картинку или видео — адрес без расширения тоже подойдёт.</p>
         <div class="dialog__body">
             <label class="field-label" for="urlInput" data-i18n="url_label">Адрес файла</label>
             <div class="field field--plain field--lg has-value studio-name-field">
