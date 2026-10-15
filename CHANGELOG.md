@@ -115,18 +115,32 @@ Notable changes to Lanpaper. Docker images are published as
   chosen tile is `--surface`, darker than the plate it sits on, so the picked
   view read as a hole. The row now carries the same plate the rest of the panel
   already uses for hover — `--surface-hover` — and what makes the button visible
-  is a single hairline: `--border-2`, the panel's own hover border, in light
-  themes, white at 10 % in dark ones. The fill is deliberately almost the same as
-  the field (3–4 levels of 255 where it was 0 before), so the row stays as quiet
-  as it was, and the outline is what answers. Hover darkens the glyph and moves
-  the edge to `--border-strong`; the pressed state paints the edge and the glyph
-  with the accent; the chosen view keeps its sliding `--surface` tile, and the
-  view switch keeps its 32 px height with the border folded into its padding.
+  is a single hairline: half of `--border-2` mixed into the plate's own fill in
+  light themes, white at 8 % in dark ones. Deliberately dimmer than a plain
+  border: at full `--border-2` the row read as a frame drawn around each button,
+  which is exactly what it was supposed to stop looking like. The fill is
+  deliberately almost the same as the field (3–4 levels of 255 where it was 0
+  before), so the row stays as quiet as it was, and the outline is what answers.
+  Hover darkens the glyph and moves the edge to `--border-strong`; the pressed
+  state paints the edge and the glyph with the accent; the chosen view keeps its
+  sliding `--surface` tile, sitting exactly on the button box — its 2 px offset
+  is the group's own padding, which that tile is measured from, so at 3 px it lay
+  a pixel low and a pixel right of the glyph — and the view switch keeps its
+  32 px height with the border folded into its padding.
   Seven contrast pairs cover the plate, its resting and accent glyphs, its edge
   (against the plate and against the field) and the tile on top of it, for all
   six palettes in both themes, and the edge weight the CSS and the checker share
   is asserted against it in `tests/frontend-contract.test.cjs`. `STATIC_CACHE`
   bumped.
+
+- **Clicking the search row no longer draws a frame around the field.** The
+  panel shows focus for the keyboard only, through the global `:focus-visible`
+  rule — but Chrome treats a text input as keyboard-focused even when the click
+  came from the mouse, so every click left a rectangular outline inside the
+  rounded row, at odds with the field's own fill-and-border focus. The shell now
+  records what the last input was (`data-input` on the root element), and the
+  outline is dropped after a pointer only; a keyboard focus keeps the ring it
+  had.
 
 ### Changed
 

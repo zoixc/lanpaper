@@ -2353,6 +2353,18 @@ import { RENDER_CHUNK, createAppState, normalizeLink, mediaExt, isVideoMedia, ma
         if (scrim) scrim.remove();
     }
 
+    /* Фокус в панели показывается только для клавиатуры (:focus-visible), но
+       текстовое поле браузер помечает клавиатурным и после клика мышью — и
+       тогда вокруг ввода загорается прямоугольный контур внутри скруглённой
+       строки. Запоминаем, чем пришёл последний ввод: CSS (studio.css) снимает
+       контур только после указателя, клавиатура получает его как раньше. */
+    function initFocusModality() {
+        const root = document.documentElement;
+        const mark = (value) => () => { root.dataset.input = value; };
+        document.addEventListener('pointerdown', mark('pointer'), true);
+        document.addEventListener('keydown', mark('keyboard'), true);
+    }
+
     /* ========================================================
        17. ГОРЯЧИЕ КЛАВИШИ
        ======================================================== */
@@ -2578,6 +2590,7 @@ import { RENDER_CHUNK, createAppState, normalizeLink, mediaExt, isVideoMedia, ma
         window.LANPAPER_BOOT?.reveal();
         initGridEvents();
         initDragDrop();
+        initFocusModality();
         initShortcuts();
         initPWA();
         loadCompressionConfig();

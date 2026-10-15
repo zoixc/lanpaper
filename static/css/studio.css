@@ -661,7 +661,10 @@
        переключателя вида лежит на --surface, как содержимое карточки.
        Значки и кайма сверены с tools/check-contrast.mjs. */
     --studio-control-face: var(--surface-hover);
-    --studio-control-edge: var(--border-2);
+    /* Кайма приглушена: --border-2 в полную силу читается как отдельная
+       рамка вокруг кнопки, а кнопка должна лишь не тонуть в поле. Годится
+       ровно середина между каймой наведения и заливкой. */
+    --studio-control-edge: color-mix(in srgb, var(--border-2) 50%, var(--surface-hover));
     /* Всё поле целиком, одним значением: его рисуют и слой на всё окно, и
        шапка (она непрозрачная — скрывает карточки, уезжающие под неё, — и
        поэтому не может пропустить слой сквозь себя). Одно значение на двоих
@@ -683,7 +686,7 @@
     /* В тёмных палитрах та же заливка сама по себе поднята над фоном, так что
        отдельного значения не нужно: плитку и здесь показывает кайма, только
        не серая, а белая с малой прозрачностью. */
-    --studio-control-edge: color-mix(in srgb, #ffffff 10%, transparent);
+    --studio-control-edge: color-mix(in srgb, #ffffff 8%, transparent);
     /* В тёмных темах и пятна, и угловой свет светлее фона: так фон читается
        подсветкой, а не грязным пятном. */
     --studio-canvas-wash-accent: rgba(var(--accent-rgb), 0.075);
@@ -1108,8 +1111,11 @@
     background: var(--surface-hover);
     border-color: var(--border);
 }
-/* Match the sliding selection to the actual button geometry (26/36px),
-   rather than inheriting the production switch's circular 30px marker. */
+/* Маркер выбранного вида повторяет геометрию кнопки (26px), а не наследует
+   круглые 30px боевого переключателя, и стоит ровно на её месте: 2px здесь —
+   это padding группы, потому что ::before отсчитывается от padding-box, а
+   кнопка начинается за той же каймой. При 3px подложка уезжала на пиксель
+   вниз и вправо от значка. */
 .studio .btn-group--view {
     --seg: var(--ctl-inner, 30px);
     /* 2px внутренних плюс 1px каймы — те же 3px до кнопок, что и у ряда без
@@ -1122,8 +1128,8 @@
     background: var(--studio-control-face);
 }
 .studio .btn-group--view::before {
-    top: 3px;
-    left: 3px;
+    top: 2px;
+    left: 2px;
     border-radius: var(--studio-inner-radius);
     background: var(--surface);
     box-shadow: var(--studio-control-shadow);
@@ -1274,6 +1280,13 @@
     .studio .menu__item:hover {
         background: var(--surface-hover);
     }
+}
+/* Клик по строке поиска не должен оставлять рамку вокруг ввода. Контур в
+   панели клавиатурный (:focus-visible), но текстовое поле браузер считает
+   клавиатурным и после мыши, поэтому внутри скруглённой строки появлялся
+   прямоугольник. Чем пришёл последний ввод, помечает app.js. */
+html[data-input="pointer"].studio .field input:focus {
+    outline: none;
 }
 /* Explicit, high-contrast keyboard outline. Radio-label focus stays visible. */
 .studio

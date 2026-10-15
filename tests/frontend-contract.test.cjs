@@ -283,7 +283,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v40/,
+  assert.match(code, /lanpaper-static-v41/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 
@@ -695,8 +695,10 @@ test('the header buttons keep a plate of their own over the gradient', () => {
 
   const edges = [...studio.matchAll(/--studio-control-edge: ([^;]+);/g)].map(([, v]) => v.trim());
   assert.equal(edges.length, 2, 'кайма должна быть определена ровно для двух тем');
-  assert.equal(edges[0], 'var(--border-2)',
-    'светлая кайма — краска наведения в панели; на --border она теряется на плите');
+  const edgeLight = edges[0].match(
+    /^color-mix\(in srgb, var\(--border-2\) (\d+)%, var\(--surface-hover\)\)$/);
+  assert.ok(edgeLight,
+    'светлая кайма приглушена смешением с заливкой; в полную силу она читается как рамка');
   const edgeMix = edges[1].match(/^color-mix\(in srgb, #ffffff (\d+)%, transparent\)$/);
   assert.ok(edgeMix, 'тёмная кайма — белый с прозрачностью поверх плитки');
 
@@ -704,8 +706,10 @@ test('the header buttons keep a plate of their own over the gradient', () => {
   // контраста будет считать не тот цвет, который видно на экране.
   const constants = Object.fromEntries(
     [...checker.matchAll(/const (CONTROL_[A-Z_]+) = (\d+);/g)].map(([, name, value]) => [name, Number(value)]));
-  assert.deepEqual(Object.keys(constants).sort(), ['CONTROL_EDGE_WHITE'],
+  assert.deepEqual(Object.keys(constants).sort(), ['CONTROL_EDGE_LIGHT_MIX', 'CONTROL_EDGE_WHITE'],
     'набор весов плитки в tools/check-contrast.mjs изменился');
+  assert.equal(Number(edgeLight[1]), constants.CONTROL_EDGE_LIGHT_MIX,
+    'приглушение светлой каймы в tools/check-contrast.mjs разошлось с CSS');
   assert.equal(Number(edgeMix[1]), constants.CONTROL_EDGE_WHITE,
     'прозрачность каймы в tools/check-contrast.mjs разошлась с CSS');
 
@@ -753,6 +757,12 @@ test('the header buttons keep a plate of their own over the gradient', () => {
   const edgeWidth = Number(group.match(/border: (\d+)px/)[1]);
   assert.equal(innerSize + 2 * padding + 2 * edgeWidth, ctl,
     'группа вида перестала быть вровень с соседними кнопками');
+  // Маркер отсчитывается от padding-box группы, а кнопка начинается за той же
+  // каймой: чтобы подложка села на кнопку ровно, её смещение равно отступу.
+  assert.equal(Number(marker.match(/top: (\d+)px/)[1]), padding,
+    'подложка выбранного вида съехала по вертикали относительно значка');
+  assert.equal(Number(marker.match(/left: (\d+)px/)[1]), padding,
+    'подложка выбранного вида съехала по горизонтали относительно значка');
 });
 
 test('accent details take the palette colour, not the text colour', () => {
@@ -899,6 +909,18 @@ test('a text field marks focus with its fill, not with a frame', () => {
   assert.match(input, /background:\s*var\(--surface-2\)/, 'a focused input no longer changes');
   const search = rule(studio, /\.search \.field:focus-within\s*\{([\s\S]*?)\n\}/, 'the search focus rule');
   assert.ok(!framed.test(search), 'the search field is framed on focus again');
+  // Скруглённую строку поиска обводил не только CSS панели: текстовое поле
+  // браузер считает клавиатурным и после клика мышью, поэтому глобальное
+  // :focus-visible рисовало вокруг <input> прямоугольник внутри строки.
+  // Панель помечает, чем пришёл последний ввод, и после указателя контура нет.
+  assert.match(studio,
+    /html\[data-input="pointer"\]\.studio \.field input:focus \{[^}]*outline: none/,
+    'клик по строке поиска снова оставляет прямоугольную рамку вокруг ввода');
+  const app = read('static/js/app.js');
+  assert.match(app, /addEventListener\('pointerdown', mark\('pointer'\), true\)/,
+    'ничто не помечает, что ввод пришёл указателем');
+  assert.match(app, /addEventListener\('keydown', mark\('keyboard'\), true\)/,
+    'ничто не помечает, что ввод пришёл с клавиатуры');
   const name = rule(studio, /\.studio \.studio-name-field:focus-within\s*\{([\s\S]*?)\n\}/, 'the name field focus rule');
   assert.ok(!/box-shadow:\s*inset 0 -2px/.test(name), 'the name field draws a rule under itself on focus');
   assert.match(name, /background:\s*var\(--surface-hover\)/, 'a focused name field no longer changes');

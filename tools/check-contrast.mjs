@@ -113,16 +113,21 @@ const CHECKS = [
     ['--text-2', '--studio-control-face', 4.5, 'значок покоя на подложке управления'],
     ['--accent', '--studio-control-face', 3, 'акцентный значок на подложке управления'],
     ['--surface', '--studio-control-face', 1.08, 'выбранный сегмент отличим от подложки'],
-    ['--studio-control-edge', '--studio-control-face', 1.1, 'кайма подложки различима'],
-    ['--studio-control-edge', '--bg', 1.2, 'кайма подложки различима на фоне'],
+    ['--studio-control-edge', '--studio-control-face', 1.08, 'кайма подложки различима'],
+    // 1.15 — дизайнерский порог для нарочно тихой каймы: поле под шапкой
+    // темнее --bg и подходит к кайме на 15 уровней из 255, поэтому требовать
+    // больше значило бы вернуть ту самую рамку, которую убрали.
+    ['--studio-control-edge', '--bg', 1.15, 'кайма подложки различима на фоне'],
     ['--border-strong', '--studio-control-face', 1.1, 'кайма наведения различима']
 ];
 
-// Кайма в тёмных темах — белый с этой прозрачностью: она ложится на плитку,
-// уже поднятую над фоном, поэтому цвет ей задаёт не палитра, а белый.
-// Число повторено здесь, потому что чекер считает по переменным палитр;
-// совпадение с CSS проверяет tests/frontend-contract.test.cjs.
-const CONTROL_EDGE_WHITE = 10;
+// Кайма плитки нарочно приглушена: в полную силу она читается как отдельная
+// рамка вокруг кнопки. Светлая — доля --border-2 в смешении с заливкой,
+// тёмная — белый с прозрачностью поверх плитки. Числа повторены здесь,
+// потому что чекер считает по переменным палитр; совпадение с CSS проверяет
+// tests/frontend-contract.test.cjs.
+const CONTROL_EDGE_LIGHT_MIX = 50;
+const CONTROL_EDGE_WHITE = 8;
 
 /* Смешение в sRGB, как его делает CSS: каналы складываются без линеаризации. */
 function srgbBlend(a, b, weightA) {
@@ -158,7 +163,7 @@ for (const palette of palettes) {
         vars['--studio-control-face'] = vars['--surface-hover'];
         vars['--studio-control-edge'] = theme === 'dark'
             ? srgbBlend('#ffffff', vars['--studio-control-face'], CONTROL_EDGE_WHITE / 100)
-            : vars['--border-2'];
+            : srgbBlend(vars['--border-2'], vars['--surface-hover'], CONTROL_EDGE_LIGHT_MIX / 100);
         const list = [...CHECKS,
             ['--select-arrow', '--surface', 3, 'стрелка select'],
             ['--select-arrow', '--surface-2', 3, 'стрелка select на вложенной поверхности'], theme === 'light' ? ON_ACCENT : ['--text-on-accent', '--accent', 4.5, 'тёмный текст на светлой кнопке'], DANGER];
