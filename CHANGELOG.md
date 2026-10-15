@@ -107,27 +107,26 @@ Notable changes to Lanpaper. Docker images are published as
   as the server does, so a Cyrillic address no longer passes here and fails
   there. `STATIC_CACHE` bumped.
 
-- **The header buttons carry a plate of their own and stay visible over the
-  gradient field.** Select-multiple, theme and settings drew their glyph
-  straight on the canvas — no fill, no border — so what the user saw was a bare
-  icon whose contrast depended on whatever the field was doing under it; and the
-  view switch did not help, because its chosen tile used `--surface`, which in
-  every dark palette is *darker* than the plate it sat on, so the picked view
-  read as a hole rather than as the picked one. Every button in the row now has
-  the same plate: an opaque palette fill plus a hairline. In dark themes the
-  fill is `--surface-hover` lifted towards white, in light themes `--surface-3`
-  densified towards `--border-2` — one surface step down was not enough, because
-  under the header the light field runs from `--bg` down to about `#e6e6e6` and
-  a plate that close to it disappeared again. On the rendered field the step is
-  now 24 levels in light mono (235 → 211) and 25 in dark ocean (30 → 55), and
-  the view switch keeps its 32 px height with the border folded into its
-  padding. Hover and the pressed state move the glyph and the edge rather than
-  the fill, so they read the same on a light plate and on a dark one, and the
-  chosen view keeps the sliding `--surface` tile. Six new contrast pairs cover
-  the plate, its resting and accent glyphs, its edge and the tile on top of it,
-  for all six palettes in both themes; the weights the CSS and the checker share
-  are asserted against each other in `tests/frontend-contract.test.cjs`.
-  `STATIC_CACHE` bumped.
+- **The header action buttons are outlined now, so they stop dissolving into the
+  gradient.** Select-multiple, theme and settings drew their glyph straight on
+  the canvas — no fill, no border — and over the library gradient what the user
+  saw was a bare icon whose edges depended on whatever the field was doing under
+  it; on the dark side the view switch did not cover for them either, because its
+  chosen tile is `--surface`, darker than the plate it sits on, so the picked
+  view read as a hole. The row now carries the same plate the rest of the panel
+  already uses for hover — `--surface-hover` — and what makes the button visible
+  is a single hairline: `--border-2`, the panel's own hover border, in light
+  themes, white at 10 % in dark ones. The fill is deliberately almost the same as
+  the field (3–4 levels of 255 where it was 0 before), so the row stays as quiet
+  as it was, and the outline is what answers. Hover darkens the glyph and moves
+  the edge to `--border-strong`; the pressed state paints the edge and the glyph
+  with the accent; the chosen view keeps its sliding `--surface` tile, and the
+  view switch keeps its 32 px height with the border folded into its padding.
+  Seven contrast pairs cover the plate, its resting and accent glyphs, its edge
+  (against the plate and against the field) and the tile on top of it, for all
+  six palettes in both themes, and the edge weight the CSS and the checker share
+  is asserted against it in `tests/frontend-contract.test.cjs`. `STATIC_CACHE`
+  bumped.
 
 ### Changed
 

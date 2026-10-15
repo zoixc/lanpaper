@@ -283,7 +283,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v39/,
+  assert.match(code, /lanpaper-static-v40/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 
@@ -687,34 +687,25 @@ test('the header buttons keep a plate of their own over the gradient', () => {
   const studio = read('static/css/studio.css');
   const checker = read('tools/check-contrast.mjs');
 
+  // Плитка нарочно тихая: заливка — та же краска, которой в панели помечают
+  // наведение, и задана один раз на обе темы. Кнопку показывает кайма.
   const faces = [...studio.matchAll(/--studio-control-face: ([^;]+);/g)].map(([, v]) => v.trim());
-  assert.equal(faces.length, 2, 'плитка должна быть определена ровно для двух тем');
-  const lightFace = faces[0].match(
-    /^color-mix\(in srgb, var\(--surface-3\) (\d+)%, var\(--border-2\)\)$/);
-  assert.ok(lightFace,
-    'светлая плитка — --surface-3, уплотнённый к --border-2; без уплотнения поле под шапкой её съедает');
-  const darkFace = faces[1].match(
-    /^color-mix\(in srgb, var\(--surface-hover\) (\d+)%, #ffffff\)$/);
-  assert.ok(darkFace, 'тёмная плитка — смешение --surface-hover с белым, а не готовый цвет');
+  assert.deepEqual(faces, ['var(--surface-hover)'],
+    'плитка перестала быть тихой: заливка ушла от краски наведения');
 
   const edges = [...studio.matchAll(/--studio-control-edge: ([^;]+);/g)].map(([, v]) => v.trim());
   assert.equal(edges.length, 2, 'кайма должна быть определена ровно для двух тем');
-  assert.equal(edges[0], 'var(--border-strong)',
-    'светлая кайма на --border-2 сливается с самой плиткой');
+  assert.equal(edges[0], 'var(--border-2)',
+    'светлая кайма — краска наведения в панели; на --border она теряется на плите');
   const edgeMix = edges[1].match(/^color-mix\(in srgb, #ffffff (\d+)%, transparent\)$/);
   assert.ok(edgeMix, 'тёмная кайма — белый с прозрачностью поверх плитки');
 
-  // Числа смешений чекер считает у себя: если они разойдутся с CSS, проверка
+  // Число каймы чекер считает у себя: если оно разойдётся с CSS, проверка
   // контраста будет считать не тот цвет, который видно на экране.
   const constants = Object.fromEntries(
     [...checker.matchAll(/const (CONTROL_[A-Z_]+) = (\d+);/g)].map(([, name, value]) => [name, Number(value)]));
-  assert.deepEqual(Object.keys(constants).sort(),
-    ['CONTROL_EDGE_WHITE', 'CONTROL_FACE_LIGHT_MIX', 'CONTROL_FACE_MIX'],
+  assert.deepEqual(Object.keys(constants).sort(), ['CONTROL_EDGE_WHITE'],
     'набор весов плитки в tools/check-contrast.mjs изменился');
-  assert.equal(Number(lightFace[1]), constants.CONTROL_FACE_LIGHT_MIX,
-    'уплотнение светлой плитки в tools/check-contrast.mjs разошлось с CSS');
-  assert.equal(Number(darkFace[1]), constants.CONTROL_FACE_MIX,
-    'смешение тёмной плитки в tools/check-contrast.mjs разошлось с CSS');
   assert.equal(Number(edgeMix[1]), constants.CONTROL_EDGE_WHITE,
     'прозрачность каймы в tools/check-contrast.mjs разошлась с CSS');
 
@@ -725,8 +716,8 @@ test('the header buttons keep a plate of their own over the gradient', () => {
     'значок покоя на подложке управления',
     'акцентный значок на подложке управления',
     'выбранный сегмент отличим от подложки',
-    'подложка отличима от фона',
     'кайма подложки различима',
+    'кайма подложки различима на фоне',
   ]) {
     assert.ok(checker.includes(label), `чекер контраста потерял пару «${label}»`);
   }
@@ -736,6 +727,11 @@ test('the header buttons keep a plate of their own over the gradient', () => {
     'кнопки ряда снова без заливки — на градиенте они пропадут');
   assert.match(button, /border-color: var\(--studio-control-edge\)/,
     'без каймы плитка на светлых палитрах почти не отличается от поля');
+  const hover = studio.match(
+    /\.studio \.appbar \.appbar__actions \.icon-btn:hover:not\(:disabled\) \{[^}]+\}/)[0];
+  assert.match(hover, /border-color: var\(--border-strong\)/,
+    'наведение должно отзываться каймой, а не заливкой: заливка и так уже плитка');
+  assert.match(hover, /color: var\(--text\)/);
 
   // Внутри группы вида подложку держит сама группа, а выбранный вид — маркер:
   // своя заливка у внутренней кнопки перекрыла бы его.

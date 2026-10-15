@@ -104,32 +104,25 @@ const CHECKS = [
     ['--text-3', '--surface-2', 4.5, 'мета на вложенной поверхности'],
     ['--text-3', '--surface-hover', 4.5, 'мета при наведении'],
     // Кнопки в шапке лежат на плитке (--studio-control-face) поверх
-    // градиентного поля: без этих пар значок на плитке мог бы «пропасть»,
-    // а сама плитка — слиться с полем. Фоном здесь считается --bg: поле —
-    // это тот же --bg плюс пять-восемь процентов заливки, и на светлых
-    // палитрах оно уходит вниз, а на тёмных вверх, то есть --bg — самый
-    // невыгодный случай для одного из двух направлений. С отрисованного поля
-    // шаг читается так: светлая mono — фон 235 -> плитка 211, тёмная ocean —
-    // фон 30 -> плитка 55; до правки у трёх кнопок из четырёх он был нулевым.
+    // градиентного поля. Плитка нарочно тихая: заливка — --surface-hover,
+    // то есть та же краска, которой в панели помечают наведение, и заметна
+    // она не сама по себе, а каймой. Поэтому здесь проверяется и то, что
+    // кайма различима на плитке, и то, что она различима на фоне: на светлых
+    // палитрах заливка от поля почти не отличается, и границу держит она.
     ['--text', '--studio-control-face', 7, 'значок на подложке управления'],
     ['--text-2', '--studio-control-face', 4.5, 'значок покоя на подложке управления'],
     ['--accent', '--studio-control-face', 3, 'акцентный значок на подложке управления'],
-    ['--surface', '--studio-control-face', 1.15, 'выбранный сегмент отличим от подложки'],
-    ['--studio-control-face', '--bg', 1.15, 'подложка отличима от фона'],
-    ['--studio-control-edge', '--studio-control-face', 1.1, 'кайма подложки различима']
+    ['--surface', '--studio-control-face', 1.08, 'выбранный сегмент отличим от подложки'],
+    ['--studio-control-edge', '--studio-control-face', 1.1, 'кайма подложки различима'],
+    ['--studio-control-edge', '--bg', 1.2, 'кайма подложки различима на фоне'],
+    ['--border-strong', '--studio-control-face', 1.1, 'кайма наведения различима']
 ];
 
-// Плитка и кайма в studio.css собраны смешением с весами ниже. Веса повторены
-// здесь, потому что чекер считает по переменным палитр; совпадение с CSS
-// проверяет tests/frontend-contract.test.cjs.
-// Светлая тема: --surface-3, уплотнённый к --border-2, и кайма --border-strong
-// — одной --surface-3 не хватает: поле под шапкой идёт от --bg почти до
-// #e6e6e6, и плитка в нём тонула.
-const CONTROL_FACE_LIGHT_MIX = 40;
-// Тёмная тема: --surface-hover плюс немного белого (светлее подложка теряет
-// --text-2), кайма — белый с прозрачностью.
-const CONTROL_FACE_MIX = 91;
-const CONTROL_EDGE_WHITE = 16;
+// Кайма в тёмных темах — белый с этой прозрачностью: она ложится на плитку,
+// уже поднятую над фоном, поэтому цвет ей задаёт не палитра, а белый.
+// Число повторено здесь, потому что чекер считает по переменным палитр;
+// совпадение с CSS проверяет tests/frontend-contract.test.cjs.
+const CONTROL_EDGE_WHITE = 10;
 
 /* Смешение в sRGB, как его делает CSS: каналы складываются без линеаризации. */
 function srgbBlend(a, b, weightA) {
@@ -162,12 +155,10 @@ for (const palette of palettes) {
     for (const theme of ['light', 'dark']) {
         const vars = themeVars(palette, theme);
         vars['--select-arrow'] = selectArrow(theme);
-        vars['--studio-control-face'] = theme === 'dark'
-            ? srgbBlend(vars['--surface-hover'], '#ffffff', CONTROL_FACE_MIX / 100)
-            : srgbBlend(vars['--surface-3'], vars['--border-2'], CONTROL_FACE_LIGHT_MIX / 100);
+        vars['--studio-control-face'] = vars['--surface-hover'];
         vars['--studio-control-edge'] = theme === 'dark'
             ? srgbBlend('#ffffff', vars['--studio-control-face'], CONTROL_EDGE_WHITE / 100)
-            : vars['--border-strong'];
+            : vars['--border-2'];
         const list = [...CHECKS,
             ['--select-arrow', '--surface', 3, 'стрелка select'],
             ['--select-arrow', '--surface-2', 3, 'стрелка select на вложенной поверхности'], theme === 'light' ? ON_ACCENT : ['--text-on-accent', '--accent', 4.5, 'тёмный текст на светлой кнопке'], DANGER];
