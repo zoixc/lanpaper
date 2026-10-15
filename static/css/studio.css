@@ -645,8 +645,13 @@
     --studio-inner-radius: 6px;
     --studio-control-shadow: 0 1px 2px rgb(0 0 0 / 4%);
     --studio-popover-shadow: 0 12px 32px -16px rgb(0 0 0 / 24%);
-    /* A quiet wash follows the selected palette, without a repeating motif. */
-    --studio-canvas-glow: rgba(var(--accent-rgb), 0.035);
+    /* Три краски фона под карточками: акцентные пятна, глубина снизу и
+       угловой свет. Все — почти прозрачные: поле должно угадываться, а не
+       спорить с фотографиями, и не сдвигать контраст текста на рельсе
+       (проверяется tools/check-contrast.mjs). */
+    --studio-canvas-wash-accent: rgba(var(--accent-rgb), 0.05);
+    --studio-canvas-wash-depth: rgba(var(--shadow-rgb), 0.05);
+    --studio-canvas-wash-sheen: rgba(var(--accent-rgb), 0.035);
     --studio-sheet-shadow: -16px 0 48px -32px rgb(0 0 0 / 28%);
     /* Высота верхней строки: её делят шапка и блок марки в рельсе (см. ниже),
        поэтому знак, название и заголовок стоят на одной центральной линии. */
@@ -655,7 +660,11 @@
 .studio[data-theme="dark"] {
     --studio-control-shadow: 0 1px 2px rgb(0 0 0 / 18%);
     --studio-popover-shadow: 0 14px 38px -14px rgb(0 0 0 / 55%);
-    --studio-canvas-glow: rgba(var(--accent-rgb), 0.045);
+    /* В тёмных темах и пятна, и угловой свет светлее фона: так фон читается
+       подсветкой, а не грязным пятном. */
+    --studio-canvas-wash-accent: rgba(var(--accent-rgb), 0.075);
+    --studio-canvas-wash-depth: rgba(255, 255, 255, 0.04);
+    --studio-canvas-wash-sheen: rgba(255, 255, 255, 0.03);
     --studio-sheet-shadow: -16px 0 48px -32px rgb(0 0 0 / 55%);
 }
 .studio[data-palette="mono"] {
@@ -675,10 +684,19 @@
 .studio .shell {
     padding-top: 0;
 }
+/* Рельса и шапка — панели над общим полем. Палитра та же (color-mix от
+   --bg, а не чужое белое стекло: прежняя общая «стеклянная» заливка давала
+   холодный оттенок на тёплых палитрах), но чуть прозрачная и с размытием —
+   поэтому фон под карточками продолжается и под ними, без стыка по краю.
+   Первая строка background — запасной вариант для браузеров без color-mix:
+   там панели просто непрозрачные, как было. */
 .studio .catalog-rail {
     top: 0;
     padding: 25px 16px 18px;
     background: var(--bg);
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
     border: 0;
     transition:
         transform var(--dur-slow) var(--ease),
@@ -779,6 +797,9 @@
     top: 0;
     border: 0;
     background: var(--bg);
+    background: color-mix(in srgb, var(--bg) 84%, transparent);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
 }
 .studio .appbar__inner {
     padding: 0 26px;
@@ -1469,20 +1490,42 @@
 .studio :is(.num, .card__meta, .chip__count, .page-head__count) {
     font-variant-numeric: tabular-nums;
 }
-/* A static, diffuse glow softens the library canvas without competing with
-   photographs. No tiles, image requests, filters or animation. The wash fades
-   near the top instead of stretching with a long library. */
-.studio .content {
-    background-image: radial-gradient(
-        ellipse 85% 520px at 15% 0%,
-        var(--studio-canvas-glow),
-        transparent 75%
-    );
+/* Фон под карточками — одно поле на всё окно.
+   Раньше это было свечение внутри .content: прямоугольник содержимого
+   начинается ниже шапки и правее рельсы, поэтому поле обрывалось ровно по
+   их краям — резкой линией поперёк страницы. Теперь фон — отдельный
+   фиксированный слой на всё окно (z-index: -1, под всем), а шапка и рельса
+   стали полупрозрачными панелями над ним: поле проходит под ними и не
+   обрывается нигде. Слой не прокручивается вместе с библиотекой: карточки
+   едут по спокойному свету, а не тащат его за собой.
+   Ни картинок, ни анимации, ни повторов: только четыре мягких градиента
+   (пятна акцента сверху справа и снизу слева, глубина у нижнего края и
+   угловой свет) — они дают объём, но не спорят с фотографиями. Проверено по
+   пикселям: переход между соседними точками — не больше двух уровней из 255
+   на обоих краях, то есть ступенек на 8-битной глубине не видно. */
+.studio .canvas-wash {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+        linear-gradient(203deg, var(--studio-canvas-wash-sheen) 0%, transparent 46%),
+        radial-gradient(46% 38% at 86% 2%, var(--studio-canvas-wash-accent), transparent 72%),
+        radial-gradient(52% 44% at 2% 96%, var(--studio-canvas-wash-accent), transparent 74%),
+        radial-gradient(78% 56% at 44% 116%, var(--studio-canvas-wash-depth), transparent 80%);
     background-repeat: no-repeat;
 }
+/* Больше контраста — меньше украшений: поле убирается, а панели над ним
+   снова становятся непрозрачными, чтобы фон под ними не мешал чтению. */
 @media (prefers-contrast: more), (forced-colors: active) {
-    .studio .content {
-        background-image: none;
+    .studio .canvas-wash {
+        display: none;
+    }
+    .studio .catalog-rail,
+    .studio .appbar {
+        background: var(--bg);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
     }
 }
 /* Create/rename uses the same template. Remove BOTH the input outline and its

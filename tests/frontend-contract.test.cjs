@@ -283,7 +283,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v36/,
+  assert.match(code, /lanpaper-static-v37/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 
@@ -617,18 +617,42 @@ test('folding the rail animates instead of snapping', () => {
     'the "less motion" switch disappeared, so the slide cannot be turned off');
 });
 
-test('the library canvas uses a quiet, non-repeating wash in both themes', () => {
+test('the canvas wash is one full-window layer, and the bars are panels over it', () => {
+  // Фон под карточками раньше был свечением внутри .content: прямоугольник
+  // содержимого начинается ниже шапки и правее рельсы, поэтому поле
+  // обрывалось ровной линией по их краям. Теперь это отдельный слой на всё
+  // окно (position: fixed, z-index: -1) — шапка и рельса лежат над ним
+  // полупрозрачными панелями, и поле не обрывается нигде.
   const studio = read('static/css/studio.css');
-  assert.doesNotMatch(studio, /--studio-canvas-mark/, 'the old registration marks returned');
-  assert.equal(matches(studio, /--studio-canvas-glow: rgba\(var\(--accent-rgb\), [^)]+\)/g).length, 2,
-    'the wash needs a restrained opacity for each theme');
-  const canvas = studio.match(/\.studio \.content \{\s*background-image:[^}]+\}/)[0];
-  assert.match(canvas, /background-image: radial-gradient\(/);
-  assert.match(canvas, /var\(--studio-canvas-glow\)/, 'the wash must follow the palette');
-  assert.match(canvas, /background-repeat: no-repeat/, 'the canvas must not tile');
-  assert.doesNotMatch(canvas, /url\(|repeating-|background-size: 96px/, 'a repeating motif returned');
+  const page = read('admin.html');
+  assert.match(page, /<div class="canvas-wash" aria-hidden="true"><\/div>/,
+    'the wash layer left the markup, so the background is back to being cut off');
+  assert.doesNotMatch(studio, /--studio-canvas-glow|--studio-canvas-mark/,
+    'the old glow token survived next to the new one');
+  const layer = studio.match(/\.studio \.canvas-wash \{[^}]+\}/)[0];
+  assert.match(layer, /position: fixed/);
+  assert.match(layer, /inset: 0/, 'the layer must cover the whole window, not the content box');
+  assert.match(layer, /z-index: -1/, 'the layer must sit under the bars, not over them');
+  assert.match(layer, /pointer-events: none/);
+  assert.match(layer, /background-repeat: no-repeat/, 'the canvas must not tile');
+  assert.doesNotMatch(layer, /url\(|repeating-/, 'a repeating motif returned');
+  // Поле следует палитре, а не фиксированному цвету, и их ровно три:
+  // пятна акцента по углам, глубина снизу и угловой свет.
+  const tokens = matches(studio, /--studio-canvas-wash-[a-z]+: (rgba\([^)]+\))/g);
+  assert.equal(tokens.length, 6, 'three wash colours, one value per theme');
+  assert.match(studio, /--studio-canvas-wash-accent: rgba\(var\(--accent-rgb\), [^)]+\)/,
+    'the accents must follow the palette');
+  // Панели над полем полупрозрачны — иначе слой был бы виден только в
+  // содержимом, то есть та же обрезка по краям, но с другой стороны.
+  for (const [selector, fraction] of [['\.studio \.catalog-rail', '88%'], ['\.studio \.appbar', '84%']]) {
+    const block = studio.match(new RegExp(selector + ' \\{[^}]+\\}'))[0];
+    assert.match(block, new RegExp('color-mix\\(in srgb, var\\(--bg\\) ' + fraction + ', transparent\\)'),
+      selector + ' must let the wash through');
+    assert.match(block, /backdrop-filter: blur\(/, selector + ' needs the blur that keeps text readable');
+    assert.match(block, /background: var\(--bg\);/, selector + ' needs its opaque fallback first');
+  }
   assert.match(studio,
-    /@media \(prefers-contrast: more\), \(forced-colors: active\) \{\s*\.studio \.content \{\s*background-image: none;/,
+    /@media \(prefers-contrast: more\), \(forced-colors: active\) \{[\s\S]*?\.studio \.canvas-wash \{\s*display: none;/,
     'the wash must disappear when more contrast is requested');
 });
 
