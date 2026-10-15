@@ -283,7 +283,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v37/,
+  assert.match(code, /lanpaper-static-v38/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 
@@ -617,43 +617,66 @@ test('folding the rail animates instead of snapping', () => {
     'the "less motion" switch disappeared, so the slide cannot be turned off');
 });
 
-test('the canvas wash is one full-window layer, and the bars are panels over it', () => {
+test('the canvas wash is one field: a full-window layer, plus the opaque header repeating it', () => {
   // Фон под карточками раньше был свечением внутри .content: прямоугольник
   // содержимого начинается ниже шапки и правее рельсы, поэтому поле
-  // обрывалось ровной линией по их краям. Теперь это отдельный слой на всё
-  // окно (position: fixed, z-index: -1) — шапка и рельса лежат над ним
-  // полупрозрачными панелями, и поле не обрывается нигде.
+  // обрывалось ровной линией по их краям. Теперь это поле на всё окно.
+  //
+  // Важно, почему рельса и шапка сделаны по-разному. Рельса — колонка в
+  // стороне: под неё ничто не уезжает, скрывать ей нечего, поэтому у неё нет
+  // своей заливки вовсе и поле видно сквозь неё как есть. Полупрозрачная
+  // панель на её месте работала бы фильтром: поле под ней бледнее, чем рядом,
+  // и разница читается вертикальной линией по краю — то же «фон обрезан».
+  // Шапка непрозрачна (под неё уезжают карточки при прокрутке), поэтому она
+  // рисует то же поле сама, тем же значением и с привязкой к окну.
   const studio = read('static/css/studio.css');
   const page = read('admin.html');
   assert.match(page, /<div class="canvas-wash" aria-hidden="true"><\/div>/,
-    'the wash layer left the markup, so the background is back to being cut off');
+    'the wash layer left the markup');
   assert.doesNotMatch(studio, /--studio-canvas-glow|--studio-canvas-mark/,
     'the old glow token survived next to the new one');
+
+  // Поле — одно значение на двоих: слой и шапка берут одну переменную, иначе
+  // их картинки разойдутся хотя бы на уровень, а это и есть шов.
+  assert.match(studio, /--studio-canvas-field:\s*\n\s*linear-gradient\(/,
+    'the field must be defined once, as a value both surfaces share');
   const layer = studio.match(/\.studio \.canvas-wash \{[^}]+\}/)[0];
   assert.match(layer, /position: fixed/);
   assert.match(layer, /inset: 0/, 'the layer must cover the whole window, not the content box');
   assert.match(layer, /z-index: -1/, 'the layer must sit under the bars, not over them');
   assert.match(layer, /pointer-events: none/);
+  assert.match(layer, /background-image: var\(--studio-canvas-field\)/,
+    'both surfaces must paint the same field');
   assert.match(layer, /background-repeat: no-repeat/, 'the canvas must not tile');
   assert.doesNotMatch(layer, /url\(|repeating-/, 'a repeating motif returned');
-  // Поле следует палитре, а не фиксированному цвету, и их ровно три:
-  // пятна акцента по углам, глубина снизу и угловой свет.
-  const tokens = matches(studio, /--studio-canvas-wash-[a-z]+: (rgba\([^)]+\))/g);
-  assert.equal(tokens.length, 6, 'three wash colours, one value per theme');
+
+  // Рельса: ни заливки, ни фильтра — иначе поле под ней бледнее соседнего.
+  const rail = studio.match(/\.studio \.catalog-rail \{[^}]+\}/)[0];
+  assert.match(rail, /background: none/, 'a rail fill would cut the field off at its edge');
+  assert.doesNotMatch(rail, /backdrop-filter|color-mix/,
+    'a translucent rail dims the field on one side of its edge');
+
+  // Шапка: непрозрачная основа плюс то же поле, привязанное к окну.
+  const bar = studio.match(/\.studio \.appbar \{[^}]+\}/)[0];
+  assert.match(bar, /background-color: var\(--bg\)/,
+    'the header must stay opaque: cards scroll under it');
+  assert.match(bar, /background-image: var\(--studio-canvas-field\)/);
+  assert.match(bar, /background-attachment: fixed/,
+    'without viewport anchoring the header field cannot line up with the layer');
+  assert.match(bar, /background-repeat: no-repeat/);
+  assert.doesNotMatch(studio, /backdrop-filter/, 'the veiled panels are back');
+
+  // Поле следует палитре, а не фиксированному цвету, и красок ровно три.
+  assert.equal(matches(studio, /--studio-canvas-wash-[a-z]+: rgba\([^)]+\)/g).length, 6,
+    'three wash colours, one value per theme');
   assert.match(studio, /--studio-canvas-wash-accent: rgba\(var\(--accent-rgb\), [^)]+\)/,
     'the accents must follow the palette');
-  // Панели над полем полупрозрачны — иначе слой был бы виден только в
-  // содержимом, то есть та же обрезка по краям, но с другой стороны.
-  for (const [selector, fraction] of [['\.studio \.catalog-rail', '88%'], ['\.studio \.appbar', '84%']]) {
-    const block = studio.match(new RegExp(selector + ' \\{[^}]+\\}'))[0];
-    assert.match(block, new RegExp('color-mix\\(in srgb, var\\(--bg\\) ' + fraction + ', transparent\\)'),
-      selector + ' must let the wash through');
-    assert.match(block, /backdrop-filter: blur\(/, selector + ' needs the blur that keeps text readable');
-    assert.match(block, /background: var\(--bg\);/, selector + ' needs its opaque fallback first');
-  }
   assert.match(studio,
     /@media \(prefers-contrast: more\), \(forced-colors: active\) \{[\s\S]*?\.studio \.canvas-wash \{\s*display: none;/,
     'the wash must disappear when more contrast is requested');
+  assert.match(studio,
+    /@media \(prefers-contrast: more\), \(forced-colors: active\) \{[\s\S]*?\.studio \.appbar \{\s*background-image: none;/,
+    'with the wash gone the header must not keep painting it');
 });
 
 test('accent details take the palette colour, not the text colour', () => {

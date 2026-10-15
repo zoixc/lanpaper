@@ -652,6 +652,16 @@
     --studio-canvas-wash-accent: rgba(var(--accent-rgb), 0.05);
     --studio-canvas-wash-depth: rgba(var(--shadow-rgb), 0.05);
     --studio-canvas-wash-sheen: rgba(var(--accent-rgb), 0.035);
+    /* Всё поле целиком, одним значением: его рисуют и слой на всё окно, и
+       шапка (она непрозрачная — скрывает карточки, уезжающие под неё, — и
+       поэтому не может пропустить слой сквозь себя). Одно значение на двоих
+       — единственный способ гарантировать, что картинка совпадёт точка в
+       точку: расхождение на один уровень читается как шов по краю шапки. */
+    --studio-canvas-field:
+        linear-gradient(203deg, var(--studio-canvas-wash-sheen) 0%, transparent 46%),
+        radial-gradient(46% 38% at 86% 2%, var(--studio-canvas-wash-accent), transparent 72%),
+        radial-gradient(52% 44% at 2% 96%, var(--studio-canvas-wash-accent), transparent 74%),
+        radial-gradient(78% 56% at 44% 116%, var(--studio-canvas-wash-depth), transparent 80%);
     --studio-sheet-shadow: -16px 0 48px -32px rgb(0 0 0 / 28%);
     /* Высота верхней строки: её делят шапка и блок марки в рельсе (см. ниже),
        поэтому знак, название и заголовок стоят на одной центральной линии. */
@@ -684,19 +694,16 @@
 .studio .shell {
     padding-top: 0;
 }
-/* Рельса и шапка — панели над общим полем. Палитра та же (color-mix от
-   --bg, а не чужое белое стекло: прежняя общая «стеклянная» заливка давала
-   холодный оттенок на тёплых палитрах), но чуть прозрачная и с размытием —
-   поэтому фон под карточками продолжается и под ними, без стыка по краю.
-   Первая строка background — запасной вариант для браузеров без color-mix:
-   там панели просто непрозрачные, как было. */
+/* Рельса — колонка в стороне от содержимого: под неё ничто не уезжает,
+   скрывать ей нечего. Поэтому своей заливки у неё нет вовсе, и поле видно
+   сквозь неё ровно таким же, как рядом. Всякая полупрозрачная плёнка здесь
+   работала бы как фильтр: поле под ней было бы бледнее, чем по соседству, и
+   разница читалась бы ровной вертикальной линией по краю рельсы — то самое
+   «фон обрезан», только чуть иначе. Пустая рельса этой границы не создаёт. */
 .studio .catalog-rail {
     top: 0;
     padding: 25px 16px 18px;
-    background: var(--bg);
-    background: color-mix(in srgb, var(--bg) 88%, transparent);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
+    background: none;
     border: 0;
     transition:
         transform var(--dur-slow) var(--ease),
@@ -793,13 +800,18 @@
 .studio .catalog-rail .chip-row__sep {
     margin: 9px 10px;
 }
+/* Шапка обязана быть непрозрачной: под неё уезжают карточки при прокрутке,
+   и полупрозрачная она их показывала бы. Значит, сквозь неё поле не видно —
+   и она рисует его сама, тем же значением и с привязкой к окну
+   (background-attachment: fixed), как у слоя: тогда поле продолжается через
+   шапку без стыка, а бар остаётся баром. */
 .studio .appbar {
     top: 0;
     border: 0;
-    background: var(--bg);
-    background: color-mix(in srgb, var(--bg) 84%, transparent);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
+    background-color: var(--bg);
+    background-image: var(--studio-canvas-field);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
 }
 .studio .appbar__inner {
     padding: 0 26px;
@@ -1493,11 +1505,13 @@
 /* Фон под карточками — одно поле на всё окно.
    Раньше это было свечение внутри .content: прямоугольник содержимого
    начинается ниже шапки и правее рельсы, поэтому поле обрывалось ровно по
-   их краям — резкой линией поперёк страницы. Теперь фон — отдельный
-   фиксированный слой на всё окно (z-index: -1, под всем), а шапка и рельса
-   стали полупрозрачными панелями над ним: поле проходит под ними и не
-   обрывается нигде. Слой не прокручивается вместе с библиотекой: карточки
-   едут по спокойному свету, а не тащат его за собой.
+   их краям — резкой линией поперёк страницы. Теперь поле — отдельный
+   фиксированный слой на всё окно (z-index: -1, под всем), который не
+   прокручивается вместе с библиотекой: карточки едут по спокойному свету, а
+   не тащат его за собой.
+   Через рельсу поле видно как есть — у неё нет своей заливки. Шапка же
+   непрозрачная (под неё уезжают карточки), поэтому она рисует то же поле
+   сама, с привязкой к окну: см. --studio-canvas-field и .studio .appbar.
    Ни картинок, ни анимации, ни повторов: только четыре мягких градиента
    (пятна акцента сверху справа и снизу слева, глубина у нижнего края и
    угловой свет) — они дают объём, но не спорят с фотографиями. Проверено по
@@ -1508,24 +1522,17 @@
     inset: 0;
     z-index: -1;
     pointer-events: none;
-    background-image:
-        linear-gradient(203deg, var(--studio-canvas-wash-sheen) 0%, transparent 46%),
-        radial-gradient(46% 38% at 86% 2%, var(--studio-canvas-wash-accent), transparent 72%),
-        radial-gradient(52% 44% at 2% 96%, var(--studio-canvas-wash-accent), transparent 74%),
-        radial-gradient(78% 56% at 44% 116%, var(--studio-canvas-wash-depth), transparent 80%);
+    background-image: var(--studio-canvas-field);
     background-repeat: no-repeat;
 }
-/* Больше контраста — меньше украшений: поле убирается, а панели над ним
-   снова становятся непрозрачными, чтобы фон под ними не мешал чтению. */
+/* Больше контраста — меньше украшений: поле убирается целиком, у шапки
+   остаётся её обычная заливка, рельса и так без неё. */
 @media (prefers-contrast: more), (forced-colors: active) {
     .studio .canvas-wash {
         display: none;
     }
-    .studio .catalog-rail,
     .studio .appbar {
-        background: var(--bg);
-        -webkit-backdrop-filter: none;
-        backdrop-filter: none;
+        background-image: none;
     }
 }
 /* Create/rename uses the same template. Remove BOTH the input outline and its
