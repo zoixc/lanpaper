@@ -131,7 +131,7 @@ func TestWebPDecodesWithoutCDecoderAndRejectsOversizedDimensions(t *testing.T) {
 			if err != nil || ext != "webp" {
 				t.Fatalf("valid WebP not detected: %s %v", ext, err)
 			}
-			decoded, release, err := decodeImage(file, ext)
+			decoded, release, err := decodeImage(t.Context(), file, ext)
 			if err != nil {
 				t.Fatalf("streaming WebP decoder failed: %v", err)
 			}
@@ -147,7 +147,7 @@ func TestWebPDecodesWithoutCDecoderAndRejectsOversizedDimensions(t *testing.T) {
 	// otherwise-valid PNG that declares an excessive pixel dimension.
 	binary.BigEndian.PutUint32(pngBytes[16:20], config.MaxImageDimension+1)
 	binary.BigEndian.PutUint32(pngBytes[29:33], crc32.ChecksumIEEE(pngBytes[12:29]))
-	if _, release, err := decodeImage(bytes.NewReader(pngBytes), "png"); err == nil {
+	if _, release, err := decodeImage(t.Context(), bytes.NewReader(pngBytes), "png"); err == nil {
 		if release != nil {
 			release()
 		}
@@ -301,14 +301,14 @@ func TestInspectMediaFileAcceptsAllMP4Brands(t *testing.T) {
 		t.Error("garbage with .mp4 name must be rejected")
 	}
 
-	// HEIF/AVIF photos share the ftyp box with MP4 but are still images and
-	// have no decoder here. Storing one as .mp4 produced a tile that neither
+	// HEIF photos share the ftyp box with MP4 but are still images and
+	// have no decoder here. AVIF is tested separately. Storing one as .mp4 produced a tile that neither
 	// the panel nor the browser could play.
 	for _, tt := range []struct {
 		name  string
 		brand string
 	}{
-		{"AVIF photo", "avif"},
+
 		{"Apple HEIC photo", "heic"},
 		{"HEIF generic brand", "mif1"},
 		{"HEIF alpha brand", "heix"},

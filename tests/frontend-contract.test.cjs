@@ -283,7 +283,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v29/,
+  assert.match(code, /lanpaper-static-v32/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 
@@ -617,19 +617,19 @@ test('folding the rail animates instead of snapping', () => {
     'the "less motion" switch disappeared, so the slide cannot be turned off');
 });
 
-test('the library canvas is textured for both themes', () => {
-  // Текстура — данные, а не градиент: цвет вшит в рисунок, поэтому на каждую
-  // тему свой файл. Один на обе темы означает, что в одной из них метки
-  // пропадают (тёмные на тёмном фоне или светлые на светлом).
+test('the library canvas uses a quiet, non-repeating wash in both themes', () => {
   const studio = read('static/css/studio.css');
-  const marks = matches(studio, /--studio-canvas-mark: url\("([^"]+)"\)/g);
-  assert.equal(marks.length, 2, 'the canvas needs one drawing per theme, not one for both');
-  assert.notEqual(marks[0], marks[1], 'both themes draw the same marks, so one of them loses them');
-  assert.match(studio, /\.studio \.content \{\s*background-image: var\(--studio-canvas-mark\);/,
-    'the canvas no longer reads its texture from the shared token');
+  assert.doesNotMatch(studio, /--studio-canvas-mark/, 'the old registration marks returned');
+  assert.equal(matches(studio, /--studio-canvas-glow: rgba\(var\(--accent-rgb\), [^)]+\)/g).length, 2,
+    'the wash needs a restrained opacity for each theme');
+  const canvas = studio.match(/\.studio \.content \{\s*background-image:[^}]+\}/)[0];
+  assert.match(canvas, /background-image: radial-gradient\(/);
+  assert.match(canvas, /var\(--studio-canvas-glow\)/, 'the wash must follow the palette');
+  assert.match(canvas, /background-repeat: no-repeat/, 'the canvas must not tile');
+  assert.doesNotMatch(canvas, /url\(|repeating-|background-size: 96px/, 'a repeating motif returned');
   assert.match(studio,
     /@media \(prefers-contrast: more\), \(forced-colors: active\) \{\s*\.studio \.content \{\s*background-image: none;/,
-    'the texture is no longer dropped when the reader asks for more contrast');
+    'the wash must disappear when more contrast is requested');
 });
 
 test('accent details take the palette colour, not the text colour', () => {

@@ -5,6 +5,10 @@
 
 This roadmap orders changes by security risk, dependency, compatibility and reviewability. “PR” below means one independently reviewable change set. Later PRs must be rebased on the accepted earlier ones; storage and frontend migrations deliberately avoid a big-bang rewrite.
 
+> Historical remediation record: implementation/CI status annotations below
+> describe those change sets, not the current release gate. Current operational
+> guidance is in `DEPLOYMENT.md`, current features in the root README/CHANGELOG.
+
 ## Delivery rules
 
 Every PR must:

@@ -18,7 +18,8 @@ Open ideas, roughly in priority order. For shipped changes see
   - Animated WebP support.
   - Animation-preserving GIF/WebP processing in compressed mode.
   - Both need frame-count and CPU budgets.
-- **More input formats.** HEIC/HEIF and AVIF conversion on upload. ICO
+- **More input formats.** HEIC/HEIF, plus AVIF animation, colour-managed HDR
+  and ICC support beyond the shipped static SDR path. ICO
   (largest frame) for favicon collections. SVG only with strict sanitisation
   or rasterisation.
 - **Token options.** Optional expiry dates and multiple tokens per link.
@@ -40,8 +41,8 @@ Open ideas, roughly in priority order. For shipped changes see
   lock. Rotation is already stateless.
 - Optional disk quota for `data/media/`, in addition to `MAX_IMAGES` and
   `HISTORY_MAX_MB`.
-- Admin-only metrics endpoint: upload queue, rate-limit hits, decode errors,
-  history budget in use.
+- Additional operational metrics for history-budget pressure and storage-tier
+  health; the authenticated `/metrics` endpoint is already shipped.
 - Storage-tier awareness for archives: an optional second directory (or a
   cheaper volume) for `data/history/`, since archived versions are read rarely.
 
@@ -51,12 +52,14 @@ Open ideas, roughly in priority order. For shipped changes see
   to every link, and rotating one means restarting the process.
 - Optional CONNECT-only mode for outbound HTTP proxies, with proxy
   conformance tests.
-- Optional sandboxed decoding or malware scanning for untrusted uploaders.
+- Extend sandboxed decoding beyond AVIF, or add optional malware scanning
+  for untrusted uploaders.
 
 ## Quality
 
-- Browser end-to-end tests in CI (create, upload, access levels, import,
-  history rollback, playlist rotation).
+- Expand the existing browser end-to-end suite with more failure-injection
+  cases for history rollback and playlist rotation. Sign-in, create/upload,
+  access changes, import/export, media playback and AVIF already run in CI.
 - A visual review gate for admin UI work. The 0.13.0 redesign passed jsdom
   assertions, a CSS-cascade analysis and contrast checks, still broke the layout
   in a real browser, and was rolled back in 0.12.1. Layout changes need eyes on
@@ -66,5 +69,6 @@ Open ideas, roughly in priority order. For shipped changes see
 - Benchmarks for the public media path (`BenchmarkPublic…`), so hot-path
   changes stay measured instead of assumed. The test harness would need a
   `*testing.B` variant of `setupApp` first.
-- Fuzz tests for media sniffing, path validation and URL checks.
+- Broader fuzz coverage for path validation and URL checks, beyond the
+  existing metadata and AVIF-container fuzzers.
 - An arm64 runtime smoke test in CI; the Docker job currently checks amd64 only.

@@ -216,13 +216,13 @@ func regenerateLink(ctx context.Context, snap *storage.Wallpaper) (regenOutcome,
 // decodeForRegen decodes f, waiting while the shared decode budget is full.
 // Only the transient "budget busy" error is retried; any other error (a bad
 // image, for example) is returned at once.
-func decodeForRegen(f *os.File, ext string) (image.Image, func(), error) {
+func decodeForRegen(ctx context.Context, f *os.File, ext string) (image.Image, func(), error) {
 	var lastErr error
 	for attempt := 0; attempt < regenBudgetRetries; attempt++ {
 		if _, err := f.Seek(0, io.SeekStart); err != nil {
 			return nil, nil, err
 		}
-		img, release, err := decodeImage(f, ext)
+		img, release, err := decodeImage(ctx, f, ext)
 		if err == nil {
 			return img, release, nil
 		}
@@ -230,7 +230,11 @@ func decodeForRegen(f *os.File, ext string) (image.Image, func(), error) {
 			return nil, nil, err
 		}
 		lastErr = err
-		time.Sleep(regenBudgetWait)
+		select {
+		case <-ctx.Done():
+			return nil, nil, ctx.Err()
+		case <-time.After(regenBudgetWait):
+		}
 	}
 	return nil, nil, lastErr
 }
@@ -249,7 +253,7 @@ func regenPreview(ctx context.Context, wp *storage.Wallpaper) error {
 	if err != nil {
 		return err
 	}
-	img, release, err := decodeForRegen(f, ext)
+	img, release, err := decodeForRegen(ctx, f, ext)
 	if err != nil {
 		return err
 	}

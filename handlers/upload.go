@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"lanpaper/config"
+	"lanpaper/internal/avifcodec"
 	appmetrics "lanpaper/internal/metrics"
 	"lanpaper/middleware"
 	"lanpaper/storage"
@@ -292,7 +293,7 @@ func (s *UploadService) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 		// Even in lossless mode, fully decode before storing: malformed files
 		// must not be published just because their first 512 bytes look valid.
-		img, release, err := decodeImage(source, ext)
+		img, release, err := decodeImage(r.Context(), source, ext)
 		if errors.Is(err, errImageBudgetBusy) {
 			w.Header().Set("Retry-After", "5")
 			http.Error(w, "Image processing busy; retry shortly", http.StatusTooManyRequests)
@@ -300,6 +301,14 @@ func (s *UploadService) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 		if err != nil {
 			log.Printf("Rejected image: %v", err)
+			if errors.Is(err, avifcodec.ErrUnavailable) {
+				http.Error(w, "AVIF decoder unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			if errors.Is(err, avifcodec.ErrUnsupported) {
+				http.Error(w, "Unsupported AVIF feature (animation, HDR, colour profile, crop or size limit)", http.StatusBadRequest)
+				return
+			}
 			http.Error(w, "Invalid image or dimensions too large", http.StatusBadRequest)
 			return
 		}
@@ -433,8 +442,15 @@ func (s *UploadService) Upload(w http.ResponseWriter, r *http.Request) {
 	// and no extra disk block for as long as the link stays. It runs after the
 	// metadata commit and is best effort: a failed archive must never fail an
 	// upload that already succeeded.
-	if config.Current.History.Limit > 0 && imagePub.backup != "" {
-		archived, err := storage.ArchiveReplaced(prev, imagePub.backup, prev.MIMEType, config.Current.History.Limit)
+	archiveSource := imagePub.backup
+	// A format change (notably original AVIF -> compressed WebP) publishes to
+	// another path, so there is no destination backup. The old live path is
+	// still intact until this post-metadata-commit point and is the archive.
+	if prev.HasImage && prev.ImagePath != imagePath {
+		archiveSource = prev.ImagePath
+	}
+	if config.Current.History.Limit > 0 && archiveSource != "" {
+		archived, err := s.Store.ArchiveReplaced(prev, archiveSource, prev.MIMEType, config.Current.History.Limit)
 		if err != nil {
 			log.Printf("Upload: could not archive the previous version of %s: %v", name, err)
 		} else if archived != nil {

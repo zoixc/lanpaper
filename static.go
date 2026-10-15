@@ -47,7 +47,6 @@ var staticAssets = map[string]bool{
 	"manifest.json":                   true,
 	"favicon.svg":                     true,
 	"logo.svg":                        true,
-	"logo-dark.svg":                   true,
 	"fonts/golos-text-latin.woff2":    true,
 	"fonts/golos-text-cyrillic.woff2": true,
 	"fonts/OFL-Golos-Text.txt":        true,

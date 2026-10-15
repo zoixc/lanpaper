@@ -120,7 +120,6 @@ ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
 LockPersonality=true
-MemoryDenyWriteExecute=true
 SystemCallArchitectures=native
 LimitNOFILE=8192
 
@@ -128,9 +127,14 @@ LimitNOFILE=8192
 WantedBy=multi-user.target
 ```
 
-`MemoryDenyWriteExecute` is safe here: the binary is pure Go — no JIT, no cgo,
-no shared libraries — so it never asks for writable-executable memory. If a
-future dependency needs it, drop that one line rather than the rest.
+AVIF uses wazero's native-code compiler on supported hosts. Do **not** add
+`MemoryDenyWriteExecute=true` or a seccomp policy that forbids the executable
+anonymous mappings needed by that JIT: existing media can keep working while
+the first AVIF request fails with `503 AVIF decoder unavailable`. Older service
+units based on the pre-AVIF guide must remove that setting (or override it with
+`MemoryDenyWriteExecute=false`). Keep the remaining hardening settings. This
+does not require CGO, shared libraries, executable temporary files, or disabling
+`/tmp`'s `noexec` mount. Verify an AVIF upload after applying host hardening.
 
 ### Shutdown and upgrades
 
@@ -169,9 +173,10 @@ Point your log collector at the container/journal output. Lines worth an alert:
   `HISTORY_LIMIT`.
 - `Warning: …` at startup — a configuration value was ignored or clamped.
 
-There is no metrics endpoint on purpose: per-link counters are in memory and
-exposed through the authenticated API, so nothing about traffic is readable
-without credentials.
+`METRICS_ENABLED=true` enables the administrator-authenticated `/metrics`
+endpoint for process-level counters and fixed latency buckets. It is disabled
+by default; never exempt it from authentication at a reverse proxy. Per-link
+counters remain available through the authenticated API, not metric labels.
 
 ## 5. Capacity
 
@@ -184,8 +189,15 @@ without credentials.
   `MAX_CONCURRENT_UPLOADS` (1–8) caps parallel uploads; a request that arrives
   while the budget is busy gets `429` with `Retry-After: 5`. Metadata is one
   small struct per link. The Go garbage collector runs with `GOGC=200` unless
-  `GOGC` is set in the environment; `GOMEMLIMIT` remains the hard ceiling. Idle
-  memory returns to about 21–24 MB within a minute after a 3,000-link list burst.
+  `GOGC` is set in the environment. `GOMEMLIMIT` is a **soft Go-runtime target**,
+  not an RSS limit; the container/cgroup `--memory` limit is the hard boundary.
+  AVIF reserves the existing 288 MiB decode budget conservatively, including
+  bounded WASM/input/output storage; runtime, metadata and resize/encoder
+  overhead still need headroom. Concurrent jobs may receive 429 rather than
+  exceed that shared budget. The earlier non-AVIF 3,000-link list measurement
+  returned to about 21–24 MB idle within a minute; AVIF retains a compiled
+  runtime after first use, so do not treat that measurement as an RSS promise.
+  Measure your workload after warming the decoders.
 - **CPU** spikes on upload (decode + scale + encode + thumbnail) and on
   `POST /api/regenerate-previews` (whole library, two previews at a time,
   rate limited like uploads). Sessions are not written on every request: the
@@ -240,6 +252,7 @@ response, credential rotation and version rollback.
 - [ ] Publish keys are long and random. Rotating one means restarting with a
       new `PUBLISH_KEYS`; per-key revocation is on the [roadmap](../ROADMAP.md)
 - [ ] `/health` and `/health/ready` are wired into the orchestrator
+- [ ] An AVIF upload succeeds under the actual systemd/seccomp policy
 - [ ] The startup log has been read once: every `Warning:` is understood
 - [ ] Log output is collected, and the alerts in §4 exist
 

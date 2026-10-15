@@ -557,6 +557,8 @@ import { RENDER_CHUNK, createAppState, normalizeLink, mediaExt, isVideoMedia, ma
         if (/link does not exist|link not found/i.test(text)) return t('link_gone');
         if (/invalid link name|invalid id/i.test(text)) return t('invalid_id');
         if (/file too large/i.test(text)) return t('upload_too_big', { mb: state.config.maxUploadMB });
+        if (/AVIF decoder unavailable/i.test(text)) return t('avif_unavailable');
+        if (/unsupported AVIF feature/i.test(text)) return t('avif_unsupported');
         if (/no file provided|invalid or unsupported media/i.test(text)) return t('invalid_image');
         if (/playlist is full|playlist full/i.test(text)) return t('playlist_full', { max: state.config.playlistMax });
         if (/no media to add|has no media/i.test(text)) return t('append_needs_media');

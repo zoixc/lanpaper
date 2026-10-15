@@ -4,7 +4,6 @@ package handlers
 
 import (
 	"errors"
-	"net/http"
 	"os"
 
 	"lanpaper/storage"
@@ -56,28 +55,6 @@ func (s *LibraryService) cleanupPlaylistItem(name string, item storage.PlaylistI
 	_ = os.Remove(storage.ItemsDirPath(name))
 	return nil
 }
-func (s *LibraryService) RemovePlaylistItem(name string, id int) (*storage.Wallpaper, error) {
-	var removed storage.PlaylistItem
-	wp, err := s.Store.Update(name, func(w *storage.Wallpaper) error {
-		var mutationErr error
-		removed, mutationErr = s.removePlaylistMetadata(w, id)
-		return mutationErr
-	})
-	if err != nil {
-		return nil, &LibraryError{"remove playlist item", err}
-	}
-	if err := s.cleanupPlaylistItem(name, removed); err != nil {
-		return wp, err
-	}
-	return wp, nil
-}
-
 func IsLibraryNotFound(err error) bool {
 	return errors.Is(err, storage.ErrNotFound) || errors.Is(err, errItemNotFound)
-}
-
-func LinkHistory(w http.ResponseWriter, r *http.Request)  { defaultLibraryService().LinkHistory(w, r) }
-func RollbackLink(w http.ResponseWriter, r *http.Request) { defaultLibraryService().RollbackLink(w, r) }
-func DeleteHistoryVersion(w http.ResponseWriter, r *http.Request) {
-	defaultLibraryService().DeleteHistoryVersion(w, r)
 }

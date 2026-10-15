@@ -113,7 +113,7 @@ func TestArchiveReplacedConsumesTheUploadBackup(t *testing.T) {
 	// must be a rename, not a copy.
 	backup := filepath.Join(config.MediaDir, ".upload-backup.png")
 	writeTestFile(t, backup, []byte("old"))
-	archived, err := ArchiveReplaced(prev, backup, "png", 2)
+	archived, err := Global.ArchiveReplaced(prev, backup, "png", 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,24 +137,24 @@ func TestArchiveReplacedConsumesTheUploadBackup(t *testing.T) {
 	legacy := mustGet(t, "w")
 	legacy.CurrentVersion = 0
 	writeTestFile(t, backup, []byte("new"))
-	if _, err := ArchiveReplaced(legacy, backup, "png", 2); err != nil {
+	if _, err := Global.ArchiveReplaced(legacy, backup, "png", 2); err != nil {
 		t.Fatal(err)
 	}
 	// Refused instead of silently ignored.
-	if _, err := ArchiveReplaced(prev, "", "png", 2); err == nil {
+	if _, err := Global.ArchiveReplaced(prev, "", "png", 2); err == nil {
 		t.Fatal("an empty backup was accepted")
 	}
-	if _, err := ArchiveReplaced(prev, backup, "png", 0); err == nil {
+	if _, err := Global.ArchiveReplaced(prev, backup, "png", 0); err == nil {
 		t.Fatal("disabled history was accepted")
 	}
-	if _, err := ArchiveReplaced(prev, backup, "exe", 2); err == nil {
+	if _, err := Global.ArchiveReplaced(prev, backup, "exe", 2); err == nil {
 		t.Fatal("an invalid extension was accepted")
 	}
-	if _, err := ArchiveReplaced(nil, backup, "png", 2); err == nil {
+	if _, err := Global.ArchiveReplaced(nil, backup, "png", 2); err == nil {
 		t.Fatal("a nil record was accepted")
 	}
 	empty := &Wallpaper{ID: "e", LinkName: "e"}
-	if _, err := ArchiveReplaced(empty, backup, "png", 2); err == nil {
+	if _, err := Global.ArchiveReplaced(empty, backup, "png", 2); err == nil {
 		t.Fatal("a link without media was archived")
 	}
 }

@@ -151,7 +151,7 @@ func TestHTTPProxyPinsHostAfterRedirect(t *testing.T) {
 			w.Header().Set("Content-Type", "image/png")
 			_, _ = w.Write([]byte("test-download"))
 		default:
-			http.Error(w, "not pinned", 502)
+			http.Error(w, "not pinned", http.StatusBadGateway)
 		}
 	}))
 	defer proxy.Close()
@@ -263,7 +263,7 @@ func TestHTTPSProxyVerifiesItsOwnCertificate(t *testing.T) {
 	setupRemoteTest(t)
 	proxy := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Host != "8.8.8.8:80" {
-			http.Error(w, "pinning mismatch", 502)
+			http.Error(w, "pinning mismatch", http.StatusBadGateway)
 			return
 		}
 		_, _ = w.Write([]byte("through HTTPS proxy"))
@@ -298,7 +298,7 @@ func TestHTTPProxyConnectPinsHTTPSAndKeepsSNI(t *testing.T) {
 	defer origin.Close()
 	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodConnect {
-			http.Error(w, "CONNECT required", 405)
+			http.Error(w, "CONNECT required", http.StatusMethodNotAllowed)
 			return
 		}
 		mu.Lock()

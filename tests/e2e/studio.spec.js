@@ -219,3 +219,20 @@ test('unplayable video reports an error without leaving a player or breaking the
 });
 
 });
+
+
+test('library canvas has a non-repeating wash and respects forced colours', async ({ page }) => {
+  await signIn(page);
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(theme => { document.documentElement.dataset.theme = theme; }, theme);
+    const background = await page.locator('.content').evaluate(el => {
+      const style = getComputedStyle(el);
+      return { image: style.backgroundImage, repeat: style.backgroundRepeat };
+    });
+    expect(background.image).toContain('radial-gradient(');
+    expect(background.image).not.toContain('url(');
+    expect(background.repeat).toBe('no-repeat');
+  }
+  await page.emulateMedia({ forcedColors: 'active' });
+  await expect(page.locator('.content')).toHaveCSS('background-image', 'none');
+});

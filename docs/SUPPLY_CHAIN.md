@@ -81,3 +81,14 @@ services:
 ```
 
 Repeat verification before changing that digest during an upgrade.
+
+## Embedded AVIF codecs
+
+The AVIF WASM module is an immutable upstream snapshot, not a Go module:
+`govulncheck` and Go-module SBOMs do not enumerate or audit its C dependencies.
+Review libavif, dav1d, libaom and libyuv upstream advisories before a release.
+The exact artifact digest, upstream commit, recipe versions, limitations of
+reproducibility and retained licenses are in
+[`internal/avifcodec/README.md`](../internal/avifcodec/README.md).
+`TestPinnedModuleDigest` guards against an unnoticed artifact replacement; it
+is an integrity check, not proof that an upstream binary is vulnerability-free.

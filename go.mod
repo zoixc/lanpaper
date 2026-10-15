@@ -6,6 +6,7 @@ require (
 	github.com/SeriousBug/webp-go-pure v1.2.0
 	github.com/joho/godotenv v1.5.1
 	github.com/ncruces/go-sqlite3 v0.35.6
+	github.com/tetratelabs/wazero v1.12.0
 	golang.org/x/image v0.47.0
 )
 

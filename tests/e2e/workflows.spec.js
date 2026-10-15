@@ -2,6 +2,8 @@
 'use strict';
 
 const { test, expect } = require('@playwright/test');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const USER = 'e2e-admin';
 const PASS = 'e2e-test-password-123';
@@ -23,16 +25,16 @@ async function api(page, path, options = {}) {
   }, { path, options });
 }
 
-async function upload(page, name, mode = 'replace') {
-  return page.evaluate(async ({ name, mode, encoded }) => {
+async function upload(page, name, mode = 'replace', file = { encoded: PNG, type: 'image/png', filename: 'pixel.png' }) {
+  return page.evaluate(async ({ name, mode, encoded, type, filename }) => {
     const bytes = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0));
     const form = new FormData();
     form.set('linkName', name);
     form.set('mode', mode);
-    form.set('file', new Blob([bytes], { type: 'image/png' }), 'pixel.png');
+    form.set('file', new Blob([bytes], { type }), filename);
     const response = await fetch('/api/upload', { method: 'POST', body: form });
     return { status: response.status, body: await response.text() };
-  }, { name, mode, encoded: PNG });
+  }, { name, mode, ...file });
 }
 
 test('create, upload, rename, access, history, playlist, export/import and delete', async ({ page }) => {
@@ -200,4 +202,43 @@ test('card spacing tokens remain editable in both responsive layouts', async ({ 
   await page.click('#viewListBtn');
   await expect(body).toHaveCSS('padding', listPadding);
   await expect(page.locator('#errorState')).toBeHidden();
+});
+
+test('AVIF upload produces displayable previews and rejects animation without replacing media', async ({ page }) => {
+  await signIn(page);
+  const name = `avif-${Date.now().toString(36)}`;
+  const file = filename => ({
+    encoded: fs.readFileSync(path.join(__dirname, '../../internal/avifcodec/testdata', filename)).toString('base64'),
+    type: 'image/avif', filename,
+  });
+  expect((await api(page, '/api/link', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ linkName: name, accessLevel: 'public' }),
+  })).status).toBe(201);
+  try {
+    const result = await upload(page, name, 'replace', file('alpha.avif'));
+    expect(result.status, result.body).toBe(200);
+    const stored = JSON.parse(result.body);
+    const config = await api(page, '/api/compression-config');
+    const original = config.body.quality === 100 && config.body.scale === 100;
+    expect(stored.mimeType).toBe(original ? 'avif' : 'webp');
+    const dimensions = await page.evaluate(name => new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve([img.naturalWidth, img.naturalHeight]);
+      img.onerror = () => reject(new Error('AVIF preview is not displayable'));
+      img.src = `/api/preview/${name}`;
+    }), name);
+    expect(dimensions).toEqual([32, 24]);
+    const rejected = await upload(page, name, 'replace', file('test.avifs'));
+    expect(rejected.status).toBe(400);
+    expect(rejected.body).toContain('Unsupported AVIF feature');
+    const live = await api(page, `/api/link/${name}/history`);
+    expect(live.status).toBe(200);
+    expect(live.body.history).toEqual([]);
+    const media = await page.request.get(`/${name}.avif`);
+    expect(media.status()).toBe(200);
+    expect(media.headers()['content-type']).toBe(original ? 'image/avif' : 'image/webp');
+  } finally {
+    expect((await api(page, `/api/link/${name}`, { method: 'DELETE' })).status).toBe(204);
+  }
 });
