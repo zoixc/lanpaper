@@ -237,10 +237,12 @@ test('library canvas has a non-repeating wash and respects forced colours', asyn
     expect(background.position).toBe('fixed');
     expect(background.image).toContain('radial-gradient(');
     expect(background.image).not.toContain('url(');
-    // Поле — список слоёв (угловой свет плюс три пятна), поэтому и повтор
-    // приходит списком: повторяться не должен ни один.
+    // Поле — композиция слоёв (угловой свет плюс три пятна), а не одна краска
+    // и не картинка: слоёв больше одного. Повтор браузер вправе свернуть в
+    // одно значение, когда он одинаков у всех слоёв (WebKit так и делает),
+    // поэтому слои считаем по изображению, а повтор проверяем поэлементно.
+    expect(background.image.match(/gradient\(/g).length).toBeGreaterThan(1);
     const repeats = background.repeat.split(',').map(value => value.trim());
-    expect(repeats.length).toBeGreaterThan(1);
     expect(repeats.every(value => value === 'no-repeat')).toBe(true);
     // То же поле у шапки — иначе по её краю читался бы шов.
     const header = await page.locator('.appbar').evaluate(el => getComputedStyle(el).backgroundImage);
