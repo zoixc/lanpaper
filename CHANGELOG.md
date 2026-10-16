@@ -3,7 +3,7 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
-## [Unreleased]
+## [0.21.0] – 2026-10-16
 
 ### Added
 
@@ -142,7 +142,48 @@ Notable changes to Lanpaper. Docker images are published as
   outline is dropped after a pointer only; a keyboard focus keeps the ring it
   had.
 
+- **The library background is one field again, not a rectangle cut off by the
+  rail and the header.** The wash lived in `.content` — a radial glow inside the
+  content box, which starts below the header and to the right of the rail — so it
+  ended in a straight line along both edges. It is a full-window layer now
+  (`.canvas-wash`, fixed, under everything), which the two bars then have to
+  respect: the rail is a column beside the content, nothing scrolls under it, and
+  it carries no fill at all (deviation under it: 0 levels), while the header must
+  stay opaque because cards scroll under it, so it paints the same field itself
+  from one shared value (`--studio-canvas-field`) with the background anchored to
+  the viewport — deviation inside the header: 0.1 levels on average, 2 at worst,
+  which is dithering. No backdrop blur and no `color-mix` film is left on either
+  bar: a translucent film dims the field on one side of the edge, which is the
+  same "cut off" reading in reverse. The field stays still while the library
+  scrolls and follows the palette in both themes; `prefers-contrast` and forced
+  colours drop it and make both bars opaque. The contract test pins the
+  arrangement. `STATIC_CACHE` bumped.
+
 ### Changed
+
+- **The loading screen no longer draws a copy of the panel.** The first version
+  did: a rail holding the brand, an action row, a label and four filter chips, a
+  header line, a search row and a dot row. A drawn copy ages with every design
+  change, and this one had: the grid stood 26px above the real one, the phone's
+  rail band was 60px against a real 114px, and it drew four chips where the rail
+  had eight. What the screen shows now is assembled from what the panel is
+  assembled from — the rail's width, the head row and the content paddings are
+  tokens the panel's own rules read, and the tiles are the panel's `.grid`,
+  `.card` and `.card__frame` plus a caption space the height of the real one, so
+  the columns, the 16:9 frame, the list row (all three thumbnail steps) and the
+  card's plate come from the rules that draw the actual cards. `prepaint.js`
+  hands over the saved view with the panel's own `grid--list` class, so a saved
+  list opens as a list, and nothing in the boot rules is a pixel size of its
+  own. Measured against the live panel at 1440px: rail, grid origin, tile box
+  and frame identical in both views; the 26px that used to be wrong are gone.
+  The panel's padding declarations moved into `--studio-pad-top/inline/bottom`,
+  `--studio-rail-pad` and `--card-body` for the shared reading, which also folds
+  the desktop rail's `padding-top: 0` override into one value; on a phone the
+  rail band (a filters row) and the head row (a wrapped search) stay
+  content-sized, so the tiles there stand 77px above the real grid — a number
+  invented for them is exactly what drifted before. The contract fails if the
+  boot rules carry a pixel size of their own again. `STATIC_CACHE` bumped to
+  `lanpaper-static-v42`.
 
 - Replaced the library canvas registration-mark pattern with a subtle, static,
   palette-aware gradient in both light and dark themes.
@@ -181,29 +222,6 @@ Notable changes to Lanpaper. Docker images are published as
   panel from the first paint until `app.js` reports it built. `prepaint.js`
   arms it, and it releases itself on a timeout or on a panel script that failed
   to load, so a broken script can never leave the panel permanently blank.
-- **The loading screen no longer draws a copy of the panel.** The first version
-  did: a rail holding the brand, an action row, a label and four filter chips, a
-  header line, a search row and a dot row. A drawn copy ages with every design
-  change, and this one had: the grid stood 26px above the real one, the phone's
-  rail band was 60px against a real 114px, and it drew four chips where the rail
-  had eight. What the screen shows now is assembled from what the panel is
-  assembled from — the rail's width, the head row and the content paddings are
-  tokens the panel's own rules read, and the tiles are the panel's `.grid`,
-  `.card` and `.card__frame` plus a caption space the height of the real one, so
-  the columns, the 16:9 frame, the list row (all three thumbnail steps) and the
-  card's plate come from the rules that draw the actual cards. `prepaint.js`
-  hands over the saved view with the panel's own `grid--list` class, so a saved
-  list opens as a list, and nothing in the boot rules is a pixel size of its
-  own. Measured against the live panel at 1440px: rail, grid origin, tile box
-  and frame identical in both views; the 26px that used to be wrong are gone.
-  The panel's padding declarations moved into `--studio-pad-top/inline/bottom`,
-  `--studio-rail-pad` and `--card-body` for the shared reading, which also folds
-  the desktop rail's `padding-top: 0` override into one value; on a phone the
-  rail band (a filters row) and the head row (a wrapped search) stay
-  content-sized, so the tiles there stand 77px above the real grid — a number
-  invented for them is exactly what drifted before. The contract fails if the
-  boot rules carry a pixel size of their own again. `STATIC_CACHE` bumped to
-  `lanpaper-static-v42`.
 - A Russian panel no longer swaps its typeface after the first paint. The
   markup preloads the Latin subset of Manrope, which covers link names in every
   language but not the labels of a Russian interface, so the brand, the page
