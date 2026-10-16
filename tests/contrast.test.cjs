@@ -26,7 +26,9 @@ test('production checker covers mono and five colour palettes in both themes', t
   for (const palette of ['mono', 'indigo', 'sage', 'clay', 'graphite', 'ocean']) {
     for (const theme of ['light', 'dark']) assert.match(result.stdout, new RegExp(`${palette} +${theme}`));
   }
-  assert.match(result.stdout, /Проверок: 204, провалов: 0/);
+  // 204 пары палитр плюс семь пар про плитку в шапке (та же матрица из шести
+  // палитр в двух темах): число растёт только вместе с новыми парами.
+  assert.match(result.stdout, /Проверок: 288, провалов: 0/);
 });
 
 test('checker rejects the original dark nested-surface contrast regression', t => {

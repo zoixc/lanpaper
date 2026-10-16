@@ -638,6 +638,15 @@
     --r-xl: 16px;
     --card-padding: 10px 2px 0;
     --card-padding-phone: 10px 2px 0;
+    /* Высота подписи под кадром карточки. Её же занимает заготовка плитки в
+       каркасе загрузки, поэтому число живёт здесь, а не в двух правилах. */
+    --card-body: 58px;
+    /* Отступы содержимого и рельсы. Их читает и каркас загрузки: он должен
+       встать на те же места, иначе панель прыгает, когда появляется. */
+    --studio-pad-top: 26px;
+    --studio-pad-inline: 26px;
+    --studio-pad-bottom: 42px;
+    --studio-rail-pad: 0 16px 18px;
     /* Один размер у названия приложения в рельсе и у заголовка «Ссылки»
        в шапке: они стоят на одной линии и читаются одним голосом. */
     --studio-title-size: 20px;
@@ -645,8 +654,36 @@
     --studio-inner-radius: 6px;
     --studio-control-shadow: 0 1px 2px rgb(0 0 0 / 4%);
     --studio-popover-shadow: 0 12px 32px -16px rgb(0 0 0 / 24%);
-    /* A quiet wash follows the selected palette, without a repeating motif. */
-    --studio-canvas-glow: rgba(var(--accent-rgb), 0.035);
+    /* Три краски фона под карточками: акцентные пятна, глубина снизу и
+       угловой свет. Все — почти прозрачные: поле должно угадываться, а не
+       спорить с фотографиями, и не сдвигать контраст текста на рельсе
+       (проверяется tools/check-contrast.mjs). */
+    --studio-canvas-wash-accent: rgba(var(--accent-rgb), 0.05);
+    --studio-canvas-wash-depth: rgba(var(--shadow-rgb), 0.05);
+    --studio-canvas-wash-sheen: rgba(var(--accent-rgb), 0.035);
+    /* Подложка элемента управления в шапке — «плитка». Кнопки ряда
+       («выделить карточки», тема, настройки) стояли совсем без заливки, и на
+       градиентном поле от них оставался один значок; плитка возвращает им
+       границу. Она нарочно тихая: заливка та же, что у наведения в остальной
+       панели (--surface-hover), а показывает кнопку волосяная кайма —
+       --border-2, которой в панели помечают наведение. Выбранный сегмент
+       переключателя вида лежит на --surface, как содержимое карточки.
+       Значки и кайма сверены с tools/check-contrast.mjs. */
+    --studio-control-face: var(--surface-hover);
+    /* Кайма приглушена: --border-2 в полную силу читается как отдельная
+       рамка вокруг кнопки, а кнопка должна лишь не тонуть в поле. Годится
+       ровно середина между каймой наведения и заливкой. */
+    --studio-control-edge: color-mix(in srgb, var(--border-2) 50%, var(--surface-hover));
+    /* Всё поле целиком, одним значением: его рисуют и слой на всё окно, и
+       шапка (она непрозрачная — скрывает карточки, уезжающие под неё, — и
+       поэтому не может пропустить слой сквозь себя). Одно значение на двоих
+       — единственный способ гарантировать, что картинка совпадёт точка в
+       точку: расхождение на один уровень читается как шов по краю шапки. */
+    --studio-canvas-field:
+        linear-gradient(203deg, var(--studio-canvas-wash-sheen) 0%, transparent 46%),
+        radial-gradient(46% 38% at 86% 2%, var(--studio-canvas-wash-accent), transparent 72%),
+        radial-gradient(52% 44% at 2% 96%, var(--studio-canvas-wash-accent), transparent 74%),
+        radial-gradient(78% 56% at 44% 116%, var(--studio-canvas-wash-depth), transparent 80%);
     --studio-sheet-shadow: -16px 0 48px -32px rgb(0 0 0 / 28%);
     /* Высота верхней строки: её делят шапка и блок марки в рельсе (см. ниже),
        поэтому знак, название и заголовок стоят на одной центральной линии. */
@@ -655,7 +692,15 @@
 .studio[data-theme="dark"] {
     --studio-control-shadow: 0 1px 2px rgb(0 0 0 / 18%);
     --studio-popover-shadow: 0 14px 38px -14px rgb(0 0 0 / 55%);
-    --studio-canvas-glow: rgba(var(--accent-rgb), 0.045);
+    /* В тёмных палитрах та же заливка сама по себе поднята над фоном, так что
+       отдельного значения не нужно: плитку и здесь показывает кайма, только
+       не серая, а белая с малой прозрачностью. */
+    --studio-control-edge: color-mix(in srgb, #ffffff 8%, transparent);
+    /* В тёмных темах и пятна, и угловой свет светлее фона: так фон читается
+       подсветкой, а не грязным пятном. */
+    --studio-canvas-wash-accent: rgba(var(--accent-rgb), 0.075);
+    --studio-canvas-wash-depth: rgba(255, 255, 255, 0.04);
+    --studio-canvas-wash-sheen: rgba(255, 255, 255, 0.03);
     --studio-sheet-shadow: -16px 0 48px -32px rgb(0 0 0 / 55%);
 }
 .studio[data-palette="mono"] {
@@ -675,10 +720,16 @@
 .studio .shell {
     padding-top: 0;
 }
+/* Рельса — колонка в стороне от содержимого: под неё ничто не уезжает,
+   скрывать ей нечего. Поэтому своей заливки у неё нет вовсе, и поле видно
+   сквозь неё ровно таким же, как рядом. Всякая полупрозрачная плёнка здесь
+   работала бы как фильтр: поле под ней было бы бледнее, чем по соседству, и
+   разница читалась бы ровной вертикальной линией по краю рельсы — то самое
+   «фон обрезан», только чуть иначе. Пустая рельса этой границы не создаёт. */
 .studio .catalog-rail {
     top: 0;
-    padding: 25px 16px 18px;
-    background: var(--bg);
+    padding: var(--studio-rail-pad);
+    background: none;
     border: 0;
     transition:
         transform var(--dur-slow) var(--ease),
@@ -687,10 +738,14 @@
 /* Блок марки — той же ширины, что кнопка «Новая ссылка», и начинается на
    той же вертикали: значок стоит у левой грани кнопки, без своего отступа.
    Отступ до названия (12px на 25px значок) держит ту же пропорцию, что
-   внутри кнопки (7px на 14px). */
+   внутри кнопки (7px на 14px). Тот же отступ стоит и в каркасе загрузки: в
+   нём та же пара значок + название, поэтому правило одно на двоих. */
+.studio .catalog-rail .brand,
+.studio .boot__brand {
+    gap: 12px;
+}
 .studio .catalog-rail .brand {
     margin: 0 7px 26px;
-    gap: 12px;
 }
 /* Одна верхняя линия на двоих. Блок марки занимает ту же высоту, что строка
    шапки, и начинается от самого верха рельсы: знак, название и заголовок
@@ -699,16 +754,14 @@
    марки снизу (26px) равен отступу сетки сверху. Ниже 761px рельса — не
    колонка, а полоса над шапкой, и её отступы заданы отдельно. */
 @media (min-width: 761px) {
-    .studio .catalog-rail {
-        padding-top: 0;
-    }
     .studio .catalog-rail .brand {
         height: var(--studio-head-height);
         flex: none;
         margin-inline: 0;
     }
 }
-.studio .catalog-rail .brand__mark {
+.studio .catalog-rail .brand__mark,
+.studio .boot__mark {
     width: 25px;
     height: 25px;
     border-radius: 7px;
@@ -722,7 +775,8 @@
    1050px она 184px) минус её 12px отступов: 142px на знак 25px, отступ 12px
    и слово «Lanpaper», которое в 20-м кегле Manrope занимает 85px. Итого
    122px из 142px — запас 20px, и название читается целиком. */
-.studio .catalog-rail .brand__name {
+.studio .catalog-rail .brand__name,
+.studio .boot__name {
     font-family: var(--font-ui);
     font-size: var(--studio-title-size);
     font-weight: 750;
@@ -775,10 +829,18 @@
 .studio .catalog-rail .chip-row__sep {
     margin: 9px 10px;
 }
+/* Шапка обязана быть непрозрачной: под неё уезжают карточки при прокрутке,
+   и полупрозрачная она их показывала бы. Значит, сквозь неё поле не видно —
+   и она рисует его сама, тем же значением и с привязкой к окну
+   (background-attachment: fixed), как у слоя: тогда поле продолжается через
+   шапку без стыка, а бар остаётся баром. */
 .studio .appbar {
     top: 0;
     border: 0;
-    background: var(--bg);
+    background-color: var(--bg);
+    background-image: var(--studio-canvas-field);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
 }
 .studio .appbar__inner {
     padding: 0 26px;
@@ -857,14 +919,12 @@
     height: 14px;
 }
 .studio .btn-group--view {
-    border: 0;
-    background: var(--surface-hover);
     box-shadow: none;
 }
 .studio .content {
-    /* 26px сверху — ровно отступ марки снизу: верх кнопки «Новая ссылка»
-       в рельсе и верх первой карточки в сетке оказываются на одной линии. */
-    padding: 26px 26px 42px;
+    /* Отступы лежат в токенах: те же значения читает каркас загрузки, и
+       сетка плиток встаёт ровно туда, где окажется сетка карточек. */
+    padding: var(--studio-pad-top) var(--studio-pad-inline) var(--studio-pad-bottom);
 }
 /* Regular contact sheet: no hero panel, no headline occupying a third of the screen. */
 .studio .grid:not(.grid--list) .card:first-child {
@@ -876,7 +936,7 @@
 }
 .studio .grid:not(.grid--list) .card__body {
     padding: var(--card-padding);
-    min-height: 58px;
+    min-height: var(--card-body);
     gap: 3px;
 }
 .studio .grid:not(.grid--list) .card__head::before {
@@ -921,14 +981,10 @@
 @media (max-width: 1050px) {
     :root.studio {
         --rail-width: 166px;
-    }
-    .studio .catalog-rail {
-        padding-inline: 12px;
+        --studio-rail-pad: 0 12px 18px;
+        --studio-pad-inline: 20px;
     }
     .studio .appbar__inner {
-        padding-inline: 20px;
-    }
-    .studio .content {
         padding-inline: 20px;
     }
     .studio .appbar__row--top {
@@ -946,7 +1002,6 @@
         position: relative;
         top: auto;
         width: 100%;
-        padding: 15px 16px 9px;
         grid-template-columns: 1fr auto;
         gap: 12px;
         border: 0;
@@ -975,6 +1030,10 @@
     :root.studio {
         --studio-head-height: 56px;
         --studio-title-size: 18px;
+        --studio-rail-pad: 15px 16px 9px;
+        --studio-pad-top: 0px;
+        --studio-pad-inline: 16px;
+        --studio-pad-bottom: 30px;
     }
     .studio .appbar__row--top {
         padding: 9px 0 14px;
@@ -996,9 +1055,6 @@
     }
     .studio .search .field {
         height: 36px;
-    }
-    .studio .content {
-        padding: 0 16px 30px;
     }
     .studio .grid:not(.grid--list) .card__frame {
         border-radius: 8px;
@@ -1063,22 +1119,54 @@
     background: var(--surface-hover);
     border-color: var(--border);
 }
-/* Match the sliding selection to the actual button geometry (26/36px),
-   rather than inheriting the production switch's circular 30px marker. */
+/* Маркер выбранного вида повторяет геометрию кнопки (26px), а не наследует
+   круглые 30px боевого переключателя, и стоит ровно на её месте: 2px здесь —
+   это padding группы, потому что ::before отсчитывается от padding-box, а
+   кнопка начинается за той же каймой. При 3px подложка уезжала на пиксель
+   вниз и вправо от значка. */
 .studio .btn-group--view {
     --seg: var(--ctl-inner, 30px);
-    padding: 3px;
+    /* 2px внутренних плюс 1px каймы — те же 3px до кнопок, что и у ряда без
+       каймы: группа остаётся 32px высотой, вровень с соседними кнопками, и
+       маркер (top/left 3px) садится на первую кнопку точно. */
+    padding: 2px;
     gap: 2px;
+    border: 1px solid var(--studio-control-edge);
     border-radius: var(--studio-control-radius);
-    background: var(--surface-hover);
+    background: var(--studio-control-face);
 }
 .studio .btn-group--view::before {
-    top: 3px;
-    left: 3px;
+    top: 2px;
+    left: 2px;
     border-radius: var(--studio-inner-radius);
     background: var(--surface);
     box-shadow: var(--studio-control-shadow);
     transition: transform 180ms var(--ease-out);
+}
+/* Кнопки ряда — «выделить карточки», тема, настройки — получают плитку на
+   том же основании, что и группа вида. Наведение и включённое состояние
+   меняют не заливку, а значок и кайму: так они читаются и на светлой
+   плитке, и на тёмной, где «приподнять» заливку уже некуда. */
+.studio .appbar .appbar__actions .icon-btn {
+    background: var(--studio-control-face);
+    border-color: var(--studio-control-edge);
+}
+.studio .appbar .appbar__actions .icon-btn:hover:not(:disabled) {
+    border-color: var(--border-strong);
+    color: var(--text);
+}
+.studio .appbar .appbar__actions .icon-btn[aria-pressed="true"] {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+/* Внутри группы подложку держит она сама, а выбранный вид показывает
+   едущий маркер: своим фоном кнопка перекрыла бы его, а кайма спорила бы
+   с каймой группы. */
+.studio .appbar .appbar__actions .btn-group--view .icon-btn,
+.studio .appbar .appbar__actions .btn-group--view .icon-btn:hover:not(:disabled),
+.studio .appbar .appbar__actions .btn-group--view .icon-btn[aria-pressed="true"] {
+    background: transparent;
+    border-color: transparent;
 }
 .studio .btn-group--view .icon-btn {
     border-radius: var(--studio-inner-radius);
@@ -1200,6 +1288,13 @@
     .studio .menu__item:hover {
         background: var(--surface-hover);
     }
+}
+/* Клик по строке поиска не должен оставлять рамку вокруг ввода. Контур в
+   панели клавиатурный (:focus-visible), но текстовое поле браузер считает
+   клавиатурным и после мыши, поэтому внутри скруглённой строки появлялся
+   прямоугольник. Чем пришёл последний ввод, помечает app.js. */
+html[data-input="pointer"].studio .field input:focus {
+    outline: none;
 }
 /* Explicit, high-contrast keyboard outline. Radio-label focus stays visible. */
 .studio
@@ -1469,19 +1564,36 @@
 .studio :is(.num, .card__meta, .chip__count, .page-head__count) {
     font-variant-numeric: tabular-nums;
 }
-/* A static, diffuse glow softens the library canvas without competing with
-   photographs. No tiles, image requests, filters or animation. The wash fades
-   near the top instead of stretching with a long library. */
-.studio .content {
-    background-image: radial-gradient(
-        ellipse 85% 520px at 15% 0%,
-        var(--studio-canvas-glow),
-        transparent 75%
-    );
+/* Фон под карточками — одно поле на всё окно.
+   Раньше это было свечение внутри .content: прямоугольник содержимого
+   начинается ниже шапки и правее рельсы, поэтому поле обрывалось ровно по
+   их краям — резкой линией поперёк страницы. Теперь поле — отдельный
+   фиксированный слой на всё окно (z-index: -1, под всем), который не
+   прокручивается вместе с библиотекой: карточки едут по спокойному свету, а
+   не тащат его за собой.
+   Через рельсу поле видно как есть — у неё нет своей заливки. Шапка же
+   непрозрачная (под неё уезжают карточки), поэтому она рисует то же поле
+   сама, с привязкой к окну: см. --studio-canvas-field и .studio .appbar.
+   Ни картинок, ни анимации, ни повторов: только четыре мягких градиента
+   (пятна акцента сверху справа и снизу слева, глубина у нижнего края и
+   угловой свет) — они дают объём, но не спорят с фотографиями. Проверено по
+   пикселям: переход между соседними точками — не больше двух уровней из 255
+   на обоих краях, то есть ступенек на 8-битной глубине не видно. */
+.studio .canvas-wash {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: var(--studio-canvas-field);
     background-repeat: no-repeat;
 }
+/* Больше контраста — меньше украшений: поле убирается целиком, у шапки
+   остаётся её обычная заливка, рельса и так без неё. */
 @media (prefers-contrast: more), (forced-colors: active) {
-    .studio .content {
+    .studio .canvas-wash {
+        display: none;
+    }
+    .studio .appbar {
         background-image: none;
     }
 }
@@ -1786,9 +1898,26 @@
    Панель собирается скриптом: initializeStudio() переносит шапку в
    рельсу, hydrateIcons() рисует значки, applyTranslations() ставит
    подписи. Пока этого не произошло, разметка — не тот вид, который
-   получится, и показывать её незачем: экран ниже рисует каркас
-   будущего вида, а prepaint.js и app.js держат его ровно до
-   готовности панели.
+   получится, и показывать её незачем.
+
+   Каркас не изображает панель: ни чипов рельсы, ни поиска, ни кнопок
+   шапки в нём нет — их число и форма меняются с каждой правкой дизайна, и
+   нарисованная копия расходится (именно так она и расходилась: сетка
+   стояла на 26px выше настоящей, полоса рельсы на телефоне была 60px
+   против 114px, а чипов рисовалось четыре из восьми). Он собран из того
+   же, из чего собран сам экран: место рельсы (--rail-width), строка шапки
+   (--studio-head-height), отступы содержимого (--studio-pad-*), сетка
+   (.grid), карточка (.card) и её кадр (.card__frame) с местом подписи
+   (--card-body). Поэтому вид (сетка или список), пропорции кадра, колонки
+   и ширины строк каркас получает от панели, а не хранит у себя: в этом
+   блоке нет ни одного своего размера в пикселях.
+
+   Чего каркас не повторяет: на телефоне и полоса рельсы, и строка шапки
+   выше своих токенов — в полосе стоит ряд фильтров, а в шапке переносится
+   поиск, и высота обеих зависит от содержимого, а не от числа. Каркас их
+   не изображает, поэтому на телефоне сетка плиток стоит выше настоящей (на
+   широком экране — ровно там же). Так честнее, чем замершая копия: чисел
+   для этих двух высот у панели нет, а нарисованные по глазам расходятся.
    ============================================================ */
 
 /* Экран показывается, только если его включил prepaint.js: без метки на
@@ -1816,95 +1945,36 @@
     pointer-events: none;
     transition: opacity 0.2s ease;
 }
+/* Колонка рельсы — та же ширина и те же отступы, что у настоящей рельсы:
+   иначе при появлении панели содержимое сдвинулось бы вбок. */
 .boot__rail {
     flex: none;
     width: var(--rail-width);
-    padding: 25px 16px 18px;
+    padding: var(--studio-rail-pad);
     display: flex;
     flex-direction: column;
 }
+/* Марка стоит на строке шапки: блок той же высоты, что у панели, поэтому
+   значок и название оказываются на её центральной линии. */
+.boot__brand {
+    display: flex;
+    align-items: center;
+    height: var(--studio-head-height);
+}
+/* Строка шапки и отступ содержимого — те же токены, что у панели: сетка
+   плиток встаёт ровно туда, где окажется сетка карточек. */
 .boot__main {
     flex: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
-    padding: 0 26px;
+    padding: calc(var(--studio-head-height) + var(--studio-pad-top)) var(--studio-pad-inline) 0;
     overflow: hidden;
 }
-/* Каркас рельсы повторяет настоящую: те же марка, название и отступы. */
-.boot__brand {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    margin: 0 7px 26px;
-}
-.boot__mark {
-    flex: none;
-    width: 25px;
-    height: 25px;
-    border-radius: 7px;
-}
-.boot__name {
-    font-family: var(--font-ui);
-    font-size: 18px;
-    font-weight: 750;
-    letter-spacing: -0.8px;
-    color: var(--text);
-}
-/* Заготовки под «Новую ссылку», подпись и фильтры — тех же размеров,
-   что настоящие кнопка и чипы в рельсе. */
-.boot__line {
-    display: block;
-    border-radius: 8px;
-}
-.boot__line--action {
-    height: 36px;
-    margin-bottom: 29px;
-}
-.boot__line--label {
-    width: 52px;
-    height: 8px;
-    margin: 0 10px 11px;
-    border-radius: 4px;
-}
-.boot__chips {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-}
-.boot__line--chip {
-    height: 34px;
-}
-.boot__bar {
-    display: flex;
-    align-items: center;
-    gap: 18px;
-    /* Та же высота, что у строки шапки: каркас повторяет настоящий вид. */
-    min-height: var(--studio-head-height);
-}
-.boot__line--title {
-    width: 96px;
-    height: 20px;
-    border-radius: 5px;
-}
-.boot__line--search {
-    flex: 0 1 265px;
-    height: 32px;
-    margin-left: auto;
-    border-radius: 7px;
-}
-.boot__dot {
-    flex: none;
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-}
-/* Мерцание то же, что у скелетонов плиток: экран не должен выглядеть
-   замершим рядом с ними. */
-.boot__line,
+/* Мерцание: единственное, что каркас добавляет от себя, — «идёт загрузка».
+   Одной краской мерцает и марка, чтобы экран не выглядел замершим. */
 .boot__mark,
-.boot__dot {
-    background-color: var(--surface-hover);
+.boot__tile .card__frame {
     background-image: linear-gradient(
         90deg,
         transparent 0%,
@@ -1915,32 +1985,17 @@
     background-repeat: no-repeat;
     animation: shimmer 1.5s linear infinite;
 }
-/* Колонки и отступы — как у сетки панели, чтобы плитки не сдвигались
-   в момент, когда экран сменится настоящей панелью. */
-.boot__grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(236px, 1fr));
-    gap: var(--s-4);
-    align-content: start;
-    overflow: hidden;
+/* Настоящий знак — картинка; здесь его место занимает плашка того же размера
+   с тем же мерцанием, что у плиток. */
+.boot__mark {
+    background-color: var(--surface-2);
 }
-/* Вид «список» известен до отрисовки — prepaint.js пишет его в data-view,
-   поэтому каркас сразу в одну колонку, как сетка панели. */
-:root[data-view="list"] .boot__grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--s-2-5);
-}
-@media (max-width: 1080px) {
-    .boot__grid {
-        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-        gap: var(--s-3);
-    }
-    .boot__main {
-        padding-inline: 20px;
-    }
-    .boot__bar {
-        gap: 12px;
-    }
+/* Место подписи под кадром: сама подпись — текст, которого до загрузки ещё
+   нет, а высота у неё та же, что у настоящей (.card__body). Поэтому карточка
+   не прыгает вниз, когда данные приходят; в строке списка, где подпись стоит
+   рядом с кадром, пустая плашка не занимает ни ширины, ни высоты. */
+.boot__body {
+    height: var(--card-body);
 }
 @media (max-width: 760px) {
     /* На телефоне рельса — верхняя строка, как в самой панели. */
@@ -1951,49 +2006,5 @@
         width: 100%;
         flex-direction: row;
         align-items: center;
-        gap: 12px;
-        padding: 15px 16px 9px;
-    }
-    .boot__brand {
-        margin: 0 auto 0 0;
-    }
-    .boot__line--action {
-        width: 96px;
-        margin-bottom: 0;
-    }
-    .boot__line--label,
-    .boot__chips {
-        display: none;
-    }
-    .boot__main {
-        padding-inline: 16px;
-    }
-    .boot__bar {
-        flex-wrap: wrap;
-        gap: 10px;
-        min-height: var(--studio-head-height);
-        padding: 9px 0 14px;
-    }
-    .boot__line--search {
-        order: 2;
-        flex: 1 1 100%;
-        height: 36px;
-        margin-left: 0;
-    }
-}
-@media (max-width: 720px) {
-    .boot__grid {
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    }
-}
-@media (max-width: 560px) {
-    .boot__grid {
-        grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
-        gap: var(--s-2-5);
-    }
-}
-@media (max-width: 340px) {
-    .boot__grid {
-        grid-template-columns: minmax(0, 1fr);
     }
 }

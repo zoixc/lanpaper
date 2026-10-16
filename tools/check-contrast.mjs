@@ -102,8 +102,43 @@ const CHECKS = [
     ['--text', '--surface-2', 4.5, 'текст на вложенной поверхности'],
     ['--text-2', '--surface-2', 4.5, 'вторичный текст на вложенной поверхности'],
     ['--text-3', '--surface-2', 4.5, 'мета на вложенной поверхности'],
-    ['--text-3', '--surface-hover', 4.5, 'мета при наведении']
+    ['--text-3', '--surface-hover', 4.5, 'мета при наведении'],
+    // Кнопки в шапке лежат на плитке (--studio-control-face) поверх
+    // градиентного поля. Плитка нарочно тихая: заливка — --surface-hover,
+    // то есть та же краска, которой в панели помечают наведение, и заметна
+    // она не сама по себе, а каймой. Поэтому здесь проверяется и то, что
+    // кайма различима на плитке, и то, что она различима на фоне: на светлых
+    // палитрах заливка от поля почти не отличается, и границу держит она.
+    ['--text', '--studio-control-face', 7, 'значок на подложке управления'],
+    ['--text-2', '--studio-control-face', 4.5, 'значок покоя на подложке управления'],
+    ['--accent', '--studio-control-face', 3, 'акцентный значок на подложке управления'],
+    ['--surface', '--studio-control-face', 1.08, 'выбранный сегмент отличим от подложки'],
+    ['--studio-control-edge', '--studio-control-face', 1.08, 'кайма подложки различима'],
+    // 1.15 — дизайнерский порог для нарочно тихой каймы: поле под шапкой
+    // темнее --bg и подходит к кайме на 15 уровней из 255, поэтому требовать
+    // больше значило бы вернуть ту самую рамку, которую убрали.
+    ['--studio-control-edge', '--bg', 1.15, 'кайма подложки различима на фоне'],
+    ['--border-strong', '--studio-control-face', 1.1, 'кайма наведения различима']
 ];
+
+// Кайма плитки нарочно приглушена: в полную силу она читается как отдельная
+// рамка вокруг кнопки. Светлая — доля --border-2 в смешении с заливкой,
+// тёмная — белый с прозрачностью поверх плитки. Числа повторены здесь,
+// потому что чекер считает по переменным палитр; совпадение с CSS проверяет
+// tests/frontend-contract.test.cjs.
+const CONTROL_EDGE_LIGHT_MIX = 50;
+const CONTROL_EDGE_WHITE = 8;
+
+/* Смешение в sRGB, как его делает CSS: каналы складываются без линеаризации. */
+function srgbBlend(a, b, weightA) {
+    const channel = (hex, i) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16);
+    let out = '#';
+    for (let i = 0; i < 3; i++) {
+        const v = Math.round(channel(a, i) * weightA + channel(b, i) * (1 - weightA));
+        out += v.toString(16).padStart(2, '0');
+    }
+    return out;
+}
 const ON_ACCENT = ['--text-on-accent', '--accent', 4.5, 'текст на акцентной кнопке'];
 const DANGER = ['--danger', '--surface', 4.5, 'текст удаления на карточке'];
 
@@ -125,6 +160,10 @@ for (const palette of palettes) {
     for (const theme of ['light', 'dark']) {
         const vars = themeVars(palette, theme);
         vars['--select-arrow'] = selectArrow(theme);
+        vars['--studio-control-face'] = vars['--surface-hover'];
+        vars['--studio-control-edge'] = theme === 'dark'
+            ? srgbBlend('#ffffff', vars['--studio-control-face'], CONTROL_EDGE_WHITE / 100)
+            : srgbBlend(vars['--border-2'], vars['--surface-hover'], CONTROL_EDGE_LIGHT_MIX / 100);
         const list = [...CHECKS,
             ['--select-arrow', '--surface', 3, 'стрелка select'],
             ['--select-arrow', '--surface-2', 3, 'стрелка select на вложенной поверхности'], theme === 'light' ? ON_ACCENT : ['--text-on-accent', '--accent', 4.5, 'тёмный текст на светлой кнопке'], DANGER];

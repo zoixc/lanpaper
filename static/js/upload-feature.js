@@ -61,7 +61,7 @@ export function createUploadFeature(deps) {
         return done > 0;
     }
 
-    async function url(link, value, mode) {
+    async function url(link, value, mode, opts) {
         const key = 'upload:' + link.linkName;
         if (!operations.begin(key)) {
             deps.toast(deps.t('operation_in_progress'), { type: 'info' });
@@ -71,11 +71,16 @@ export function createUploadFeature(deps) {
         const busy = deps.toast(deps.t('uploading'), { type: 'info', duration: 0 });
         try {
             deps.applyUpdate(await deps.request('/api/upload', 'POST', form, true, undefined,
-                () => url(link, value, mode)));
+                () => url(link, value, mode, opts)));
             deps.toast(deps.t(mode === 'append' ? 'append_success' : 'upload_success'));
             return true;
-        } catch (_) { return false; }
-        finally { operations.end(key); busy.dismissToast(); }
+        } catch (error) {
+            /* Причина отказа приходит от сервера и у каждой бывает своя:
+               адрес, который не отвечает, — это сеть, а не «нет картинки».
+               Диалог показывает её на месте общей фразы. */
+            if (opts && typeof opts.onError === 'function') opts.onError(error);
+            return false;
+        } finally { operations.end(key); busy.dismissToast(); }
     }
 
     return Object.freeze({ file, files, url });

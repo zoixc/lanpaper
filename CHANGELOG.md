@@ -3,7 +3,7 @@
 Notable changes to Lanpaper. Docker images are published as
 `ptabi/lanpaper:<version>` and `ptabi/lanpaper:latest`.
 
-## [Unreleased]
+## [0.21.0] – 2026-10-16
 
 ### Added
 
@@ -22,6 +22,28 @@ Notable changes to Lanpaper. Docker images are published as
 
 ### Fixed
 
+- **A photo whose EXIF orientation asks for a turn is no longer stored and
+  served sideways.** That tag is what makes a portrait shot from a phone
+  portrait: the pixels come off the sensor landscape, and every viewer is asked
+  for a quarter turn. Nothing in Lanpaper read it, and the compression pass
+  re-encodes the picture — dropping EXIF on purpose, since it also carries the
+  location — so the turn was gone for good: the link, the panel thumbnail and
+  the display all showed the same photo on its side, while every other viewer
+  showed it upright. The tag is now read before the decode (JPEG, WebP and TIFF;
+  a value outside the eight defined ones is ignored) and baked into the pixels
+  of the stored image and of the thumbnail. Lossless and original mode keep the
+  bytes, and with them the tag, exactly as before — only the thumbnail is turned
+  there, because it never carried a tag of its own — and rebuilding previews
+  applies the same turn. Measured cost on a 12 MP JPEG: ~106 ms and one image's
+  worth of memory, against ~490 ms for a per-pixel copy through the `image.Image`
+  interface. AVIF is unchanged: its `irot`/`imir` are applied by the decoder.
+- A host written in another script is converted to punycode by the panel before
+  the address is sent, so `https://пример.рф/фото.jpg` is fetched instead of
+  answering `502`: the browser's URL parser is the only party here that can do
+  the conversion, and the server passes the host to DNS as it is written. The
+  field shows the address that will really be requested. Credentials, other
+  schemes and anything that does not parse stay as typed — those are refused
+  with their own message. `STATIC_CACHE` bumped.
 - Canceled first-use AVIF requests return promptly while one bounded shared
   initialization finishes. Runtime failures return 503 instead of 400.
 - Upload replacement history uses the service's injected store rather than
@@ -32,8 +54,136 @@ Notable changes to Lanpaper. Docker images are published as
   endpoint and soft-memory-limit deployment guidance.
 - Version history now also archives the previous live file when a replacement
   changes the stored extension (including original AVIF to compressed WebP).
+- **Adding media by URL no longer refuses an address that carries no media
+  extension.** The panel's dialog tested the pasted address against a
+  `\.(jpg|png|…)$` pattern before sending it, so every image-CDN link —
+  `https://images.unsplash.com/photo-…?w=1336`, the shape Unsplash, imgix and
+  most resizing CDNs serve their files under — was refused in the dialog with
+  "No image or video at this address" and the submit button stayed disabled.
+  The server had accepted those addresses since content sniffing replaced the
+  extension, and the panel's own hint text followed the extension. The check now
+  validates only what the server would reject anyway (scheme and length) and
+  describes what will happen: a known media extension is confirmed, everything
+  else is handed to the server, which decides by content.
+- The dialog names the two download failures apart. An address the server cannot
+  reach at all — DNS, a timeout, TLS, a CDN blocked for the server's own country
+  — answers `502` and reads "the server could not connect to this address",
+  while an address that answered with something other than media keeps `400`.
+  Before, every failure said "No image or video at this address", which sends
+  someone hunting for a fault in a link that is fine.
+- `&amp;` in a pasted address becomes the query separator it stands for, in the
+  panel and in `POST /api/upload` alike. Copied out of a page source or a
+  markdown file, a link reached an imgix-based CDN with parameters named
+  `amp;w`, which the CDN ignores: the answer was the full-size original — a
+  different and much larger file than the resized one the user picked.
+- **Every limit on a URL upload and every failure of one now has its own
+  answer**, so a refusal names something the user can act on. The gates were
+  audited end to end (`handlers/url_matrix_test.go` holds the inventory) and
+  four of them were saying the wrong thing:
+  - A download over `MAX_UPLOAD_MB` answered `400 Failed to load media` — the
+    same answer as "your link is wrong", although the address and the file are
+    fine. It is `413 File too large` now, as for a local file, and it is
+    enforced twice: on `Content-Length` and again while the body is streamed,
+    so a chunked answer that declares no length cannot slip past.
+  - An unwritable or full media directory answered as a download failure. The
+    address was fetched successfully; what failed was the write. It is
+    `500 Failed to save media`, with the real cause (`ENOSPC`, `EACCES`,
+    `EROFS` — told apart from a connection that died mid-transfer) in the log.
+  - An address the SSRF rules refuse — private, loopback, CGNAT, a metadata
+    hostname, credentials in the URL — answered the same `400 Failed to load
+    media` as a `404` at the CDN. It is `400 Address is not allowed`, and the
+    panel says what to do instead: the server gallery.
+  - A picture over the dimension limits (36 MP, 16,384 px per side) was reported
+    as `Invalid image or dimensions too large`, indistinguishable from a
+    truncated file, though the fixes are opposite: scale it down, or fetch it
+    again. The two are separate answers (`400 Image dimensions too large` and
+    `400 Invalid image`) and two separate panel messages.
+- In the panel: a `429` from the upload rate limit or the concurrent-download
+  ceiling reads "the server is busy, try again shortly" instead of quoting the
+  server's English log line; pasted addresses lose the quotes, brackets and
+  invisible characters (zero-width space, soft hyphen, BOM) that chat clients,
+  prose and PDFs add — the non-breaking space stays, because it is a real space
+  and now says so (`url_malformed`); and the 2048-byte length check counts bytes
+  as the server does, so a Cyrillic address no longer passes here and fails
+  there. `STATIC_CACHE` bumped.
+
+- **The header action buttons are outlined now, so they stop dissolving into the
+  gradient.** Select-multiple, theme and settings drew their glyph straight on
+  the canvas — no fill, no border — and over the library gradient what the user
+  saw was a bare icon whose edges depended on whatever the field was doing under
+  it; on the dark side the view switch did not cover for them either, because its
+  chosen tile is `--surface`, darker than the plate it sits on, so the picked
+  view read as a hole. The row now carries the same plate the rest of the panel
+  already uses for hover — `--surface-hover` — and what makes the button visible
+  is a single hairline: half of `--border-2` mixed into the plate's own fill in
+  light themes, white at 8 % in dark ones. Deliberately dimmer than a plain
+  border: at full `--border-2` the row read as a frame drawn around each button,
+  which is exactly what it was supposed to stop looking like. The fill is
+  deliberately almost the same as the field (3–4 levels of 255 where it was 0
+  before), so the row stays as quiet as it was, and the outline is what answers.
+  Hover darkens the glyph and moves the edge to `--border-strong`; the pressed
+  state paints the edge and the glyph with the accent; the chosen view keeps its
+  sliding `--surface` tile, sitting exactly on the button box — its 2 px offset
+  is the group's own padding, which that tile is measured from, so at 3 px it lay
+  a pixel low and a pixel right of the glyph — and the view switch keeps its
+  32 px height with the border folded into its padding.
+  Seven contrast pairs cover the plate, its resting and accent glyphs, its edge
+  (against the plate and against the field) and the tile on top of it, for all
+  six palettes in both themes, and the edge weight the CSS and the checker share
+  is asserted against it in `tests/frontend-contract.test.cjs`. `STATIC_CACHE`
+  bumped.
+
+- **Clicking the search row no longer draws a frame around the field.** The
+  panel shows focus for the keyboard only, through the global `:focus-visible`
+  rule — but Chrome treats a text input as keyboard-focused even when the click
+  came from the mouse, so every click left a rectangular outline inside the
+  rounded row, at odds with the field's own fill-and-border focus. The shell now
+  records what the last input was (`data-input` on the root element), and the
+  outline is dropped after a pointer only; a keyboard focus keeps the ring it
+  had.
+
+- **The library background is one field again, not a rectangle cut off by the
+  rail and the header.** The wash lived in `.content` — a radial glow inside the
+  content box, which starts below the header and to the right of the rail — so it
+  ended in a straight line along both edges. It is a full-window layer now
+  (`.canvas-wash`, fixed, under everything), which the two bars then have to
+  respect: the rail is a column beside the content, nothing scrolls under it, and
+  it carries no fill at all (deviation under it: 0 levels), while the header must
+  stay opaque because cards scroll under it, so it paints the same field itself
+  from one shared value (`--studio-canvas-field`) with the background anchored to
+  the viewport — deviation inside the header: 0.1 levels on average, 2 at worst,
+  which is dithering. No backdrop blur and no `color-mix` film is left on either
+  bar: a translucent film dims the field on one side of the edge, which is the
+  same "cut off" reading in reverse. The field stays still while the library
+  scrolls and follows the palette in both themes; `prefers-contrast` and forced
+  colours drop it and make both bars opaque. The contract test pins the
+  arrangement. `STATIC_CACHE` bumped.
 
 ### Changed
+
+- **The loading screen no longer draws a copy of the panel.** The first version
+  did: a rail holding the brand, an action row, a label and four filter chips, a
+  header line, a search row and a dot row. A drawn copy ages with every design
+  change, and this one had: the grid stood 26px above the real one, the phone's
+  rail band was 60px against a real 114px, and it drew four chips where the rail
+  had eight. What the screen shows now is assembled from what the panel is
+  assembled from — the rail's width, the head row and the content paddings are
+  tokens the panel's own rules read, and the tiles are the panel's `.grid`,
+  `.card` and `.card__frame` plus a caption space the height of the real one, so
+  the columns, the 16:9 frame, the list row (all three thumbnail steps) and the
+  card's plate come from the rules that draw the actual cards. `prepaint.js`
+  hands over the saved view with the panel's own `grid--list` class, so a saved
+  list opens as a list, and nothing in the boot rules is a pixel size of its
+  own. Measured against the live panel at 1440px: rail, grid origin, tile box
+  and frame identical in both views; the 26px that used to be wrong are gone.
+  The panel's padding declarations moved into `--studio-pad-top/inline/bottom`,
+  `--studio-rail-pad` and `--card-body` for the shared reading, which also folds
+  the desktop rail's `padding-top: 0` override into one value; on a phone the
+  rail band (a filters row) and the head row (a wrapped search) stay
+  content-sized, so the tiles there stand 77px above the real grid — a number
+  invented for them is exactly what drifted before. The contract fails if the
+  boot rules carry a pixel size of their own again. `STATIC_CACHE` bumped to
+  `lanpaper-static-v42`.
 
 - Replaced the library canvas registration-mark pattern with a subtle, static,
   palette-aware gradient in both light and dark themes.

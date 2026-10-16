@@ -99,7 +99,10 @@ func (s *UploadService) Upload(w http.ResponseWriter, r *http.Request) {
 	// to an unknown name is still rejected, so a typo cannot silently create a
 	// link and an existing client's behaviour does not change.
 	autoCreate := formFlag(form.value("autoCreate"))
-	urlStr := form.value("url")
+	// A link copied out of a page source carries "&amp;" where the query
+	// separator belongs; the panel rewrites it before sending, and the API
+	// does the same here so a script gets the file it pointed at.
+	urlStr := utils.NormalizeRemoteURL(form.value("url"))
 	if len(urlStr) > 2048 {
 		http.Error(w, "URL too long", http.StatusBadRequest)
 		return
@@ -200,7 +203,23 @@ func (s *UploadService) Upload(w http.ResponseWriter, r *http.Request) {
 			}()
 			if err != nil {
 				log.Printf("Download rejected: %v", err)
-				http.Error(w, "Failed to load media", http.StatusBadRequest)
+				// Every failure here has its own cause and its own answer. A
+				// download that is too large is a 413 (the same as a local
+				// file), an address the server refuses or cannot reach is not
+				// "no media at this address", and a disk that cannot take the
+				// bytes is the server's problem, not the link's.
+				switch {
+				case errors.Is(err, errMediaTooLarge):
+					http.Error(w, "File too large", http.StatusRequestEntityTooLarge)
+				case errors.Is(err, ErrMediaStorage):
+					http.Error(w, "Failed to save media", http.StatusInternalServerError)
+				case errors.Is(err, ErrRemoteUnreachable):
+					http.Error(w, "Could not reach the address", http.StatusBadGateway)
+				case errors.Is(err, utils.ErrAddressNotAllowed):
+					http.Error(w, "Address is not allowed", http.StatusBadRequest)
+				default:
+					http.Error(w, "Failed to load media", http.StatusBadRequest)
+				}
 				return
 			}
 			defer func() { f.Close(); os.Remove(f.Name()) }()
@@ -309,13 +328,28 @@ func (s *UploadService) Upload(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Unsupported AVIF feature (animation, HDR, colour profile, crop or size limit)", http.StatusBadRequest)
 				return
 			}
-			http.Error(w, "Invalid image or dimensions too large", http.StatusBadRequest)
+			if errors.Is(err, errImageDimensions) {
+				http.Error(w, "Image dimensions too large", http.StatusBadRequest)
+				return
+			}
+			http.Error(w, "Invalid image", http.StatusBadRequest)
 			return
 		}
 		defer release()
 		// Decoding a large image takes seconds; the client may be long gone.
 		if clientGone(r) {
 			return
+		}
+		/* Камера пишет пиксели как есть, а поворот — в теге EXIF. При
+		   перекодировании тег исчезает (он же несёт геоданные), поэтому
+		   поворот нужно впечатать в пиксели; иначе фото с телефона
+		   сохранится боком. Если же байты остаются как есть (lossless или
+		   PNG), тег в них сохраняется, и его применяет любой просмотрщик —
+		   тогда поворачиваем только превью, у которого тега нет. */
+		orientation := imageOrientation(source, ext)
+		if orientation > orientationNormal && !storeBytes {
+			img = applyOrientation(img, orientation)
+			orientation = orientationNormal
 		}
 		if !storeBytes {
 			img = scaleImage(img, config.Current.Compression.Scale)
@@ -330,7 +364,7 @@ func (s *UploadService) Upload(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			defer os.Remove(previewStage)
-			if err := savePreview(img, previewStage); err != nil {
+			if err := savePreview(img, orientation, previewStage); err != nil {
 				writeUploadError(w, err)
 				return
 			}

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
@@ -35,6 +36,27 @@ type Clock interface{ Now() time.Time }
 type systemClock struct{}
 
 func (systemClock) Now() time.Time { return time.Now() }
+
+var (
+	// ErrRemoteUnreachable marks a download that produced no response at all:
+	// DNS, a refused or timed-out connection, TLS, or a body that never
+	// arrived. The upload handler answers it with 502 instead of the 400 it
+	// uses for "the address answered, but not with media": conflating the two
+	// sends a user hunting for a broken link when the server is the one that
+	// cannot reach the host — a CDN blocked for the server's own country, for
+	// instance. That difference is the whole point of the sentinel.
+	ErrRemoteUnreachable = errors.New("remote address is unreachable")
+	// ErrMediaStorage marks a failure to write the downloaded bytes to disk: a
+	// full volume, a read-only or unwritable media directory, a failed seek.
+	// The address was fine, so this must not be reported as a download
+	// problem — the user cannot fix it from the link, and the log holds the
+	// real cause.
+	ErrMediaStorage = errors.New("cannot store the downloaded media")
+	// errRedirectRefused marks a redirect chain the fetch does not follow
+	// (more than config.MaxRedirects, or a hop that left HTTP(S)). The address
+	// answered, so this is not a connectivity problem and keeps the 400.
+	errRedirectRefused = errors.New("redirect refused")
+)
 
 type safeRemoteTransport struct{ Resolver URLResolver }
 
@@ -161,18 +183,25 @@ func (f *RemoteFetcher) Fetch(ctx context.Context, raw string, maxBytes int64) (
 		Transport: f.transport(),
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= config.MaxRedirects {
-				return errors.New("too many redirects")
+				return fmt.Errorf("%w: too many redirects", errRedirectRefused)
 			}
 			// RoundTrip will resolve and pin the next target before any I/O.
 			if req.URL.Scheme != "http" && req.URL.Scheme != "https" {
-				return errors.New("redirect scheme not allowed")
+				return fmt.Errorf("%w: scheme %q", errRedirectRefused, req.URL.Scheme)
 			}
 			return nil
 		},
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, 0, err
+		// A refused address was never contacted and a refused redirect was
+		// answered by the target itself: neither is a network failure, so both
+		// keep their own wording for the log and the generic 400 for the
+		// client.
+		if errors.Is(err, utils.ErrAddressNotAllowed) || errors.Is(err, errRedirectRefused) {
+			return nil, 0, err
+		}
+		return nil, 0, fmt.Errorf("%w: %v", ErrRemoteUnreachable, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -187,12 +216,12 @@ func (f *RemoteFetcher) Fetch(ctx context.Context, raw string, maxBytes int64) (
 	}
 	tmp, err := os.CreateTemp(tempDir, ".download-*")
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, storageFailure(err)
 	}
 	fail := func(err error) (*os.File, int64, error) {
 		tmp.Close()
 		os.Remove(tmp.Name())
-		return nil, 0, err
+		return nil, 0, storageFailure(err)
 	}
 	n, err := io.Copy(tmp, io.LimitReader(resp.Body, maxBytes+1))
 	if err != nil {
@@ -205,4 +234,16 @@ func (f *RemoteFetcher) Fetch(ctx context.Context, raw string, maxBytes int64) (
 		return fail(err)
 	}
 	return tmp, n, nil
+}
+
+// storageFailure separates the two things a failed stream can mean: a full or
+// unwritable disk (a *fs.PathError — ENOSPC, EACCES, EROFS) from a connection
+// that died mid-body. Only the second is a download problem, and the difference
+// decides whether the user is told to look at their link or at their server.
+func storageFailure(err error) error {
+	var pathErr *fs.PathError
+	if errors.As(err, &pathErr) {
+		return fmt.Errorf("%w: %v", ErrMediaStorage, err)
+	}
+	return err
 }

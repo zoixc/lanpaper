@@ -283,7 +283,7 @@ test('shortcuts stay out of an open dialog, and the gear reports its state', () 
   assert.match(adminHtml, /id="settingsSheet"/, 'the settings sheet lost its id');
   assert.match(scriptSource, /setSettingsExpanded\(/, 'nothing updates the gear state');
   const code = read('static/sw.js');
-  assert.match(code, /lanpaper-static-v32/,
+  assert.match(code, /lanpaper-static-v42/,
     'the precache generation must be bumped whenever the panel assets change');
 });
 
@@ -330,6 +330,46 @@ test('the boot screen covers the unassembled panel and is always released', () =
     'nothing turns the boot screen on once it is armed');
   assert.match(boot, /:root\[data-boot="done"\] \.boot[\s\S]*?opacity: 0;/,
     'the boot screen no longer fades out when it is released');
+  // Каркас не рисует панель заново: ни чипов рельсы, ни строки поиска, ни
+  // кнопок шапки — их число и форма меняются с каждой правкой дизайна, и
+  // нарисованная копия расходится (именно это и случилось). Он собирается
+  // из тех же классов, что и панель, а размеры берёт у её токенов.
+  const mark = adminHtml.slice(adminHtml.indexOf('id="bootScreen"'),
+    adminHtml.indexOf('<a class="skip-link"'));
+  assert.match(mark, /<div class="grid boot__grid">/,
+    'the boot grid no longer uses the panel grid, so its columns can drift again');
+  assert.match(mark, /<div class="card boot__tile"><div class="card__frame"><\/div><div class="boot__body"><\/div><\/div>/,
+    'the boot tile is no longer a card with a frame and a caption space');
+  assert.ok(!/boot__(line|dot|chip|bar|pill|search|action)/.test(mark),
+    'the boot screen draws the panel furniture again (chips, search row, header buttons)');
+  // Ни одного своего размера: всё, чем каркас меряется, объявлено у панели и
+  // стоит на её же элементах. Иначе копия снова начнёт расходиться.
+  const sizes = boot.replace(/@media[^{]*/g, '').match(/[\d.]+px/g) || [];
+  assert.deepEqual(sizes, [],
+    'the boot skeleton carries pixel sizes of its own instead of reading the panel tokens');
+  const rootStudio = studioCss.match(/:root\.studio \{([\s\S]*?)\n\}/);
+  assert.ok(rootStudio, ':root.studio disappeared');
+  // Каждый токен объявлен у панели, читается её собственным правилом и
+  // повторяется каркасом: правка дизайна доходит до экрана загрузки сама.
+  const tokens = [
+    ['--rail-width', /\.catalog-rail \{[^}]*width: var\(--rail-width\)/],
+    ['--studio-head-height', /\.studio \.appbar__row--top \{[^}]*min-height: var\(--studio-head-height\)/],
+    ['--studio-rail-pad', /\.studio \.catalog-rail \{[^}]*padding: var\(--studio-rail-pad\)/],
+    ['--studio-pad-top', /\.studio \.content \{[^}]*padding: var\(--studio-pad-top\)/],
+    ['--card-body', /\.studio \.grid:not\(\.grid--list\) \.card__body \{[^}]*min-height: var\(--card-body\)/],
+  ];
+  for (const [token, panel] of tokens) {
+    assert.ok(new RegExp(`\\n    ${token}: `).test(rootStudio[1]),
+      `${token} is no longer a panel token, so the boot skeleton cannot take it from the panel`);
+    assert.match(studioCss, panel, `the panel stopped sizing itself with ${token}`);
+    assert.ok(boot.includes(`var(${token})`), `the boot skeleton stopped reading ${token}`);
+  }
+  // Вид каркас получает тем же классом, что и панель: в сохранённом списке
+  // каркас показывает строки, а не сетку плиток, и ничего не считает сам.
+  assert.match(prepaint, /classList\.add\('grid--list'\)/,
+    'nothing hands the saved list view to the boot skeleton');
+  assert.match(prepaint, /getElementById\('bootScreen'\)[\s\S]{0,120}querySelector\('\.boot__grid'\)/,
+    'the boot grid is looked up somewhere else than in the boot screen');
 });
 
 test('the panel preloads the typeface subset its language needs', () => {
@@ -594,9 +634,11 @@ test('the rail head and the appbar share one top line', () => {
   assert.match(studio, /\.studio \.catalog-rail \.brand \{\s*height: var\(--studio-head-height\)/,
     'the brand block is no longer as tall as the appbar row, so the name and the title drift apart');
   const brand = studio.match(/\.studio \.catalog-rail \.brand \{\s*margin: 0 7px (\d+)px;/);
-  const content = studio.match(/\.studio \.content \{[^}]*padding: (\d+)px/);
-  assert.ok(brand && content, 'the brand margin or the content padding is gone');
-  assert.equal(content[1], brand[1],
+  const top = studio.match(/--studio-pad-top: (\d+)px;/);
+  assert.ok(brand && top, 'the brand margin or the content padding is gone');
+  assert.match(studio, /\.studio \.content \{[^}]*padding: var\(--studio-pad-top\)/,
+    'the content padding stopped reading the token the boot skeleton shares');
+  assert.equal(top[1], brand[1],
     'the grid no longer starts level with the new-link button');
 });
 
@@ -617,19 +659,152 @@ test('folding the rail animates instead of snapping', () => {
     'the "less motion" switch disappeared, so the slide cannot be turned off');
 });
 
-test('the library canvas uses a quiet, non-repeating wash in both themes', () => {
+test('the canvas wash is one field: a full-window layer, plus the opaque header repeating it', () => {
+  // Фон под карточками раньше был свечением внутри .content: прямоугольник
+  // содержимого начинается ниже шапки и правее рельсы, поэтому поле
+  // обрывалось ровной линией по их краям. Теперь это поле на всё окно.
+  //
+  // Важно, почему рельса и шапка сделаны по-разному. Рельса — колонка в
+  // стороне: под неё ничто не уезжает, скрывать ей нечего, поэтому у неё нет
+  // своей заливки вовсе и поле видно сквозь неё как есть. Полупрозрачная
+  // панель на её месте работала бы фильтром: поле под ней бледнее, чем рядом,
+  // и разница читается вертикальной линией по краю — то же «фон обрезан».
+  // Шапка непрозрачна (под неё уезжают карточки при прокрутке), поэтому она
+  // рисует то же поле сама, тем же значением и с привязкой к окну.
   const studio = read('static/css/studio.css');
-  assert.doesNotMatch(studio, /--studio-canvas-mark/, 'the old registration marks returned');
-  assert.equal(matches(studio, /--studio-canvas-glow: rgba\(var\(--accent-rgb\), [^)]+\)/g).length, 2,
-    'the wash needs a restrained opacity for each theme');
-  const canvas = studio.match(/\.studio \.content \{\s*background-image:[^}]+\}/)[0];
-  assert.match(canvas, /background-image: radial-gradient\(/);
-  assert.match(canvas, /var\(--studio-canvas-glow\)/, 'the wash must follow the palette');
-  assert.match(canvas, /background-repeat: no-repeat/, 'the canvas must not tile');
-  assert.doesNotMatch(canvas, /url\(|repeating-|background-size: 96px/, 'a repeating motif returned');
+  const page = read('admin.html');
+  assert.match(page, /<div class="canvas-wash" aria-hidden="true"><\/div>/,
+    'the wash layer left the markup');
+  assert.doesNotMatch(studio, /--studio-canvas-glow|--studio-canvas-mark/,
+    'the old glow token survived next to the new one');
+
+  // Поле — одно значение на двоих: слой и шапка берут одну переменную, иначе
+  // их картинки разойдутся хотя бы на уровень, а это и есть шов.
+  assert.match(studio, /--studio-canvas-field:\s*\n\s*linear-gradient\(/,
+    'the field must be defined once, as a value both surfaces share');
+  const layer = studio.match(/\.studio \.canvas-wash \{[^}]+\}/)[0];
+  assert.match(layer, /position: fixed/);
+  assert.match(layer, /inset: 0/, 'the layer must cover the whole window, not the content box');
+  assert.match(layer, /z-index: -1/, 'the layer must sit under the bars, not over them');
+  assert.match(layer, /pointer-events: none/);
+  assert.match(layer, /background-image: var\(--studio-canvas-field\)/,
+    'both surfaces must paint the same field');
+  assert.match(layer, /background-repeat: no-repeat/, 'the canvas must not tile');
+  assert.doesNotMatch(layer, /url\(|repeating-/, 'a repeating motif returned');
+
+  // Рельса: ни заливки, ни фильтра — иначе поле под ней бледнее соседнего.
+  const rail = studio.match(/\.studio \.catalog-rail \{[^}]+\}/)[0];
+  assert.match(rail, /background: none/, 'a rail fill would cut the field off at its edge');
+  assert.doesNotMatch(rail, /backdrop-filter|color-mix/,
+    'a translucent rail dims the field on one side of its edge');
+
+  // Шапка: непрозрачная основа плюс то же поле, привязанное к окну.
+  const bar = studio.match(/\.studio \.appbar \{[^}]+\}/)[0];
+  assert.match(bar, /background-color: var\(--bg\)/,
+    'the header must stay opaque: cards scroll under it');
+  assert.match(bar, /background-image: var\(--studio-canvas-field\)/);
+  assert.match(bar, /background-attachment: fixed/,
+    'without viewport anchoring the header field cannot line up with the layer');
+  assert.match(bar, /background-repeat: no-repeat/);
+  assert.doesNotMatch(studio, /backdrop-filter/, 'the veiled panels are back');
+
+  // Поле следует палитре, а не фиксированному цвету, и красок ровно три.
+  assert.equal(matches(studio, /--studio-canvas-wash-[a-z]+: rgba\([^)]+\)/g).length, 6,
+    'three wash colours, one value per theme');
+  assert.match(studio, /--studio-canvas-wash-accent: rgba\(var\(--accent-rgb\), [^)]+\)/,
+    'the accents must follow the palette');
   assert.match(studio,
-    /@media \(prefers-contrast: more\), \(forced-colors: active\) \{\s*\.studio \.content \{\s*background-image: none;/,
+    /@media \(prefers-contrast: more\), \(forced-colors: active\) \{[\s\S]*?\.studio \.canvas-wash \{\s*display: none;/,
     'the wash must disappear when more contrast is requested');
+  assert.match(studio,
+    /@media \(prefers-contrast: more\), \(forced-colors: active\) \{[\s\S]*?\.studio \.appbar \{\s*background-image: none;/,
+    'with the wash gone the header must not keep painting it');
+});
+
+test('the header buttons keep a plate of their own over the gradient', () => {
+  // Кнопки ряда («выделить карточки», вид, тема, настройки) стояли на поле
+  // совсем без заливки, и на градиенте от них оставался один значок. Плитка —
+  // это непрозрачная заливка плюс кайма, и обе краски обязаны быть
+  // переменными палитры: свой цвет здесь разошёлся бы с темой.
+  const studio = read('static/css/studio.css');
+  const checker = read('tools/check-contrast.mjs');
+
+  // Плитка нарочно тихая: заливка — та же краска, которой в панели помечают
+  // наведение, и задана один раз на обе темы. Кнопку показывает кайма.
+  const faces = [...studio.matchAll(/--studio-control-face: ([^;]+);/g)].map(([, v]) => v.trim());
+  assert.deepEqual(faces, ['var(--surface-hover)'],
+    'плитка перестала быть тихой: заливка ушла от краски наведения');
+
+  const edges = [...studio.matchAll(/--studio-control-edge: ([^;]+);/g)].map(([, v]) => v.trim());
+  assert.equal(edges.length, 2, 'кайма должна быть определена ровно для двух тем');
+  const edgeLight = edges[0].match(
+    /^color-mix\(in srgb, var\(--border-2\) (\d+)%, var\(--surface-hover\)\)$/);
+  assert.ok(edgeLight,
+    'светлая кайма приглушена смешением с заливкой; в полную силу она читается как рамка');
+  const edgeMix = edges[1].match(/^color-mix\(in srgb, #ffffff (\d+)%, transparent\)$/);
+  assert.ok(edgeMix, 'тёмная кайма — белый с прозрачностью поверх плитки');
+
+  // Число каймы чекер считает у себя: если оно разойдётся с CSS, проверка
+  // контраста будет считать не тот цвет, который видно на экране.
+  const constants = Object.fromEntries(
+    [...checker.matchAll(/const (CONTROL_[A-Z_]+) = (\d+);/g)].map(([, name, value]) => [name, Number(value)]));
+  assert.deepEqual(Object.keys(constants).sort(), ['CONTROL_EDGE_LIGHT_MIX', 'CONTROL_EDGE_WHITE'],
+    'набор весов плитки в tools/check-contrast.mjs изменился');
+  assert.equal(Number(edgeLight[1]), constants.CONTROL_EDGE_LIGHT_MIX,
+    'приглушение светлой каймы в tools/check-contrast.mjs разошлось с CSS');
+  assert.equal(Number(edgeMix[1]), constants.CONTROL_EDGE_WHITE,
+    'прозрачность каймы в tools/check-contrast.mjs разошлась с CSS');
+
+  // Пара «что на чём» должна существовать и в чекере: иначе об этой плитке
+  // никто не узнает при следующей правке палитр.
+  for (const label of [
+    'значок на подложке управления',
+    'значок покоя на подложке управления',
+    'акцентный значок на подложке управления',
+    'выбранный сегмент отличим от подложки',
+    'кайма подложки различима',
+    'кайма подложки различима на фоне',
+  ]) {
+    assert.ok(checker.includes(label), `чекер контраста потерял пару «${label}»`);
+  }
+
+  const button = studio.match(/\.studio \.appbar \.appbar__actions \.icon-btn \{[^}]+\}/)[0];
+  assert.match(button, /background: var\(--studio-control-face\)/,
+    'кнопки ряда снова без заливки — на градиенте они пропадут');
+  assert.match(button, /border-color: var\(--studio-control-edge\)/,
+    'без каймы плитка на светлых палитрах почти не отличается от поля');
+  const hover = studio.match(
+    /\.studio \.appbar \.appbar__actions \.icon-btn:hover:not\(:disabled\) \{[^}]+\}/)[0];
+  assert.match(hover, /border-color: var\(--border-strong\)/,
+    'наведение должно отзываться каймой, а не заливкой: заливка и так уже плитка');
+  assert.match(hover, /color: var\(--text\)/);
+
+  // Внутри группы вида подложку держит сама группа, а выбранный вид — маркер:
+  // своя заливка у внутренней кнопки перекрыла бы его.
+  const inner = studio.match(/\.studio \.appbar \.appbar__actions \.btn-group--view \.icon-btn,[^}]+\}/)[0];
+  assert.match(inner, /background: transparent/,
+    'внутренняя кнопка группы перекрывает маркер выбранного вида');
+  const marker = studio.match(/\.studio \.btn-group--view::before \{[^}]+\}/)[0];
+  assert.match(marker, /background: var\(--surface\)/,
+    'маркер выбранного вида потерял краску содержимого карточки');
+
+  // Группа вида стоит в одном ряду с кнопками, у которых каймы нет: её
+  // внутренние 2px плюс 1px каймы должны давать ровно то же поле до кнопок,
+  // иначе группа окажется выше соседей и разъедется по центру.
+  const actions = studio.match(/\.studio \.appbar__actions \{[^}]+\}/)[0];
+  const group = studio.match(/\.studio \.btn-group--view \{[^}]*--seg[^}]*\}/)[0];
+  const ctl = Number(actions.match(/--ctl: (\d+)px/)[1]);
+  const innerSize = Number(actions.match(/--ctl-inner: (\d+)px/)[1]);
+  const padding = Number(group.match(/padding: (\d+)px/)[1]);
+  const edgeWidth = Number(group.match(/border: (\d+)px/)[1]);
+  assert.equal(innerSize + 2 * padding + 2 * edgeWidth, ctl,
+    'группа вида перестала быть вровень с соседними кнопками');
+  // Маркер отсчитывается от padding-box группы, а кнопка начинается за той же
+  // каймой: чтобы подложка села на кнопку ровно, её смещение равно отступу.
+  assert.equal(Number(marker.match(/top: (\d+)px/)[1]), padding,
+    'подложка выбранного вида съехала по вертикали относительно значка');
+  assert.equal(Number(marker.match(/left: (\d+)px/)[1]), padding,
+    'подложка выбранного вида съехала по горизонтали относительно значка');
 });
 
 test('accent details take the palette colour, not the text colour', () => {
@@ -776,6 +951,18 @@ test('a text field marks focus with its fill, not with a frame', () => {
   assert.match(input, /background:\s*var\(--surface-2\)/, 'a focused input no longer changes');
   const search = rule(studio, /\.search \.field:focus-within\s*\{([\s\S]*?)\n\}/, 'the search focus rule');
   assert.ok(!framed.test(search), 'the search field is framed on focus again');
+  // Скруглённую строку поиска обводил не только CSS панели: текстовое поле
+  // браузер считает клавиатурным и после клика мышью, поэтому глобальное
+  // :focus-visible рисовало вокруг <input> прямоугольник внутри строки.
+  // Панель помечает, чем пришёл последний ввод, и после указателя контура нет.
+  assert.match(studio,
+    /html\[data-input="pointer"\]\.studio \.field input:focus \{[^}]*outline: none/,
+    'клик по строке поиска снова оставляет прямоугольную рамку вокруг ввода');
+  const app = read('static/js/app.js');
+  assert.match(app, /addEventListener\('pointerdown', mark\('pointer'\), true\)/,
+    'ничто не помечает, что ввод пришёл указателем');
+  assert.match(app, /addEventListener\('keydown', mark\('keyboard'\), true\)/,
+    'ничто не помечает, что ввод пришёл с клавиатуры');
   const name = rule(studio, /\.studio \.studio-name-field:focus-within\s*\{([\s\S]*?)\n\}/, 'the name field focus rule');
   assert.ok(!/box-shadow:\s*inset 0 -2px/.test(name), 'the name field draws a rule under itself on focus');
   assert.match(name, /background:\s*var\(--surface-hover\)/, 'a focused name field no longer changes');
@@ -809,8 +996,10 @@ test('the brand block matches the new-link button it stands above', () => {
   // приложения набрано тем же кеглем, что «Ссылки» в шапке, — одним токеном,
   // чтобы они не разъезжались по размеру на разных ширинах.
   const studio = read('static/css/studio.css');
-  const brand = studio.match(/\.studio \.catalog-rail \.brand \{([\s\S]*?)\n\}/);
-  assert.ok(brand, 'the brand rule disappeared');
+  // Правило общее с каркасом загрузки: в нём стоит та же пара значок+название,
+  // поэтому отступ у них один (ниже селектор каркаса — он последний в списке).
+  const brand = studio.match(/\.studio \.boot__brand \{([\s\S]*?)\n\}/);
+  assert.ok(brand, 'the brand gap rule disappeared');
   assert.match(brand[1], /gap: \d+px;/, 'the gap between the mark and the name is back to the inherited one');
   const wide = studio.match(/@media \(min-width: 761px\) \{([\s\S]*?)\n\}\n/);
   assert.ok(wide, 'the desktop rail rules disappeared');
@@ -819,7 +1008,7 @@ test('the brand block matches the new-link button it stands above', () => {
   assert.match(wideBrand[1], /margin-inline: 0;/, 'the brand is narrower than the button by its own margins');
   assert.ok(!/padding-inline:/.test(wideBrand[1]),
     'the brand has an inset of its own again: the mark no longer starts at the left edge of the button');
-  const name = studio.match(/\.studio \.catalog-rail \.brand__name \{([\s\S]*?)\n\}/);
+  const name = studio.match(/\.studio \.boot__name \{([\s\S]*?)\n\}/);
   assert.ok(name, 'the brand name rule disappeared');
   assert.match(name[1], /overflow: visible;/,
     'the app name is clipped again: it is cut to «Lanpa…» instead of fitting the rail');
@@ -827,7 +1016,7 @@ test('the brand block matches the new-link button it stands above', () => {
   // Худший случай: рельса 166px (шире 1050px она 184px) минус её 12px
   // отступов — 142px. Слово «Lanpaper» в 20-м кегле Manrope — 85px, замерено
   // по самому файлу шрифта (static/fonts/manrope-latin-wght-normal.woff2).
-  const mark = Number(studio.match(/\.studio \.catalog-rail \.brand__mark \{\s*width: (\d+)px/)[1]);
+  const mark = Number(studio.match(/\.studio \.boot__mark \{[\s\S]*?width: (\d+)px/)[1]);
   const gap = Number(brand[1].match(/gap: (\d+)px/)[1]);
   assert.ok(mark + gap + 86 <= 142,
     `the mark, the gap and the name need ${mark + gap + 86}px, but the narrowest rail gives 142px`);

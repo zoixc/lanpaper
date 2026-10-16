@@ -266,7 +266,7 @@ func regenPreview(ctx context.Context, wp *storage.Wallpaper) error {
 		return err
 	}
 	defer os.Remove(stage)
-	if err := savePreview(img, stage); err != nil {
+	if err := savePreview(img, imageOrientation(f, ext), stage); err != nil {
 		return err
 	}
 	if err := ctx.Err(); err != nil {

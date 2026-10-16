@@ -295,7 +295,14 @@ The request is `multipart/form-data` with these fields:
   answers `400 Link does not exist` (see `autoCreate`).
 - One media source:
   - `file`: an uploaded file.
-  - `url`: a public `http(s)://` URL.
+  - `url`: a public `http(s)://` URL. Surrounding whitespace is trimmed and
+    the HTML escape `&amp;` becomes the query separator it stands for — a link
+    copied out of a page source arrives escaped, and image CDNs built on imgix
+    (Unsplash, for one) silently ignore the parameters behind it. The address
+    does not need a file extension, and the type comes from the content. A host
+    in another script must be punycode already (`xn--e1afmkfd.xn--p1ai`): the
+    server hands the host to DNS as it is written, so the Cyrillic form answers
+    `502`. The panel converts it before sending, an API client has to.
   - `url` set to a path relative to `EXTERNAL_IMAGE_DIR`, as returned by
     `/api/external-images`.
 - `mode`: `replace` (default) or `append`.
@@ -348,14 +355,20 @@ Success: `200` with the updated link object.
 
 | Status | Cause |
 | --- | --- |
-| `400` | Invalid input, unsupported or corrupt media, an unknown `mode`, an `append` to a link without media, invalid `autoCreate` defaults, or a remote URL that is not allowed or failed to download. |
+| `400` | Invalid input, an unknown `mode`, an `append` to a link without media, invalid `autoCreate` defaults, or one of the media answers below. |
+| `400 Invalid URL` | The address does not parse (`url.Parse`): a stray space, or a `%` that is not an escape. |
+| `400 Address is not allowed` | The server refuses to fetch this address: credentials in the URL, a private, loopback, link-local, CGNAT or special-purpose range, or a metadata hostname. Nothing was dialled. |
+| `400 Invalid image` | The bytes are not a supported image or video, or the picture is truncated. |
+| `400 Image dimensions too large` | Over 36 MP, or over 16,384 px on a side. The format is fine; the picture needs scaling. |
+| `400 Failed to load media` | The address answered, but not with media: `404`, a hotlink refusal, an HTML page, or more than `MaxRedirects` (5). |
 | `401` | Missing or wrong credentials, or a wrong publish key. |
 | `403` | A publish key tried to replace the media of a link that already has media, a cross-origin request was refused, or a gallery path lies outside the gallery directory. |
 | `404` | File not found. |
 | `409` | The playlist already holds `PLAYLIST_MAX` items. |
-| `413` | Larger than `MAX_UPLOAD_MB`. |
-| `429` | Rate limit, concurrent-upload limit (`MAX_CONCURRENT_UPLOADS`, default 2 — the slots are busy, not the rate: retry when one finishes), or image memory budget exhausted. All of them carry `Retry-After`. |
-| `500` | Storage error. |
+| `413 File too large` | Larger than `MAX_UPLOAD_MB` — checked from `Content-Length` and again while the body is streamed (a chunked answer that declares no length is caught by the counting reader). |
+| `429` | Rate limit (`Rate limit exceeded`), the concurrent-upload limit (`MAX_CONCURRENT_UPLOADS`, default 2 — the slots are busy, not the rate: retry when one finishes), too many concurrent remote downloads, or the image memory budget (`Image processing busy; retry shortly`). All of them carry `Retry-After`. |
+| `500 Failed to save media` | The bytes could not be written: no space left, or an unwritable media directory. The link and its current media are untouched. |
+| `502 Could not reach the address` | Nothing answered: DNS, a refused or timed-out connection, TLS (a filtered or blocked host, or a CDN unreachable from the server's network), or a body that died mid-transfer. |
 
 Long uploads are allowed: after authentication, the read deadline is at least
 120 s plus the time needed to transfer the maximum size at 256 KiB/s. Media

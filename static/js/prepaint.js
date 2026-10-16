@@ -53,6 +53,20 @@
             reveal();
         }, true);
         window.LANPAPER_BOOT = { reveal: reveal };
+
+        /* Вид каркаса: класс grid--list на сетку панели навешивает app.js, а
+           он выполнится уже после первой отрисовки. Разметка каркаса идёт
+           сразу за <body>, а этот скрипт — в <head>, поэтому ждём, когда
+           документ разберётся, и ставим класс сами: иначе в сохранённом
+           списке каркас показал бы сетку плиток, а панель — строки. Числа и
+           пропорции строк каркас берёт из этого класса, своих у него нет. */
+        function armView() {
+            if (document.documentElement.dataset.view !== 'list') return;
+            var screen = document.getElementById('bootScreen');
+            var grid = screen && screen.querySelector('.boot__grid');
+            if (grid) grid.classList.add('grid--list');
+        }
+        document.addEventListener('DOMContentLoaded', armView);
     })();
 
     (function () {

@@ -38,3 +38,22 @@ test('upload feature rejects unsupported media before a request', async () => {
   assert.equal(await feature.file({ linkName: 'wall' }, new Blob(['x'], { type: 'text/plain' }), 'replace'), false);
   assert.equal(requests, 0);
 });
+
+test('a refused URL upload hands the reason to the dialog', async () => {
+  const { createUploadFeature } = await import(moduleURL);
+  const reason = Object.assign(new Error('Failed to load media'), { status: 400 });
+  const feature = createUploadFeature({
+    compressor: () => null, t: key => key, formatBytes: String,
+    toast: () => ({ dismissToast() {} }),
+    request: async () => { throw reason; }, applyUpdate() {}
+  });
+  let seen = null;
+  assert.equal(await feature.url({ linkName: 'wall' }, 'https://example.test/a.png', 'replace',
+    { onError: error => { seen = error; } }), false);
+  // The caller renders the server's own wording instead of a generic failure:
+  // "the address did not answer" and "the answer is not media" are different
+  // problems with different fixes.
+  assert.equal(seen, reason);
+  // Without the hook the feature keeps its old contract.
+  assert.equal(await feature.url({ linkName: 'wall' }, 'https://example.test/a.png', 'replace'), false);
+});
