@@ -222,17 +222,33 @@ test('unplayable video reports an error without leaving a player or breaking the
 
 
 test('library canvas has a non-repeating wash and respects forced colours', async ({ page }) => {
+  // Поле рисует слой на всё окно (.canvas-wash), а не .content: содержимое
+  // начинается ниже шапки и правее рельсы, и поле, нарисованное внутри него,
+  // обрывалось ровной линией по обеим границам. Шапка непрозрачна (карточки
+  // уезжают под неё) и повторяет то же поле сама, из одного значения
+  // --studio-canvas-field с фоном, привязанным к окну.
   await signIn(page);
   for (const theme of ['light', 'dark']) {
     await page.evaluate(theme => { document.documentElement.dataset.theme = theme; }, theme);
-    const background = await page.locator('.content').evaluate(el => {
+    const background = await page.locator('.canvas-wash').evaluate(el => {
       const style = getComputedStyle(el);
-      return { image: style.backgroundImage, repeat: style.backgroundRepeat };
+      return { position: style.position, image: style.backgroundImage, repeat: style.backgroundRepeat };
     });
+    expect(background.position).toBe('fixed');
     expect(background.image).toContain('radial-gradient(');
     expect(background.image).not.toContain('url(');
-    expect(background.repeat).toBe('no-repeat');
+    // Поле — список слоёв (угловой свет плюс три пятна), поэтому и повтор
+    // приходит списком: повторяться не должен ни один.
+    const repeats = background.repeat.split(',').map(value => value.trim());
+    expect(repeats.length).toBeGreaterThan(1);
+    expect(repeats.every(value => value === 'no-repeat')).toBe(true);
+    // То же поле у шапки — иначе по её краю читался бы шов.
+    const header = await page.locator('.appbar').evaluate(el => getComputedStyle(el).backgroundImage);
+    expect(header).toBe(background.image);
   }
-  await page.emulateMedia({ forcedColors: 'active' });
+  // У самого содержимого своей заливки нет: она бы снова оборвала поле.
   await expect(page.locator('.content')).toHaveCSS('background-image', 'none');
+  await page.emulateMedia({ forcedColors: 'active' });
+  await expect(page.locator('.canvas-wash')).toHaveCSS('display', 'none');
+  await expect(page.locator('.appbar')).toHaveCSS('background-image', 'none');
 });
