@@ -6,7 +6,7 @@
     "format": "prettier --write ../static/css/style.css ../static/css/studio.css"
   },
   "devDependencies": {
-    "postcss": "8.5.29",
+    "postcss": "8.5.30",
     "postcss-value-parser": "4.2.0",
     "prettier": "3.9.10"
   }
